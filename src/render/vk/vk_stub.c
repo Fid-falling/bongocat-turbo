@@ -1,0 +1,119 @@
+#include "vk_internal.h"
+#include "bongo_cat/log.h"
+
+#include <SDL3/SDL.h>
+
+/*
+ * 未启用 Vulkan 时的桩实现。
+ *
+ * 调用方 (窗口创建、叠加层、模型加载、命中测试) 因此不需要到处写 #ifdef
+ * BONGO_CAT_HAS_VULKAN: 这条后端在不可用时只是老老实实地返回失败/空指针。
+ */
+
+#ifndef BONGO_CAT_HAS_VULKAN
+
+bool bongo_cat_vk_compiled(void) { return false; }
+
+BongoCatVk *bongo_cat_vk_current(void) { return NULL; }
+
+bool bongo_cat_vk_probe(BongoCatError *error) {
+    bongo_cat_error_set(error, BONGO_CAT_ERROR_PLATFORM,
+        "此构建未启用 Vulkan (需要 -DBONGO_CAT_ENABLE_VULKAN=ON)");
+    return false;
+}
+
+BongoCatVk *bongo_cat_vk_create(SDL_Window *window, BongoCatError *error) {
+    (void)window;
+    bongo_cat_error_set(error, BONGO_CAT_ERROR_PLATFORM,
+        "此构建未启用 Vulkan (需要 -DBONGO_CAT_ENABLE_VULKAN=ON)");
+    return NULL;
+}
+
+void bongo_cat_vk_destroy(BongoCatVk *vk) { (void)vk; }
+
+bool bongo_cat_vk_info(const BongoCatVk *vk, BongoCatVkInfo *info) {
+    (void)vk; (void)info;
+    return false;
+}
+
+bool bongo_cat_vk_resize(BongoCatVk *vk, int width, int height) {
+    (void)vk; (void)width; (void)height;
+    return false;
+}
+
+bool bongo_cat_vk_begin_frame(BongoCatVk *vk, int width, int height) {
+    (void)vk; (void)width; (void)height;
+    return false;
+}
+
+bool bongo_cat_vk_end_frame(BongoCatVk *vk) { (void)vk; return false; }
+bool bongo_cat_vk_frame_active(const BongoCatVk *vk) { (void)vk; return false; }
+
+void bongo_cat_vk_set_clear_color(BongoCatVk *vk, float red, float green,
+    float blue, float alpha) {
+    (void)vk; (void)red; (void)green; (void)blue; (void)alpha;
+}
+
+BongoCatVkTexture *bongo_cat_vk_texture_from_pixels(BongoCatVk *vk,
+    const unsigned char *rgba, int width, int height, const char *label,
+    BongoCatError *error) {
+    (void)vk; (void)rgba; (void)width; (void)height; (void)label;
+    bongo_cat_error_set(error, BONGO_CAT_ERROR_PLATFORM,
+        "此构建未启用 Vulkan (需要 -DBONGO_CAT_ENABLE_VULKAN=ON)");
+    return NULL;
+}
+
+BongoCatVkTexture *bongo_cat_vk_texture_load(BongoCatVk *vk, const char *path,
+    int *width, int *height, BongoCatError *error) {
+    (void)vk; (void)path; (void)width; (void)height;
+    bongo_cat_error_set(error, BONGO_CAT_ERROR_PLATFORM,
+        "此构建未启用 Vulkan (需要 -DBONGO_CAT_ENABLE_VULKAN=ON)");
+    return NULL;
+}
+
+void bongo_cat_vk_texture_destroy(BongoCatVk *vk, BongoCatVkTexture *texture) {
+    (void)vk; (void)texture;
+}
+
+int bongo_cat_vk_texture_width(const BongoCatVkTexture *texture) {
+    (void)texture;
+    return 0;
+}
+
+int bongo_cat_vk_texture_height(const BongoCatVkTexture *texture) {
+    (void)texture;
+    return 0;
+}
+
+bool bongo_cat_vk_draw_overlay_quad(BongoCatVk *vk, BongoCatVkTexture *texture,
+    bool mirror, int reference_width, int reference_height, bool erase_left,
+    bool erase_right) {
+    (void)vk; (void)texture; (void)mirror; (void)reference_width;
+    (void)reference_height; (void)erase_left; (void)erase_right;
+    return false;
+}
+
+bool bongo_cat_vk_draw_triangles(BongoCatVk *vk, BongoCatVkTexture *texture,
+    const float *vertices, unsigned int vertex_count, bool textured) {
+    (void)vk; (void)texture; (void)vertices; (void)vertex_count; (void)textured;
+    return false;
+}
+
+bool bongo_cat_vk_mask_corners(BongoCatVk *vk, int width, int height,
+    float radius_percent) {
+    (void)vk; (void)width; (void)height; (void)radius_percent;
+    return false;
+}
+
+bool bongo_cat_vk_queue_hit_sample(BongoCatVk *vk, int x, int y) {
+    (void)vk; (void)x; (void)y;
+    return false;
+}
+
+bool bongo_cat_vk_hit_alpha(const BongoCatVk *vk, int x, int y,
+    unsigned char *alpha) {
+    (void)vk; (void)x; (void)y; (void)alpha;
+    return false;
+}
+
+#endif /* !BONGO_CAT_HAS_VULKAN */

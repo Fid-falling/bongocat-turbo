@@ -48,6 +48,29 @@ bool bongo_cat_vk_render_main(BongoCatApp *app, bool present) {
     bongo_cat_overlay_draw_effect(app->overlay, app->settings.model.mirror);
     bongo_cat_overlay_draw_pointer_after_keys(app->overlay);
 
+    /* 圆角遮罩必须在所有内容之后: 它把 RGB 与 alpha 一起乘上覆盖率 */
+    if (app->settings.window.rounded_corners &&
+        app->settings.window.corner_radius_percent > 0.0f)
+        bongo_cat_vk_mask_corners(app->vk, width, height,
+            SDL_clamp(app->settings.window.corner_radius_percent, 0.0f, 50.0f));
+
+    /* 命中测试: 需要采样时把指针附近的小块 alpha 拷回主机, 下一次绘制前取回 */
+    if (app->pointer_hit_dirty && app->pointer_known) {
+        float local_x = 0.0f, local_y = 0.0f;
+        int window_width = 0, window_height = 0, pixel_width = 0, pixel_height = 0;
+        if (bongo_cat_platform_pointer_local(&app->platform, app->pointer_x,
+                app->pointer_y, &local_x, &local_y) &&
+            SDL_GetWindowSize(app->window, &window_width, &window_height) &&
+            SDL_GetWindowSizeInPixels(app->window, &pixel_width, &pixel_height) &&
+            window_width > 0 && window_height > 0 &&
+            pixel_width > 0 && pixel_height > 0) {
+            /* Vulkan 图像的第 0 行在视觉上方, 与 window_hit.c 的 GL 约定相反 */
+            bongo_cat_vk_queue_hit_sample(app->vk,
+                (int)(local_x * pixel_width / window_width),
+                (int)(local_y * pixel_height / window_height));
+        }
+    }
+
     app->render_retry_ns = 0;
     bool presented = bongo_cat_vk_end_frame(app->vk);
     if (!presented) {

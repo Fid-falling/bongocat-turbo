@@ -112,6 +112,13 @@ void bongo_cat_vk_destroy_swapchain(BongoCatVk *vk) {
         vkDestroySwapchainKHR(vk->device, vk->swapchain, NULL);
         vk->swapchain = VK_NULL_HANDLE;
     }
+    /* 交换链销毁之后再释放呈现信号量: 它们此前由呈现操作使用 */
+    for (uint32_t i = 0; i < BONGO_CAT_VK_MAX_SWAP_IMAGES; ++i) {
+        if (vk->present_semaphores[i] != VK_NULL_HANDLE) {
+            vkDestroySemaphore(vk->device, vk->present_semaphores[i], NULL);
+            vk->present_semaphores[i] = VK_NULL_HANDLE;
+        }
+    }
     vk->extent_valid = false;
 }
 
@@ -177,8 +184,12 @@ bool bongo_cat_vk_create_swapchain(BongoCatVk *vk, int width, int height,
     if (image_count > BONGO_CAT_VK_MAX_SWAP_IMAGES) image_count = BONGO_CAT_VK_MAX_SWAP_IMAGES;
 
     VkImageUsageFlags usage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
-    if (capabilities.supportedUsageFlags & VK_IMAGE_USAGE_TRANSFER_SRC_BIT)
+    vk->transfer_source = false;
+    if (capabilities.supportedUsageFlags & VK_IMAGE_USAGE_TRANSFER_SRC_BIT) {
         usage |= VK_IMAGE_USAGE_TRANSFER_SRC_BIT;
+        /* 命中测试回读依赖把交换链图像当拷贝源 */
+        vk->transfer_source = true;
+    }
 
     VkSwapchainCreateInfoKHR create = {0};
     create.sType = VK_STRUCTURE_TYPE_SWAPCHAIN_CREATE_INFO_KHR;
@@ -257,6 +268,17 @@ bool bongo_cat_vk_create_swapchain(BongoCatVk *vk, int width, int height,
     vk->extent_valid = true;
     vk->info.width = (int)extent.width;
     vk->info.height = (int)extent.height;
+    VkSemaphoreCreateInfo semaphore = {0};
+    semaphore.sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO;
+    for (uint32_t i = 0; i < vk->image_count; ++i) {
+        if (vkCreateSemaphore(vk->device, &semaphore, NULL,
+                &vk->present_semaphores[i]) != VK_SUCCESS) {
+            bongo_cat_error_set(error, BONGO_CAT_ERROR_PLATFORM,
+                "呈现信号量创建失败 (index=%u)", i);
+            bongo_cat_vk_destroy_swapchain(vk);
+            return false;
+        }
+    }
     /* 管线绑定渲染通道, 交换链重建后必须跟着重建 */
     bongo_cat_vk_rebuild_pipelines(vk);
     SDL_LogInfo(BONGO_CAT_LOG_LIFECYCLE,

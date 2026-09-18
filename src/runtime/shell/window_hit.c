@@ -1,6 +1,7 @@
 #include "runtime.h"
 #include "bongo_cat/preferences.h"
 #include "bongo_cat/render.h"
+#include "bongo_cat/vk_backend.h"
 
 #include <SDL3/SDL_opengl.h>
 
@@ -25,8 +26,16 @@ bool bongo_cat_window_visible_at_pointer(BongoCatApp *app, float x, float y) {
     int pixel_y = pixel_height - 1 -
         SDL_clamp((int)(y * pixel_height / height), 0, pixel_height - 1);
     if (bongo_cat_renderer_active() == BONGO_CAT_RENDERER_VULKAN) {
-        /* 阶段 2: Vulkan 路径的逐像素命中测试 (交换链回读) 还没接上, 先按
-           "整窗不透明" 处理。宁可多点一下, 也不要把窗口变成不可点。 */
+        /* Vulkan 路径没有可读的 GL 前后缓冲: 用渲染帧回读缓存下来的 alpha。
+           Vulkan 图像第 0 行在视觉上方, 所以像素 y 不需要翻转。 */
+        uint8_t alpha = 0;
+        if (bongo_cat_vk_hit_alpha(bongo_cat_vk_current(),
+                SDL_clamp((int)(x * pixel_width / width), 0, pixel_width - 1),
+                SDL_clamp((int)(y * pixel_height / height), 0, pixel_height - 1),
+                &alpha))
+            return alpha > 8;
+        /* 还没有回读结果 (刚启动或指针在缓存块之外): 先按不透明处理, 宁可多点
+           一下, 也不要把窗口变成不可点。 */
         return true;
     }
     uint8_t presented_alpha = 0;

@@ -66,6 +66,8 @@ void bongo_cat_vk_destroy_texture_resources(BongoCatVk *vk) {
         bongo_cat_vk_texture_destroy(vk, vk->fallback_texture);
         vk->fallback_texture = NULL;
     }
+    /* 设备已经空闲, 延迟队列里的贴图可以立刻释放 (包括刚退休的兜底贴图) */
+    bongo_cat_vk_destroy_retired(vk);
     if (vk->sampler != VK_NULL_HANDLE) {
         vkDestroySampler(vk->device, vk->sampler, NULL);
         vk->sampler = VK_NULL_HANDLE;
@@ -323,7 +325,7 @@ BongoCatVkTexture *bongo_cat_vk_texture_load(BongoCatVk *vk, const char *path,
     return texture;
 }
 
-void bongo_cat_vk_texture_destroy(BongoCatVk *vk, BongoCatVkTexture *texture) {
+static void free_texture(BongoCatVk *vk, BongoCatVkTexture *texture) {
     if (!texture) return;
     if (vk && vk->device != VK_NULL_HANDLE) {
         if (texture->descriptor != VK_NULL_HANDLE)
@@ -337,6 +339,43 @@ void bongo_cat_vk_texture_destroy(BongoCatVk *vk, BongoCatVkTexture *texture) {
             vkFreeMemory(vk->device, texture->memory, NULL);
     }
     free(texture);
+}
+
+void bongo_cat_vk_collect_retired(BongoCatVk *vk) {
+    if (!vk || vk->retired_count == 0) return;
+    uint32_t keep = 0;
+    for (uint32_t i = 0; i < vk->retired_count; ++i) {
+        BongoCatVkRetired entry = vk->retired[i];
+        if (entry.frame + BONGO_CAT_VK_FRAMES_IN_FLIGHT <= vk->frame_counter)
+            free_texture(vk, entry.texture);
+        else
+            vk->retired[keep++] = entry;
+    }
+    vk->retired_count = keep;
+}
+
+void bongo_cat_vk_destroy_retired(BongoCatVk *vk) {
+    if (!vk) return;
+    for (uint32_t i = 0; i < vk->retired_count; ++i)
+        free_texture(vk, vk->retired[i].texture);
+    vk->retired_count = 0;
+}
+
+void bongo_cat_vk_texture_destroy(BongoCatVk *vk, BongoCatVkTexture *texture) {
+    if (!texture) return;
+    if (!vk || vk->device == VK_NULL_HANDLE) {
+        free(texture);
+        return;
+    }
+    /* 已经提交的命令缓冲可能还在采样这张贴图: 记下来, 等帧栅栏过去再释放 */
+    if (vk->retired_count < BONGO_CAT_VK_RETIRE_CAP) {
+        vk->retired[vk->retired_count].texture = texture;
+        vk->retired[vk->retired_count].frame = vk->frame_counter;
+        vk->retired_count++;
+        return;
+    }
+    vkDeviceWaitIdle(vk->device);
+    free_texture(vk, texture);
 }
 
 int bongo_cat_vk_texture_width(const BongoCatVkTexture *texture) {

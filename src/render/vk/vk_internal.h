@@ -14,7 +14,6 @@
 typedef struct BongoCatVkFrame {
     VkCommandBuffer command;
     VkSemaphore image_available;
-    VkSemaphore render_finished;
     VkFence fence;
 } BongoCatVkFrame;
 
@@ -27,6 +26,32 @@ typedef struct BongoCatVkArena {
     size_t offset;
 } BongoCatVkArena;
 
+/* 命中测试回读: 指针附近的一小块 alpha 从交换链图像拷回主机 */
+#define BONGO_CAT_VK_HIT_TILE 64
+
+/*
+ * 已经交给 GPU 的贴图不能立刻销毁: 可能还有命令缓冲在引用它。销毁请求先记在
+ * 这里, 等对应的帧栅栏过去之后再真正释放。
+ */
+#define BONGO_CAT_VK_RETIRE_CAP 32
+
+typedef struct BongoCatVkRetired {
+    BongoCatVkTexture *texture;
+    uint64_t frame;
+} BongoCatVkRetired;
+
+typedef struct BongoCatVkReadback {
+    VkBuffer buffer;
+    VkDeviceMemory memory;
+    unsigned char *mapped;
+    bool requested;      /* 这一帧要录制拷贝 */
+    bool pending;        /* 已经录制, 等下一次复用该帧槽时读取 */
+    int origin_x;
+    int origin_y;
+    int width;
+    int height;
+} BongoCatVkReadback;
+
 struct BongoCatVkTexture {
     VkImage image;
     VkDeviceMemory memory;
@@ -36,6 +61,25 @@ struct BongoCatVkTexture {
     int height;
     char label[64];
 };
+
+/* 推送常量布局, 必须与 src/render/vk/shaders/*.vert|frag 的 std430 声明一致 */
+typedef struct OverlayPush {
+    float reference[2];
+    float image_size[2];
+    int mirror;
+    int erase_left;
+    int erase_right;
+} OverlayPush;
+
+typedef struct PointerPush {
+    int textured;
+} PointerPush;
+
+typedef struct CornerPush {
+    int width;
+    int height;
+    int radius_milli;
+} CornerPush;
 
 struct BongoCatVk {
     SDL_Window *window;
@@ -59,6 +103,11 @@ struct BongoCatVk {
     VkImage images[BONGO_CAT_VK_MAX_SWAP_IMAGES];
     VkImageView views[BONGO_CAT_VK_MAX_SWAP_IMAGES];
     VkFramebuffer framebuffers[BONGO_CAT_VK_MAX_SWAP_IMAGES];
+    /*
+     * 呈现完成信号量按交换链图像索引分配, 而不是按帧槽: 一张图像只会在它上一次
+     * 呈现完成之后才会被重新获取, 所以这样复用信号量是安全的 (VUID 00067)。
+     */
+    VkSemaphore present_semaphores[BONGO_CAT_VK_MAX_SWAP_IMAGES];
     VkRenderPass render_pass;
 
     BongoCatVkFrame frames[BONGO_CAT_VK_FRAMES_IN_FLIGHT];
@@ -74,9 +123,23 @@ struct BongoCatVk {
     BongoCatVkTexture *fallback_texture;
     VkPipelineLayout overlay_layout;
     VkPipelineLayout pointer_layout;
+    VkPipelineLayout corner_layout;
     VkPipeline overlay_pipeline;
     VkPipeline pointer_pipeline;
+    VkPipeline corner_pipeline;
     BongoCatVkArena arenas[BONGO_CAT_VK_FRAMES_IN_FLIGHT];
+    BongoCatVkReadback readback[BONGO_CAT_VK_FRAMES_IN_FLIGHT];
+    /* 最近一次成功回读的 alpha 块 */
+    unsigned char hit_alpha[BONGO_CAT_VK_HIT_TILE * BONGO_CAT_VK_HIT_TILE];
+    int hit_x;
+    int hit_y;
+    int hit_width;
+    int hit_height;
+    bool hit_valid;
+    bool transfer_source;   /* 交换链图像能否作为拷贝源 */
+    BongoCatVkRetired retired[BONGO_CAT_VK_RETIRE_CAP];
+    uint32_t retired_count;
+    uint64_t frame_counter;
 
     BongoCatVkInfo info;
 };
@@ -99,12 +162,16 @@ void bongo_cat_vk_destroy_frame_sync(BongoCatVk *vk);
 /* vk_texture.c */
 bool bongo_cat_vk_create_texture_resources(BongoCatVk *vk, BongoCatError *error);
 void bongo_cat_vk_destroy_texture_resources(BongoCatVk *vk);
+/* 释放那些引用它们的帧栅栏已经过去的贴图 */
+void bongo_cat_vk_collect_retired(BongoCatVk *vk);
+void bongo_cat_vk_destroy_retired(BongoCatVk *vk);
 
 /* vk_draw.c */
 bool bongo_cat_vk_create_draw_resources(BongoCatVk *vk, BongoCatError *error);
 void bongo_cat_vk_destroy_draw_resources(BongoCatVk *vk);
 /* 交换链重建后, 管线需要跟着新的渲染通道/格式重建 */
 void bongo_cat_vk_rebuild_pipelines(BongoCatVk *vk);
+void bongo_cat_vk_destroy_pipelines(BongoCatVk *vk);
 
 #endif /* BONGO_CAT_HAS_VULKAN */
 

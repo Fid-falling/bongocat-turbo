@@ -15,6 +15,13 @@ static bool test_transparency_disabled(void) {
  *  - 失败时把原因写进 error, 调用方切回 OpenGL 再试一次。
  */
 static bool try_vulkan_window(BongoCatApp *app, BongoCatError *error) {
+    /* 与 BONGO_CAT_TEST_GL_FALLBACK 对应: 让 Vulkan 初始化必定失败, 用于验证
+       "失败也要能起来" 的回退路径。 */
+    if (SDL_getenv("BONGO_CAT_TEST_VULKAN_FALLBACK")) {
+        bongo_cat_error_set(error, BONGO_CAT_ERROR_PLATFORM,
+            "test hook BONGO_CAT_TEST_VULKAN_FALLBACK");
+        return false;
+    }
     bool transparent = !test_transparency_disabled();
     SDL_WindowFlags flags = SDL_WINDOW_VULKAN | SDL_WINDOW_BORDERLESS |
         SDL_WINDOW_HIGH_PIXEL_DENSITY | SDL_WINDOW_HIDDEN;

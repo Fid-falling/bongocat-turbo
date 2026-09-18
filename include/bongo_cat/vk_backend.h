@@ -84,4 +84,18 @@ bool bongo_cat_vk_draw_overlay_quad(BongoCatVk *vk, BongoCatVkTexture *texture,
 bool bongo_cat_vk_draw_triangles(BongoCatVk *vk, BongoCatVkTexture *texture,
     const float *vertices, unsigned int vertex_count, bool textured);
 
+/* 圆角遮罩: 与 OpenGL 路径一样把 RGB 与 alpha 一起乘上覆盖率 */
+bool bongo_cat_vk_mask_corners(BongoCatVk *vk, int width, int height,
+    float radius_percent);
+
+/*
+ * 命中测试回读。请求发生在帧内 (end_frame 之前), 拷贝与主机映射在下一次使用
+ * 同一个帧槽时完成, 所以结果有一帧延迟 —— 与 OpenGL 路径读前/后台缓冲的时序
+ * 相当, 远快于命中测试的调度间隔 (100 ms)。
+ */
+bool bongo_cat_vk_queue_hit_sample(BongoCatVk *vk, int x, int y);
+/* 查询已缓存的回读结果; 目标点不在缓存块内时返回 false */
+bool bongo_cat_vk_hit_alpha(const BongoCatVk *vk, int x, int y,
+    unsigned char *alpha);
+
 #endif

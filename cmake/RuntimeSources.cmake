@@ -35,11 +35,13 @@ set(BONGO_CAT_RENDER_SOURCES
   src/render/mver_pointer_overlay.c
   src/render/mver_pointer_overlay_draw.c
   # Vulkan 后端。文件内部按 BONGO_CAT_HAS_VULKAN 分叉: 未启用时只编出
-  # 一组返回失败/空指针的桩, 让调用方不必到处写 #ifdef。
+  # vk_stub.c 里那组返回失败/空指针的桩, 让调用方不必到处写 #ifdef。
   src/render/vk/vk_core.c
+  src/render/vk/vk_stub.c
   src/render/vk/vk_swapchain.c
   src/render/vk/vk_frame.c
   src/render/vk/vk_texture.c
+  src/render/vk/vk_pipeline.c
   src/render/vk/vk_draw.c
   src/render/vk/vk_scene.c)
 

@@ -9,7 +9,9 @@ set(BONGO_CAT_VK_SHADERS
   overlay.vert
   overlay.frag
   pointer.vert
-  pointer.frag)
+  pointer.frag
+  corner.vert
+  corner.frag)
 
 function(bongo_cat_embed_vulkan_shaders header)
   if(NOT Vulkan_GLSLC_EXECUTABLE)

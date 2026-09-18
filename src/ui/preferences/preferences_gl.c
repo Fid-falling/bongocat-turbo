@@ -13,22 +13,26 @@ static bool fail(BongoCatPreferences *value, const char *message) {
         "main_window=%p settings_window=%p main_context=%p",
         detail, (void *)value->app->window, (void *)value->window,
         (void *)value->app->gl_context);
-    SDL_GL_MakeCurrent(value->app->window, value->app->gl_context);
+    /* 主窗口可能是 Vulkan 后端 (没有 GL 上下文), 这时不要把上下文设成 NULL。 */
+    if (value->app->gl_context)
+        SDL_GL_MakeCurrent(value->app->window, value->app->gl_context);
     SDL_SetError("%s", detail);
     return false;
 }
 
 bool bongo_cat_preferences_gl_create(BongoCatPreferences *value) {
-    if (!value || !value->app || !value->window || !value->app->window ||
-        !value->app->gl_context)
+    if (!value || !value->app || !value->window || !value->app->window)
         return false;
-    if (!SDL_GL_MakeCurrent(value->app->window, value->app->gl_context))
+    /* 主窗口是 OpenGL 时共享它的上下文 (贴图互通、省显存); 主窗口是 Vulkan 时
+       没有可共享的对象, 设置窗口自己建一个独立的上下文。 */
+    const bool share = value->app->gl_context != NULL;
+    if (share && !SDL_GL_MakeCurrent(value->app->window, value->app->gl_context))
         return fail(value, SDL_GetError());
     /* The transparent settings window relies on per-pixel alpha to clip the
        rounded corners (bongo_cat_ui_paint_rounded_surface). Request an alpha
        channel explicitly so the corner mask reaches the framebuffer. */
     SDL_GL_SetAttribute(SDL_GL_ALPHA_SIZE, 8);
-    if (!SDL_GL_SetAttribute(SDL_GL_SHARE_WITH_CURRENT_CONTEXT, 1))
+    if (share && !SDL_GL_SetAttribute(SDL_GL_SHARE_WITH_CURRENT_CONTEXT, 1))
         return fail(value, SDL_GetError());
     SDL_GLContext context = SDL_GL_CreateContext(value->window);
     char creation_error[256] = {0};
@@ -72,8 +76,11 @@ void bongo_cat_preferences_gl_destroy(BongoCatPreferences *value) {
         "current_context=%p", (void *)value->window,
         (void *)value->gl_context, (void *)SDL_GL_GetCurrentWindow(),
         (void *)SDL_GL_GetCurrentContext());
-    if (SDL_GL_GetCurrentContext() == value->gl_context)
-        SDL_GL_MakeCurrent(value->app->window, value->app->gl_context);
+    if (SDL_GL_GetCurrentContext() == value->gl_context) {
+        /* 主窗口是 Vulkan 时没有 GL 上下文可切回, 直接解绑。 */
+        SDL_GL_MakeCurrent(value->app->gl_context ? value->app->window : NULL,
+            value->app->gl_context);
+    }
     if (value->owns_gl_context) SDL_GL_DestroyContext(value->gl_context);
     value->gl_context = NULL;
     value->owns_gl_context = false;

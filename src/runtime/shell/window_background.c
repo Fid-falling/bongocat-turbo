@@ -1,5 +1,7 @@
 #include "runtime.h"
 #include "bongo_cat/gl_api.h"
+#include "bongo_cat/render.h"
+#include "bongo_cat/vk_backend.h"
 
 #include <SDL3/SDL_opengl.h>
 
@@ -61,8 +63,13 @@ static bool prepare_corner_mask(void) {
 void bongo_cat_window_mask_corners(BongoCatApp *app, int width, int height) {
     if (!app->settings.window.rounded_corners ||
         app->settings.window.corner_radius_percent <= 0.0f ||
-        width <= 0 || height <= 0 ||
-        !prepare_corner_mask()) return;
+        width <= 0 || height <= 0) return;
+    float percent = SDL_clamp(app->settings.window.corner_radius_percent, 0.0f, 50.0f);
+    if (bongo_cat_renderer_active() == BONGO_CAT_RENDERER_VULKAN) {
+        bongo_cat_vk_mask_corners(bongo_cat_vk_current(), width, height, percent);
+        return;
+    }
+    if (!prepare_corner_mask()) return;
     GLint program, vao, equation_rgb, equation_alpha, src_rgb, dst_rgb,
         src_alpha, dst_alpha;
     GLboolean color_mask[4];
@@ -92,7 +99,6 @@ void bongo_cat_window_mask_corners(BongoCatApp *app, int width, int height) {
     corner_gl.bind_vertex_array(corner_vao);
     corner_gl.uniform_1i(corner_width, width);
     corner_gl.uniform_1i(corner_height, height);
-    float percent = SDL_clamp(app->settings.window.corner_radius_percent, 0.0f, 50.0f);
     corner_gl.uniform_1i(corner_radius,
         (GLint)(SDL_min(width, height) * percent * 10.0f + 0.5f));
     glDrawArrays(GL_TRIANGLES, 0, 3);
