@@ -31,6 +31,7 @@
           "renderer": "Renderizador"
         },
         "hints": {
+        "rendererRestart": "A troca de renderizador passa a valer depois de reiniciar o BongoCat.",
           "hoverUnavailable": "Ocultar ao passar o mouse não está disponível no ambiente de desktop atual.",
           "gameInput": "O mascote não responde ao jogar?",
           "gameInputHelp": "Tente executar o BongoCat como administrador e colocar o jogo em modo janela.",

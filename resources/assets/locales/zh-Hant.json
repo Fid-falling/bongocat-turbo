@@ -31,6 +31,7 @@
           "renderer": "渲染後端"
         },
         "hints": {
+        "rendererRestart": "渲染後端切換後，需要重新啟動 BongoCat 才會生效。",
           "hoverUnavailable": "目前桌面環境暫不支援滑鼠移入隱藏。",
           "gameInput": "遊戲中桌寵沒反應？",
           "gameInputHelp": "試試以系統管理員身分啟動 BongoCat，並將遊戲設為視窗模式。",

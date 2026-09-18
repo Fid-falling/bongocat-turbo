@@ -31,6 +31,7 @@
           "renderer": "Renderer"
         },
         "hints": {
+        "rendererRestart": "Renderer changes take effect after restarting BongoCat.",
           "hoverUnavailable": "Hover hiding is unavailable in the current desktop environment.",
           "gameInput": "Pet not responding in games?",
           "gameInputHelp": "Try running BongoCat as administrator and setting the game to windowed mode.",

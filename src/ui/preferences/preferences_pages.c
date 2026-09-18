@@ -6,6 +6,7 @@
 #include "ui_tooltip.h"
 #include "bongo_cat/audio.h"
 #include "bongo_cat/i18n.h"
+#include "bongo_cat/log.h"
 #include "bongo_cat/preferences.h"
 #include "bongo_cat/render.h"
 #include "bongo_cat/tray.h"
@@ -168,10 +169,21 @@ static void page_display(BongoCatApp *app, struct nk_context *context) {
     model->max_fps = bongo_cat_pref_fps(context, "max-fps", tr(app,
         "pages.preference.cat.labels.maxFPS", "Max Frame Rate"), model->max_fps);
     bongo_cat_pref_row_icon(context, BONGO_CAT_PREF_ICON_RENDERER);
+    BongoCatRenderer previous_renderer = model->renderer;
     model->renderer = (BongoCatRenderer)bongo_cat_pref_renderer(context,
         "renderer", tr(app, "pages.preference.cat.labels.renderer", "Renderer"),
         (int)model->renderer,
         bongo_cat_renderer_available(BONGO_CAT_RENDERER_VULKAN));
+    if (model->renderer != previous_renderer) {
+        /* 后端在宠物窗口创建时一次性选定, 运行中换不了, 所以明确告诉用户要重启,
+           免得选了 Vulkan 却看着还是 OpenGL 的画面。 */
+        bongo_cat_preferences_notice_show(app, tr(app,
+            "pages.preference.cat.hints.rendererRestart",
+            "Renderer changes take effect after restarting BongoCat"), false);
+        SDL_LogInfo(BONGO_CAT_LOG_LIFECYCLE,
+            "[render] 渲染后端偏好改为 %s, 需要重启才会生效",
+            bongo_cat_renderer_name(model->renderer));
+    }
 }
 
 static void update_autostart(BongoCatApp *app, bool old_value) {
