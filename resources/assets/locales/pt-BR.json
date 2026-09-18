@@ -1,0 +1,264 @@
+{
+  "pages": {
+    "main": {
+      "hints": {
+        "redrawing": "Redimensionando...",
+        "switching": "Alternando..."
+      }
+    },
+    "preference": {
+      "title": "Preferências",
+      "cat": {
+        "title": "Preferências",
+        "labels": {
+          "modelSettings": "Modelo",
+          "mirrorMode": "Modo Espelho",
+          "mouseMirror": "Espelho do Mouse",
+          "mouseCentered": "Mouse centrado no mascote de mesa",
+          "ignoreMouse": "Ignorar Eventos do Mouse",
+          "windowSettings": "Janela",
+          "passThrough": "Janela Transparente",
+          "alwaysOnTop": "Sempre no Topo",
+          "keepInScreen": "Manter na Tela",
+          "windowSize": "Tamanho da Janela",
+          "windowCorners": "Cantos arredondados (%)",
+          "opacity": "Opacidade",
+          "randomExpression": "Expressões Aleatórias",
+          "obsBackground": "Fundo sólido",
+          "hideOnHover": "Ocultar ao Passar o Mouse",
+          "hideFadeSeconds": "Duração do fade (s)",
+          "maxFPS": "Taxa Máxima de Quadros",
+          "renderer": "Renderizador"
+        },
+        "hints": {
+          "hoverUnavailable": "Ocultar ao passar o mouse não está disponível no ambiente de desktop atual.",
+          "gameInput": "O mascote não responde ao jogar?",
+          "gameInputHelp": "Tente executar o BongoCat como administrador e colocar o jogo em modo janela.",
+          "passThrough": "Também é possível desativar pelo clique direito no ícone da bandeja",
+          "alwaysOnTop": "Quando ativado, a janela sempre ficará acima de outros aplicativos.",
+          "keepInScreen": "Quando ativado, a janela permanece automaticamente dentro dos limites da tela.",
+          "obsBackground": "A captura da janela está preta?",
+          "obsBackgroundHelp": "OBS: ative esta opção, use o método compatível com o Windows 7 e remova o fundo com um filtro de chave de cor.",
+          "windowSize": "Mova o mouse para a borda da janela ou segure Shift e arraste com o botão direito para redimensionar.",
+          "hideOnHover": "Com a passagem de cliques e Sempre no Topo ativados, o mascote se oculta imediatamente ao passar o mouse e reaparece ao afastá-lo."
+        }
+      },
+      "general": {
+        "title": "Geral",
+        "labels": {
+          "appSettings": "Aplicativo",
+          "launchOnStartup": "Iniciar na inicialização",
+          "showTrayIcon": "Mostrar ícone na bandeja",
+          "appearanceSettings": "Aparência",
+          "themeMode": "Tema",
+          "language": "Idiomas",
+          "permissionsSettings": "Configurações de Permissões",
+          "inputMonitoringPermission": "Permissão de Monitoramento de Entrada",
+          "administratorPermission": "Administrador",
+          "cacheDirectory": "Diretório de cache"
+        },
+        "options": {
+          "auto": "Sistema",
+          "lightMode": "Claro",
+          "darkMode": "Escuro",
+          "browse": "Procurar",
+          "clear": "Restaurar"
+        },
+        "hints": {
+          "showTrayIcon": "Quando ativado, o ícone do aplicativo é exibido na bandeja do sistema.",
+          "autostartFailed": "Não foi possível atualizar a inicialização automática",
+          "inputMonitoringPermission": "Reinicie após autorizar.",
+          "inputMonitoringPermissionGuide": "O Monitoramento de Entrada permite que o BongoCat veja teclas pressionadas em outros aplicativos; o mouse continua funcionando sem ele. O BongoCat cria o monitoramento ao iniciar, então uma mudança de permissão exige reiniciar.\n\nPassos:\n1. Abra Ajustes do Sistema → Privacidade e Segurança → Monitoramento de Entrada.\n2. Ative a entrada do BongoCat que já está na lista; não remova entradas existentes.\n3. Se o BongoCat não estiver na lista, clique em \"+\" e adicione a cópia que você executa (confira o local do aplicativo).\n4. Encerre o BongoCat por completo e inicie de novo para recriar o monitoramento.\n\nSe o teclado continuar sem resposta, você pode remover e adicionar de novo a entrada do BongoCat.",
+          "administratorPermission": "Executar o aplicativo como administrador ajuda a capturar algumas teclas e eventos de entrada em nível de sistema com mais confiabilidade.",
+          "administratorPermissionGuide": "Para capturar algumas teclas e eventos de entrada em nível de sistema com mais confiabilidade, é recomendado executar o aplicativo como administrador.\n\nComo fazer:\n1. Feche o aplicativo primeiro.\n2. Encontre o exe do aplicativo ou o atalho no Explorador de Arquivos.\n3. Escolha como iniciar:\n   • Apenas desta vez: Clique com o botão direito e escolha \"Executar como administrador\".\n   • Sempre (padrão): Botão direito → Propriedades → aba Compatibilidade → marque \"Executar este programa como administrador\" → OK.",
+          "cacheDirectory": "Pasta usada para os caches de recursos e modelos. Deixe vazio para usar o padrão.",
+          "defaultCache": "Padrão (automático)",
+          "cacheApplied": "Diretório de cache atualizado",
+          "cacheCancelled": "Seleção do diretório de cache cancelada",
+          "cacheReset": "Diretório de cache restaurado para o padrão"
+        },
+        "status": {
+          "authorized": "Autorizado",
+          "adminEnabled": "Ativado",
+          "authorize": "Ir para Ativar",
+          "viewGuide": "Ver instruções",
+          "openSettingsFailed": "Ajustes → Privacidade e Segurança → Monitoramento de Entrada."
+        },
+        "buttons": {
+          "openNow": "Abrir Agora",
+          "openLater": "Abrir Mais Tarde",
+          "setLater": "Configurar Depois",
+          "exitApp": "Sair do App"
+        }
+      },
+      "model": {
+        "title": "Modelo",
+        "nearbyTitle": "Modelos próximos",
+        "labels": {
+          "deleteModel": "Excluir modelo"
+        },
+        "hints": {
+          "deleteSuccess": "Modelo \"%s\" excluído",
+          "deleteModel": "Tem certeza de que deseja excluir \"%s\"?",
+          "deleteFailed": "Não foi possível excluir este modelo",
+          "importSuccess": "Importação bem-sucedida",
+          "importExists": "O modelo já existe",
+          "importBatchResult": "Importados com sucesso: %zu; falhas: %zu. Modelos com falha: %s%s. Primeira falha: %s",
+          "importMoreFailures": " e mais %zu",
+          "importUnknownSource": "origem desconhecida",
+          "importInvalidSource": "A origem selecionada não existe mais ou não pode ser usada",
+          "importInvalidFormat": "Nenhum modelo compatível foi encontrado ou o pacote do modelo está incompleto",
+          "importFileAccess": "Não foi possível ler ou salvar os arquivos do modelo. Verifique as permissões e o espaço disponível em disco",
+          "importOutOfMemory": "Não há memória suficiente para importar este modelo",
+          "importLoadFailed": "O modelo foi importado, mas não pôde ser exibido",
+          "importFailed": "Falha ao importar o modelo. Verifique os arquivos selecionados e tente novamente",
+          "clickOrDragToImport": "Clique ou arraste uma pasta",
+          "supportedImportFormats": "Compatível com Mver e Tauri",
+          "openDirectoryFailed": "Não foi possível abrir a pasta do modelo"
+        },
+        "tooltips": {
+          "createModel": "Criar modelo",
+          "convertModel": "Converter modelo",
+          "moreModels": "Mais modelos"
+        },
+        "behaviorModal": {
+          "title": "Movimentos, expressões e áudio",
+          "labels": {
+            "motion": "Movimento",
+            "expression": "Expressão",
+            "audio": "Áudio",
+            "stopAllAudio": "Parar todos os áudios",
+            "motionIndex": "Movimento {index}",
+            "motionGroupIndex": "Grupo de Movimento {index}",
+            "expressionIndex": "Expressão {index}"
+          }
+        }
+      },
+      "shortcut": {
+        "title": "Atalhos",
+        "labels": {
+          "toggleCat": "Mostrar/Ocultar Gato",
+          "togglePreferences": "Abrir Preferências",
+          "mirrorMode": "Modo Espelho",
+          "passThrough": "Janela Transparente",
+          "alwaysOnTop": "Sempre no Topo"
+        },
+        "hints": {
+          "toggleCat": "Alternar a visibilidade da janela do gato.",
+          "togglePreferences": "Alternar a visibilidade da janela de preferências.",
+          "mirrorMode": "Alternar o modo espelho do gato.",
+          "passThrough": "Alternar se a janela do gato é clicável.",
+          "alwaysOnTop": "Alternar se a janela do gato permanece no topo."
+        }
+      },
+      "about": {
+        "title": "Sobre",
+        "labels": {
+          "aboutApp": "Sobre o Aplicativo",
+          "appLog": "Logs do Aplicativo"
+        },
+        "hints": {
+          "copySuccess": "Copiado com sucesso"
+        },
+        "buttons": {
+          "copy": "Copiar",
+          "viewLog": "Ver Logs"
+        }
+      }
+    }
+  },
+  "components": {
+    "shortcut": {
+      "hints": {
+        "pressRecordShortcut": "Pressione as teclas para gravar atalho",
+        "clickRecordShortcut": "Clique para gravar atalho",
+        "alreadyUsed": "Este atalho já está em uso. Escolha outro."
+      }
+    }
+  },
+  "composables": {
+    "useAppMenu": {
+      "labels": {
+        "preference": "Preferências...",
+        "hideCat": "Ocultar Gato",
+        "showCat": "Mostrar Gato",
+        "passThrough": "Janela Transparente",
+        "alwaysOnTop": "Sempre no Topo",
+        "windowSize": "Tamanho da Janela",
+        "opacity": "Opacidade",
+        "motion": "Movimentos",
+        "expression": "Expressões",
+        "wheelSizeHint": "Roda: tamanho",
+        "wheelOpacityHint": "Ctrl+roda: opacidade",
+        "quitApp": "Sair",
+        "model": "Modelo",
+        "addModel": "Adicionar modelo"
+      }
+    }
+  },
+  "utils": {
+    "live2d": {
+      "hints": {
+        "notFound": "Arquivo de configuração principal do modelo não encontrado. Verifique se os arquivos do modelo estão completos."
+      }
+    }
+  },
+  "native": {
+    "multiplePets": "Exibir vários",
+    "multiplePetsLimit": "Até 8 mascotes podem ser exibidos ao mesmo tempo",
+    "removeDesktopPet": "Fechar este mascote da área de trabalho",
+    "modelLoadFailed": "Não foi possível exibir este modelo",
+    "noBehaviors": "Nenhum item",
+    "preferencesWindowTitle": "BongoCat - Settings",
+    "startup": {
+      "failed": "Não foi possível iniciar o BongoCat.",
+      "detail": "Consulte o log de diagnóstico para obter detalhes técnicos.",
+      "diagnosticLog": "Log de diagnóstico:"
+    },
+    "support": {
+      "title": "Sobre",
+      "website": "Site: bongocat.pet",
+      "heroText": "Obrigado pelo apoio. Cada uso e compartilhamento ajuda o BongoCat a continuar crescendo.",
+      "version": "Versão do aplicativo",
+      "checkUpdate": "Verificar atualizações",
+      "feedback": "Feedback",
+      "openLogs": "Abrir logs",
+      "openLogsFailed": "Não foi possível abrir a pasta de logs",
+      "latest": "Já está atualizado",
+      "checkingUpdate": "Verificando...",
+      "updateAvailable": "Nova versão disponível:",
+      "updateFailed": "Não foi possível verificar atualizações",
+      "updateHttpFailed": "O GitHub retornou o status HTTP %s",
+      "downloadUpdate": "Atualizar para v%s",
+      "openStore": "Abrir Microsoft Store",
+      "viewReleases": "Ver versões",
+      "openUpdateFailed": "Não foi possível abrir a página de atualização",
+      "works": "Mais aplicativos",
+      "worksText": "Outras criações de vladelaina que valem a pena conhecer",
+      "refactorDeveloper": "Desenvolvedor que reescreveu o BongoCat em C e também é seu mantenedor atual",
+      "community": "Comunidade",
+      "qqGroup": "Grupo QQ",
+      "coffee": "Pagar um café para o desenvolvedor?",
+      "starOnGitHub": "Estrela GitHub!",
+      "by": "por "
+    },
+    "shortcut": {
+      "toggleCat": "Mostrar/Ocultar",
+      "preferences": "Preferências",
+      "mirror": "Espelho",
+      "passThrough": "Clique através",
+      "alwaysOnTop": "No topo"
+    },
+    "hoverDelay": "Atraso ao ocultar ao passar o mouse (segundos)",
+    "modeStandard": "Padrão",
+    "modeKeyboard": "Teclado",
+    "modeGamepad": "Controle",
+    "cancel": "Cancelar",
+    "delete": "Excluir",
+    "select": "Selecionar",
+    "selected": "Selecionado",
+    "import": "Importar",
+    "importing": "Importando...",
+    "builtIn": "integrado"
+  }
+}

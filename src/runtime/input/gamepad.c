@@ -1,0 +1,158 @@
+#include "runtime.h"
+
+#include <stdio.h>
+#include <string.h>
+
+const char *bongo_cat_gamepad_axis_name(Uint8 axis) {
+    switch (axis) {
+    case SDL_GAMEPAD_AXIS_LEFTX: return "LeftStickX";
+    case SDL_GAMEPAD_AXIS_LEFTY: return "LeftStickY";
+    case SDL_GAMEPAD_AXIS_RIGHTX: return "RightStickX";
+    case SDL_GAMEPAD_AXIS_RIGHTY: return "RightStickY";
+    case SDL_GAMEPAD_AXIS_LEFT_TRIGGER: return "LeftTrigger2";
+    case SDL_GAMEPAD_AXIS_RIGHT_TRIGGER: return "RightTrigger2";
+    default: return "UnknownAxis";
+    }
+}
+
+const char *bongo_cat_gamepad_button_name(Uint8 button) {
+    switch (button) {
+    case SDL_GAMEPAD_BUTTON_SOUTH: return "South";
+    case SDL_GAMEPAD_BUTTON_EAST: return "East";
+    case SDL_GAMEPAD_BUTTON_WEST: return "West";
+    case SDL_GAMEPAD_BUTTON_NORTH: return "North";
+    case SDL_GAMEPAD_BUTTON_BACK: return "Select";
+    case SDL_GAMEPAD_BUTTON_GUIDE: return "Mode";
+    case SDL_GAMEPAD_BUTTON_START: return "Start";
+    case SDL_GAMEPAD_BUTTON_LEFT_STICK: return "LeftThumb";
+    case SDL_GAMEPAD_BUTTON_RIGHT_STICK: return "RightThumb";
+    case SDL_GAMEPAD_BUTTON_LEFT_SHOULDER: return "LeftTrigger";
+    case SDL_GAMEPAD_BUTTON_RIGHT_SHOULDER: return "RightTrigger";
+    case SDL_GAMEPAD_BUTTON_DPAD_UP: return "DPadUp";
+    case SDL_GAMEPAD_BUTTON_DPAD_DOWN: return "DPadDown";
+    case SDL_GAMEPAD_BUTTON_DPAD_LEFT: return "DPadLeft";
+    case SDL_GAMEPAD_BUTTON_DPAD_RIGHT: return "DPadRight";
+    case SDL_GAMEPAD_BUTTON_MISC1: return "Misc1";
+    case SDL_GAMEPAD_BUTTON_RIGHT_PADDLE1: return "RightPaddle1";
+    case SDL_GAMEPAD_BUTTON_LEFT_PADDLE1: return "LeftPaddle1";
+    case SDL_GAMEPAD_BUTTON_RIGHT_PADDLE2: return "RightPaddle2";
+    case SDL_GAMEPAD_BUTTON_LEFT_PADDLE2: return "LeftPaddle2";
+    case SDL_GAMEPAD_BUTTON_TOUCHPAD: return "Touchpad";
+    case SDL_GAMEPAD_BUTTON_MISC2: return "Misc2";
+    case SDL_GAMEPAD_BUTTON_MISC3: return "Misc3";
+    case SDL_GAMEPAD_BUTTON_MISC4: return "Misc4";
+    case SDL_GAMEPAD_BUTTON_MISC5: return "Misc5";
+    case SDL_GAMEPAD_BUTTON_MISC6: return "Misc6";
+    default: return "UnknownButton";
+    }
+}
+
+static void close_inactive_gamepads(BongoCatApp *app, const SDL_JoystickID *ids,
+    int count) {
+    for (int i = 0; ids && i < count; ++i) {
+        SDL_Gamepad *gamepad = SDL_GetGamepadFromID(ids[i]);
+        if (gamepad && ids[i] != app->active_gamepad) SDL_CloseGamepad(gamepad);
+    }
+}
+
+static bool select_first_gamepad(BongoCatApp *app) {
+    int count = 0;
+    SDL_JoystickID *ids = SDL_GetGamepads(&count);
+    SDL_JoystickID selected = 0;
+    for (int i = 0; ids && i < count && !selected; ++i) {
+        SDL_Gamepad *gamepad = SDL_GetGamepadFromID(ids[i]);
+        if (!gamepad) gamepad = SDL_OpenGamepad(ids[i]);
+        if (gamepad) selected = ids[i];
+    }
+    app->active_gamepad = selected;
+    close_inactive_gamepads(app, ids, count);
+    SDL_free(ids);
+    return selected != 0;
+}
+
+void bongo_cat_gamepads_set_enabled(BongoCatApp *app, bool enabled) {
+    if (!app) return;
+    bool initialized = (SDL_WasInit(SDL_INIT_GAMEPAD) & SDL_INIT_GAMEPAD) != 0;
+    if (enabled && !initialized) {
+        SDL_SetHint(SDL_HINT_JOYSTICK_ALLOW_BACKGROUND_EVENTS, "1");
+        if (!SDL_InitSubSystem(SDL_INIT_GAMEPAD)) {
+            SDL_LogWarn(SDL_LOG_CATEGORY_INPUT,
+                "Gamepad initialization failed: %s", SDL_GetError());
+            app->active_gamepad = 0;
+            bongo_cat_app_reset_gamepad(app);
+            return;
+        }
+        initialized = true;
+    }
+    int count = 0;
+    SDL_JoystickID *ids = initialized ? SDL_GetGamepads(&count) : NULL;
+    bool active_connected = false;
+    for (int i = 0; ids && i < count; ++i) {
+        if (ids[i] == app->active_gamepad && SDL_GetGamepadFromID(ids[i]))
+            active_connected = true;
+        if (!enabled) {
+            SDL_Gamepad *gamepad = SDL_GetGamepadFromID(ids[i]);
+            if (gamepad) SDL_CloseGamepad(gamepad);
+        }
+    }
+    SDL_free(ids);
+    if (!enabled) {
+        app->active_gamepad = 0;
+        bongo_cat_app_reset_gamepad(app);
+        if (initialized) SDL_QuitSubSystem(SDL_INIT_GAMEPAD);
+    } else if (active_connected) {
+        ids = SDL_GetGamepads(&count);
+        close_inactive_gamepads(app, ids, count);
+        SDL_free(ids);
+    } else {
+        app->active_gamepad = 0;
+        bongo_cat_app_reset_gamepad(app);
+        select_first_gamepad(app);
+    }
+}
+
+void bongo_cat_gamepad_event(BongoCatApp *app, const void *raw) {
+    const SDL_Event *event = raw;
+    if (event->type == SDL_EVENT_GAMEPAD_ADDED) {
+        if (app->loaded_mode == BONGO_CAT_MODE_GAMEPAD &&
+            !app->active_gamepad) {
+            SDL_Gamepad *gamepad = SDL_GetGamepadFromID(event->gdevice.which);
+            if (!gamepad) gamepad = SDL_OpenGamepad(event->gdevice.which);
+            if (gamepad) app->active_gamepad = event->gdevice.which;
+        }
+        return;
+    }
+    if (event->type == SDL_EVENT_GAMEPAD_REMOVED) {
+        SDL_Gamepad *gamepad = SDL_GetGamepadFromID(event->gdevice.which);
+        if (gamepad) SDL_CloseGamepad(gamepad);
+        if (event->gdevice.which == app->active_gamepad) {
+            app->active_gamepad = 0;
+            bongo_cat_app_reset_gamepad(app);
+            if (app->loaded_mode == BONGO_CAT_MODE_GAMEPAD)
+                select_first_gamepad(app);
+        }
+        return;
+    }
+    if (app->loaded_mode != BONGO_CAT_MODE_GAMEPAD) return;
+    BongoCatInputEvent input = {0};
+    SDL_JoystickID source;
+    if (event->type == SDL_EVENT_GAMEPAD_AXIS_MOTION) {
+        source = event->gaxis.which;
+        input.kind = BONGO_CAT_INPUT_GAMEPAD_AXIS;
+        input.value = event->gaxis.value < 0
+            ? event->gaxis.value / 32768.0f : event->gaxis.value / 32767.0f;
+        snprintf(input.name, sizeof(input.name), "%s", bongo_cat_gamepad_axis_name(event->gaxis.axis));
+    } else if (event->type == SDL_EVENT_GAMEPAD_BUTTON_DOWN ||
+        event->type == SDL_EVENT_GAMEPAD_BUTTON_UP) {
+        source = event->gbutton.which;
+        input.kind = BONGO_CAT_INPUT_GAMEPAD_BUTTON;
+        input.value = event->type == SDL_EVENT_GAMEPAD_BUTTON_DOWN ? 1.0f : 0.0f;
+        snprintf(input.name, sizeof(input.name), "%s", bongo_cat_gamepad_button_name(event->gbutton.button));
+    } else return;
+    if (!app->active_gamepad || source != app->active_gamepad) return;
+    if (strncmp(input.name, "Unknown", 7) == 0) return;
+    input.timestamp_ms = SDL_GetTicks();
+    if (input.kind == BONGO_CAT_INPUT_GAMEPAD_BUTTON)
+        bongo_cat_app_shortcuts(app, &input);
+    bongo_cat_app_apply_input(app, &input);
+}

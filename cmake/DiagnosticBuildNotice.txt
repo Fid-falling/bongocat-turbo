@@ -1,0 +1,7 @@
+BongoCat diagnostic build
+
+This package was built without the Live2D Cubism SDK. Live2D rendering,
+animation, pointer tracking, imported-model rendering, and cover generation
+are disabled. This build is only for startup and platform diagnostics.
+
+Do not distribute this package to end users or submit it to an app store.

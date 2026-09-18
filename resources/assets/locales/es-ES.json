@@ -1,0 +1,264 @@
+{
+  "pages": {
+    "main": {
+      "hints": {
+        "redrawing": "Redibujando...",
+        "switching": "Cambiando..."
+      }
+    },
+    "preference": {
+      "title": "Preferencias",
+      "cat": {
+        "title": "Preferencias",
+        "labels": {
+          "modelSettings": "Modelo",
+          "mirrorMode": "Modo espejo",
+          "mouseMirror": "Invertir ratón",
+          "mouseCentered": "Ratón centrado en la mascota",
+          "ignoreMouse": "Ignorar eventos del ratón",
+          "windowSettings": "Ventana",
+          "passThrough": "Dejar pasar clics",
+          "alwaysOnTop": "Siempre visible",
+          "keepInScreen": "Mantener en pantalla",
+          "windowSize": "Tamaño de la ventana",
+          "windowCorners": "Esquinas redondeadas (%)",
+          "opacity": "Opacidad",
+          "randomExpression": "Expresiones aleatorias",
+          "obsBackground": "Fondo sólido",
+          "hideOnHover": "Ocultar al pasar el ratón",
+          "hideFadeSeconds": "Duración del fundido (s)",
+          "maxFPS": "Frecuencia máxima de fotogramas",
+          "renderer": "Renderizador"
+        },
+        "hints": {
+          "hoverUnavailable": "Ocultar al pasar el cursor no está disponible en el entorno de escritorio actual.",
+          "gameInput": "¿La mascota no responde al jugar?",
+          "gameInputHelp": "Prueba a ejecutar BongoCat como administrador y a poner el juego en modo ventana.",
+          "passThrough": "También puedes desactivarlo con un clic derecho en el icono de la bandeja",
+          "alwaysOnTop": "Al activarlo, la ventana permanece por encima de las demás.",
+          "keepInScreen": "Al activarlo, la ventana se mantiene automáticamente dentro de los límites de la pantalla.",
+          "obsBackground": "¿La captura de ventana aparece en negro?",
+          "obsBackgroundHelp": "OBS: activa esta opción, usa el método compatible con Windows 7 y elimina el fondo con un filtro de clave de color.",
+          "windowSize": "Mueva el ratón al borde de la ventana o mantenga Mayús y arrastre con el botón derecho para cambiar el tamaño.",
+          "hideOnHover": "Con el paso de clics y Siempre visible activados, la mascota se oculta inmediatamente al pasar el ratón y reaparece al retirarlo."
+        }
+      },
+      "general": {
+        "title": "General",
+        "labels": {
+          "appSettings": "Aplicación",
+          "launchOnStartup": "Iniciar con el sistema",
+          "showTrayIcon": "Mostrar icono en la bandeja",
+          "appearanceSettings": "Apariencia",
+          "themeMode": "Tema",
+          "language": "Idioma",
+          "permissionsSettings": "Ajustes de permisos",
+          "inputMonitoringPermission": "Permiso de supervisión de entrada",
+          "administratorPermission": "Administrador",
+          "cacheDirectory": "Directorio de caché"
+        },
+        "options": {
+          "auto": "Sistema",
+          "lightMode": "Claro",
+          "darkMode": "Oscuro",
+          "browse": "Examinar",
+          "clear": "Restablecer"
+        },
+        "hints": {
+          "showTrayIcon": "Al activarlo, el icono de la aplicación aparece en la bandeja del sistema.",
+          "autostartFailed": "No se pudo actualizar la configuración de inicio automático",
+          "inputMonitoringPermission": "Reinicie tras autorizar.",
+          "inputMonitoringPermissionGuide": "La Supervisión de entrada permite que BongoCat vea las teclas pulsadas en otras aplicaciones; el ratón sigue funcionando sin ella. BongoCat crea la escucha al iniciarse, así que un cambio de permiso requiere reiniciar.\n\nPasos:\n1. Abra Ajustes del Sistema → Privacidad y seguridad → Supervisión de entrada.\n2. Active la entrada de BongoCat que ya aparece en la lista; no elimine entradas existentes.\n3. Si BongoCat no está en la lista, pulse \"+\" y añada la copia que está ejecutando (compruebe la ubicación de la aplicación).\n4. Cierre BongoCat por completo y vuelva a iniciarlo para que reconstruya la escucha.\n\nSi el teclado sigue sin responder, puede eliminar y volver a añadir la entrada de BongoCat.",
+          "administratorPermission": "Ejecutar la aplicación como administrador ayuda a capturar con mayor fiabilidad algunas teclas del sistema y eventos de entrada.",
+          "administratorPermissionGuide": "Para capturar con mayor fiabilidad algunas teclas del sistema y eventos de entrada, se recomienda ejecutar la aplicación como administrador.\n\nCómo hacerlo:\n1. Cierre primero la aplicación.\n2. Busque el archivo exe o su acceso directo en el Explorador de archivos.\n3. Elija cómo iniciarla:\n   - Una vez: haga clic con el botón derecho y elija \"Ejecutar como administrador\".\n   - Siempre: clic derecho > Propiedades > Compatibilidad > marque \"Ejecutar este programa como administrador\" > Aceptar.",
+          "cacheDirectory": "Carpeta para las cachés de recursos y modelos. Déjala vacía para usar la predeterminada.",
+          "defaultCache": "Predeterminado (automático)",
+          "cacheApplied": "Directorio de caché actualizado",
+          "cacheCancelled": "Selección de directorio de caché cancelada",
+          "cacheReset": "Directorio de caché restablecido al predeterminado"
+        },
+        "status": {
+          "authorized": "Autorizado",
+          "adminEnabled": "Activado",
+          "authorize": "Activar",
+          "viewGuide": "Ver instrucciones",
+          "openSettingsFailed": "Ajustes del Sistema → Privacidad y seguridad → Supervisión de entrada."
+        },
+        "buttons": {
+          "openNow": "Abrir ahora",
+          "openLater": "Abrir más tarde",
+          "setLater": "Configurar más tarde",
+          "exitApp": "Salir de la aplicación"
+        }
+      },
+      "model": {
+        "title": "Modelo",
+        "nearbyTitle": "Modelos cercanos",
+        "labels": {
+          "deleteModel": "Eliminar modelo"
+        },
+        "hints": {
+          "deleteSuccess": "Se eliminó \"%s\"",
+          "deleteModel": "¿Seguro que quiere eliminar \"%s\"?",
+          "deleteFailed": "No se pudo eliminar este modelo",
+          "importSuccess": "Importado correctamente",
+          "importExists": "El modelo ya existe",
+          "importBatchResult": "Importación correcta: %zu; fallida: %zu. Modelos fallidos: %s%s. Primer error: %s",
+          "importMoreFailures": " y %zu más",
+          "importUnknownSource": "fuente desconocida",
+          "importInvalidSource": "La fuente seleccionada ya no existe o no se puede utilizar",
+          "importInvalidFormat": "No se encontró ningún modelo compatible o el paquete del modelo está incompleto",
+          "importFileAccess": "No se pudieron leer o guardar los archivos del modelo. Compruebe los permisos y el espacio disponible en el disco",
+          "importOutOfMemory": "No hay memoria suficiente para importar este modelo",
+          "importLoadFailed": "El modelo se importó, pero no se pudo mostrar",
+          "importFailed": "Error al importar el modelo. Compruebe los archivos seleccionados e inténtelo de nuevo",
+          "clickOrDragToImport": "Haz clic o arrastra una carpeta",
+          "supportedImportFormats": "Compatible con Mver y Tauri",
+          "openDirectoryFailed": "No se pudo abrir la carpeta del modelo"
+        },
+        "tooltips": {
+          "createModel": "Crear modelo",
+          "convertModel": "Convertir modelo",
+          "moreModels": "Más modelos"
+        },
+        "behaviorModal": {
+          "title": "Movimientos, expresiones y audio",
+          "labels": {
+            "motion": "Movimiento",
+            "expression": "Expresión",
+            "audio": "Audio",
+            "stopAllAudio": "Detener todo el audio",
+            "motionIndex": "Movimiento {index}",
+            "motionGroupIndex": "Grupo de movimientos {index}",
+            "expressionIndex": "Expresión {index}"
+          }
+        }
+      },
+      "shortcut": {
+        "title": "Atajos",
+        "labels": {
+          "toggleCat": "Mostrar u ocultar mascota",
+          "togglePreferences": "Mostrar u ocultar preferencias",
+          "mirrorMode": "Modo espejo",
+          "passThrough": "Dejar pasar clics",
+          "alwaysOnTop": "Siempre visible"
+        },
+        "hints": {
+          "toggleCat": "Cambia la visibilidad de la ventana de la mascota.",
+          "togglePreferences": "Cambia la visibilidad de la ventana de preferencias.",
+          "mirrorMode": "Activa o desactiva el modo espejo de la mascota.",
+          "passThrough": "Cambia si los clics atraviesan la ventana de la mascota.",
+          "alwaysOnTop": "Cambia si la ventana de la mascota permanece por encima."
+        }
+      },
+      "about": {
+        "title": "Acerca de",
+        "labels": {
+          "aboutApp": "Acerca de la aplicación",
+          "appLog": "Registros de la aplicación"
+        },
+        "hints": {
+          "copySuccess": "Copiado correctamente"
+        },
+        "buttons": {
+          "copy": "Copiar",
+          "viewLog": "Ver registros"
+        }
+      }
+    }
+  },
+  "components": {
+    "shortcut": {
+      "hints": {
+        "pressRecordShortcut": "Pulse para registrar el atajo",
+        "clickRecordShortcut": "Haga clic para registrar el atajo",
+        "alreadyUsed": "Este atajo ya está en uso. Elija otro."
+      }
+    }
+  },
+  "composables": {
+    "useAppMenu": {
+      "labels": {
+        "preference": "Preferencias...",
+        "hideCat": "Ocultar mascota",
+        "showCat": "Mostrar mascota",
+        "passThrough": "Dejar pasar clics",
+        "alwaysOnTop": "Siempre visible",
+        "windowSize": "Tamaño de la ventana",
+        "opacity": "Opacidad",
+        "motion": "Movimientos",
+        "expression": "Expresiones",
+        "wheelSizeHint": "Rueda: cambiar tamaño",
+        "wheelOpacityHint": "Ctrl+rueda: opacidad",
+        "quitApp": "Salir de la aplicación",
+        "model": "Modelo",
+        "addModel": "Añadir modelo"
+      }
+    }
+  },
+  "utils": {
+    "live2d": {
+      "hints": {
+        "notFound": "No se encontró el archivo de configuración principal del modelo. Compruebe que los archivos del modelo estén completos."
+      }
+    }
+  },
+  "native": {
+    "multiplePets": "Mostrar varias a la vez",
+    "multiplePetsLimit": "Se pueden mostrar hasta 8 mascotas a la vez",
+    "removeDesktopPet": "Cerrar esta mascota de escritorio",
+    "modelLoadFailed": "No se puede mostrar este modelo",
+    "noBehaviors": "No hay elementos",
+    "preferencesWindowTitle": "BongoCat - Settings",
+    "startup": {
+      "failed": "No se pudo iniciar BongoCat.",
+      "detail": "Consulte el registro de diagnóstico para ver los detalles técnicos.",
+      "diagnosticLog": "Registro de diagnóstico:"
+    },
+    "support": {
+      "title": "Acerca de",
+      "website": "Sitio web: bongocat.pet",
+      "heroText": "Gracias por su apoyo. Cada uso y cada difusión ayudan a BongoCat a seguir creciendo.",
+      "version": "Versión de la aplicación",
+      "checkUpdate": "Buscar actualizaciones",
+      "feedback": "Comentarios",
+      "openLogs": "Abrir registros",
+      "openLogsFailed": "No se pudo abrir la carpeta de registros",
+      "latest": "Ya está actualizado",
+      "checkingUpdate": "Comprobando...",
+      "updateAvailable": "Nueva versión disponible:",
+      "updateFailed": "No se pudieron buscar actualizaciones",
+      "updateHttpFailed": "GitHub devolvió el estado HTTP %s",
+      "downloadUpdate": "Actualizar a v%s",
+      "openStore": "Abrir Microsoft Store",
+      "viewReleases": "Ver versiones",
+      "openUpdateFailed": "No se pudo abrir la página de actualización",
+      "works": "Más aplicaciones",
+      "worksText": "Más creaciones de vladelaina que vale la pena probar",
+      "refactorDeveloper": "Desarrollador que reescribió BongoCat en C y que también es su mantenedor actual",
+      "community": "Comunidad",
+      "qqGroup": "Grupo de QQ",
+      "coffee": "¿Invitar a un café al desarrollador?",
+      "starOnGitHub": "Estrella GitHub!",
+      "by": "por "
+    },
+    "shortcut": {
+      "toggleCat": "Mostrar/ocultar",
+      "preferences": "Preferencias",
+      "mirror": "Espejo",
+      "passThrough": "Dejar pasar clics",
+      "alwaysOnTop": "Siempre visible"
+    },
+    "hoverDelay": "Retardo al pasar el ratón (segundos)",
+    "modeStandard": "Estándar",
+    "modeKeyboard": "Teclado",
+    "modeGamepad": "Mando",
+    "cancel": "Cancelar",
+    "delete": "Eliminar",
+    "select": "Seleccionar",
+    "selected": "Seleccionado",
+    "import": "Importar",
+    "importing": "Importando...",
+    "builtIn": "integrado"
+  }
+}

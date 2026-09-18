@@ -1,0 +1,264 @@
+{
+  "pages": {
+    "main": {
+      "hints": {
+        "redrawing": "Redessin en cours...",
+        "switching": "Changement en cours..."
+      }
+    },
+    "preference": {
+      "title": "Préférences",
+      "cat": {
+        "title": "Préférences",
+        "labels": {
+          "modelSettings": "Modèle",
+          "mirrorMode": "Mode miroir",
+          "mouseMirror": "Miroir de la souris",
+          "mouseCentered": "Souris centrée sur le compagnon",
+          "ignoreMouse": "Ignorer les événements de souris",
+          "windowSettings": "Fenêtre",
+          "passThrough": "Clics traversants",
+          "alwaysOnTop": "Toujours au premier plan",
+          "keepInScreen": "Maintenir à l'écran",
+          "windowSize": "Taille de la fenêtre",
+          "windowCorners": "Coins arrondis (%)",
+          "opacity": "Opacité",
+          "randomExpression": "Expressions aléatoires",
+          "obsBackground": "Arrière-plan uni",
+          "hideOnHover": "Masquer au survol",
+          "hideFadeSeconds": "Durée du fondu (s)",
+          "maxFPS": "Fréquence d'images maximale",
+          "renderer": "Moteur de rendu"
+        },
+        "hints": {
+          "hoverUnavailable": "Le masquage au survol est indisponible dans cet environnement de bureau.",
+          "gameInput": "La mascotte ne réagit pas en jeu ?",
+          "gameInputHelp": "Essayez de lancer BongoCat en tant qu’administrateur et de passer le jeu en mode fenêtré.",
+          "passThrough": "Désactivation possible aussi par clic droit sur l’icône de la zone de notification",
+          "alwaysOnTop": "Lorsque cette option est activée, la fenêtre reste au-dessus des autres fenêtres.",
+          "keepInScreen": "Lorsque cette option est activée, la fenêtre reste automatiquement dans les limites de l'écran.",
+          "obsBackground": "La capture de fenêtre est noire ?",
+          "obsBackgroundHelp": "OBS : activez cette option, utilisez la méthode compatible Windows 7 et supprimez le fond avec un filtre d'incrustation couleur.",
+          "windowSize": "Placez la souris sur le bord de la fenêtre, ou maintenez Maj et faites glisser avec le bouton droit pour redimensionner.",
+          "hideOnHover": "Lorsque le passage des clics et Toujours au premier plan sont activés, le compagnon se masque immédiatement au survol et réapparaît lorsque le pointeur s’éloigne."
+        }
+      },
+      "general": {
+        "title": "Général",
+        "labels": {
+          "appSettings": "Application",
+          "launchOnStartup": "Lancer au démarrage",
+          "showTrayIcon": "Afficher l'icône dans la zone de notification",
+          "appearanceSettings": "Apparence",
+          "themeMode": "Thème",
+          "language": "Langue",
+          "permissionsSettings": "Paramètres des autorisations",
+          "inputMonitoringPermission": "Autorisation de surveillance des entrées",
+          "administratorPermission": "Administrateur",
+          "cacheDirectory": "Répertoire du cache"
+        },
+        "options": {
+          "auto": "Système",
+          "lightMode": "Clair",
+          "darkMode": "Sombre",
+          "browse": "Parcourir",
+          "clear": "Réinitialiser"
+        },
+        "hints": {
+          "showTrayIcon": "Lorsque cette option est activée, l'icône de l'application apparaît dans la zone de notification.",
+          "autostartFailed": "Impossible de modifier le lancement au démarrage",
+          "inputMonitoringPermission": "Redémarrez après l'autorisation.",
+          "inputMonitoringPermissionGuide": "La surveillance des entrées permet à BongoCat de voir les touches pressées dans d'autres applications ; la souris continue de fonctionner sans elle. BongoCat construit l'écoute à son démarrage, un changement d'autorisation demande donc un redémarrage.\n\nÉtapes :\n1. Ouvrez Réglages Système → Confidentialité et sécurité → Surveillance de l'entrée.\n2. Activez l'entrée BongoCat déjà présente dans la liste ; ne supprimez aucune entrée.\n3. Si BongoCat n'est pas listé, cliquez sur \"+\" et ajoutez la copie que vous exécutez (vérifiez son emplacement).\n4. Quittez complètement BongoCat puis relancez-le pour qu'il reconstruise l'écoute.\n\nSi le clavier reste sans réponse, vous pouvez supprimer puis rajouter vous-même l'entrée BongoCat.",
+          "administratorPermission": "Exécuter l'application en tant qu'administrateur permet de capturer plus fiablement certaines touches système et certains événements d'entrée.",
+          "administratorPermissionGuide": "Pour capturer plus fiablement certaines touches système et certains événements d'entrée, il est recommandé d'exécuter l'application en tant qu'administrateur.\n\nProcédure :\n1. Quittez d'abord l'application.\n2. Trouvez le fichier exe ou son raccourci dans l'Explorateur de fichiers.\n3. Choisissez le mode de lancement :\n   - Une fois : faites un clic droit et choisissez \"Exécuter en tant qu'administrateur\".\n   - Toujours : clic droit > Propriétés > onglet Compatibilité > cochez \"Exécuter ce programme en tant qu'administrateur\" > OK.",
+          "cacheDirectory": "Dossier utilisé pour les caches de ressources et de modèles. Laissez vide pour la valeur par défaut.",
+          "defaultCache": "Par défaut (automatique)",
+          "cacheApplied": "Répertoire du cache mis à jour",
+          "cacheCancelled": "Sélection du répertoire de cache annulée",
+          "cacheReset": "Répertoire du cache réinitialisé à la valeur par défaut"
+        },
+        "status": {
+          "authorized": "Autorisé",
+          "adminEnabled": "Activé",
+          "authorize": "Activer",
+          "viewGuide": "Voir les instructions",
+          "openSettingsFailed": "Réglages Système → Confidentialité et sécurité → Surveillance de l'entrée."
+        },
+        "buttons": {
+          "openNow": "Ouvrir maintenant",
+          "openLater": "Ouvrir plus tard",
+          "setLater": "Configurer plus tard",
+          "exitApp": "Quitter l'application"
+        }
+      },
+      "model": {
+        "title": "Modèle",
+        "nearbyTitle": "Modèles à proximité",
+        "labels": {
+          "deleteModel": "Supprimer le modèle"
+        },
+        "hints": {
+          "deleteSuccess": "« %s » a été supprimé",
+          "deleteModel": "Voulez-vous vraiment supprimer \"%s\" ?",
+          "deleteFailed": "Impossible de supprimer ce modèle",
+          "importSuccess": "Importation réussie",
+          "importExists": "Le modèle existe déjà",
+          "importBatchResult": "Importations réussies : %zu ; échecs : %zu. Modèles en échec : %s%s. Premier échec : %s",
+          "importMoreFailures": " et %zu autre(s)",
+          "importUnknownSource": "source inconnue",
+          "importInvalidSource": "La source sélectionnée n'existe plus ou ne peut pas être utilisée",
+          "importInvalidFormat": "Aucun modèle pris en charge n'a été trouvé, ou le paquet du modèle est incomplet",
+          "importFileAccess": "Impossible de lire ou d'enregistrer les fichiers du modèle. Vérifiez les autorisations et l'espace disque disponible",
+          "importOutOfMemory": "La mémoire disponible est insuffisante pour importer ce modèle",
+          "importLoadFailed": "Le modèle a été importé, mais il n'a pas pu être affiché",
+          "importFailed": "Échec de l'importation du modèle. Vérifiez les fichiers sélectionnés et réessayez",
+          "clickOrDragToImport": "Cliquez ou déposez un dossier",
+          "supportedImportFormats": "Formats Mver et Tauri pris en charge",
+          "openDirectoryFailed": "Impossible d'ouvrir le dossier du modèle"
+        },
+        "tooltips": {
+          "createModel": "Créer un modèle",
+          "convertModel": "Convertir un modèle",
+          "moreModels": "Plus de modèles"
+        },
+        "behaviorModal": {
+          "title": "Mouvements, expressions et audio",
+          "labels": {
+            "motion": "Mouvement",
+            "expression": "Expression",
+            "audio": "Audio",
+            "stopAllAudio": "Arrêter tous les sons",
+            "motionIndex": "Mouvement {index}",
+            "motionGroupIndex": "Groupe de mouvements {index}",
+            "expressionIndex": "Expression {index}"
+          }
+        }
+      },
+      "shortcut": {
+        "title": "Raccourcis",
+        "labels": {
+          "toggleCat": "Afficher/masquer le compagnon",
+          "togglePreferences": "Afficher/masquer les préférences",
+          "mirrorMode": "Mode miroir",
+          "passThrough": "Clics traversants",
+          "alwaysOnTop": "Toujours au premier plan"
+        },
+        "hints": {
+          "toggleCat": "Affiche ou masque la fenêtre du compagnon.",
+          "togglePreferences": "Affiche ou masque la fenêtre des préférences.",
+          "mirrorMode": "Active ou désactive le mode miroir du compagnon.",
+          "passThrough": "Active ou désactive les clics traversants de la fenêtre.",
+          "alwaysOnTop": "Définit si la fenêtre reste au premier plan."
+        }
+      },
+      "about": {
+        "title": "À propos",
+        "labels": {
+          "aboutApp": "À propos de l'application",
+          "appLog": "Journaux de l'application"
+        },
+        "hints": {
+          "copySuccess": "Copié avec succès"
+        },
+        "buttons": {
+          "copy": "Copier",
+          "viewLog": "Voir les journaux"
+        }
+      }
+    }
+  },
+  "components": {
+    "shortcut": {
+      "hints": {
+        "pressRecordShortcut": "Appuyez pour enregistrer le raccourci",
+        "clickRecordShortcut": "Cliquez pour enregistrer le raccourci",
+        "alreadyUsed": "Ce raccourci est déjà utilisé. Choisissez-en un autre."
+      }
+    }
+  },
+  "composables": {
+    "useAppMenu": {
+      "labels": {
+        "preference": "Préférences...",
+        "hideCat": "Masquer le compagnon",
+        "showCat": "Afficher le compagnon",
+        "passThrough": "Clics traversants",
+        "alwaysOnTop": "Toujours au premier plan",
+        "windowSize": "Taille de la fenêtre",
+        "opacity": "Opacité",
+        "motion": "Mouvements",
+        "expression": "Expressions",
+        "wheelSizeHint": "Molette : redimensionner",
+        "wheelOpacityHint": "Ctrl+molette : opacité",
+        "quitApp": "Quitter l'application",
+        "model": "Modèle",
+        "addModel": "Ajouter un modèle"
+      }
+    }
+  },
+  "utils": {
+    "live2d": {
+      "hints": {
+        "notFound": "Le fichier de configuration principal du modèle est introuvable. Vérifiez que les fichiers du modèle sont complets."
+      }
+    }
+  },
+  "native": {
+    "multiplePets": "Afficher plusieurs modèles",
+    "multiplePetsLimit": "Jusqu'à 8 mascottes peuvent être affichées à la fois",
+    "removeDesktopPet": "Fermer cette mascotte de bureau",
+    "modelLoadFailed": "Impossible d'afficher ce modèle",
+    "noBehaviors": "Aucun élément",
+    "preferencesWindowTitle": "BongoCat - Settings",
+    "startup": {
+      "failed": "Impossible de démarrer BongoCat.",
+      "detail": "Consultez le journal de diagnostic pour les détails techniques.",
+      "diagnosticLog": "Journal de diagnostic :"
+    },
+    "support": {
+      "title": "À propos",
+      "website": "Site web: bongocat.pet",
+      "heroText": "Merci pour votre soutien. Chaque utilisation et chaque partage aide BongoCat à continuer de grandir.",
+      "version": "Version de l'application",
+      "checkUpdate": "Rechercher des mises à jour",
+      "feedback": "Commentaires",
+      "openLogs": "Ouvrir les journaux",
+      "openLogsFailed": "Impossible d'ouvrir le dossier des journaux",
+      "latest": "Déjà à jour",
+      "checkingUpdate": "Vérification...",
+      "updateAvailable": "Nouvelle version disponible :",
+      "updateFailed": "Impossible de vérifier les mises à jour",
+      "updateHttpFailed": "GitHub a renvoyé le statut HTTP %s",
+      "downloadUpdate": "Mettre à jour vers v%s",
+      "openStore": "Ouvrir Microsoft Store",
+      "viewReleases": "Voir les versions",
+      "openUpdateFailed": "Impossible d'ouvrir la page de mise à jour",
+      "works": "Plus d'applications",
+      "worksText": "D’autres créations de vladelaina à découvrir",
+      "refactorDeveloper": "Développeur qui a réécrit BongoCat en C et qui en est aussi le mainteneur actuel",
+      "community": "Communauté",
+      "qqGroup": "Groupe QQ",
+      "coffee": "Offrir un café au développeur ?",
+      "starOnGitHub": "Étoile GitHub!",
+      "by": "par "
+    },
+    "shortcut": {
+      "toggleCat": "Afficher/masquer",
+      "preferences": "Préférences",
+      "mirror": "Miroir",
+      "passThrough": "Clics traversants",
+      "alwaysOnTop": "Toujours au premier plan"
+    },
+    "hoverDelay": "Délai de survol (secondes)",
+    "modeStandard": "Standard",
+    "modeKeyboard": "Clavier",
+    "modeGamepad": "Manette",
+    "cancel": "Annuler",
+    "delete": "Supprimer",
+    "select": "Sélectionner",
+    "selected": "Sélectionné",
+    "import": "Importer",
+    "importing": "Importation...",
+    "builtIn": "intégré"
+  }
+}

@@ -1,0 +1,264 @@
+{
+  "pages": {
+    "main": {
+      "hints": {
+        "redrawing": "重繪中…",
+        "switching": "切換中…"
+      }
+    },
+    "preference": {
+      "title": "偏好設定",
+      "cat": {
+        "title": "偏好",
+        "labels": {
+          "modelSettings": "模型",
+          "mirrorMode": "鏡像模式",
+          "mouseMirror": "滑鼠游標鏡像",
+          "mouseCentered": "滑鼠以桌寵為中心",
+          "ignoreMouse": "忽略滑鼠事件",
+          "windowSettings": "視窗",
+          "passThrough": "視窗穿透",
+          "alwaysOnTop": "視窗置頂",
+          "keepInScreen": "保持在螢幕內",
+          "windowSize": "視窗尺寸",
+          "windowCorners": "視窗圓角 (%)",
+          "opacity": "不透明度",
+          "randomExpression": "隨機表情",
+          "obsBackground": "純色背景",
+          "hideOnHover": "滑鼠游標移入隱藏",
+          "hideFadeSeconds": "隱藏漸變時長 (秒)",
+          "maxFPS": "最大幀率",
+          "renderer": "渲染後端"
+        },
+        "hints": {
+          "hoverUnavailable": "目前桌面環境暫不支援滑鼠移入隱藏。",
+          "gameInput": "遊戲中桌寵沒反應？",
+          "gameInputHelp": "試試以系統管理員身分啟動 BongoCat，並將遊戲設為視窗模式。",
+          "passThrough": "右鍵點擊系統匣圖示也可關閉此功能",
+          "alwaysOnTop": "啟用後，視窗始終顯示在其他應用程式上方。",
+          "keepInScreen": "啟用後，視窗會自動調整位置，防止超出螢幕邊界。",
+          "obsBackground": "視窗擷取黑屏？",
+          "obsBackgroundHelp": "OBS：開啟目前選項，使用 Windows 7 相容擷取，並用色鍵濾鏡移除背景。\n嗶哩嗶哩直播姬：不需要開啟目前選項，選擇遊戲程序擷取，並開啟允許視窗透明。",
+          "windowSize": "將滑鼠游標移至視窗邊緣，或按住 Shift 並右鍵拖曳，也可以調整視窗大小。",
+          "hideOnHover": "滑鼠穿透和置頂皆啟用時，滑鼠移到桌寵上立即隱藏，移開後恢復顯示。"
+        }
+      },
+      "general": {
+        "title": "一般設定",
+        "labels": {
+          "appSettings": "應用程式",
+          "launchOnStartup": "開機自動啟動",
+          "showTrayIcon": "顯示托盤圖示",
+          "appearanceSettings": "外觀",
+          "themeMode": "主題",
+          "language": "語言",
+          "permissionsSettings": "權限設定",
+          "inputMonitoringPermission": "輸入監控權限",
+          "administratorPermission": "系統管理員身分",
+          "cacheDirectory": "快取目錄"
+        },
+        "options": {
+          "auto": "跟隨系統",
+          "lightMode": "淺色模式",
+          "darkMode": "深色模式",
+          "browse": "瀏覽",
+          "clear": "重設"
+        },
+        "hints": {
+          "showTrayIcon": "啟用後，在系統托盤中顯示應用程式圖示。",
+          "autostartFailed": "無法更新開機啟動設定",
+          "inputMonitoringPermission": "授權後請重新啟動",
+          "inputMonitoringPermissionGuide": "輸入監控權限讓 BongoCat 能接收其他應用程式中的按鍵；滑鼠移動和點擊無需該權限。BongoCat 在啟動時建立監聽，因此權限變更後需要重新啟動。\n\n操作方式：\n1. 開啟「系統設定」→「隱私權與安全性」→「輸入監控」。\n2. 直接開啟清單中已有的 BongoCat 項目，不要刪除現有項目。\n3. 若清單中沒有 BongoCat，點擊「+」按鈕，加入你目前執行的那份應用程式（請確認應用程式位置）。\n4. 完全結束 BongoCat 後重新啟動，讓它重建監聽。\n\n若鍵盤仍然沒有反應，可由你自行移除並重新加入 BongoCat 項目來排解問題。",
+          "administratorPermission": "以系統管理員身分執行應用程式，可以更穩定地擷取部分系統層級按鍵與輸入事件。",
+          "administratorPermissionGuide": "為了能更穩定地擷取部分系統層級按鍵與輸入事件，建議以系統管理員身分執行應用程式。\n\n操作方式：\n1. 先退出應用程式。\n2. 在檔案總管中找到應用程式的 exe 或捷徑。\n3. 根據需求選擇啟動方式：\n   • 僅本次：右鍵並選擇「以系統管理員身分執行」。\n   • 永久預設：右鍵 → 內容 → 相容性索引標籤 → 勾選「以系統管理員身分執行此程式」→ 確定。",
+          "cacheDirectory": "用於資產和模型快取的資料夾。留空則使用預設位置。",
+          "defaultCache": "預設（自動）",
+          "cacheApplied": "快取目錄已更新",
+          "cacheCancelled": "快取目錄選擇已取消",
+          "cacheReset": "快取目錄已重設為預設"
+        },
+        "status": {
+          "authorized": "已授權",
+          "adminEnabled": "已啟用",
+          "authorize": "去授權",
+          "viewGuide": "查看操作說明",
+          "openSettingsFailed": "無法開啟系統設定，請手動開啟：隱私權與安全性 → 輸入監控"
+        },
+        "buttons": {
+          "openNow": "前往開啟",
+          "openLater": "稍後開啟",
+          "setLater": "稍後設置",
+          "exitApp": "退出應用"
+        }
+      },
+      "model": {
+        "title": "模型",
+        "nearbyTitle": "附近模型",
+        "labels": {
+          "deleteModel": "刪除模型"
+        },
+        "hints": {
+          "deleteSuccess": "已刪除「%s」",
+          "deleteModel": "您確定要刪除「%s」嗎？",
+          "deleteFailed": "無法刪除此模型",
+          "importSuccess": "匯入成功",
+          "importExists": "模型已存在，無需重複匯入",
+          "importBatchResult": "匯入成功 %zu 個，匯入失敗 %zu 個。失敗模型：%s%s。首個失敗原因：%s",
+          "importMoreFailures": "等其餘 %zu 個",
+          "importUnknownSource": "未知來源",
+          "importInvalidSource": "所選來源已不存在或無法使用",
+          "importInvalidFormat": "找不到支援的模型，或模型套件檔案不完整",
+          "importFileAccess": "無法讀取或儲存模型檔案，請檢查檔案權限和可用磁碟空間",
+          "importOutOfMemory": "記憶體不足，無法匯入此模型",
+          "importLoadFailed": "模型已匯入，但無法正常顯示",
+          "importFailed": "模型匯入失敗，請檢查所選檔案後再試一次",
+          "clickOrDragToImport": "點擊或拖入模型資料夾",
+          "supportedImportFormats": "支援 Mver 與 Tauri 格式",
+          "openDirectoryFailed": "無法開啟模型目錄"
+        },
+        "tooltips": {
+          "createModel": "製作模型",
+          "convertModel": "轉換模型",
+          "moreModels": "模型庫"
+        },
+        "behaviorModal": {
+          "title": "動作、表情與音訊",
+          "labels": {
+            "motion": "動作",
+            "expression": "表情",
+            "audio": "音訊",
+            "stopAllAudio": "停止所有音訊",
+            "motionIndex": "動作{index}",
+            "motionGroupIndex": "動作組{index}",
+            "expressionIndex": "表情{index}"
+          }
+        }
+      },
+      "shortcut": {
+        "title": "快速鍵",
+        "labels": {
+          "toggleCat": "開啟貓咪",
+          "togglePreferences": "開啟偏好設定",
+          "mirrorMode": "鏡像模式",
+          "passThrough": "視窗穿透",
+          "alwaysOnTop": "視窗置頂"
+        },
+        "hints": {
+          "toggleCat": "切換貓咪視窗的顯示與隱藏。",
+          "togglePreferences": "切換偏好設定視窗的顯示與隱藏。",
+          "mirrorMode": "切換貓咪的鏡像模式。",
+          "passThrough": "切換貓咪視窗是否可穿透。",
+          "alwaysOnTop": "切換貓咪視窗是否置頂。"
+        }
+      },
+      "about": {
+        "title": "關於",
+        "labels": {
+          "aboutApp": "關於軟體",
+          "appLog": "軟體日誌"
+        },
+        "hints": {
+          "copySuccess": "複製成功"
+        },
+        "buttons": {
+          "copy": "複製",
+          "viewLog": "查看日誌"
+        }
+      }
+    }
+  },
+  "components": {
+    "shortcut": {
+      "hints": {
+        "pressRecordShortcut": "按下錄製快速鍵",
+        "clickRecordShortcut": "點擊錄製快速鍵",
+        "alreadyUsed": "此快速鍵已被使用，請選擇其他組合。"
+      }
+    }
+  },
+  "composables": {
+    "useAppMenu": {
+      "labels": {
+        "preference": "偏好設定…",
+        "hideCat": "隱藏貓咪",
+        "showCat": "顯示貓咪",
+        "passThrough": "視窗穿透",
+        "alwaysOnTop": "置頂",
+        "windowSize": "視窗尺寸",
+        "opacity": "不透明度",
+        "motion": "動作",
+        "expression": "表情",
+        "wheelSizeHint": "滾輪調整大小",
+        "wheelOpacityHint": "Ctrl+滾輪調整透明度",
+        "quitApp": "退出應用程式",
+        "model": "模型",
+        "addModel": "新增模型"
+      }
+    }
+  },
+  "utils": {
+    "live2d": {
+      "hints": {
+        "notFound": "未找到模型主設定檔，請確認模型文件是否完整。"
+      }
+    }
+  },
+  "native": {
+    "multiplePets": "同時顯示多個",
+    "multiplePetsLimit": "最多可同時顯示 8 個桌寵",
+    "removeDesktopPet": "關閉此桌寵",
+    "modelLoadFailed": "模型無法顯示",
+    "noBehaviors": "暫無可用項目",
+    "preferencesWindowTitle": "BongoCat - Settings",
+    "startup": {
+      "failed": "BongoCat 無法啟動。",
+      "detail": "請查看診斷日誌以瞭解技術詳情。",
+      "diagnosticLog": "診斷日誌："
+    },
+    "support": {
+      "title": "關於",
+      "website": "官網: bongocat.pet",
+      "heroText": "感謝你的支持。每一次使用與分享，都讓 BongoCat 持續成長。",
+      "version": "應用程式版本",
+      "checkUpdate": "檢查更新",
+      "feedback": "意見回饋",
+      "openLogs": "開啟日誌",
+      "openLogsFailed": "無法開啟日誌資料夾",
+      "latest": "已是最新版本",
+      "checkingUpdate": "正在檢查...",
+      "updateAvailable": "發現新版本：",
+      "updateFailed": "無法檢查更新",
+      "updateHttpFailed": "GitHub 回傳 HTTP 狀態碼 %s",
+      "downloadUpdate": "更新至 v%s",
+      "openStore": "開啟 Microsoft Store",
+      "viewReleases": "查看發佈版本",
+      "openUpdateFailed": "無法開啟更新頁面",
+      "works": "更多作品",
+      "worksText": "來自 vladelaina 的其他作品，同樣值得一試",
+      "refactorDeveloper": "將BongoCat用C語言重構的開發者，同時也是現任維護者",
+      "community": "社群",
+      "qqGroup": "QQ 群",
+      "coffee": "請開發者喝杯咖啡？",
+      "starOnGitHub": "喜歡就點顆星吧!",
+      "by": "by "
+    },
+    "shortcut": {
+      "toggleCat": "顯示/隱藏",
+      "preferences": "設定",
+      "mirror": "鏡像",
+      "passThrough": "滑鼠穿透",
+      "alwaysOnTop": "置頂"
+    },
+    "hoverDelay": "懸停隱藏延遲（秒）",
+    "modeStandard": "標準模式",
+    "modeKeyboard": "鍵盤模式",
+    "modeGamepad": "遊戲手把模式",
+    "cancel": "取消",
+    "delete": "刪除",
+    "select": "選擇",
+    "selected": "已選擇",
+    "import": "匯入",
+    "importing": "匯入中...",
+    "builtIn": "內建"
+  }
+}

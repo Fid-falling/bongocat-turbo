@@ -1,0 +1,264 @@
+{
+  "pages": {
+    "main": {
+      "hints": {
+        "redrawing": "다시 그리는 중...",
+        "switching": "전환 중..."
+      }
+    },
+    "preference": {
+      "title": "환경 설정",
+      "cat": {
+        "title": "환경 설정",
+        "labels": {
+          "modelSettings": "모델",
+          "mirrorMode": "미러 모드",
+          "mouseMirror": "마우스 반전",
+          "mouseCentered": "마우스를 데스크톱 펫 중심으로",
+          "ignoreMouse": "마우스 이벤트 무시",
+          "windowSettings": "창",
+          "passThrough": "클릭 통과",
+          "alwaysOnTop": "항상 위",
+          "keepInScreen": "화면 안에 유지",
+          "windowSize": "창 크기",
+          "windowCorners": "창 모서리 둥글기 (%)",
+          "opacity": "불투명도",
+          "randomExpression": "무작위 표정",
+          "obsBackground": "단색 배경",
+          "hideOnHover": "마우스를 올리면 숨기기",
+          "hideFadeSeconds": "페이드 시간 (초)",
+          "maxFPS": "최대 프레임 속도",
+          "renderer": "렌더러"
+        },
+        "hints": {
+          "hoverUnavailable": "현재 데스크톱 환경에서는 마우스를 올려 숨기기 기능을 사용할 수 없습니다.",
+          "gameInput": "게임 중 데스크톱 펫이 반응하지 않나요?",
+          "gameInputHelp": "BongoCat을 관리자 권한으로 실행하고 게임을 창 모드로 설정해 보세요.",
+          "passThrough": "트레이 아이콘을 우클릭해서도 끌 수 있습니다",
+          "alwaysOnTop": "활성화하면 창이 다른 모든 창 위에 유지됩니다.",
+          "keepInScreen": "활성화하면 창이 자동으로 화면 경계 안에 유지됩니다.",
+          "obsBackground": "창 캡처가 검은 화면인가요?",
+          "obsBackgroundHelp": "OBS: 이 옵션을 켜고 Windows 7 호환 방식으로 캡처한 뒤 색상 키 필터로 배경을 제거하세요.",
+          "windowSize": "마우스를 창 가장자리로 이동하거나 Shift를 누른 채 오른쪽 버튼으로 끌어 크기를 조절합니다.",
+          "hideOnHover": "클릭 통과와 항상 위에 표시가 모두 켜져 있으면 펫에 마우스를 올릴 때 즉시 숨기고, 마우스를 치우면 다시 표시합니다."
+        }
+      },
+      "general": {
+        "title": "일반",
+        "labels": {
+          "appSettings": "앱",
+          "launchOnStartup": "시작할 때 실행",
+          "showTrayIcon": "트레이 아이콘 표시",
+          "appearanceSettings": "모양",
+          "themeMode": "테마",
+          "language": "언어",
+          "permissionsSettings": "권한 설정",
+          "inputMonitoringPermission": "입력 모니터링 권한",
+          "administratorPermission": "관리자",
+          "cacheDirectory": "캐시 디렉터리"
+        },
+        "options": {
+          "auto": "시스템",
+          "lightMode": "라이트",
+          "darkMode": "다크",
+          "browse": "찾아보기",
+          "clear": "초기화"
+        },
+        "hints": {
+          "showTrayIcon": "활성화하면 시스템 트레이에 앱 아이콘이 표시됩니다.",
+          "autostartFailed": "시작 프로그램 설정을 변경할 수 없습니다",
+          "inputMonitoringPermission": "허용한 뒤 다시 시작하세요.",
+          "inputMonitoringPermissionGuide": "입력 모니터링 권한이 있으면 BongoCat이 다른 앱에서 누른 키를 받을 수 있습니다. 마우스는 권한 없이도 동작합니다. BongoCat은 시작할 때 감시를 만들기 때문에 권한을 바꾼 뒤에는 다시 시작해야 합니다.\n\n단계:\n1. 시스템 설정 → 개인정보 보호 및 보안 → 입력 모니터링을 엽니다.\n2. 목록에 이미 있는 BongoCat 항목을 켭니다. 기존 항목은 삭제하지 마세요.\n3. 목록에 BongoCat이 없으면 \"+\"를 클릭해 현재 실행 중인 앱을 추가합니다(앱 위치를 확인하세요).\n4. BongoCat을 완전히 종료한 뒤 다시 시작해 감시를 다시 만들게 합니다.\n\n키보드가 계속 반응하지 않으면 BongoCat 항목을 직접 삭제하고 다시 추가해 확인할 수 있습니다.",
+          "administratorPermission": "앱을 관리자로 실행하면 일부 시스템 키와 입력 이벤트를 더 안정적으로 캡처할 수 있습니다.",
+          "administratorPermissionGuide": "일부 시스템 키와 입력 이벤트를 더 안정적으로 캡처하려면 앱을 관리자로 실행하는 것이 좋습니다.\n\n방법:\n1. 먼저 앱을 종료합니다.\n2. 파일 탐색기에서 앱의 exe 파일 또는 바로 가기를 찾습니다.\n3. 실행 방법을 선택합니다:\n   - 한 번만: 마우스 오른쪽 버튼을 누르고 \"관리자 권한으로 실행\"을 선택합니다.\n   - 항상: 오른쪽 클릭 > 속성 > 호환성 > \"관리자 권한으로 이 프로그램 실행\" 선택 > 확인.",
+          "cacheDirectory": "자산 및 모델 캐시에 사용할 폴더입니다. 비워두면 기본값을 사용합니다.",
+          "defaultCache": "기본값 (자동)",
+          "cacheApplied": "캐시 디렉터리가 업데이트되었습니다",
+          "cacheCancelled": "캐시 디렉터리 선택이 취소되었습니다",
+          "cacheReset": "캐시 디렉터리가 기본값으로 재설정되었습니다"
+        },
+        "status": {
+          "authorized": "허용됨",
+          "adminEnabled": "활성화됨",
+          "authorize": "활성화",
+          "viewGuide": "안내 보기",
+          "openSettingsFailed": "직접 여세요: 시스템 설정 → 개인정보 보호 및 보안 → 입력 모니터링."
+        },
+        "buttons": {
+          "openNow": "지금 열기",
+          "openLater": "나중에 열기",
+          "setLater": "나중에 설정",
+          "exitApp": "앱 종료"
+        }
+      },
+      "model": {
+        "title": "모델",
+        "nearbyTitle": "주변 모델",
+        "labels": {
+          "deleteModel": "모델 삭제"
+        },
+        "hints": {
+          "deleteSuccess": "\"%s\" 모델을 삭제했습니다",
+          "deleteModel": "\"%s\" 모델을 삭제하시겠습니까?",
+          "deleteFailed": "이 모델을 삭제할 수 없습니다",
+          "importSuccess": "가져오기 완료",
+          "importExists": "모델이 이미 존재합니다",
+          "importBatchResult": "가져오기 성공 %zu개, 실패 %zu개. 실패한 모델: %s%s. 첫 번째 실패 원인: %s",
+          "importMoreFailures": " 외 %zu개",
+          "importUnknownSource": "알 수 없는 원본",
+          "importInvalidSource": "선택한 원본이 더 이상 존재하지 않거나 사용할 수 없습니다",
+          "importInvalidFormat": "지원되는 모델을 찾을 수 없거나 모델 패키지가 완전하지 않습니다",
+          "importFileAccess": "모델 파일을 읽거나 저장할 수 없습니다. 파일 권한과 사용 가능한 디스크 공간을 확인하세요",
+          "importOutOfMemory": "메모리가 부족하여 이 모델을 가져올 수 없습니다",
+          "importLoadFailed": "모델을 가져왔지만 표시할 수 없습니다",
+          "importFailed": "모델을 가져오지 못했습니다. 선택한 파일을 확인한 후 다시 시도하세요",
+          "clickOrDragToImport": "모델 폴더를 클릭하거나 끌어오세요",
+          "supportedImportFormats": "Mver 및 Tauri 형식 지원",
+          "openDirectoryFailed": "모델 폴더를 열 수 없습니다"
+        },
+        "tooltips": {
+          "createModel": "모델 만들기",
+          "convertModel": "모델 변환",
+          "moreModels": "더 많은 모델"
+        },
+        "behaviorModal": {
+          "title": "모션, 표정 및 오디오",
+          "labels": {
+            "motion": "모션",
+            "expression": "표정",
+            "audio": "오디오",
+            "stopAllAudio": "모든 오디오 중지",
+            "motionIndex": "모션 {index}",
+            "motionGroupIndex": "모션 그룹 {index}",
+            "expressionIndex": "표정 {index}"
+          }
+        }
+      },
+      "shortcut": {
+        "title": "단축키",
+        "labels": {
+          "toggleCat": "펫 표시 전환",
+          "togglePreferences": "환경 설정 표시 전환",
+          "mirrorMode": "미러 모드",
+          "passThrough": "클릭 통과",
+          "alwaysOnTop": "항상 위"
+        },
+        "hints": {
+          "toggleCat": "펫 창을 표시하거나 숨깁니다.",
+          "togglePreferences": "환경 설정 창을 표시하거나 숨깁니다.",
+          "mirrorMode": "펫의 미러 모드를 전환합니다.",
+          "passThrough": "펫 창의 클릭 통과 여부를 전환합니다.",
+          "alwaysOnTop": "펫 창을 항상 위에 둘지 전환합니다."
+        }
+      },
+      "about": {
+        "title": "정보",
+        "labels": {
+          "aboutApp": "앱 정보",
+          "appLog": "앱 로그"
+        },
+        "hints": {
+          "copySuccess": "복사 완료"
+        },
+        "buttons": {
+          "copy": "복사",
+          "viewLog": "로그 보기"
+        }
+      }
+    }
+  },
+  "components": {
+    "shortcut": {
+      "hints": {
+        "pressRecordShortcut": "키를 눌러 단축키 기록",
+        "clickRecordShortcut": "클릭하여 단축키 기록",
+        "alreadyUsed": "이미 사용 중인 단축키입니다. 다른 단축키를 선택하세요."
+      }
+    }
+  },
+  "composables": {
+    "useAppMenu": {
+      "labels": {
+        "preference": "환경 설정...",
+        "hideCat": "펫 숨기기",
+        "showCat": "펫 표시",
+        "passThrough": "클릭 통과",
+        "alwaysOnTop": "항상 위",
+        "windowSize": "창 크기",
+        "opacity": "불투명도",
+        "motion": "모션",
+        "expression": "표정",
+        "wheelSizeHint": "휠: 크기 조절",
+        "wheelOpacityHint": "Ctrl+휠: 불투명도",
+        "quitApp": "앱 종료",
+        "model": "모델",
+        "addModel": "모델 추가"
+      }
+    }
+  },
+  "utils": {
+    "live2d": {
+      "hints": {
+        "notFound": "모델의 기본 설정 파일을 찾을 수 없습니다. 모델 파일이 완전한지 확인하세요."
+      }
+    }
+  },
+  "native": {
+    "multiplePets": "여러 개 동시에 표시",
+    "multiplePetsLimit": "데스크톱 펫은 한 번에 최대 8개까지 표시할 수 있습니다",
+    "removeDesktopPet": "이 데스크톱 펫 닫기",
+    "modelLoadFailed": "이 모델을 표시할 수 없습니다",
+    "noBehaviors": "항목 없음",
+    "preferencesWindowTitle": "BongoCat - Settings",
+    "startup": {
+      "failed": "BongoCat을 시작할 수 없습니다.",
+      "detail": "기술적인 세부 정보는 진단 로그를 확인하세요.",
+      "diagnosticLog": "진단 로그:"
+    },
+    "support": {
+      "title": "정보",
+      "website": "공식 웹사이트: bongocat.pet",
+      "heroText": "지원해 주셔서 감사합니다. 사용할 때마다, 공유할 때마다 BongoCat이 계속 성장하는 데 도움이 됩니다.",
+      "version": "앱 버전",
+      "checkUpdate": "업데이트 확인",
+      "feedback": "피드백",
+      "openLogs": "로그 열기",
+      "openLogsFailed": "로그 폴더를 열 수 없습니다",
+      "latest": "최신 버전입니다",
+      "checkingUpdate": "확인 중...",
+      "updateAvailable": "새 버전 사용 가능:",
+      "updateFailed": "업데이트를 확인할 수 없습니다",
+      "updateHttpFailed": "GitHub에서 HTTP 상태 코드 %s를 반환했습니다",
+      "downloadUpdate": "v%s(으)로 업데이트",
+      "openStore": "Microsoft Store 열기",
+      "viewReleases": "릴리스 보기",
+      "openUpdateFailed": "업데이트 페이지를 열 수 없습니다",
+      "works": "더 많은 앱",
+      "worksText": "vladelaina의 다른 작품도 만나보세요",
+      "refactorDeveloper": "BongoCat을 C 언어로 재작성한 개발자이자 현재 유지보수 담당자",
+      "community": "커뮤니티",
+      "qqGroup": "QQ 그룹",
+      "coffee": "개발자에게 커피 한 잔을 선물할까요?",
+      "starOnGitHub": "GitHub 스타!",
+      "by": "제작: "
+    },
+    "shortcut": {
+      "toggleCat": "표시/숨기기",
+      "preferences": "환경 설정",
+      "mirror": "미러",
+      "passThrough": "클릭 통과",
+      "alwaysOnTop": "항상 위"
+    },
+    "hoverDelay": "호버 지연(초)",
+    "modeStandard": "표준",
+    "modeKeyboard": "키보드",
+    "modeGamepad": "게임패드",
+    "cancel": "취소",
+    "delete": "삭제",
+    "select": "선택",
+    "selected": "선택됨",
+    "import": "가져오기",
+    "importing": "가져오는 중...",
+    "builtIn": "내장"
+  }
+}

@@ -1,0 +1,84 @@
+# CMake build trees and generated metadata
+/build*/
+/out/
+/output/
+/CMakeFiles/
+/Testing/
+/CMakeCache.txt
+/cmake_install.cmake
+/CTestTestfile.cmake
+/compile_commands.json
+/build.ninja
+/.ninja_deps
+/.ninja_log
+/Makefile
+
+# Compiled native artifacts
+*.o
+*.obj
+*.a
+*.lib
+*.so
+*.so.*
+*.dylib
+*.dll
+*.exe
+*.pdb
+*.ilk
+*.exp
+*.dSYM/
+
+# Local licensed dependency; install it separately on each machine
+/vendor/CubismSdkForNative/
+
+# IDE and editor-local state
+/.vs/
+/.vscode/
+/.idea/
+*.user
+*.suo
+*.swp
+*~
+
+# Operating-system metadata
+.DS_Store
+Thumbs.db
+Desktop.ini
+
+# Local logs and temporary files
+*.log
+*.tmp
+*.temp
+
+# Local reference files
+/.reference/
+
+# Local build environment (dependency cache & offline build helper scripts)
+/_deps_cache/
+/run_build_bg.cmd
+/run_offline_build.cmd
+
+/docs/*
+!/docs/
+!/docs/README.zh-CN.md
+!/docs/README.zh-Hant.md
+!/docs/README.fr-FR.md
+!/docs/README.de-DE.md
+!/docs/README.ja-JP.md
+!/docs/README.ko-KR.md
+!/docs/README.pt-BR.md
+!/docs/README.ru-RU.md
+!/docs/README.es-ES.md
+!/docs/README.id-ID.md
+!/docs/wechat.png
+!/docs/windows-multimonitor-input-validation.md
+!/docs/model-import-rendering.md
+
+# Local Windows audit tools
+/cmake/*.ps1
+!/cmake/RunCubismViewerBlindTest.ps1
+
+# Local diagnostic test state
+/.diagnostic-session/
+/.diagnostic-storage/
+/.diagnostic-storage-morning/

@@ -1,0 +1,264 @@
+{
+  "pages": {
+    "main": {
+      "hints": {
+        "redrawing": "Redrawing...",
+        "switching": "Switching..."
+      }
+    },
+    "preference": {
+      "title": "Preferences",
+      "cat": {
+        "title": "Preferences",
+        "labels": {
+          "modelSettings": "Model",
+          "mirrorMode": "Mirror Mode",
+          "mouseMirror": "Mouse Mirror",
+          "mouseCentered": "Mouse Centered on Desktop Pet",
+          "ignoreMouse": "Ignore Mouse Events",
+          "windowSettings": "Window",
+          "passThrough": "Pass Through",
+          "alwaysOnTop": "Always on Top",
+          "keepInScreen": "Keep on Screen",
+          "windowSize": "Window Size",
+          "windowCorners": "Window Corners (%)",
+          "opacity": "Opacity",
+          "randomExpression": "Random Expressions",
+          "obsBackground": "Solid Background",
+          "hideOnHover": "Hide on Hover",
+          "hideFadeSeconds": "Fade Duration (s)",
+          "maxFPS": "Max Frame Rate",
+          "renderer": "Renderer"
+        },
+        "hints": {
+          "hoverUnavailable": "Hover hiding is unavailable in the current desktop environment.",
+          "gameInput": "Pet not responding in games?",
+          "gameInputHelp": "Try running BongoCat as administrator and setting the game to windowed mode.",
+          "passThrough": "You can also turn this off by right-clicking the tray icon",
+          "alwaysOnTop": "When enabled, the window stays above all other windows.",
+          "keepInScreen": "When enabled, the window automatically stays within the screen boundaries.",
+          "obsBackground": "Window capture is black?",
+          "obsBackgroundHelp": "OBS: enable this option, use the Windows 7 compatibility method, and remove the background with a color key filter.",
+          "windowSize": "Move mouse to window edge, or hold Shift and right-drag to resize.",
+          "hideOnHover": "With Pass Through and Always on Top enabled, hide the pet immediately on hover and show it again when the pointer leaves."
+        }
+      },
+      "general": {
+        "title": "General",
+        "labels": {
+          "appSettings": "Application",
+          "launchOnStartup": "Launch on Startup",
+          "showTrayIcon": "Show Tray Icon",
+          "appearanceSettings": "Appearance",
+          "themeMode": "Theme",
+          "language": "Language",
+          "permissionsSettings": "Permissions Settings",
+          "inputMonitoringPermission": "Input Monitoring Permission",
+          "administratorPermission": "Administrator",
+          "cacheDirectory": "Cache directory"
+        },
+        "options": {
+          "auto": "System",
+          "lightMode": "Light",
+          "darkMode": "Dark",
+          "browse": "Browse",
+          "clear": "Reset"
+        },
+        "hints": {
+          "showTrayIcon": "When enabled, the app icon is displayed in the system tray.",
+          "autostartFailed": "Unable to update launch-on-startup settings",
+          "inputMonitoringPermission": "Restart after granting it.",
+          "inputMonitoringPermissionGuide": "Input Monitoring lets BongoCat see keys pressed in other apps; the mouse keeps working without it. BongoCat builds the listener when it starts, so a permission change needs a restart.\n\nSteps:\n1. Open System Settings → Privacy & Security → Input Monitoring.\n2. Turn on the BongoCat entry that is already listed; do not remove existing entries.\n3. If BongoCat is not listed, click the \"+\" button and add the copy you are running (check the app location).\n4. Quit BongoCat completely and start it again, so it rebuilds the listener.\n\nIf the keyboard still stays silent, you can remove and re-add the BongoCat entry yourself.",
+          "administratorPermission": "Running the app as administrator helps capture some system-level keys and input events more reliably.",
+          "administratorPermissionGuide": "To capture some system-level keys and input events more reliably, it is recommended to run the app as administrator.\n\nHow to do it:\n1. Exit the app first.\n2. Find the app exe or its shortcut in File Explorer.\n3. Choose how to launch:\n   • One-time: Right-click and choose \"Run as administrator\".\n   • Always (default): Right-click → Properties → Compatibility tab → check \"Run this program as an administrator\" → OK.",
+          "cacheDirectory": "Folder used for asset and model caches. Leave empty for the default.",
+          "defaultCache": "Default (automatic)",
+          "cacheApplied": "Cache directory updated",
+          "cacheCancelled": "Cache directory selection cancelled",
+          "cacheReset": "Cache directory reset to default"
+        },
+        "status": {
+          "authorized": "Authorized",
+          "adminEnabled": "Enabled",
+          "authorize": "Go to Enable",
+          "viewGuide": "View Instructions",
+          "openSettingsFailed": "Cannot open System Settings. Open Privacy & Security → Input Monitoring."
+        },
+        "buttons": {
+          "openNow": "Open Now",
+          "openLater": "Open Later",
+          "setLater": "Set Up Later",
+          "exitApp": "Exit App"
+        }
+      },
+      "model": {
+        "title": "Model",
+        "nearbyTitle": "Nearby models",
+        "labels": {
+          "deleteModel": "Delete Model"
+        },
+        "hints": {
+          "deleteSuccess": "Deleted \"%s\"",
+          "deleteModel": "Are you sure you want to delete \"%s\"?",
+          "deleteFailed": "Unable to delete this model",
+          "importSuccess": "Imported Successfully",
+          "importExists": "Model already exists",
+          "importBatchResult": "Import succeeded: %zu; failed: %zu. Failed models: %s%s. First failure: %s",
+          "importMoreFailures": " and %zu more",
+          "importUnknownSource": "unknown source",
+          "importInvalidSource": "The selected source no longer exists or cannot be used",
+          "importInvalidFormat": "No supported model was found, or the model package is incomplete",
+          "importFileAccess": "The model files could not be read or saved. Check file permissions and available disk space",
+          "importOutOfMemory": "There is not enough memory to import this model",
+          "importLoadFailed": "The model was imported, but it could not be displayed",
+          "importFailed": "Model import failed. Check the selected files and try again",
+          "clickOrDragToImport": "Click or drag a model folder",
+          "supportedImportFormats": "Supports Mver and Tauri formats",
+          "openDirectoryFailed": "Unable to open model directory"
+        },
+        "tooltips": {
+          "createModel": "Create Model",
+          "convertModel": "Convert Model",
+          "moreModels": "More Models"
+        },
+        "behaviorModal": {
+          "title": "Motions, Expressions and Audio",
+          "labels": {
+            "motion": "Motion",
+            "expression": "Expression",
+            "audio": "Audio",
+            "stopAllAudio": "Stop all audio",
+            "motionIndex": "Motion {index}",
+            "motionGroupIndex": "Motion Group {index}",
+            "expressionIndex": "Expression {index}"
+          }
+        }
+      },
+      "shortcut": {
+        "title": "Shortcuts",
+        "labels": {
+          "toggleCat": "Toggle Cat",
+          "togglePreferences": "Toggle Preferences",
+          "mirrorMode": "Mirror Mode",
+          "passThrough": "Pass Through",
+          "alwaysOnTop": "Always on Top"
+        },
+        "hints": {
+          "toggleCat": "Toggle the visibility of the cat window.",
+          "togglePreferences": "Toggle the visibility of the preferences window.",
+          "mirrorMode": "Toggle the cat's mirror mode.",
+          "passThrough": "Toggle whether the cat window is pass-through.",
+          "alwaysOnTop": "Toggle whether the cat window stays on top."
+        }
+      },
+      "about": {
+        "title": "About",
+        "labels": {
+          "aboutApp": "About App",
+          "appLog": "App Logs"
+        },
+        "hints": {
+          "copySuccess": "Copied Successfully"
+        },
+        "buttons": {
+          "copy": "Copy",
+          "viewLog": "View Logs"
+        }
+      }
+    }
+  },
+  "components": {
+    "shortcut": {
+      "hints": {
+        "pressRecordShortcut": "Press to record shortcut",
+        "clickRecordShortcut": "Click to record shortcut",
+        "alreadyUsed": "This shortcut is already in use. Choose another one."
+      }
+    }
+  },
+  "composables": {
+    "useAppMenu": {
+      "labels": {
+        "preference": "Preferences...",
+        "hideCat": "Hide Cat",
+        "showCat": "Show Cat",
+        "passThrough": "Pass Through",
+        "alwaysOnTop": "Always on Top",
+        "windowSize": "Window Size",
+        "opacity": "Opacity",
+        "motion": "Motions",
+        "expression": "Expressions",
+        "wheelSizeHint": "Wheel: resize",
+        "wheelOpacityHint": "Ctrl+Wheel: opacity",
+        "quitApp": "Quit App",
+        "model": "Model",
+        "addModel": "Add Model"
+      }
+    }
+  },
+  "utils": {
+    "live2d": {
+      "hints": {
+        "notFound": "Model master configuration file not found, please ensure the model files are complete."
+      }
+    }
+  },
+  "native": {
+    "multiplePets": "Display multiple",
+    "multiplePetsLimit": "Up to 8 desktop pets can be displayed at once",
+    "removeDesktopPet": "Close this desktop pet",
+    "modelLoadFailed": "Unable to display this model",
+    "noBehaviors": "No items",
+    "preferencesWindowTitle": "BongoCat - Settings",
+    "startup": {
+      "failed": "BongoCat could not start.",
+      "detail": "See the diagnostic log for technical details.",
+      "diagnosticLog": "Diagnostic log:"
+    },
+    "support": {
+      "title": "About",
+      "website": "Website: bongocat.pet",
+      "heroText": "Thank you for your support. Every use and share helps BongoCat continue to grow.",
+      "version": "App version",
+      "checkUpdate": "Check for updates",
+      "feedback": "Feedback",
+      "openLogs": "Open logs",
+      "openLogsFailed": "Unable to open logs folder",
+      "latest": "Already up to date",
+      "checkingUpdate": "Checking...",
+      "updateAvailable": "New version available:",
+      "updateFailed": "Unable to check for updates",
+      "updateHttpFailed": "GitHub returned HTTP status %s",
+      "downloadUpdate": "Update to v%s",
+      "openStore": "Open Microsoft Store",
+      "viewReleases": "View releases",
+      "openUpdateFailed": "Unable to open the update page",
+      "works": "More apps",
+      "worksText": "More from vladelaina, well worth a try",
+      "refactorDeveloper": "Developer who rewrote BongoCat in C and is also its current maintainer",
+      "community": "Community",
+      "qqGroup": "QQ Group",
+      "coffee": "Buy the developer a coffee?",
+      "starOnGitHub": "Star on GitHub!",
+      "by": "by "
+    },
+    "shortcut": {
+      "toggleCat": "Show/Hide",
+      "preferences": "Preferences",
+      "mirror": "Mirror",
+      "passThrough": "Pass Through",
+      "alwaysOnTop": "Always on Top"
+    },
+    "hoverDelay": "Hover delay (seconds)",
+    "modeStandard": "Standard",
+    "modeKeyboard": "Keyboard",
+    "modeGamepad": "Gamepad",
+    "cancel": "Cancel",
+    "delete": "Delete",
+    "select": "Select",
+    "selected": "Selected",
+    "import": "Import",
+    "importing": "Importing...",
+    "builtIn": "built-in"
+  }
+}
