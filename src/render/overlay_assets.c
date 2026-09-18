@@ -7,10 +7,8 @@
 #include <string.h>
 
 void bongo_cat_overlay_clear_textures(BongoCatOverlay *value) {
-    if (value->background) glDeleteTextures(1, &value->background);
-    if (value->composite) glDeleteTextures(1, &value->composite);
-    value->background = 0;
-    value->composite = 0;
+    bongo_cat_texture_release(&value->background);
+    bongo_cat_texture_release(&value->composite);
     value->clean_paws = false;
     value->composed_cover = false;
     value->composite_dirty = false;
@@ -58,15 +56,14 @@ BongoCatResult bongo_cat_overlay_load(BongoCatOverlay *value,
 #endif
     bongo_cat_overlay_clear_textures(value);
     bongo_cat_mver_pointer_overlay_clear(value->mver_pointer);
-    GLuint background = 0;
     BongoCatError background_error = {0};
-    if (bongo_cat_path_is_file(path)) background = bongo_cat_image_texture(path,
-        NULL, NULL, &background_error);
+    bool has_background = bongo_cat_path_is_file(path) &&
+        bongo_cat_texture_from_file(&value->background, path, &background_error);
     BongoCatError pointer_error = {0};
     if (!model_pointer_preferred &&
         !bongo_cat_mver_pointer_overlay_load(value->mver_pointer, directory,
             &pointer_error)) {
-        if (background) glDeleteTextures(1, &background);
+        bongo_cat_texture_release(&value->background);
         *failure = pointer_error;
         if (!failure->message[0] && background_error.message[0])
             *failure = background_error;
@@ -74,9 +71,8 @@ BongoCatResult bongo_cat_overlay_load(BongoCatOverlay *value,
             "Unable to load model overlay");
         return BONGO_CAT_ERROR_IO;
     }
-    if (!background && background_error.message[0])
+    if (!has_background && background_error.message[0])
         SDL_LogWarn(SDL_LOG_CATEGORY_APPLICATION, "%s", background_error.message);
-    value->background = background;
     /* SFML sprites use original pixels at the top-left of the configured view.
        Their image size is not necessarily the size of that view. */
 #ifdef BONGO_CAT_HAS_CUBISM

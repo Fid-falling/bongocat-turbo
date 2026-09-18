@@ -89,6 +89,18 @@ unsigned int bongo_cat_image_texture(const char *path, int *width, int *height, 
     return texture;
 }
 
+unsigned int bongo_cat_image_upload_texture(const BongoCatImage *image,
+    unsigned int texture, bool premultiply) {
+    if (!image || image->width <= 0 || image->height <= 0) return 0;
+    return upload(image, (GLuint)texture, premultiply);
+}
+
+void bongo_cat_image_release_texture(unsigned int texture) {
+    if (!texture) return;
+    GLuint name = (GLuint)texture;
+    glDeleteTextures(1, &name);
+}
+
 unsigned int bongo_cat_image_texture_thumbnail(const char *path, int max_width,
     int max_height, int *width, int *height, BongoCatError *error) {
     BongoCatImage image;
@@ -267,15 +279,30 @@ static bool blend_file(BongoCatImage *base, const char *path, BongoCatError *err
     return valid;
 }
 
+BongoCatResult bongo_cat_image_composite(const char *base, const char *left,
+    const char *right, bool erase_left, bool erase_right, BongoCatImage *out,
+    BongoCatError *error) {
+    if (!out) return BONGO_CAT_ERROR_ARGUMENT;
+    BongoCatImage image;
+    BongoCatResult result = bongo_cat_image_load(base, &image, error);
+    if (result != BONGO_CAT_OK) return result;
+    if (erase_left) erase_paw(&image, true);
+    if (erase_right) erase_paw(&image, false);
+    if (!blend_file(&image, left, error) || !blend_file(&image, right, error)) {
+        bongo_cat_image_free(&image);
+        return BONGO_CAT_ERROR_IO;
+    }
+    *out = image;
+    return BONGO_CAT_OK;
+}
+
 unsigned int bongo_cat_image_composite_texture(const char *base, const char *left,
     const char *right, unsigned int texture, bool erase_left, bool erase_right,
     BongoCatError *error) {
     BongoCatImage image;
-    if (bongo_cat_image_load(base, &image, error) != BONGO_CAT_OK) return 0;
-    if (erase_left) erase_paw(&image, true);
-    if (erase_right) erase_paw(&image, false);
-    bool valid = blend_file(&image, left, error) && blend_file(&image, right, error);
-    if (valid) texture = upload(&image, texture, false);
+    if (bongo_cat_image_composite(base, left, right, erase_left, erase_right,
+            &image, error) != BONGO_CAT_OK) return 0;
+    texture = upload(&image, texture, false);
     bongo_cat_image_free(&image);
     return texture;
 }

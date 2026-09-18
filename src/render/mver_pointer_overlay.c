@@ -27,7 +27,7 @@ static void clear_textures(BongoCatMverPointerOverlay *value) {
     BongoCatPointerTexture *textures[] = {&value->arm, &value->device,
         &value->left, &value->right, &value->side};
     for (size_t index = 0; index < sizeof(textures) / sizeof(textures[0]); ++index) {
-        if (textures[index]->id) glDeleteTextures(1, &textures[index]->id);
+        bongo_cat_texture_release(&textures[index]->texture);
         *textures[index] = (BongoCatPointerTexture){0};
     }
     value->enabled = false;
@@ -36,7 +36,10 @@ static void clear_textures(BongoCatMverPointerOverlay *value) {
 BongoCatMverPointerOverlay *bongo_cat_mver_pointer_overlay_create(
     BongoCatError *error) {
     BongoCatMverPointerOverlay *value = calloc(1, sizeof(*value));
-    if (!value || !bongo_cat_gl_load(&value->gl, error)) {
+    if (!value) return NULL;
+    /* Vulkan 后端没有 GL 上下文: 着色器/顶点缓冲都不创建 */
+    if (bongo_cat_renderer_active() == BONGO_CAT_RENDERER_VULKAN) return value;
+    if (!bongo_cat_gl_load(&value->gl, error)) {
         free(value);
         return NULL;
     }
@@ -72,7 +75,6 @@ void bongo_cat_mver_pointer_overlay_destroy(BongoCatMverPointerOverlay *value) {
     if (value->program) value->gl.delete_program(value->program);
     free(value);
 }
-
 void bongo_cat_mver_pointer_overlay_clear(BongoCatMverPointerOverlay *value) {
     if (value) clear_textures(value);
 }
@@ -101,11 +103,11 @@ static bool load_texture(const char *directory, const char *relative,
             "Missing Mver pointer asset: %s", relative);
         return !required;
     }
-    texture->id = bongo_cat_image_texture(path, &texture->width,
-        &texture->height, error);
-    return texture->id != 0;
+    if (!bongo_cat_texture_from_file(&texture->texture, path, error)) return false;
+    texture->width = texture->texture.width;
+    texture->height = texture->texture.height;
+    return true;
 }
-
 static double number_or(yyjson_val *value, double fallback) {
     return yyjson_is_num(value) ? yyjson_get_num(value) : fallback;
 }

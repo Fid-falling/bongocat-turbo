@@ -18,6 +18,7 @@ typedef struct BongoCatI18n BongoCatI18n;
 typedef struct BongoCatMultiPetRuntime BongoCatMultiPetRuntime;
 typedef struct BongoCatModelRefresh BongoCatModelRefresh;
 typedef struct BongoCatUpdateService BongoCatUpdateService;
+typedef struct BongoCatVk BongoCatVk;
 
 #define BONGO_CAT_MODEL_COVER_PENDING_CAP 8
 
@@ -57,6 +58,8 @@ typedef struct BongoCatApp {
     BongoCatUpdateService *update;
     SDL_Window *window;
     void *gl_context;
+    /* 只有 Vulkan 后端被选中时非空; 两条路互斥, 不会同时存在。 */
+    BongoCatVk *vk;
     char settings_path[BONGO_CAT_PATH_CAP];
     char session_path[BONGO_CAT_PATH_CAP];
     char config_root[BONGO_CAT_PATH_CAP];

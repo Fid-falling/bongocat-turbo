@@ -107,15 +107,18 @@ void bongo_cat_window_mask_corners(BongoCatApp *app, int width, int height) {
     }
 }
 
-void bongo_cat_window_clear_background(BongoCatApp *app) {
-    BongoCatWindowPreferences *window = &app->settings.window;
-    uint32_t rgb = bongo_cat_obs_background_color_rgb(
-        window->obs_background_color);
+/*
+ * 背景色是两条渲染路径共用的状态: OpenGL 用它 glClearColor, Vulkan 用它做
+ * 渲染通道的 clear 值。这里只算颜色, 不碰任何 GPU 状态。
+ */
+void bongo_cat_window_background_rgba(const BongoCatApp *app, float rgba[4]) {
+    const BongoCatWindowPreferences *window = &app->settings.window;
+    uint32_t rgb = bongo_cat_obs_background_color_rgb(window->obs_background_color);
     float alpha = window->obs_background ? 1.0f : 0.0f;
-    glClearColor(window->obs_background ? ((rgb >> 16) & 255) / 255.0f : 0.0f,
-        window->obs_background ? ((rgb >> 8) & 255) / 255.0f : 0.0f,
-        window->obs_background ? (rgb & 255) / 255.0f : 0.0f, alpha);
-    glClear(GL_COLOR_BUFFER_BIT);
+    rgba[0] = window->obs_background ? ((rgb >> 16) & 255) / 255.0f : 0.0f;
+    rgba[1] = window->obs_background ? ((rgb >> 8) & 255) / 255.0f : 0.0f;
+    rgba[2] = window->obs_background ? (rgb & 255) / 255.0f : 0.0f;
+    rgba[3] = alpha;
     static int last_enabled = -1;
     static BongoCatObsBackgroundColor last_color =
         BONGO_CAT_OBS_BACKGROUND_COLOR_COUNT;
@@ -127,4 +130,11 @@ void bongo_cat_window_clear_background(BongoCatApp *app) {
             window->obs_background,
             bongo_cat_obs_background_color_name(window->obs_background_color));
     }
+}
+
+void bongo_cat_window_clear_background(BongoCatApp *app) {
+    float rgba[4];
+    bongo_cat_window_background_rgba(app, rgba);
+    glClearColor(rgba[0], rgba[1], rgba[2], rgba[3]);
+    glClear(GL_COLOR_BUFFER_BIT);
 }

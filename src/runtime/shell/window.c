@@ -1,7 +1,47 @@
 #include "runtime.h"
 #include "bongo_cat/render.h"
+#include "bongo_cat/vk_backend.h"
 #include <SDL3/SDL_opengl.h>
 #include <stdio.h>
+
+static bool test_transparency_disabled(void) {
+    return SDL_getenv("BONGO_CAT_TEST_DISABLE_PREFERENCES_TRANSPARENCY") != NULL;
+}
+
+/*
+ * Vulkan 主窗口。与 OpenGL 路径的区别:
+ *  - 窗口带 SDL_WINDOW_VULKAN, 不设置任何 GL 属性;
+ *  - 没有 MSAA 重试循环, 交换链的取样设置在渲染通道里;
+ *  - 失败时把原因写进 error, 调用方切回 OpenGL 再试一次。
+ */
+static bool try_vulkan_window(BongoCatApp *app, BongoCatError *error) {
+    bool transparent = !test_transparency_disabled();
+    SDL_WindowFlags flags = SDL_WINDOW_VULKAN | SDL_WINDOW_BORDERLESS |
+        SDL_WINDOW_HIGH_PIXEL_DENSITY | SDL_WINDOW_HIDDEN;
+    if (transparent) flags |= SDL_WINDOW_TRANSPARENT;
+    app->window = SDL_CreateWindow(BONGO_CAT_PET_WINDOW_TITLE,
+        app->session.window.width, app->session.window.height, flags);
+    if (!app->window) {
+        bongo_cat_error_set(error, BONGO_CAT_ERROR_PLATFORM,
+            "Vulkan 窗口创建失败: %s", SDL_GetError());
+        return false;
+    }
+    app->vk = bongo_cat_vk_create(app->window, error);
+    if (!app->vk) {
+        if (!error->message[0])
+            bongo_cat_error_set(error, BONGO_CAT_ERROR_PLATFORM,
+                "Vulkan 后端初始化失败");
+        SDL_DestroyWindow(app->window);
+        app->window = NULL;
+        return false;
+    }
+    BongoCatVkInfo info = {0};
+    if (bongo_cat_vk_info(app->vk, &info))
+        SDL_Log("[runtime] Vulkan 窗口就绪 (transparent=%d, device=%s, driver=%s, "
+            "api=%s, swapchain=%dx%d)", transparent ? 1 : 0, info.device,
+            info.driver, info.api, info.width, info.height);
+    return true;
+}
 
 static bool set_gl_attributes(int samples) {
     SDL_GL_ResetAttributes();
@@ -24,7 +64,7 @@ static bool set_gl_attributes(int samples) {
 
 static bool try_window(BongoCatApp *app, bool transparent, int samples,
     char *failure, size_t capacity) {
-    if (SDL_getenv("BONGO_CAT_TEST_DISABLE_PREFERENCES_TRANSPARENCY"))
+    if (test_transparency_disabled())
         transparent = false;
     if (!set_gl_attributes(samples)) {
         snprintf(failure, capacity, "OpenGL attributes: %s", SDL_GetError()); return false;
@@ -63,11 +103,15 @@ BongoCatResult bongo_cat_window_create(BongoCatApp *app, BongoCatError *error) {
             "SDL initialization failed: %s", SDL_GetError());
         return BONGO_CAT_ERROR_PLATFORM;
     }
-    /* 选定渲染后端。阶段 1 只有 OpenGL 后端是实现的, 所以请求 Vulkan 时
-       bongo_cat_renderer_select() 会把原因写进日志并回退, 下面照旧走 GL 的
-       窗口创建。Vulkan 后端落地后, 这里按 bongo_cat_renderer_active() 分叉
-       窗口标志 (SDL_WINDOW_OPENGL 与 SDL_WINDOW_VULKAN)。 */
+    /* 选定渲染后端。Vulkan 可用时按 SDL_WINDOW_VULKAN 建窗并初始化设备;
+       初始化失败 (驱动/设备被占用等) 会在下面回退到 OpenGL 重试一次。 */
     bongo_cat_renderer_select(app->settings.model.renderer);
+    if (bongo_cat_renderer_active() == BONGO_CAT_RENDERER_VULKAN) {
+        BongoCatError vk_error = {0};
+        if (try_vulkan_window(app, &vk_error)) return BONGO_CAT_OK;
+        bongo_cat_renderer_fallback(BONGO_CAT_RENDERER_VULKAN,
+            vk_error.message);
+    }
     /* Keep a lower-cost MSAA path for drivers that cannot provide 4 samples. */
     const int options[][2] = {{true, 4}, {true, 2}, {true, 0}, {false, 0}};
     char failure[256] = {0};
@@ -243,6 +287,10 @@ bool bongo_cat_window_event(BongoCatApp *app, const SDL_Event *event) {
 
 void bongo_cat_window_destroy(BongoCatApp *app) {
     bongo_cat_window_drag_end(app);
+    if (app->vk) {
+        bongo_cat_vk_destroy(app->vk);
+        app->vk = NULL;
+    }
     if (app->gl_context && SDL_GL_MakeCurrent(app->window, app->gl_context))
         bongo_cat_window_destroy_corner_mask();
     if (app->gl_context) SDL_GL_DestroyContext(app->gl_context);

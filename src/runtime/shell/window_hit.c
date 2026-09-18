@@ -1,5 +1,6 @@
 #include "runtime.h"
 #include "bongo_cat/preferences.h"
+#include "bongo_cat/render.h"
 
 #include <SDL3/SDL_opengl.h>
 
@@ -23,6 +24,11 @@ bool bongo_cat_window_visible_at_pointer(BongoCatApp *app, float x, float y) {
     int pixel_x = SDL_clamp((int)(x * pixel_width / width), 0, pixel_width - 1);
     int pixel_y = pixel_height - 1 -
         SDL_clamp((int)(y * pixel_height / height), 0, pixel_height - 1);
+    if (bongo_cat_renderer_active() == BONGO_CAT_RENDERER_VULKAN) {
+        /* 阶段 2: Vulkan 路径的逐像素命中测试 (交换链回读) 还没接上, 先按
+           "整窗不透明" 处理。宁可多点一下, 也不要把窗口变成不可点。 */
+        return true;
+    }
     uint8_t presented_alpha = 0;
     if (bongo_cat_platform_frame_alpha(&app->platform, pixel_width, pixel_height,
         pixel_x, pixel_y, &presented_alpha)) return presented_alpha > 8;

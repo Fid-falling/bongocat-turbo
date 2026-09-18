@@ -11,13 +11,15 @@ extern "C" {
 /*
  * 渲染后端选择。
  *
- * 阶段 1 现状: 只有 OpenGL 后端是实现的。Vulkan 的编译期能力 (SDL_Vulkan_*,
- * headers, 链接) 会随 BONGO_CAT_ENABLE_VULKAN 一起就绪, 但渲染器本身尚未实现,
- * 所以 bongo_cat_renderer_available(BONGO_CAT_RENDERER_VULKAN) 仍然返回 false。
- * 这样用户可以在设置里表达偏好并被正确持久化, 而运行时不会去启动一条走不通的路。
+ * 阶段 1: OpenGL 后端 + Vulkan 的编译期能力与设置项。
+ * 阶段 2: Vulkan 后端落地 (设备/交换链/呈现/主窗口绘制)。于是可用性判断不再
+ * 只看编译开关, 还要真的探测到可用设备: compiled_in 说的是"这次构建编进来了
+ * 没有", available 说的是"这次构建 + 这台机器此刻能不能真的跑起来"。
+ * 不可用时 bongo_cat_renderer_resolve() 回退 OpenGL 并把原因写进日志; 运行中
+ * 初始化失败则调用 bongo_cat_renderer_fallback() 走同一条回退。
  */
 
-/* 这次构建是否编入了该后端的支持 (不代表后端已实现) */
+/* 这次构建是否编入了该后端的支持 */
 bool bongo_cat_renderer_compiled_in(BongoCatRenderer value);
 
 /* 该后端此刻是否真的能用 */
@@ -32,6 +34,9 @@ BongoCatRenderer bongo_cat_renderer_resolve(BongoCatRenderer requested);
 /* 启动时选定一次, 之后渲染/平台层查询 bongo_cat_renderer_active() */
 void bongo_cat_renderer_select(BongoCatRenderer requested);
 BongoCatRenderer bongo_cat_renderer_active(void);
+
+/* 已选定的后端在初始化阶段失败: 记录原因并立刻切回 OpenGL */
+void bongo_cat_renderer_fallback(BongoCatRenderer failed, const char *reason);
 
 /* 用于日志和设置界面 */
 const char *bongo_cat_renderer_description(BongoCatRenderer value);

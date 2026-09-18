@@ -6,6 +6,7 @@
 #include "bongo_cat/audio.h"
 #include "bongo_cat/overlay.h"
 #include "bongo_cat/preferences.h"
+#include "bongo_cat/render.h"
 
 #include <SDL3/SDL.h>
 #include <SDL3/SDL_opengl.h>
@@ -157,8 +158,12 @@ bool bongo_cat_app_select_model_with_error(BongoCatApp *app,
     if (app->window) SDL_GetWindowSizeInPixels(app->window, &pixel_width, &pixel_height);
     SDL_Window *previous_window = SDL_GL_GetCurrentWindow();
     SDL_GLContext previous_context = SDL_GL_GetCurrentContext();
-    bool restore_context = previous_window != app->window ||
-        previous_context != app->gl_context;
+    /* Vulkan 后端没有 OpenGL 上下文: 模型加载不再切换 GL 上下文, 也不读取
+       glGetError, 其余流程完全一致。 */
+    const bool gl_backend =
+        bongo_cat_renderer_active() != BONGO_CAT_RENDERER_VULKAN;
+    bool restore_context = gl_backend && (previous_window != app->window ||
+        previous_context != app->gl_context);
     if (restore_context && !SDL_GL_MakeCurrent(app->window, app->gl_context)) {
         bongo_cat_error_set(failure, BONGO_CAT_ERROR_PLATFORM,
             "Cannot activate the main OpenGL context: %s", SDL_GetError());
@@ -170,7 +175,7 @@ bool bongo_cat_app_select_model_with_error(BongoCatApp *app,
     snprintf(previous_model, sizeof(previous_model), "%s",
         app->loaded_model[0] ? app->loaded_model : "none");
     uint64_t load_started_ns = SDL_GetTicksNS();
-    GLenum initial_gl_error = glGetError();
+    GLenum initial_gl_error = gl_backend ? glGetError() : 0;
     SDL_Log("[runtime] Model switch transaction: stage=begin previous=%s next=%s "
         "main_window=%p main_context=%p current_window=%p current_context=%p "
         "gl_error=0x%x", previous_model, entry->id, (void *)app->window,
@@ -191,7 +196,7 @@ bool bongo_cat_app_select_model_with_error(BongoCatApp *app,
             "stage=failed previous=%s next=%s elapsed_ms=%.2f gl_error=0x%x "
             "error=%s", previous_model, entry->id,
             (double)(SDL_GetTicksNS() - load_started_ns) / 1000000.0,
-            (unsigned)glGetError(), failure->message);
+            gl_backend ? (unsigned)glGetError() : 0u, failure->message);
         if (restore_context && previous_window && previous_context &&
             !SDL_GL_MakeCurrent(previous_window, previous_context))
             SDL_LogError(SDL_LOG_CATEGORY_APPLICATION,
@@ -273,7 +278,7 @@ bool bongo_cat_app_select_model_with_error(BongoCatApp *app,
         "gl_error=0x%x", previous_model, entry->id,
         (double)(SDL_GetTicksNS() - load_started_ns) / 1000000.0,
         (void *)SDL_GL_GetCurrentWindow(), (void *)SDL_GL_GetCurrentContext(),
-        (unsigned)glGetError());
+        gl_backend ? (unsigned)glGetError() : 0u);
     model_runtime_stage(app, "completed", entry);
     model_running_stage(app, entry->id);
     return true;

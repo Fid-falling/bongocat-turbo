@@ -24,12 +24,21 @@ static const char *fragment_source =
 
 BongoCatOverlay *bongo_cat_overlay_create(BongoCatError *error) {
     BongoCatOverlay *value = calloc(1, sizeof(*value));
-    if (!value || !bongo_cat_gl_load(&value->gl, error)) {
+    if (!value) return NULL;
+    value->mver_pointer = bongo_cat_mver_pointer_overlay_create(error);
+    if (!value->mver_pointer) {
         free(value);
         return NULL;
     }
+    /* Vulkan 后端没有 OpenGL 上下文: 着色器/VAO/VBO 都不创建, 绘制走
+       vk_backend 的管线。 */
+    if (bongo_cat_renderer_active() == BONGO_CAT_RENDERER_VULKAN) return value;
+    if (!bongo_cat_gl_load(&value->gl, error)) {
+        bongo_cat_overlay_destroy(value);
+        return NULL;
+    }
     value->program = bongo_cat_gl_program(&value->gl, vertex_source, fragment_source, error);
-    if (!value->program) { free(value); return NULL; }
+    if (!value->program) { bongo_cat_overlay_destroy(value); return NULL; }
     value->mirror_location = value->gl.uniform_location(value->program, "mirror");
     value->image_location = value->gl.uniform_location(value->program, "image");
     value->reference_width_location = value->gl.uniform_location(value->program,
@@ -49,11 +58,6 @@ BongoCatOverlay *bongo_cat_overlay_create(BongoCatError *error) {
     value->gl.enable_attribute(1);
     value->gl.attribute_pointer(1, 2, GL_FLOAT, GL_FALSE, sizeof(float) * 4,
         (const void *)(sizeof(float) * 2));
-    value->mver_pointer = bongo_cat_mver_pointer_overlay_create(error);
-    if (!value->mver_pointer) {
-        bongo_cat_overlay_destroy(value);
-        return NULL;
-    }
     return value;
 }
 

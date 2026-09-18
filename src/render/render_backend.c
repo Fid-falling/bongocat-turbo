@@ -1,5 +1,8 @@
 #include "bongo_cat/render.h"
 #include "bongo_cat/log.h"
+#include "bongo_cat/vk_backend.h"
+
+#include <stdio.h>
 
 /*
  * 日志类别说明: 项目的日志策略 (bongo_cat/log.h) 只对 LIFECYCLE/UPDATE/INPUT
@@ -7,13 +10,14 @@
  * 必须挂在 BONGO_CAT_LOG_LIFECYCLE 上, 否则用户根本看不到实际用的是哪个后端。
  *
  * Vulkan 后端的实现进度开关。
- * BONGO_CAT_HAS_VULKAN 只说明"这次构建带了 Vulkan 的编译期能力";
- * 渲染器本身 (交换链/管线/同步) 属于后续阶段, 在它落地之前这里保持 0,
- * 免得设置里选了 Vulkan 之后启动到一半失败。
+ * 0 = 只有编译期能力 (设置里能选, 运行时回退 OpenGL);
+ * 1 = 设备/交换链/主窗口绘制已经落地, 选中即真正生效。
  */
-#define BONGO_CAT_VULKAN_BACKEND_IMPLEMENTED 0
+#define BONGO_CAT_VULKAN_BACKEND_IMPLEMENTED 1
 
 static BongoCatRenderer active_renderer = BONGO_CAT_RENDERER_OPENGL;
+/* 探测失败原因需要活到调用方读完, 所以放在静态缓冲里。 */
+static char vk_unavailable_reason[256];
 
 bool bongo_cat_renderer_compiled_in(BongoCatRenderer value) {
     switch (value) {
@@ -39,10 +43,20 @@ const char *bongo_cat_renderer_unavailable_reason(BongoCatRenderer value) {
     case BONGO_CAT_RENDERER_VULKAN:
         if (!bongo_cat_renderer_compiled_in(value))
             return "此构建未启用 Vulkan (需要 -DBONGO_CAT_ENABLE_VULKAN=ON)";
-#if BONGO_CAT_VULKAN_BACKEND_IMPLEMENTED
-        return NULL;
-#else
+#if !BONGO_CAT_VULKAN_BACKEND_IMPLEMENTED
         return "Vulkan 后端尚未实现, 目前只有 OpenGL 可用";
+#elif defined(BONGO_CAT_HAS_CUBISM)
+        /* Cubism 模型的渲染器仍然是 OpenGL 实现, 在它移植完成之前, 让带
+           Cubism 的构建明确地留在 OpenGL 上, 而不是画出一个没有模型的窗口。 */
+        return "Vulkan 后端尚未支持 Cubism 模型渲染, 请使用 OpenGL";
+#else
+        {
+            BongoCatError probe = {0};
+            if (bongo_cat_vk_probe(&probe)) return NULL;
+            snprintf(vk_unavailable_reason, sizeof(vk_unavailable_reason), "%s",
+                probe.message[0] ? probe.message : "Vulkan 设备不可用");
+            return vk_unavailable_reason;
+        }
 #endif
     case BONGO_CAT_RENDERER_AUTO:
         return NULL; /* AUTO 本身不可选, 由 resolve 展开 */
@@ -57,6 +71,8 @@ bool bongo_cat_renderer_available(BongoCatRenderer value) {
 }
 
 BongoCatRenderer bongo_cat_renderer_resolve(BongoCatRenderer requested) {
+    /* AUTO 暂时固定解析成 OpenGL: 等 Vulkan 后端覆盖主窗口的全部绘制 (含圆角
+       遮罩与命中测试回读) 之后再让 AUTO 优先选它。 */
     if (requested == BONGO_CAT_RENDERER_AUTO) return BONGO_CAT_RENDERER_OPENGL;
     if (bongo_cat_renderer_available(requested)) return requested;
     SDL_LogWarn(BONGO_CAT_LOG_LIFECYCLE,
@@ -74,6 +90,14 @@ void bongo_cat_renderer_select(BongoCatRenderer requested) {
         bongo_cat_renderer_name(active_renderer),
         bongo_cat_renderer_compiled_in(BONGO_CAT_RENDERER_VULKAN) ? "是" : "否",
         BONGO_CAT_VULKAN_BACKEND_IMPLEMENTED);
+}
+
+void bongo_cat_renderer_fallback(BongoCatRenderer failed, const char *reason) {
+    if (failed != BONGO_CAT_RENDERER_VULKAN) return;
+    active_renderer = BONGO_CAT_RENDERER_OPENGL;
+    SDL_LogWarn(BONGO_CAT_LOG_LIFECYCLE,
+        "[render] %s 初始化失败 (%s), 本次运行回退到 OpenGL",
+        bongo_cat_renderer_name(failed), reason && reason[0] ? reason : "未知原因");
 }
 
 BongoCatRenderer bongo_cat_renderer_active(void) {

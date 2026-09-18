@@ -26,13 +26,22 @@ set(BONGO_CAT_MEDIA_SOURCES
 
 set(BONGO_CAT_RENDER_SOURCES
   src/render/render_backend.c
+  src/render/render_texture.c
   src/render/gl_api.c
   src/render/overlay.c
   src/render/overlay_assets.c
   src/render/overlay_input.c
   src/render/overlay_draw.c
   src/render/mver_pointer_overlay.c
-  src/render/mver_pointer_overlay_draw.c)
+  src/render/mver_pointer_overlay_draw.c
+  # Vulkan 后端。文件内部按 BONGO_CAT_HAS_VULKAN 分叉: 未启用时只编出
+  # 一组返回失败/空指针的桩, 让调用方不必到处写 #ifdef。
+  src/render/vk/vk_core.c
+  src/render/vk/vk_swapchain.c
+  src/render/vk/vk_frame.c
+  src/render/vk/vk_texture.c
+  src/render/vk/vk_draw.c
+  src/render/vk/vk_scene.c)
 
 set(BONGO_CAT_RUNTIME_LIFECYCLE_SOURCES
   src/runtime/lifecycle/app.c

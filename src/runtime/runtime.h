@@ -39,6 +39,10 @@ void bongo_cat_startup_ci_failure(BongoCatApp *app, const BongoCatError *error);
 void bongo_cat_window_destroy(BongoCatApp *app);
 void bongo_cat_window_apply(BongoCatApp *app);
 bool bongo_cat_window_event(BongoCatApp *app, const SDL_Event *event);
+/* 主窗口背景色 (OBS 背景模式), 两条渲染路径共用 */
+void bongo_cat_window_background_rgba(const BongoCatApp *app, float rgba[4]);
+/* Vulkan 后端的主窗口一帧: 开始 -> 绘制 -> 提交呈现 */
+bool bongo_cat_vk_render_main(BongoCatApp *app, bool present);
 bool bongo_cat_window_visible_at_pointer(BongoCatApp *app, float x, float y);
 void bongo_cat_window_capture_pointer_hit(BongoCatApp *app);
 void bongo_cat_window_mark_hit_dirty(BongoCatApp *app);

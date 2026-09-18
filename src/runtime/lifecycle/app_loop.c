@@ -4,6 +4,7 @@
 #include "model_cover.h"
 #include "bongo_cat/overlay.h"
 #include "bongo_cat/preferences.h"
+#include "bongo_cat/render.h"
 #include "bongo_cat/tray.h"
 
 #include <SDL3/SDL_opengl.h>
@@ -32,6 +33,10 @@ static bool render(BongoCatApp *app, bool present) {
         bongo_cat_window_snapshot_present(app);
         return app->window_snapshot != NULL;
     }
+    /* Vulkan 后端有自己的一整条帧路径 (交换链获取/绘制/呈现), 这里直接分叉,
+       不碰任何 OpenGL 状态。 */
+    if (bongo_cat_renderer_active() == BONGO_CAT_RENDERER_VULKAN)
+        return bongo_cat_vk_render_main(app, present);
     uint64_t now = SDL_GetTicksNS();
     if (app->render_retry_ns > now) return false;
     if (!SDL_GL_MakeCurrent(app->window, app->gl_context)) {

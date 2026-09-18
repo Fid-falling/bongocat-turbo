@@ -4,9 +4,11 @@
 #include "mver_pointer_overlay.h"
 #include "bongo_cat/gl_api.h"
 #include "bongo_cat/mver_pointer.h"
+#include "bongo_cat/render.h"
+#include "render_texture.h"
 
 typedef struct BongoCatPointerTexture {
-    unsigned int id;
+    BongoCatTexture texture;
     int width;
     int height;
 } BongoCatPointerTexture;
