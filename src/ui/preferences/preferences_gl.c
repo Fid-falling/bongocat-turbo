@@ -97,9 +97,14 @@ void bongo_cat_preferences_gl_destroy(BongoCatPreferences *value) {
     SDL_Log("[runtime] Preferences OpenGL context release: "
         "settings_window=%p settings_context=%p current_window=%p "
         "current_context=%p", (void *)value->window,
-        (void *)value->gl_context, (void *)SDL_GL_GetCurrentWindow(),
-        (void *)SDL_GL_GetCurrentContext());
-    if (SDL_GL_GetCurrentContext() == value->gl_context) {
+        (void *)value->gl_context,
+        value->prefer_vulkan ? (void *)0 : (void *)SDL_GL_GetCurrentWindow(),
+        value->prefer_vulkan ? (void *)0 : (void *)SDL_GL_GetCurrentContext());
+    /*
+     * SDL_GL_GetCurrentContext() 会去问 GL 驱动; 设置窗口在 Vulkan 模式下没有 GL
+     * 上下文, 不该碰它 (WER 显示崩在 nvoglv64.dll, 0xc0000005)。
+     */
+    if (!value->prefer_vulkan && SDL_GL_GetCurrentContext() == value->gl_context) {
         /* 主窗口是 Vulkan 时没有 GL 上下文可切回, 直接解绑。 */
         SDL_GL_MakeCurrent(value->app->gl_context ? value->app->window : NULL,
             value->app->gl_context);
