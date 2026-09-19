@@ -34,7 +34,14 @@ typedef struct DialBatch { unsigned int texture; int first, count; } DialBatch;
 typedef struct DialCover { unsigned int texture; float width, height; bool attempted; } DialCover;
 typedef struct DialPaint {
     BongoCatGL gl;
-    GLuint program, vao, vbo, white, font_texture;
+    GLuint program, vao, vbo, white, font_texture;
+    /*
+     * Vulkan 菜单窗口的纹理句柄表: 批/封面里存的是 id, 画的时候要换成
+     * bongo_cat_vk_draw_triangles 需要的纹理指针。id = 下标 + 1。
+     * 与设置窗口里 BongoCatUIBackend.vk_textures[] 同一套做法。
+     */
+    struct BongoCatVkTexture *vk_textures[8];
+    struct BongoCatVk *vk;
     GLint projection, sampler;
     DialVertex *vertices;
     size_t count, capacity;
@@ -93,6 +100,11 @@ bool dial_paint_frame(Dial *d);
 void dial_scene(Dial *d);
 void dial_triangle(Dial *d, DialPoint a, DialPoint b, DialPoint c,
     uint32_t ca, uint32_t cb, uint32_t cc);
+/* Vulkan 纹理句柄表 (id = 下标 + 1, 0 表示无) */
+int dial_vk_texture_register(Dial *d, struct BongoCatVkTexture *texture);
+struct BongoCatVkTexture *dial_vk_texture_lookup(const Dial *d, unsigned int id);
+void dial_vk_texture_release(Dial *d, unsigned int id);
+
 void dial_quad(Dial *d, unsigned int texture, float x, float y, float w, float h,
     float u0, float v0, float u1, float v1, uint32_t color);
 void dial_stroke(Dial *d, const DialPoint *points, int count, float width,

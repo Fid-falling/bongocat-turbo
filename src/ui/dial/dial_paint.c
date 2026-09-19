@@ -1,4 +1,5 @@
 #include "dial_internal.h"
+#include "bongo_cat/vk_backend.h"
 #include <stddef.h>
 #include <stdlib.h>
 
@@ -76,6 +77,32 @@ bool dial_paint_frame(Dial *d) {
     }
     if (glGetError() != GL_NO_ERROR) return SDL_SetError("Radial menu OpenGL draw failed");
     return SDL_GL_SwapWindow(d->window);
+}
+
+/*
+ * Vulkan 菜单纹理表: 与设置窗口的界面纹理表同构 (id = 下标 + 1)。
+ * 现在只登记/查找/注销句柄, 真正在绘制里使用要等 dial_paint 的 Vulkan 分支落地。
+ */
+int dial_vk_texture_register(Dial *d, struct BongoCatVkTexture *texture) {
+    if (!d || !texture) return 0;
+    for (int i = 0; i < 8; ++i) {
+        if (d->paint.vk_textures[i]) continue;
+        d->paint.vk_textures[i] = texture;
+        return i + 1;
+    }
+    return 0;
+}
+
+struct BongoCatVkTexture *dial_vk_texture_lookup(const Dial *d, unsigned int id) {
+    if (!d || id == 0 || id > 8) return NULL;
+    return d->paint.vk_textures[id - 1];
+}
+
+void dial_vk_texture_release(Dial *d, unsigned int id) {
+    if (!d || id == 0 || id > 8) return;
+    struct BongoCatVkTexture *texture = d->paint.vk_textures[id - 1];
+    d->paint.vk_textures[id - 1] = NULL;
+    if (texture && d->paint.vk) bongo_cat_vk_texture_destroy(d->paint.vk, texture);
 }
 
 void dial_paint_free(Dial *d) {
