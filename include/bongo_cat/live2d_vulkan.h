@@ -1,6 +1,14 @@
 #ifndef BONGO_CAT_LIVE2D_VULKAN_H
 #define BONGO_CAT_LIVE2D_VULKAN_H
 
+/*
+ * 这个头文件由 C (运行时窗口代码) 与 C++ (桥的实现) 共用, 必须显式给出
+ * C 链接, 否则 C 侧按未修饰名调用、C++ 侧按修饰名定义, 链接期对不上。
+ */
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 #include <stdbool.h>
 
 struct BongoCatVk;
@@ -37,5 +45,9 @@ bool bongo_cat_live2d_vulkan_bind_texture(void *renderer, void *texture);
 /* 离屏结果 (纹理与尺寸), 供合成到宠物窗口时使用 */
 bool bongo_cat_live2d_vulkan_target_info(void **image, void **view, void **sampler,
     int *width, int *height);
+
+#ifdef __cplusplus
+} /* extern "C" */
+#endif
 
 #endif

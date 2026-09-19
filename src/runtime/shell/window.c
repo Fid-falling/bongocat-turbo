@@ -1,6 +1,7 @@
 #include "runtime.h"
 #include "bongo_cat/render.h"
 #include "bongo_cat/vk_backend.h"
+#include "bongo_cat/live2d_vulkan.h"
 #include <SDL3/SDL_opengl.h>
 #include <stdio.h>
 
@@ -43,6 +44,15 @@ static bool try_vulkan_window(BongoCatApp *app, BongoCatError *error) {
         return false;
     }
     BongoCatVkInfo info = {0};
+    /*
+     * Cubism 的 Live2D 渲染器要提前知道用哪个设备与离屏目标: 窗口一建好就挂上
+     * (桥内部会把渲染器工厂切到 Vulkan)。失败不影响任何事 —— 桥会一直返回
+     * false, 上层据此保留 OpenGL 路径。
+     */
+    if (!bongo_cat_live2d_vulkan_attach(app->vk, info.width, info.height))
+        SDL_LogWarn(SDL_LOG_CATEGORY_VIDEO,
+            "[vulkan] Live2D 的 Vulkan 渲染器未挂载, Live2D 将回退 OpenGL");
+
     if (bongo_cat_vk_info(app->vk, &info))
         SDL_Log("[runtime] Vulkan 窗口就绪 (transparent=%d, device=%s, driver=%s, "
             "api=%s, swapchain=%dx%d)", transparent ? 1 : 0, info.device,
