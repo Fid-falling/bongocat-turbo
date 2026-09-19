@@ -212,6 +212,21 @@ bool bongo_cat_live2d_vulkan_begin_frame(void) {
     if (!device_info || !device_info->GetOffscreenManager()) return false;
     device_info->GetOffscreenManager()->BeginFrameProcess();
     VkExtent2D extent = {g_target->GetBufferWidth(), g_target->GetBufferHeight()};
+    /*
+     * 每帧刷新 SDK 的静态设置。窗口改尺寸会重建我们的交换链 (新的 imageView),
+     * 而 SDK 把这些值缓存在静态变量里 —— 只在 attach 时设过一次的话, resize 之后
+     * 它仍按旧 extent/旧 imageView 记账, 在遮罩目标 BeginDraw 里越界
+     * (校验层拖慢时稳定复现)。SetConstantSettings 只是纯赋值, 每帧调用开销可忽略。
+     */
+    BongoCatVkNativeInfo current = {0};
+    if (g_vk && bongo_cat_vk_native_info(g_vk, &current)) {
+        Csm::Rendering::CubismRenderer_Vulkan::SetConstantSettings(
+            (VkDevice)current.device, (VkPhysicalDevice)current.physical_device,
+            (VkCommandPool)current.command_pool, (VkQueue)current.queue,
+            (unsigned int)current.image_count, extent,
+            (VkImageView)current.image_view, (VkFormat)current.image_format,
+            kDepthFormat);
+    }
     Csm::Rendering::CubismRenderer_Vulkan::SetImageExtent(extent);
     Csm::Rendering::CubismRenderer_Vulkan::SetRenderTarget(g_target->GetTextureImage(),
         g_target->GetTextureView(), g_format, extent);
