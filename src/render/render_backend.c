@@ -77,9 +77,14 @@ bool bongo_cat_renderer_available(BongoCatRenderer value) {
 }
 
 BongoCatRenderer bongo_cat_renderer_resolve(BongoCatRenderer requested) {
-    /* AUTO 暂时固定解析成 OpenGL: 等 Vulkan 后端覆盖主窗口的全部绘制 (含圆角
-       遮罩与命中测试回读) 之后再让 AUTO 优先选它。 */
-    if (requested == BONGO_CAT_RENDERER_AUTO) return BONGO_CAT_RENDERER_OPENGL;
+    /*
+     * AUTO 现在优先选 Vulkan: 主窗口的绘制 (Live2D 渲染、圆角遮罩、命中回读)
+     * 都已在 Vulkan 上验证可用, 且初始化失败会回退 OpenGL
+     * (见 window.c 的回退路径与 BONGO_CAT_TEST_VULKAN_FALLBACK 钩子)。
+     */
+    if (requested == BONGO_CAT_RENDERER_AUTO)
+        return bongo_cat_renderer_available(BONGO_CAT_RENDERER_VULKAN)
+            ? BONGO_CAT_RENDERER_VULKAN : BONGO_CAT_RENDERER_OPENGL;
     if (bongo_cat_renderer_available(requested)) return requested;
     SDL_LogWarn(BONGO_CAT_LOG_LIFECYCLE,
         "[render] 请求的后端 %s 不可用 (%s), 回退到 OpenGL",
