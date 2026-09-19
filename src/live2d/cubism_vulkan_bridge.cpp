@@ -66,11 +66,20 @@ bool bongo_cat_live2d_vulkan_attach(struct BongoCatVk *vk, int width, int height
      * SetConstantSettings 里建的, 提前建离屏目标会因为拿不到它们而失败。
      * 默认目标先用交换链第 0 张图像 (没有视图时传 NULL)。
      */
+    SDL_LogWarn(SDL_LOG_CATEGORY_VIDEO,
+        "[live2d/vk] attach: Step 1 SetConstantSettings (view=%p extent=%dx%d "
+        "format=%d depth=%d images=%d)",
+        (void *)info.image_view, width, height, (int)g_format,
+        (int)kDepthFormat, info.image_count);
     Csm::Rendering::CubismRenderer_Vulkan::SetConstantSettings(g_device,
         (VkPhysicalDevice)info.physical_device, (VkCommandPool)info.command_pool,
         (VkQueue)info.queue, (unsigned int)info.image_count, extent,
         (VkImageView)info.image_view, g_format, kDepthFormat);
     Csm::Rendering::CubismRenderer_Vulkan::EnableChangeRenderTarget();
+    SDL_LogWarn(SDL_LOG_CATEGORY_VIDEO,
+        "[live2d/vk] attach: Step 2 SetConstantSettings 返回");
+    SDL_LogWarn(SDL_LOG_CATEGORY_VIDEO,
+        "[live2d/vk] attach: Step 3 CreateRenderTarget %dx%d", width, height);
     auto *target = CSM_NEW Csm::Rendering::CubismRenderTarget_Vulkan();
     target->CreateRenderTarget(g_device, (VkPhysicalDevice)info.physical_device,
         (unsigned int)width, (unsigned int)height, g_format, kDepthFormat);
