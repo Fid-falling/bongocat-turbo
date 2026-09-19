@@ -94,6 +94,7 @@ void bongo_cat_preferences_render(BongoCatPreferences *value) {
     SDL_LogWarn(SDL_LOG_CATEGORY_VIDEO, "[prefs] stage=smoke-done");
     bool presented = true;
     if (vulkan) {
+    SDL_LogWarn(SDL_LOG_CATEGORY_VIDEO, "[prefs] stage=present-begin");
         presented = bongo_cat_vk_end_frame(value->vk);
             if (!presented)
             SDL_LogWarn(SDL_LOG_CATEGORY_VIDEO, "Preferences Vulkan present failed");
@@ -106,7 +107,9 @@ void bongo_cat_preferences_render(BongoCatPreferences *value) {
         value->render_dirty = true;
         value->render_retry_ns = now + 1000000000ull;
     } else bongo_cat_memory_policy_ui_frame_presented();
+    SDL_LogWarn(SDL_LOG_CATEGORY_VIDEO, "[prefs] stage=present-done");
     bongo_cat_preferences_record_frame(value);
+    SDL_LogWarn(SDL_LOG_CATEGORY_VIDEO, "[prefs] stage=record-done");
     if (value->shortcut_recording || value->model_load_visual_active ||
         importing || bongo_cat_pref_controls_animating(&value->ui.context) ||
         bongo_cat_ui_animations_active(&value->ui.context))
@@ -115,6 +118,7 @@ void bongo_cat_preferences_render(BongoCatPreferences *value) {
         bongo_cat_ui_trim_idle(&value->ui);
     if (!vulkan) SDL_GL_MakeCurrent(value->app->window, value->app->gl_context);
     bongo_cat_ui_cursor_apply(&value->ui);
+    SDL_LogWarn(SDL_LOG_CATEGORY_VIDEO, "[prefs] stage=cursor-done");
     if (close_requested) {
         bongo_cat_preferences_close(value);
         return;
