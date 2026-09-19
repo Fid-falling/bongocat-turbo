@@ -10,8 +10,16 @@ endforeach()
 
 add_library(Live2DCubismCore STATIC IMPORTED GLOBAL)
 if(WIN32)
-  if(MSVC_VERSION LESS 1930 OR MSVC_VERSION GREATER_EQUAL 1950)
-    message(FATAL_ERROR "Cubism Windows build requires Visual Studio 2022")
+  # 官方只提供 v143 的 Windows Core 库, 上游这里要求 1930 <= MSVC_VERSION < 1950。
+  # MSVC 14.x (v143 之后) 保持二进制兼容, 所以这里允许更新的工具集 (例如 VS 18 的
+  # 14.51/v145) 直接链 143 的库, 只提示风险; 低于 v143 仍然拒绝。
+  if(MSVC_VERSION LESS 1930)
+    message(FATAL_ERROR "Cubism Windows build requires Visual Studio 2022 (v143) or newer")
+  endif()
+  if(MSVC_VERSION GREATER_EQUAL 1950)
+    message(WARNING
+      "Cubism Core 库是 v143 构建的, 当前工具集 MSVC_VERSION=${MSVC_VERSION}; "
+      "MSVC 14.x 二进制兼容, 若链接或运行异常请换 -T v143。")
   endif()
   if(CMAKE_SIZEOF_VOID_P EQUAL 8)
     set(CUBISM_WINDOWS_ARCH "x86_64")
