@@ -54,7 +54,28 @@ bool dial_paint_frame(Dial *d) {
        pointer hits on some native transparent-window implementations. */
     p->alpha = fmaxf(.15f,fminf(1,(float)(SDL_GetTicks()-d->opened_at)/180));
     dial_scene(d);
-    if (p->failed) return SDL_SetError("Radial menu geometry budget exceeded");
+    if (p->failed) return SDL_SetError("Radial menu geometry budget exceeded");
+    if (d->vk) {
+        /*
+         * Vulkan 菜单窗口: 几何已由 dial_scene() 后端无关地构建好, 这里只提交绘制。
+         * 批里存的是纹理 id, 用 dial_vk_texture_lookup 换成绘制需要的句柄。
+         * 菜单是透明弹窗, 清屏色必须是全透明。
+         */
+        bongo_cat_vk_set_clear_color(d->vk, 0, 0, 0, 0);
+        if (!bongo_cat_vk_begin_frame(d->vk, d->pixel_width, d->pixel_height))
+            return SDL_SetError("Radial menu Vulkan frame failed");
+        for (int i = 0; i < p->batch_count; ++i) {
+            DialBatch batch = p->batches[i];
+            bongo_cat_vk_draw_triangles(d->vk,
+                dial_vk_texture_lookup(d, batch.texture),
+                (const float *)&p->vertices[batch.first],
+                (unsigned)batch.count, true);
+        }
+        if (!bongo_cat_vk_end_frame(d->vk))
+            return SDL_SetError("Radial menu Vulkan present failed");
+        return true;
+    }
+
     glViewport(0,0,d->pixel_width,d->pixel_height);
     glDisable(GL_SCISSOR_TEST); glDisable(GL_DEPTH_TEST); glDisable(GL_CULL_FACE);
     glColorMask(GL_TRUE,GL_TRUE,GL_TRUE,GL_TRUE);
