@@ -147,6 +147,14 @@ int bongo_cat_vk_max_texture_dimension(const BongoCatVk *vk) {
     return 0;
 }
 
+BongoCatVkTexture *bongo_cat_vk_texture_from_external(BongoCatVk *vk,
+    void *image, void *view, int width, int height, const char *label,
+    BongoCatError *error) {
+    (void)vk; (void)image; (void)view; (void)width; (void)height;
+    (void)label; (void)error;
+    return NULL;
+}
+
 bool bongo_cat_vk_native_info(const BongoCatVk *vk, BongoCatVkNativeInfo *info) {
     (void)vk;
     (void)info;

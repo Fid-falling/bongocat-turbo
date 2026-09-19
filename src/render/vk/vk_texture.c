@@ -347,6 +347,7 @@ static void free_texture(BongoCatVk *vk, BongoCatVkTexture *texture) {
         if (texture->descriptor != VK_NULL_HANDLE)
             vkFreeDescriptorSets(vk->device, vk->descriptor_pool, 1,
                 &texture->descriptor);
+        if (!texture->external) {
         if (texture->view != VK_NULL_HANDLE)
             vkDestroyImageView(vk->device, texture->view, NULL);
         if (texture->image != VK_NULL_HANDLE)
@@ -354,6 +355,7 @@ static void free_texture(BongoCatVk *vk, BongoCatVkTexture *texture) {
         if (texture->memory != VK_NULL_HANDLE)
             vkFreeMemory(vk->device, texture->memory, NULL);
     }
+        }
     free(texture);
 }
 
@@ -400,6 +402,52 @@ int bongo_cat_vk_texture_width(const BongoCatVkTexture *texture) {
 
 int bongo_cat_vk_texture_height(const BongoCatVkTexture *texture) {
     return texture ? texture->height : 0;
+}
+
+
+/*
+ * 包装一张外部拥有的图像 (当前用途: Cubism 的 Vulkan 渲染器画出来的离屏纹理)。
+ * 只借用 image/view 建描述符, 不接管所有权: 销毁时只回收描述符集。
+ * 图像必须已经是 SHADER_READ_ONLY 布局, 否则采样结果是未定义的。
+ */
+BongoCatVkTexture *bongo_cat_vk_texture_from_external(BongoCatVk *vk,
+    void *image, void *view, int width, int height, const char *label,
+    BongoCatError *error) {
+    if (!vk || !image || !view || width <= 0 || height <= 0) return NULL;
+    BongoCatVkTexture *texture = calloc(1, sizeof(*texture));
+    if (!texture) return NULL;
+    texture->image = (VkImage)image;
+    texture->view = (VkImageView)view;
+    texture->external = true;
+    texture->width = width;
+    texture->height = height;
+    snprintf(texture->label, sizeof(texture->label), "%s",
+        label ? label : "external");
+    VkDescriptorSetAllocateInfo descriptor = {0};
+    descriptor.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
+    descriptor.descriptorPool = vk->descriptor_pool;
+    descriptor.descriptorSetCount = 1;
+    descriptor.pSetLayouts = &vk->texture_layout;
+    if (vkAllocateDescriptorSets(vk->device, &descriptor,
+            &texture->descriptor) != VK_SUCCESS) {
+        bongo_cat_error_set(error, BONGO_CAT_ERROR_PLATFORM,
+            "Vulkan 外部纹理描述符集分配失败");
+        free(texture);
+        return NULL;
+    }
+    VkDescriptorImageInfo info = {0};
+    info.sampler = vk->sampler;
+    info.imageView = texture->view;
+    info.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+    VkWriteDescriptorSet write = {0};
+    write.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+    write.dstSet = texture->descriptor;
+    write.dstBinding = 0;
+    write.descriptorCount = 1;
+    write.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+    write.pImageInfo = &info;
+    vkUpdateDescriptorSets(vk->device, 1, &write, 0, NULL);
+    return texture;
 }
 
 #endif /* BONGO_CAT_HAS_VULKAN */

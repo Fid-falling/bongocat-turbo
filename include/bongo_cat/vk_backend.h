@@ -136,6 +136,11 @@ typedef struct BongoCatVkNativeInfo {
 
 bool bongo_cat_vk_native_info(const BongoCatVk *vk, BongoCatVkNativeInfo *info);
 
+/* 包装外部拥有的 VkImage (只借 view, 不接管所有权) */
+BongoCatVkTexture *bongo_cat_vk_texture_from_external(BongoCatVk *vk,
+    void *image, void *view, int width, int height, const char *label,
+    BongoCatError *error);
+
 /*
  * 命中测试回读。请求发生在帧内 (end_frame 之前), 拷贝与主机映射在下一次使用
  * 同一个帧槽时完成, 所以结果有一帧延迟 —— 与 OpenGL 路径读前/后台缓冲的时序

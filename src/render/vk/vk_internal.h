@@ -57,6 +57,8 @@ struct BongoCatVkTexture {
     VkDeviceMemory memory;
     VkImageView view;
     VkDescriptorSet descriptor;
+    /* 外部拥有的图像: 只借用, 释放时不动 image/memory/view */
+    bool external;
     int width;
     int height;
     char label[64];
