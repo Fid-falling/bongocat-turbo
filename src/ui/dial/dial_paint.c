@@ -23,6 +23,17 @@ bool dial_paint_init(Dial *d) {
     if (!p->program) { SDL_SetError("%s",error.message); return false; }
     p->projection = p->gl.uniform_location(p->program,"Projection");
     p->sampler = p->gl.uniform_location(p->program,"Texture");
+    if (d->vk) {
+        /*
+         * Vulkan 菜单: VAO/VBO 与顶点属性是 GL 专有, 整段跳过;
+         * 白点纹理走后端接口创建并登记到纹理表 (id 存进 p->white, 与句柄约定一致)。
+         */
+        const unsigned char white_pixel[4] = {255, 255, 255, 255};
+        BongoCatError error = {0};
+        p->white = (GLuint)dial_vk_texture_register(d,
+            bongo_cat_vk_texture_from_pixels(d->vk, white_pixel, 1, 1,
+                "dial-white", &error));
+    } else {
     p->gl.gen_vertex_arrays(1,&p->vao);
     p->gl.gen_buffers(1,&p->vbo);
     p->gl.bind_vertex_array(p->vao);
@@ -35,7 +46,8 @@ bool dial_paint_init(Dial *d) {
     const uint8_t white[] = {255,255,255,255};
     glTexImage2D(GL_TEXTURE_2D,0,GL_RGBA8,1,1,0,GL_RGBA,GL_UNSIGNED_BYTE,white);
     glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_MIN_FILTER,GL_LINEAR);
-    glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_MAG_FILTER,GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_MAG_FILTER,GL_LINEAR);
+    }
     if (!dial_fonts_init(d)) return SDL_SetError("Radial menu font atlas could not be created");
     for (int i = 0; i < d->count; ++i) {
         float angle = -DIAL_PI/2 + (float)i*2*DIAL_PI/(float)d->count;
