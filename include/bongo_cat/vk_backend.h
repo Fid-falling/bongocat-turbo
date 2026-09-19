@@ -128,6 +128,8 @@ typedef struct BongoCatVkNativeInfo {
     void *physical_device;
     void *command_pool;
     void *queue;
+    /* 交换链第 0 张图像的视图: SDK 的 SetConstantSettings 需要一个默认目标 */
+    void *image_view;
     int width;
     int height;
     int image_format;   /* VkFormat */

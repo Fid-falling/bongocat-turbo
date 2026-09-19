@@ -13,6 +13,8 @@
 
 #include "bongo_cat/vk_backend.h"
 
+#include <SDL3/SDL.h>
+
 #ifdef BONGO_CAT_HAS_VULKAN
 
 #include <Rendering/Vulkan/CubismDeviceInfo_Vulkan.hpp>
@@ -36,26 +38,49 @@ bool bongo_cat_live2d_vulkan_attach(struct BongoCatVk *vk, int width, int height
     if (g_attached) return true;
     if (!vk || width <= 0 || height <= 0) return false;
     BongoCatVkNativeInfo info = {0};
-    if (!bongo_cat_vk_native_info(vk, &info) || !info.device || !info.physical_device ||
-        !info.command_pool || !info.queue)
+    if (!bongo_cat_vk_native_info(vk, &info)) {
+        SDL_LogWarn(SDL_LOG_CATEGORY_VIDEO, "[live2d/vk] attach: 后端句柄不可用");
         return false;
+    }
+    if (!info.device || !info.physical_device || !info.command_pool || !info.queue) {
+        SDL_LogWarn(SDL_LOG_CATEGORY_VIDEO,
+            "[live2d/vk] attach: 句柄不完整 (device=%p physical=%p pool=%p queue=%p)",
+            info.device, info.physical_device, info.command_pool, info.queue);
+        return false;
+    }
+    SDL_LogWarn(SDL_LOG_CATEGORY_VIDEO,
+        "[live2d/vk] attach: 探针 device=%p view=%p extent=%dx%d format=%d images=%d",
+        info.device, info.image_view, info.width, info.height, info.image_format,
+        info.image_count);
     g_device = (VkDevice)info.device;
     g_format = (VkFormat)info.image_format;
-    if (!Csm::Rendering::CubismDeviceInfo_Vulkan::GetDeviceInfo(g_device)) return false;
+    if (!Csm::Rendering::CubismDeviceInfo_Vulkan::GetDeviceInfo(g_device)) {
+        SDL_LogWarn(SDL_LOG_CATEGORY_VIDEO, "[live2d/vk] attach: GetDeviceInfo 失败");
+        return false;
+    }
 
+    VkExtent2D extent = {(unsigned int)width, (unsigned int)height};
+    /*
+     * 顺序与 SDK 示例一致 (LAppDelegate::initialize 先 SetConstantSettings,
+     * LAppView 之后才 CreateRenderTarget): 设备级的管线/描述符是在
+     * SetConstantSettings 里建的, 提前建离屏目标会因为拿不到它们而失败。
+     * 默认目标先用交换链第 0 张图像 (没有视图时传 NULL)。
+     */
+    Csm::Rendering::CubismRenderer_Vulkan::SetConstantSettings(g_device,
+        (VkPhysicalDevice)info.physical_device, (VkCommandPool)info.command_pool,
+        (VkQueue)info.queue, (unsigned int)info.image_count, extent,
+        (VkImageView)info.image_view, g_format, kDepthFormat);
+    Csm::Rendering::CubismRenderer_Vulkan::EnableChangeRenderTarget();
     auto *target = CSM_NEW Csm::Rendering::CubismRenderTarget_Vulkan();
     target->CreateRenderTarget(g_device, (VkPhysicalDevice)info.physical_device,
         (unsigned int)width, (unsigned int)height, g_format, kDepthFormat);
     if (!target->IsValid()) {
+        SDL_LogWarn(SDL_LOG_CATEGORY_VIDEO,
+            "[live2d/vk] attach: 离屏目标创建失败 (%dx%d format=%d depth=%d)",
+            width, height, (int)g_format, (int)kDepthFormat);
         CSM_DELETE(target);
         return false;
     }
-    VkExtent2D extent = {(unsigned int)width, (unsigned int)height};
-    Csm::Rendering::CubismRenderer_Vulkan::SetConstantSettings(g_device,
-        (VkPhysicalDevice)info.physical_device, (VkCommandPool)info.command_pool,
-        (VkQueue)info.queue, (unsigned int)info.image_count, extent,
-        target->GetTextureView(), g_format, kDepthFormat);
-    Csm::Rendering::CubismRenderer_Vulkan::EnableChangeRenderTarget();
     g_target = target;
     g_vk = vk;
     g_attached = true;

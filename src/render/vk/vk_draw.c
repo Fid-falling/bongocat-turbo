@@ -349,6 +349,8 @@ bool bongo_cat_vk_native_info(const BongoCatVk *vk, BongoCatVkNativeInfo *info) 
     info->height = (int)vk->extent.height;
     info->image_format = (int)vk->format;
     info->image_count = (int)vk->image_count;
+    /* SDK 的 SetConstantSettings 需要一个默认目标视图 (交换链第 0 张) */
+    if (vk->image_count > 0) info->image_view = (void *)vk->views[0];
     return true;
 }
 
