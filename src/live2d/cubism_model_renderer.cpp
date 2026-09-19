@@ -29,6 +29,17 @@ static Csm::csmInt32 mask_buffer_count(size_t count) {
 }
 
 void NativeModel::bind_textures() {
+    /* Vulkan: SDK 的 Vulkan 渲染器收 CubismImageVulkan, 类型细节留在桥里 */
+#ifdef BONGO_CAT_HAS_VULKAN
+    if (bongo_cat_cubism_renderer_uses_vulkan()) {
+        auto *vulkan = GetRenderer<Csm::Rendering::CubismRenderer_Vulkan>();
+        if (!vulkan) return;
+        for (void *texture : vulkan_textures_)
+            if (texture)
+                bongo_cat_live2d_vulkan_bind_texture((void *)vulkan, texture);
+        return;
+    }
+#endif
     auto *renderer = GetRenderer<Csm::Rendering::CubismRenderer_OpenGLES2>();
     if (!renderer) return;
     for (size_t i = 0; i < textures_.size(); ++i)
@@ -38,6 +49,16 @@ void NativeModel::bind_textures() {
 }
 
 void NativeModel::release_textures() {
+#ifdef BONGO_CAT_HAS_VULKAN
+    if (bongo_cat_cubism_renderer_uses_vulkan()) {
+        for (void *texture : vulkan_textures_)
+            bongo_cat_live2d_vulkan_destroy_texture(texture);
+        vulkan_textures_.clear();
+        texture_alpha_.clear();
+        triangle_alpha_.clear();
+        return;
+    }
+#endif
     if (!textures_.empty())
         glDeleteTextures((GLsizei)textures_.size(), textures_.data());
     textures_.clear();
@@ -111,6 +132,35 @@ void NativeModel::update_mask_buffers() {
 }
 
 bool NativeModel::create_renderer(BongoCatError *error) {
+    /*
+     * Vulkan: 设备与离屏目标由桥在窗口创建时准备好 (attach), 这里只确认它就绪;
+     * GL 那一套 context / 错误检查 / 遮罩尺寸查询全部跳过。
+     */
+#ifdef BONGO_CAT_HAS_VULKAN
+    if (bongo_cat_cubism_renderer_uses_vulkan()) {
+        if (!bongo_cat_live2d_vulkan_ready()) {
+            bongo_cat_error_set(error, BONGO_CAT_ERROR_PLATFORM,
+                "Live2D Vulkan renderer is not attached");
+            return false;
+        }
+        const size_t drawable = mask_combination_count(_model->GetDrawableCount(),
+            _model->GetDrawableMaskCounts(), _model->GetDrawableMasks());
+        const size_t offscreen = mask_combination_count(_model->GetOffscreenCount(),
+            _model->GetOffscreenMaskCounts(), _model->GetOffscreenMasks());
+        const Csm::csmInt32 buffers = std::max(mask_buffer_count(drawable),
+            mask_buffer_count(offscreen));
+        CreateRenderer((Csm::csmUint32)width_, (Csm::csmUint32)height_, buffers);
+        auto *vulkan = GetRenderer<Csm::Rendering::CubismRenderer_Vulkan>();
+        if (!vulkan) {
+            bongo_cat_error_set(error, BONGO_CAT_ERROR_CUBISM,
+                "Cannot create the Live2D Vulkan renderer");
+            release_renderer();
+            return false;
+        }
+        bind_textures();
+        return true;
+    }
+#endif
     if (!SDL_GL_GetCurrentContext()) {
         bongo_cat_error_set(error, BONGO_CAT_ERROR_PLATFORM,
             "Cannot create the Live2D renderer without an OpenGL context");

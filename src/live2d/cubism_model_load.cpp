@@ -254,12 +254,32 @@ bool NativeModel::load_textures(BongoCatError *error,
     release_textures();
     int count = setting_->GetTextureCount();
     textures_.assign((size_t)count, 0);
+    vulkan_textures_.assign((size_t)count, nullptr);
     texture_alpha_.assign((size_t)count, {});
     TextureProgressContext texture_context = {progress, userdata, .50f,
         .45f / (float)(count > 0 ? count : 1)};
     for (int i = 0; i < count; ++i) {
         texture_context.start = .50f + .45f * (float)i /
             (float)(count > 0 ? count : 1);
+        if (bongo_cat_cubism_renderer_uses_vulkan()) {
+            BongoCatImage image = {0};
+            const std::string texture_path = path(setting_->GetTextureFileName(i));
+            if (bongo_cat_image_load(texture_path.c_str(), &image, error) !=
+                    BONGO_CAT_OK || !image.pixels) {
+                release_textures();
+                return false;
+            }
+            vulkan_textures_[(size_t)i] = bongo_cat_live2d_vulkan_create_texture_attached(
+                image.pixels, image.width, image.height);
+            bongo_cat_image_free(&image);
+            if (!vulkan_textures_[(size_t)i]) {
+                release_textures();
+                return false;
+            }
+            if (progress) progress(userdata, .50f + .45f * (float)(i + 1) /
+                (float)(count > 0 ? count : 1));
+            continue;
+        }
         textures_[(size_t)i] = bongo_cat_image_texture_model(
             path(setting_->GetTextureFileName(i)).c_str(), direct_textures_,
             nullptr, nullptr, &texture_alpha_[(size_t)i],

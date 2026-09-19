@@ -7,12 +7,17 @@
 
 #include "bongo_cat/model.h"
 #include "bongo_cat/image.h"
+#include "bongo_cat/live2d_vulkan.h"
+#include "cubism_renderer_select.hpp"
 
 #include <Model/CubismUserModel.hpp>
 #include <CubismModelSettingJson.hpp>
 #include <Motion/ACubismMotion.hpp>
 #include <Math/CubismMatrix44.hpp>
 #include <Rendering/OpenGL/CubismRenderer_OpenGLES2.hpp>
+#ifdef BONGO_CAT_HAS_VULKAN
+#include <Rendering/Vulkan/CubismRenderer_Vulkan.hpp>
+#endif
 #include <SDL3/SDL_opengl.h>
 #include <map>
 #include <set>
@@ -152,6 +157,8 @@ private:
     MotionMap expressions_;
     std::vector<std::string> expression_names_;
     std::vector<GLuint> textures_;
+    /* Vulkan 后端下的贴图句柄 (CubismImageVulkan*), 与 textures_ 一一对应 */
+    std::vector<void *> vulkan_textures_;
     std::vector<BongoCatImageAlphaMask> texture_alpha_;
     mutable std::vector<std::vector<unsigned char>> triangle_alpha_;
     mutable std::vector<DrawableBounds> bounds_scratch_;

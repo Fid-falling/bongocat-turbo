@@ -13,6 +13,8 @@
 
 #include "bongo_cat/vk_backend.h"
 
+#ifdef BONGO_CAT_HAS_VULKAN
+
 #include <Rendering/Vulkan/CubismDeviceInfo_Vulkan.hpp>
 #include <Rendering/Vulkan/CubismRenderTarget_Vulkan.hpp>
 #include <Rendering/Vulkan/CubismRenderer_Vulkan.hpp>
@@ -116,3 +118,23 @@ void *bongo_cat_live2d_vulkan_create_texture_attached(const void *pixels, int wi
     if (!g_vk) return nullptr;
     return bongo_cat_live2d_vulkan_create_texture(g_vk, pixels, width, height);
 }
+
+#else /* !BONGO_CAT_HAS_VULKAN */
+
+
+/* 没有编译 Vulkan 后端时, 桥一律不可用, 上层据此回退 OpenGL。 */
+bool bongo_cat_live2d_vulkan_attach(struct BongoCatVk *vk, int width, int height) {
+    (void)vk; (void)width; (void)height;
+    return false;
+}
+bool bongo_cat_live2d_vulkan_ready(void) { return false; }
+bool bongo_cat_live2d_vulkan_begin_frame(void) { return false; }
+bool bongo_cat_live2d_vulkan_end_frame(void) { return false; }
+void bongo_cat_live2d_vulkan_detach(void) {}
+bool bongo_cat_live2d_vulkan_target_info(void **image, void **view, void **sampler,
+    int *width, int *height) {
+    (void)image; (void)view; (void)sampler; (void)width; (void)height;
+    return false;
+}
+
+#endif

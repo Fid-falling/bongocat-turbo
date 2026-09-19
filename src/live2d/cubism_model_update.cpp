@@ -112,6 +112,25 @@ void NativeModel::build_projection(Csm::CubismMatrix44 &projection,
 
 void NativeModel::draw() {
     if (!_model || width_ <= 0 || height_ <= 0) return;
+    /* Vulkan: 桥负责每帧的离屏目标切换与命令提交 (SDK 渲染器自行提交) */
+#ifdef BONGO_CAT_HAS_VULKAN
+    if (bongo_cat_cubism_renderer_uses_vulkan()) {
+        auto *vulkan = GetRenderer<Csm::Rendering::CubismRenderer_Vulkan>();
+        if (!vulkan || !bongo_cat_live2d_vulkan_begin_frame()) return;
+        Csm::CubismMatrix44 projection;
+        build_projection(projection, viewport_width_, viewport_height_);
+        apply_viewport_projection(projection);
+        visual_state_ = BongoCatLive2DVisualState{};
+        visual_state_.fit_scale = 1.0f;
+        visual_state_.mver_projection = render_options_.mver_projection;
+        record_visible_state(projection);
+        visual_state_ready_ = true;
+        vulkan->SetMvpMatrix(&projection);
+        vulkan->DrawModel();
+        bongo_cat_live2d_vulkan_end_frame();
+        return;
+    }
+#endif
 #ifdef CSM_TARGET_MAC_GL
     CoreProfileBinding binding(core_buffers_);
 #endif

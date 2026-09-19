@@ -13,6 +13,8 @@
 
 #include "bongo_cat/vk_backend.h"
 
+#ifdef BONGO_CAT_HAS_VULKAN
+
 #include <Rendering/Vulkan/CubismClass_Vulkan.hpp>
 #include <Rendering/Vulkan/CubismRenderer_Vulkan.hpp>
 
@@ -131,3 +133,24 @@ bool bongo_cat_live2d_vulkan_bind_texture(void *renderer, void *texture) {
         ->BindTexture(((VulkanTexture *)texture)->image);
     return true;
 }
+
+#else /* !BONGO_CAT_HAS_VULKAN */
+
+
+void *bongo_cat_live2d_vulkan_create_texture(struct BongoCatVk *vk,
+    const void *pixels, int width, int height) {
+    (void)vk; (void)pixels; (void)width; (void)height;
+    return nullptr;
+}
+void *bongo_cat_live2d_vulkan_create_texture_attached(const void *pixels, int width,
+    int height) {
+    (void)pixels; (void)width; (void)height;
+    return nullptr;
+}
+void bongo_cat_live2d_vulkan_destroy_texture(void *texture) { (void)texture; }
+bool bongo_cat_live2d_vulkan_bind_texture(void *renderer, void *texture) {
+    (void)renderer; (void)texture;
+    return false;
+}
+
+#endif
