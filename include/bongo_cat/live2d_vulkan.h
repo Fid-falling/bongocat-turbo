@@ -27,6 +27,10 @@ void *bongo_cat_live2d_vulkan_create_texture(struct BongoCatVk *vk,
     const void *pixels, int width, int height);
 void bongo_cat_live2d_vulkan_destroy_texture(void *texture);
 
+/* 同上, 但用 attach() 时记住的后端 (模型侧不用持有 BongoCatVk*) */
+void *bongo_cat_live2d_vulkan_create_texture_attached(const void *pixels,
+    int width, int height);
+
 /* 离屏结果 (纹理与尺寸), 供合成到宠物窗口时使用 */
 bool bongo_cat_live2d_vulkan_target_info(void **image, void **view, void **sampler,
     int *width, int *height);

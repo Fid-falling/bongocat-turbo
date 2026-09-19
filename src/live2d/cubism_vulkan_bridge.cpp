@@ -20,6 +20,7 @@
 namespace {
 
 bool g_attached = false;
+BongoCatVk *g_vk = nullptr;
 Csm::Rendering::CubismRenderTarget_Vulkan *g_target = nullptr;
 VkDevice g_device = VK_NULL_HANDLE;
 VkFormat g_format = VK_FORMAT_UNDEFINED;
@@ -54,6 +55,7 @@ bool bongo_cat_live2d_vulkan_attach(struct BongoCatVk *vk, int width, int height
         target->GetTextureView(), g_format, kDepthFormat);
     Csm::Rendering::CubismRenderer_Vulkan::EnableChangeRenderTarget();
     g_target = target;
+    g_vk = vk;
     g_attached = true;
     return true;
 }
@@ -92,6 +94,7 @@ void bongo_cat_live2d_vulkan_detach(void) {
     if (g_device != VK_NULL_HANDLE)
         Csm::Rendering::CubismDeviceInfo_Vulkan::ReleaseDeviceInfo(g_device);
     g_device = VK_NULL_HANDLE;
+    g_vk = nullptr;
     g_format = VK_FORMAT_UNDEFINED;
     g_attached = false;
 }
@@ -105,4 +108,11 @@ bool bongo_cat_live2d_vulkan_target_info(void **image, void **view, void **sampl
     if (width) *width = (int)g_target->GetBufferWidth();
     if (height) *height = (int)g_target->GetBufferHeight();
     return true;
+}
+
+/* 用 attach 时记住的后端建贴图, 省掉把 BongoCatVk* 一路传进模型的管道 */
+void *bongo_cat_live2d_vulkan_create_texture_attached(const void *pixels, int width,
+    int height) {
+    if (!g_vk) return nullptr;
+    return bongo_cat_live2d_vulkan_create_texture(g_vk, pixels, width, height);
 }

@@ -181,6 +181,12 @@ void *bongo_cat_live2d_vulkan_create_texture(struct BongoCatVk *vk,
 
 void bongo_cat_live2d_vulkan_destroy_texture(void *texture) { (void)texture; }
 
+void *bongo_cat_live2d_vulkan_create_texture_attached(const void *pixels,
+    int width, int height) {
+    (void)pixels; (void)width; (void)height;
+    return NULL;
+}
+
 bool bongo_cat_live2d_vulkan_ready(void) { return false; }
 bool bongo_cat_live2d_vulkan_begin_frame(void) { return false; }
 bool bongo_cat_live2d_vulkan_end_frame(void) { return false; }
