@@ -138,8 +138,24 @@ void dial_vk_texture_release(Dial *d, unsigned int id) {
     if (texture && d->vk) bongo_cat_vk_texture_destroy(d->vk, texture);
 }
 
-void dial_paint_free(Dial *d) {
-    DialPaint *p = &d->paint;
+void dial_paint_free(Dial *d) {
+    DialPaint *p = &d->paint;
+    if (d->vk) {
+        /*
+         * Vulkan 菜单: 纹理句柄表里的对象由后端销毁 (glDeleteTextures 在这里是
+         * 无效的 —— 那些 id 根本不是 GL 纹理名); VAO/VBO/Program 在 Vulkan 下
+         * 本来就是 0, 不需要释放。id 为 0 时 dial_vk_texture_release 直接返回。
+         */
+        for (size_t i = 0; i < BONGO_CAT_MODEL_CAP; ++i)
+            dial_vk_texture_release(d, d->covers[i].texture);
+        dial_vk_texture_release(d, (unsigned)p->font_texture);
+        if (p->atlas.permanent.alloc) nk_font_atlas_clear(&p->atlas);
+        for (int i = 0; i < 4; ++i) free(p->ranges[i]);
+        dial_vk_texture_release(d, (unsigned)p->white);
+        free(p->vertices);
+        return;
+    }
+
     for (size_t i = 0; i < BONGO_CAT_MODEL_CAP; ++i)
         if (d->covers[i].texture) glDeleteTextures(1,&d->covers[i].texture);
     if (p->font_texture) glDeleteTextures(1,&p->font_texture);
