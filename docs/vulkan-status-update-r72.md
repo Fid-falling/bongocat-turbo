@@ -36,7 +36,32 @@ extent 投影，合成又按 `image/reference = 目标/窗口` 算比例，模�
 实测：attach 600x600 → 自适应 1037x907 → 手动缩到 900x900，交换链与目标同时跟随，
 不崩溃。
 
-## 三、叠加层按键/特效贴图在 Vulkan 下整块消失
+## 三、叠加层视口：猫与键盘对不上的第二个原因
+
+修完第一、二节之后模型的比例已经和 OpenGL 一致，但**叠加层的位置仍然不同**：
+同尺寸（1037x907）对比截图，背景图/键盘在 Vulkan 下比 GL 高约 140 px，
+所以猫看起来浮在键盘上方（用户反馈的"猫的位置不对"）。
+
+原因在 `app_loop.c` 与 `vk_scene.c` 的视口处理不一致：
+
+| | OpenGL (`app_loop.c`) | Vulkan (`vk_scene.c`，修前) |
+|---|---|---|
+| 背景/按键/特效/指针 | 模型内容视口 `glViewport(content_x, content_y, content_w, content_h)` | 整窗视口 |
+| Live2D | 整窗视口（投影里自带内容变换） | 整窗视口 |
+
+背景/按键/特效/指针都是按 NDC 画的整屏四边形，视口不同 → 它们被拉伸到整窗并
+整体偏上，与模型错位。
+
+修法：新增 `bongo_cat_vk_set_viewport(x, y, w, h)`（左上角像素坐标、y 向下，
+对应 GL 的 `glViewport`），`vk_scene.c` 复刻 GL 的视口切换顺序。
+
+验证（内置 `standard` 模型，1037x907）：
+
+- 桌面/键盘所在列的亮度剖面两后端**逐字节相同**（`[0,0,9,253,215]`），右侧列同样；
+- 全窗像素差异从 17.4% 降到 **2.1%**，残差只是 Live2D 待机动作与屏幕上的
+  RivaTuner OSD 文本（两次运行本来就会变）。
+
+## 四、叠加层按键/特效贴图在 Vulkan 下整块消失
 
 Cubism 构建里 `overlay.left/right/effect` 一直是裸 `GLuint`（GL 上传创建，绘制时
 包成 `BongoCatTexture{.gl=...}`）。Vulkan 下既没有 GL 上下文可以创建它们，
@@ -48,7 +73,7 @@ Cubism 构建里 `overlay.left/right/effect` 一直是裸 `GLuint`（GL 上传�
 
 实测：Vulkan 下按 A 键窗口像素变化 23234 px，键盘上的 A 键高亮与 GL 一致。
 
-## 四、径向菜单的 Vulkan 绘制通路
+## 五、径向菜单的 Vulkan 绘制通路
 
 菜单窗口在 `renderer=vulkan` 时改用自己的一份 Vulkan 上下文。之前打不开，
 因为 `dial_paint_init` 无条件调用 `bongo_cat_gl_load()`，在没有 GL 上下文的
@@ -66,7 +91,7 @@ Cubism 构建里 `overlay.left/right/effect` 一直是裸 `GLuint`（GL 上传�
 实测：Vulkan 下右键宠物窗口，菜单正常打开并绘制 12 个扇区与彩色图标；
 与 OpenGL 的稳定帧逐格对比，菜单区域差异 ≤0.8%（其余差异来自宠物动画与任务栏时钟）。
 
-## 五、已知遗留
+## 六、已知遗留
 
 | 项 | 状态 |
 |---|---|
@@ -74,7 +99,7 @@ Cubism 构建里 `overlay.left/right/effect` 一直是裸 `GLuint`（GL 上传�
 | 封面截取 / 整帧回读 | 仍走 GL；配方见 `docs/vulkan-readback-recipe.md` |
 | `live2d-visual-audit` 的 `edge_pixels` | 该列用 `glReadPixels`，Vulkan 下读到的是未初始化数据；几何列可信，`edge_pixels` 列在 Vulkan 下不可用 |
 
-## 六、当前可用性总览
+## 七、当前可用性总览
 
 | 维度 | 状态 |
 |---|---|
