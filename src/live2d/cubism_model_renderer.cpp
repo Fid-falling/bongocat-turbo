@@ -181,6 +181,15 @@ bool NativeModel::create_renderer(BongoCatError *error) {
         const int mask_size = std::min(2048, ((mask_requested + 511) / 512) * 512);
         vulkan->SetClippingMaskBufferSize((Csm::csmFloat32)mask_size,
             (Csm::csmFloat32)mask_size);
+        /*
+         * SDK 样例在 CreateRenderer 之后还会单独建这三样 (命令缓冲/顶点/索引)。
+         * 我原先漏了, 于是 SDK 内部用于绘制的缓冲是空的 —— 它在
+         * CubismRenderTarget_Vulkan::BeginDraw 里按这些缓冲记账时越界
+         * (校验层拖慢后稳定复现, cdb 栈已确认)。
+         */
+        vulkan->CreateCommandBuffer();
+        vulkan->CreateVertexBuffer();
+        vulkan->CreateIndexBuffer();
         bind_textures();
         return true;
     }
