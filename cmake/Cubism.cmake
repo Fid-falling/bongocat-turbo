@@ -55,7 +55,13 @@ if(UNIX AND NOT APPLE)
   find_package(X11 REQUIRED)
   target_link_libraries(glew_s PRIVATE X11::X11 ${CMAKE_DL_LIBS})
 endif()
+# 默认只编 OpenGL 后端; 打开 Vulkan 后端时把 SDK 自带的 Vulkan 渲染器
+# (CubismRenderer_Vulkan / CubismRenderTarget_Vulkan ...) 一起编进来,
+# 运行时再由 bongo_cat 决定用哪一个。
 set(FRAMEWORK_SOURCE OpenGL)
+if(BONGO_CAT_ENABLE_VULKAN)
+  set(FRAMEWORK_SOURCE "OpenGL;Vulkan")
+endif()
 add_subdirectory("${CUBISM_FRAMEWORK_PATH}" "${CMAKE_BINARY_DIR}/cubism-framework")
 include(cmake/CubismUserModelSafety.cmake)
 bongo_cat_harden_cubism_user_model(Framework)
@@ -78,3 +84,16 @@ target_include_directories(Framework SYSTEM PUBLIC
   "${CUBISM_FRAMEWORK_PATH}/src"
   "${CUBISM_CORE_PATH}/include")
 target_link_libraries(Framework PUBLIC Live2DCubismCore glew_s)
+
+if(BONGO_CAT_ENABLE_VULKAN)
+  target_link_libraries(Framework PUBLIC Vulkan::Vulkan)
+  # SDK 的 Vulkan 着色器: 按 (色彩混合 x alpha 混合) 组合编出一整套 .spv,
+  # 规则直接复用 SDK 自己的 CMakeLists (依赖 $ENV{VK_SDK_PATH}/Bin/glslc.exe,
+  # CMake 的 FindVulkan 找到的正是同一个 SDK)。
+  add_subdirectory(
+    "${CUBISM_FRAMEWORK_PATH}/src/Rendering/Vulkan/Shaders"
+    "${CMAKE_BINARY_DIR}/cubism-vulkan-shaders")
+  set(BONGO_CAT_CUBISM_VK_SHADER_DIR
+    "${CMAKE_BINARY_DIR}/cubism-vulkan-shaders/compiledShaders")
+  message(STATUS "Cubism Vulkan 渲染器已启用, 着色器输出: ${BONGO_CAT_CUBISM_VK_SHADER_DIR}")
+endif()
