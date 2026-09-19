@@ -66,6 +66,56 @@ bool bongo_cat_live2d_vulkan_ready(void) {
     return g_attached && g_target && g_target->IsValid();
 }
 
+
+/*
+ * SDK 的 Vulkan 渲染器把模型画进离屏图像后, 图像停在 COLOR_ATTACHMENT_OPTIMAL;
+ * 要被我们的合成着色器采样, 必须先转成 SHADER_READ_ONLY_OPTIMAL。
+ * 这里用后端自己的命令池做一次单次提交, 与贴图上传同样的做法。
+ */
+static void transition_target_to_sampled(const BongoCatVkNativeInfo &info,
+    VkImage image) {
+    if (!info.device || !info.command_pool || !info.queue || !image) return;
+    VkCommandBufferAllocateInfo allocate = {0};
+    allocate.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
+    allocate.commandPool = (VkCommandPool)info.command_pool;
+    allocate.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
+    allocate.commandBufferCount = 1;
+    VkCommandBuffer command = VK_NULL_HANDLE;
+    if (vkAllocateCommandBuffers((VkDevice)info.device, &allocate, &command) != VK_SUCCESS)
+        return;
+    VkCommandBufferBeginInfo begin = {0};
+    begin.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
+    begin.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
+    if (vkBeginCommandBuffer(command, &begin) != VK_SUCCESS) {
+        vkFreeCommandBuffers((VkDevice)info.device, (VkCommandPool)info.command_pool,
+            1, &command);
+        return;
+    }
+    VkImageMemoryBarrier barrier = {0};
+    barrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
+    barrier.oldLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+    barrier.newLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+    barrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+    barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+    barrier.image = image;
+    barrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+    barrier.subresourceRange.levelCount = 1;
+    barrier.subresourceRange.layerCount = 1;
+    barrier.srcAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
+    barrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
+    vkCmdPipelineBarrier(command, VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
+        VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, 0, 0, NULL, 0, NULL, 1, &barrier);
+    vkEndCommandBuffer(command);
+    VkSubmitInfo submit = {0};
+    submit.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
+    submit.commandBufferCount = 1;
+    submit.pCommandBuffers = &command;
+    if (vkQueueSubmit((VkQueue)info.queue, 1, &submit, VK_NULL_HANDLE) == VK_SUCCESS)
+        vkQueueWaitIdle((VkQueue)info.queue);
+    vkFreeCommandBuffers((VkDevice)info.device, (VkCommandPool)info.command_pool, 1,
+        &command);
+}
+
 bool bongo_cat_live2d_vulkan_begin_frame(void) {
     if (!bongo_cat_live2d_vulkan_ready()) return false;
     auto *device_info = Csm::Rendering::CubismDeviceInfo_Vulkan::GetDeviceInfo(g_device);
@@ -84,6 +134,10 @@ bool bongo_cat_live2d_vulkan_end_frame(void) {
     if (!device_info || !device_info->GetOffscreenManager()) return false;
     device_info->GetOffscreenManager()->EndFrameProcess();
     device_info->GetOffscreenManager()->ReleaseStaleRenderTextures();
+    /* 交给合成着色器之前必须换成可采样布局 */
+    BongoCatVkNativeInfo native = {0};
+    if (g_vk && bongo_cat_vk_native_info(g_vk, &native))
+        transition_target_to_sampled(native, g_target->GetTextureImage());
     return true;
 }
 
