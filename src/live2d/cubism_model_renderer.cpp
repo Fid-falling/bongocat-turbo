@@ -165,6 +165,14 @@ bool NativeModel::create_renderer(BongoCatError *error) {
             release_renderer();
             return false;
         }
+        /*
+         * 遮罩缓冲尺寸必须显式设置。GL 路径在 update_mask_buffers() 里做这件事,
+         * 而我的 Vulkan 分支当初整段跳过了它, 于是 SDK 的 Vulkan 裁剪管理器按
+         * 未设置的尺寸工作, 在 SetupClippingContext 里越界写 (0xC0000409)。
+         * 这里先按模型画布尺寸设置, 与 GL 路径同一个量级。
+         */
+        vulkan->SetClippingMaskBufferSize((Csm::csmFloat32)width_,
+            (Csm::csmFloat32)height_);
         bind_textures();
         return true;
     }
