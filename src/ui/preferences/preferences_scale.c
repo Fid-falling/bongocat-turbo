@@ -195,8 +195,14 @@ bool bongo_cat_preferences_open_window(BongoCatPreferences *value) {
         value->owns_gl_context, value->transparent_window,
         pixel_width, pixel_height,
         layout_scale, raster_scale);
-    if (!SDL_GL_SetSwapInterval(0)) SDL_LogWarn(SDL_LOG_CATEGORY_VIDEO,
-        "Preferences VSync disable unavailable: %s", SDL_GetError());
+    /*
+     * 只有 GL 窗口才碰 GL。设置窗口在 Vulkan 模式下没有 GL 上下文, 直接调用会进
+     * nvoglv64.dll 崩掉 (WER: Faulting module nvoglv64.dll, 0xc0000005) —— 这正是
+     * 之前那个"偶发崩溃"的真身。
+     */
+    if (!value->prefer_vulkan && !SDL_GL_SetSwapInterval(0))
+        SDL_LogWarn(SDL_LOG_CATEGORY_VIDEO,
+            "Preferences VSync disable unavailable: %s", SDL_GetError());
     SDL_StartTextInput(value->window);
     value->render_dirty = true;
     bongo_cat_preferences_live_resize_install(value);
