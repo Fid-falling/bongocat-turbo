@@ -45,19 +45,10 @@ static bool try_vulkan_window(BongoCatApp *app, BongoCatError *error) {
     }
     BongoCatVkInfo info = {0};
     /*
-     * Cubism 的 Live2D 渲染器要提前知道用哪个设备与离屏目标: 窗口一建好就挂上
-     * (桥内部会把渲染器工厂切到 Vulkan)。失败不影响任何事 —— 桥会一直返回
-     * false, 上层据此保留 OpenGL 路径。
-     *
-     * 注意: 必须先真的问一次 bongo_cat_vk_info 才能拿到尺寸。之前这里直接用了
-     * 还没填充的 info (全 0), attach 的 width<=0 检查立刻早退, 于是桥永远挂不上。
+     * Live2D 的 Vulkan 桥不在这里挂载: SDK 的设备表用的是全局分配器, 要等
+     * CubismFramework::StartUp 之后才能用。这里只记下后端, 真正挂载放到渲染
+     * 阶段 (见 src/render/vk/vk_scene.c)。
      */
-    BongoCatVkInfo attach_info = {0};
-    if (bongo_cat_vk_info(app->vk, &attach_info) &&
-        !bongo_cat_live2d_vulkan_attach(app->vk, attach_info.width,
-            attach_info.height))
-        SDL_LogWarn(SDL_LOG_CATEGORY_VIDEO,
-            "[vulkan] Live2D 的 Vulkan 渲染器未挂载, Live2D 将回退 OpenGL");
 
     if (bongo_cat_vk_info(app->vk, &info))
         SDL_Log("[runtime] Vulkan 窗口就绪 (transparent=%d, device=%s, driver=%s, "
