@@ -28,6 +28,16 @@ function(bongo_cat_stage_cubism_assets target)
       "${BONGO_CAT_CUBISM_SHADER_SOURCE_DIR}"
       "${shader_destination}"
     VERBATIM)
+  # Vulkan 后端的 Cubism 渲染器按相对路径 FrameworkShaders/*.spv 加载着色器,
+  # 所以编译好的 SPIR-V 也要放进同一个目录 (由 FrameworkShaders 目标先生成)。
+  if(BONGO_CAT_ENABLE_VULKAN AND BONGO_CAT_CUBISM_VK_SHADER_DIR)
+    add_dependencies(${target} FrameworkShaders)
+    add_custom_command(TARGET ${target} POST_BUILD
+      COMMAND ${CMAKE_COMMAND} -E copy_directory
+        "${BONGO_CAT_CUBISM_VK_SHADER_DIR}"
+        "${shader_destination}"
+      VERBATIM)
+  endif()
   if(UNIX AND NOT APPLE AND target STREQUAL "bongo_cat")
     install(DIRECTORY
       "${BONGO_CAT_CUBISM_SHADER_SOURCE_DIR}/"
