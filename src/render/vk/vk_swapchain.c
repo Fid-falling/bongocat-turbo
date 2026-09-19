@@ -293,6 +293,17 @@ bool bongo_cat_vk_recreate_swapchain(BongoCatVk *vk, int width, int height) {
     vkDeviceWaitIdle(vk->device);
     /* 已经等待空闲, 顺手把各帧的获取信号量重建掉, 避免复用未消费的信号量 */
     if (!bongo_cat_vk_reset_frame_semaphores(vk)) return false;
+    /*
+     * 作废挂起的回读并把 image_index 归零: 回读是用 image_index 去索引图像数组的
+     * (vk_frame.c 的 record_readback), 而它来自上一帧的 acquire。交换链一重建,
+     * 旧下标就可能超出新交换链的图像数 -> 越界 -> 驱动崩溃 (nvoglv64 + 0xc0000005)。
+     * 设置窗口恰好是"排队回读 + 立刻改尺寸"的组合, 所以只有它会崩。
+     */
+    for (uint32_t i = 0; i < BONGO_CAT_VK_FRAMES_IN_FLIGHT; ++i) {
+        vk->readback[i].requested = false;
+        vk->readback[i].pending = false;
+    }
+    vk->image_index = 0;
     bongo_cat_vk_destroy_swapchain(vk);
     BongoCatError error = {0};
     if (!bongo_cat_vk_create_swapchain(vk, width, height, &error)) {
