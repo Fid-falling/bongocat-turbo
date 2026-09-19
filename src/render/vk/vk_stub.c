@@ -112,6 +112,11 @@ bool bongo_cat_vk_mask_corners(BongoCatVk *vk, int width, int height,
     return false;
 }
 
+void bongo_cat_vk_set_viewport(BongoCatVk *vk, int x, int y, int width,
+    int height) {
+    (void)vk; (void)x; (void)y; (void)width; (void)height;
+}
+
 bool bongo_cat_vk_queue_hit_sample(BongoCatVk *vk, int x, int y) {
     (void)vk; (void)x; (void)y;
     return false;

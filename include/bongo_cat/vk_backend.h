@@ -105,6 +105,17 @@ bool bongo_cat_vk_draw_triangles(BongoCatVk *vk, BongoCatVkTexture *texture,
 bool bongo_cat_vk_draw_dial(BongoCatVk *vk, BongoCatVkTexture *texture,
     const void *vertices, unsigned int vertex_count, int width, int height);
 
+/*
+ * 设置视口 (x/y 为左上角像素坐标, y 轴向下)。
+ *
+ * 画叠加层 (背景图/按键/特效/指针) 时必须用模型的内容视口, 与 OpenGL 路径的
+ * glViewport(content_x, content_y, content_w, content_h) 对齐: 那些图元是按
+ * NDC 画的整屏四边形, 只有视口一致, 它们才会和叠加层落在同一块内容区域里。
+ * 画 Live2D 合成与圆角遮罩之前记得恢复整窗视口。
+ */
+void bongo_cat_vk_set_viewport(BongoCatVk *vk, int x, int y, int width,
+    int height);
+
 /* 圆角遮罩: 与 OpenGL 路径一样把 RGB 与 alpha 一起乘上覆盖率 */
 bool bongo_cat_vk_mask_corners(BongoCatVk *vk, int width, int height,
     float radius_percent);

@@ -323,6 +323,31 @@ bool bongo_cat_vk_mask_corners(BongoCatVk *vk, int width, int height,
     return true;
 }
 
+void bongo_cat_vk_set_viewport(BongoCatVk *vk, int x, int y, int width,
+    int height) {
+    if (!vk || !vk->frame_active) return;
+    VkViewport viewport = {0.0f, 0.0f, (float)vk->extent.width,
+        (float)vk->extent.height, 0.0f, 1.0f};
+    /*
+     * 内容视口: 与 OpenGL 的 glViewport 一致地裁剪到交换链范围内。
+     * Vulkan 的视口 y 从上方开始, 调用方传的就是左上角坐标。
+     */
+    if (width > 0 && height > 0 && x < (int)vk->extent.width &&
+        y < (int)vk->extent.height) {
+        if (x < 0) { width += x; x = 0; }
+        if (y < 0) { height += y; y = 0; }
+        if (x + width > (int)vk->extent.width) width = (int)vk->extent.width - x;
+        if (y + height > (int)vk->extent.height) height = (int)vk->extent.height - y;
+        if (width > 0 && height > 0) {
+            viewport.x = (float)x;
+            viewport.y = (float)y;
+            viewport.width = (float)width;
+            viewport.height = (float)height;
+        }
+    }
+    vkCmdSetViewport(vk->frames[vk->frame_index].command, 0, 1, &viewport);
+}
+
 void bongo_cat_vk_set_scissor(BongoCatVk *vk, int x, int y, int width, int height) {
     if (!vk || !vk->frame_active) return;
     if (x < 0) { width += x; x = 0; }

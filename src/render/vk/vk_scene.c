@@ -5,6 +5,7 @@
 #include "bongo_cat/overlay.h"
 #include "bongo_cat/render.h"
 #include "bongo_cat/vk_backend.h"
+#include "bongo_cat/model.h"
 
 #include <SDL3/SDL.h>
 
@@ -92,7 +93,26 @@ bool bongo_cat_vk_render_main(BongoCatApp *app, bool present) {
         return false;
     }
 
+    /*
+     * 叠加层的视口: 与 OpenGL 路径逐行对齐 (app_loop.c 的 render())。
+     *
+     * 背景图/按键/特效/指针都是按 NDC 画的整屏四边形, GL 那边它们被画在
+     * "模型内容视口" 里 (glViewport(content_x, content_y, content_w, content_h)),
+     * 只有 Live2D 自己按整窗视口画 —— 因为它的投影里已经带了内容变换。这里过去
+     * 一直用整窗视口画叠加层, 于是背景/键盘图比模型偏上、缩放也不同, 看起来就是
+     * "猫的位置不对"。
+     */
+    int content_x = 0, content_y = 0;
+    int content_width = width, content_height = height;
+    const bool content_viewport = bongo_cat_live2d_viewport(app->live2d,
+        &content_x, &content_y, &content_width, &content_height) &&
+        content_width > 0 && content_height > 0;
+    if (content_viewport)
+        /* GL 的视口 y 从左下角算, Vulkan 从左上角算, 这里翻转 */
+        bongo_cat_vk_set_viewport(app->vk, content_x,
+            height - content_y - content_height, content_width, content_height);
     bongo_cat_overlay_draw_background(app->overlay, app->settings.model.mirror);
+    bongo_cat_vk_set_viewport(app->vk, 0, 0, width, height);
     /* Live2D 的离屏结果按整窗四边形合成 (离屏目标就是按窗口尺寸建的) */
     if (bongo_cat_live2d_vulkan_ready()) {
         BongoCatVkTexture *live2d = live2d_target_texture(app);
@@ -100,10 +120,14 @@ bool bongo_cat_vk_render_main(BongoCatApp *app, bool present) {
             bongo_cat_vk_draw_overlay_quad(app->vk, live2d,
                 app->settings.model.mirror, width, height, false, false);
     }
+    if (content_viewport)
+        bongo_cat_vk_set_viewport(app->vk, content_x,
+            height - content_y - content_height, content_width, content_height);
     bongo_cat_overlay_draw_pointer_before_keys(app->overlay);
     bongo_cat_overlay_draw_keys(app->overlay, app->settings.model.mirror);
     bongo_cat_overlay_draw_effect(app->overlay, app->settings.model.mirror);
     bongo_cat_overlay_draw_pointer_after_keys(app->overlay);
+    bongo_cat_vk_set_viewport(app->vk, 0, 0, width, height);
 
     /* 圆角遮罩必须在所有内容之后: 它把 RGB 与 alpha 一起乘上覆盖率 */
     if (app->settings.window.rounded_corners &&
