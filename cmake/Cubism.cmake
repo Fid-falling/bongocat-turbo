@@ -55,12 +55,15 @@ if(UNIX AND NOT APPLE)
   find_package(X11 REQUIRED)
   target_link_libraries(glew_s PRIVATE X11::X11 ${CMAKE_DL_LIBS})
 endif()
-# 默认只编 OpenGL 后端; 打开 Vulkan 后端时把 SDK 自带的 Vulkan 渲染器
-# (CubismRenderer_Vulkan / CubismRenderTarget_Vulkan ...) 一起编进来,
-# 运行时再由 bongo_cat 决定用哪一个。
+# SDK 的后端目录只能一个一个 add_subdirectory (它用的是单一的
+# FRAMEWORK_SOURCE), 所以这里保留 OpenGL, Vulkan 的源文件在下面显式补进
+# Framework 目标。
 set(FRAMEWORK_SOURCE OpenGL)
 if(BONGO_CAT_ENABLE_VULKAN)
-  set(FRAMEWORK_SOURCE "OpenGL;Vulkan")
+  # 两个后端的 CubismRenderer::Create/StaticRelease 会重复符号, 配置阶段先给
+  # 它们加上条件编译, 唯一的实现放在 src/live2d/cubism_renderer_factory.cpp。
+  include(cmake/CubismRendererSelect.cmake)
+  bongo_cat_prepare_cubism_renderer_selection()
 endif()
 add_subdirectory("${CUBISM_FRAMEWORK_PATH}" "${CMAKE_BINARY_DIR}/cubism-framework")
 include(cmake/CubismUserModelSafety.cmake)
@@ -87,6 +90,17 @@ target_link_libraries(Framework PUBLIC Live2DCubismCore glew_s)
 
 if(BONGO_CAT_ENABLE_VULKAN)
   target_link_libraries(Framework PUBLIC Vulkan::Vulkan)
+  # SDK 自带的 Vulkan 渲染器源文件 (对应其 Rendering/Vulkan/CMakeLists.txt,
+  # 这里显式列出, 因为 add_subdirectory 只能加一个后端目录)。
+  target_sources(Framework PRIVATE
+    "${CUBISM_FRAMEWORK_PATH}/src/Rendering/Vulkan/CubismClass_Vulkan.cpp"
+    "${CUBISM_FRAMEWORK_PATH}/src/Rendering/Vulkan/CubismDeviceInfo_Vulkan.cpp"
+    "${CUBISM_FRAMEWORK_PATH}/src/Rendering/Vulkan/CubismOffscreenManager_Vulkan.cpp"
+    "${CUBISM_FRAMEWORK_PATH}/src/Rendering/Vulkan/CubismOffscreenRenderTarget_Vulkan.cpp"
+    "${CUBISM_FRAMEWORK_PATH}/src/Rendering/Vulkan/CubismRenderTarget_Vulkan.cpp"
+    "${CUBISM_FRAMEWORK_PATH}/src/Rendering/Vulkan/CubismRenderer_Vulkan.cpp")
+  # 关掉 SDK 里两份工厂定义, 用我们自己的运行时选择实现
+  target_compile_definitions(Framework PUBLIC BONGO_CAT_RUNTIME_RENDERER_SELECT)
   # SDK 的 Vulkan 着色器: 按 (色彩混合 x alpha 混合) 组合编出一整套 .spv,
   # 规则直接复用 SDK 自己的 CMakeLists (依赖 $ENV{VK_SDK_PATH}/Bin/glslc.exe,
   # CMake 的 FindVulkan 找到的正是同一个 SDK)。
