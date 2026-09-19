@@ -60,9 +60,8 @@ ${endguard}")
 endfunction()
 
 function(bongo_cat_prepare_cubism_renderer_selection)
-  if(NOT BONGO_CAT_ENABLE_VULKAN)
-    return()
-  endif()
+  # 无论是否启用 Vulkan 后端都要打: 唯一的工厂实现固定由
+  # src/live2d/cubism_renderer_factory.cpp 提供, 否则两者的定义会重复。
   bongo_cat_guard_cubism_renderer_factory(
     "OpenGL" "OpenGL/CubismRenderer_OpenGLES2.cpp" "CubismRenderer_OpenGLES2")
   bongo_cat_guard_cubism_renderer_factory(

@@ -59,11 +59,12 @@ endif()
 # FRAMEWORK_SOURCE), 所以这里保留 OpenGL, Vulkan 的源文件在下面显式补进
 # Framework 目标。
 set(FRAMEWORK_SOURCE OpenGL)
+# SDK 的 CubismRenderer::Create/StaticRelease 在两个后端文件里各有一份且无条件
+# 定义, 而我们的实现固定由 src/live2d/cubism_renderer_factory.cpp 提供, 所以配置
+# 阶段必须把 SDK 那两份关掉 (与是否启用 Vulkan 后端无关)。
+include(cmake/CubismRendererSelect.cmake)
+bongo_cat_prepare_cubism_renderer_selection()
 if(BONGO_CAT_ENABLE_VULKAN)
-  # 两个后端的 CubismRenderer::Create/StaticRelease 会重复符号, 配置阶段先给
-  # 它们加上条件编译, 唯一的实现放在 src/live2d/cubism_renderer_factory.cpp。
-  include(cmake/CubismRendererSelect.cmake)
-  bongo_cat_prepare_cubism_renderer_selection()
 endif()
 add_subdirectory("${CUBISM_FRAMEWORK_PATH}" "${CMAKE_BINARY_DIR}/cubism-framework")
 include(cmake/CubismUserModelSafety.cmake)

@@ -10,7 +10,9 @@
 #include "cubism_renderer_select.hpp"
 
 #include <Rendering/OpenGL/CubismRenderer_OpenGLES2.hpp>
+#ifdef BONGO_CAT_HAS_VULKAN
 #include <Rendering/Vulkan/CubismRenderer_Vulkan.hpp>
+#endif
 
 namespace bongo_cat {
 namespace {
@@ -32,14 +34,18 @@ namespace Framework {
 namespace Rendering {
 
 CubismRenderer *CubismRenderer::Create(csmUint32 width, csmUint32 height) {
+#ifdef BONGO_CAT_HAS_VULKAN
     if (bongo_cat::bongo_cat_cubism_renderer_uses_vulkan())
         return CSM_NEW CubismRenderer_Vulkan(width, height);
+#endif
     return CSM_NEW CubismRenderer_OpenGLES2(width, height);
 }
 
 void CubismRenderer::StaticRelease() {
     CubismRenderer_OpenGLES2::DoStaticRelease();
+#ifdef BONGO_CAT_HAS_VULKAN
     CubismRenderer_Vulkan::DoStaticRelease();
+#endif
 }
 
 } // namespace Rendering
