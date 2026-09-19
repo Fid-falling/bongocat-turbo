@@ -85,3 +85,4 @@ Desktop.ini
 /.diagnostic-storage-morning/
 
 !docs/vulkan-cubism-status.md
+!docs/vulkan-readback-recipe.md
