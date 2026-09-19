@@ -291,8 +291,16 @@ bool bongo_cat_vk_create_swapchain(BongoCatVk *vk, int width, int height,
 bool bongo_cat_vk_recreate_swapchain(BongoCatVk *vk, int width, int height) {
     if (!vk || vk->device == VK_NULL_HANDLE || vk->surface == VK_NULL_HANDLE) return false;
     vkDeviceWaitIdle(vk->device);
-    /* 已经等待空闲, 顺手把各帧的获取信号量重建掉, 避免复用未消费的信号量 */
-    if (!bongo_cat_vk_reset_frame_semaphores(vk)) return false;
+    /*
+     * 只在没有活动帧时才重建帧信号量。
+     *
+     * 若这一帧已经 acquire (begin_frame 之后、end_frame 之前), 那个 acquire 信号量
+     * 正被本帧的 submit 使用; 销毁它会让我们随后拿已销毁的信号量去 submit/present,
+     * 驱动的表现就是在 vkQueuePresentKHR 里崩 (nvoglv64 + 0xc0000005)。
+     * 设置窗口恰好命中这个时序: 它在隐藏状态下建窗建交换链, 随后立刻显示/改尺寸,
+     * 于是发生了"帧中途重建交换链"。
+     */
+    if (!vk->frame_active && !bongo_cat_vk_reset_frame_semaphores(vk)) return false;
     /*
      * 作废挂起的回读并把 image_index 归零: 回读是用 image_index 去索引图像数组的
      * (vk_frame.c 的 record_readback), 而它来自上一帧的 acquire。交换链一重建,
