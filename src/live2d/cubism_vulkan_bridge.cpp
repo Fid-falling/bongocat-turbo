@@ -94,7 +94,13 @@ bool bongo_cat_live2d_vulkan_attach(struct BongoCatVk *vk, int width, int height
     Csm::Rendering::CubismRenderer_Vulkan::SetConstantSettings(g_device,
         (VkPhysicalDevice)info.physical_device, (VkCommandPool)info.command_pool,
         (VkQueue)info.queue, (unsigned int)info.image_count, extent,
-        (VkImageView)info.image_view, g_format, kDepthFormat);
+        /*
+         * 默认目标视图传 NULL: 我们每帧都用 SetRenderTarget 指向自己的离屏
+         * 图像 (配合 EnableChangeRenderTarget), 从不通过 Cubism 渲染到交换链。
+         * 之前传的交换链视图在本环境里是无效句柄, SDK 用它建 framebuffer
+         * 时会崩。
+         */
+        VK_NULL_HANDLE, g_format, kDepthFormat);
     Csm::Rendering::CubismRenderer_Vulkan::EnableChangeRenderTarget();
     SDL_LogWarn(SDL_LOG_CATEGORY_VIDEO,
         "[live2d/vk] attach: Step 2 SetConstantSettings 返回");
