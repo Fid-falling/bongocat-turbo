@@ -1,5 +1,6 @@
 #include "dial_internal.h"
 #include "bongo_cat/render.h"
+#include "bongo_cat/vk_backend.h"
 #include "ui_backend.h"
 #include "bongo_cat/log.h"
 #include "bongo_cat/memory.h"
@@ -106,13 +107,20 @@ static bool create(Dial *d) {
     }
     if (!d->window) return false;
     d->window_id = SDL_GetWindowID(d->window);
+    if (dial_vulkan) {
+        /* 菜单窗口自己的 Vulkan 上下文 (与设置窗口同一套写法) */
+        BongoCatError error = {0};
+        d->vk = bongo_cat_vk_create(d->window, &error);
+        if (!d->vk) return false;
+    } else {
     int sharing = 0;
     SDL_GL_GetAttribute(SDL_GL_SHARE_WITH_CURRENT_CONTEXT,&sharing);
     if (!SDL_GL_SetAttribute(SDL_GL_SHARE_WITH_CURRENT_CONTEXT,0)) return false;
     d->context = SDL_GL_CreateContext(d->window);
     SDL_GL_SetAttribute(SDL_GL_SHARE_WITH_CURRENT_CONTEXT,sharing);
     if (!d->context || !SDL_GL_MakeCurrent(d->window,d->context)) return false;
-    SDL_GL_SetSwapInterval(0); /* The modal tick supplies a 16 ms frame budget. */
+    SDL_GL_SetSwapInterval(0); /* The modal tick supplies a 16 ms frame budget. */
+    } /* dial_vulkan ? ... : GL */
     if (!SDL_GetWindowSize(d->window,&d->width,&d->height) ||
         !SDL_GetWindowSizeInPixels(d->window,&d->pixel_width,&d->pixel_height) ||
         d->width < 1 || d->height < 1) return false;
