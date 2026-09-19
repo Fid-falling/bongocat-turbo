@@ -293,7 +293,12 @@ static void render_vulkan(BongoCatUIBackend *ui) {
     if (!bongo_cat_vk_ui_upload_vertices(ui->vk, ui->vertices,
             (unsigned int)vertex_count)) return;
     const struct nk_draw_command *command;
-    const nk_draw_index *offset = NULL;
+    /*
+     * 索引的起点必须是元素缓冲本身。OpenGL 那边 offset 从 NULL 开始, 因为
+     * glDrawElements 的最后一个参数是 "EBO 里的字节偏移"; Vulkan 这里 offset 是
+     * 真的内存指针, 从 NULL 起步会直接崩在拷贝里 (MoveWithYMM 读 NULL+偏移)。
+     */
+    const nk_draw_index *offset = (const nk_draw_index *)ui->elements;
     ui->last_draw_commands = 0;
     ui->last_draw_elements = 0;
     nk_draw_foreach(command, &ui->context, &ui->commands) {
