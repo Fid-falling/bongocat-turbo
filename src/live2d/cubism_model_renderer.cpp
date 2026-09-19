@@ -171,8 +171,16 @@ bool NativeModel::create_renderer(BongoCatError *error) {
          * 未设置的尺寸工作, 在 SetupClippingContext 里越界写 (0xC0000409)。
          * 这里先按模型画布尺寸设置, 与 GL 路径同一个量级。
          */
-        vulkan->SetClippingMaskBufferSize((Csm::csmFloat32)width_,
-            (Csm::csmFloat32)height_);
+        /*
+         * 尺寸必须与 GL 路径同款: 正方形 + 512 对齐。裁剪管理器会把多个裁剪区域
+         * 按网格排布进一张遮罩纹理, 非正方形/未对齐的尺寸会让布局计算越界
+         * (之前传 width_ x height_ = 612x354 就是这个毛病)。
+         */
+        const int mask_extent = std::max(width_, height_);
+        const int mask_requested = std::max(512, mask_extent);
+        const int mask_size = std::min(2048, ((mask_requested + 511) / 512) * 512);
+        vulkan->SetClippingMaskBufferSize((Csm::csmFloat32)mask_size,
+            (Csm::csmFloat32)mask_size);
         bind_textures();
         return true;
     }
