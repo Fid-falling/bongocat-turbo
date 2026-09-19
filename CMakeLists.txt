@@ -59,6 +59,7 @@ if(EXISTS "${CUBISM_CORE_HEADER}")
       src/live2d/cubism_model_load.cpp
       src/live2d/cubism_model_renderer.cpp
       src/live2d/cubism_renderer_factory.cpp
+      src/live2d/cubism_vulkan_bridge.cpp
       src/live2d/cubism_model_idle.cpp
       src/live2d/cubism_model_update.cpp
       src/live2d/cubism_parameter_overrides.cpp

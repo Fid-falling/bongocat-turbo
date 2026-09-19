@@ -1,3 +1,4 @@
+#include "bongo_cat/live2d_vulkan.h"
 #include "bongo_cat/model.h"
 #include "model_import_manifest.h"
 #include "bongo_cat/json.h"
@@ -164,4 +165,21 @@ int bongo_cat_live2d_expression(const BongoCatLive2D *value) {
 bool bongo_cat_live2d_visual_state(const BongoCatLive2D *value,
     BongoCatLive2DVisualState *state) {
     (void)value; (void)state; return false;
+}
+
+/* Vulkan 桥的桩: 没有 Cubism (或没有 Vulkan 后端) 时一律失败, 上层回退 OpenGL。 */
+bool bongo_cat_live2d_vulkan_attach(struct BongoCatVk *vk, int width, int height) {
+    (void)vk; (void)width; (void)height;
+    return false;
+}
+
+bool bongo_cat_live2d_vulkan_ready(void) { return false; }
+bool bongo_cat_live2d_vulkan_begin_frame(void) { return false; }
+bool bongo_cat_live2d_vulkan_end_frame(void) { return false; }
+void bongo_cat_live2d_vulkan_detach(void) {}
+
+bool bongo_cat_live2d_vulkan_target_info(void **image, void **view, void **sampler,
+    int *width, int *height) {
+    (void)image; (void)view; (void)sampler; (void)width; (void)height;
+    return false;
 }
