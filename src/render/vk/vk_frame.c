@@ -253,6 +253,7 @@ bool bongo_cat_vk_begin_frame(BongoCatVk *vk, int width, int height) {
     /* 每帧的顶点/索引数据从零开始追加 */
     vk->arenas[vk->frame_index].offset = 0;
     vk->index_arenas[vk->frame_index].offset = 0;
+    vk->dial_arenas[vk->frame_index].offset = 0;
     vk->frame_active = true;
     return true;
 }

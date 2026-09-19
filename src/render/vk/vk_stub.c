@@ -99,6 +99,13 @@ bool bongo_cat_vk_draw_triangles(BongoCatVk *vk, BongoCatVkTexture *texture,
     return false;
 }
 
+bool bongo_cat_vk_draw_dial(BongoCatVk *vk, BongoCatVkTexture *texture,
+    const void *vertices, unsigned int vertex_count, int width, int height) {
+    (void)vk; (void)texture; (void)vertices; (void)vertex_count; (void)width;
+    (void)height;
+    return false;
+}
+
 bool bongo_cat_vk_mask_corners(BongoCatVk *vk, int width, int height,
     float radius_percent) {
     (void)vk; (void)width; (void)height; (void)radius_percent;

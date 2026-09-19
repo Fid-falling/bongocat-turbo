@@ -34,6 +34,10 @@ void bongo_cat_vk_destroy_pipelines(BongoCatVk *vk) {
         vkDestroyPipeline(vk->device, vk->ui_pipeline, NULL);
         vk->ui_pipeline = VK_NULL_HANDLE;
     }
+    if (vk->dial_pipeline != VK_NULL_HANDLE) {
+        vkDestroyPipeline(vk->device, vk->dial_pipeline, NULL);
+        vk->dial_pipeline = VK_NULL_HANDLE;
+    }
     if (vk->overlay_layout != VK_NULL_HANDLE) {
         vkDestroyPipelineLayout(vk->device, vk->overlay_layout, NULL);
         vk->overlay_layout = VK_NULL_HANDLE;
@@ -264,8 +268,20 @@ void bongo_cat_vk_rebuild_pipelines(BongoCatVk *vk) {
         ui_binding, 3, ui_attributes, VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST,
         BONGO_CAT_VK_BLEND_ALPHA);
 
+    /*
+     * 径向菜单: 顶点格式与设置界面相同 (pos 2f + uv 2f + color RGBA8), 但片元
+     * 走普通 RGBA 采样, 所以单独一条管线 —— 复用 ui_layout 的 push constant
+     * (同样是 scale/offset) 与描述符布局。
+     */
+    vk->dial_pipeline = build_pipeline(vk, vk->ui_layout,
+        bongo_cat_spv_dial_vert, sizeof(bongo_cat_spv_dial_vert),
+        bongo_cat_spv_dial_frag, sizeof(bongo_cat_spv_dial_frag),
+        ui_binding, 3, ui_attributes, VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST,
+        BONGO_CAT_VK_BLEND_PREMULTIPLIED);
+
     if (vk->overlay_pipeline == VK_NULL_HANDLE || vk->pointer_pipeline == VK_NULL_HANDLE ||
-        vk->corner_pipeline == VK_NULL_HANDLE || vk->ui_pipeline == VK_NULL_HANDLE) {
+        vk->corner_pipeline == VK_NULL_HANDLE || vk->ui_pipeline == VK_NULL_HANDLE ||
+        vk->dial_pipeline == VK_NULL_HANDLE) {
         SDL_LogError(SDL_LOG_CATEGORY_VIDEO, "[vulkan] 图形管线创建失败");
         bongo_cat_vk_destroy_pipelines(vk);
     }

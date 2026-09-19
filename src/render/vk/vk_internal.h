@@ -144,9 +144,16 @@ struct BongoCatVk {
     VkPipeline pointer_pipeline;
     VkPipeline corner_pipeline;
     VkPipeline ui_pipeline;
+    /* 径向菜单: 与设置界面同一套顶点/描述符布局, 但片元是普通 RGBA 采样 */
+    VkPipeline dial_pipeline;
     BongoCatVkArena arenas[BONGO_CAT_VK_FRAMES_IN_FLIGHT];
     /* 设置界面的索引缓冲 (16 位), 与顶点一样每帧从零开始追加 */
     BongoCatVkArena index_arenas[BONGO_CAT_VK_FRAMES_IN_FLIGHT];
+    /*
+     * 径向菜单的顶点缓冲。菜单一帧就有几万个图元顶点 (远超上面 256 KB 的
+     * 通用缓冲), 而且顶点格式与应用内其它图元不同, 所以单独一份。
+     */
+    BongoCatVkArena dial_arenas[BONGO_CAT_VK_FRAMES_IN_FLIGHT];
     BongoCatVkReadback readback[BONGO_CAT_VK_FRAMES_IN_FLIGHT];
     /* 设置界面这一帧的顶点在顶点缓冲里的起点 (ui_upload_vertices 记录) */
     VkDeviceSize ui_vertex_offset;

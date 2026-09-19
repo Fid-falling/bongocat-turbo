@@ -96,6 +96,14 @@ bool bongo_cat_vk_draw_overlay_quad(BongoCatVk *vk, BongoCatVkTexture *texture,
     bool erase_right);
 bool bongo_cat_vk_draw_triangles(BongoCatVk *vk, BongoCatVkTexture *texture,
     const float *vertices, unsigned int vertex_count, bool textured);
+/*
+ * 径向菜单的三角形列表。顶点格式与 draw_triangles 不同 (位置 2f + uv 2f +
+ * 颜色 RGBA8, 共 20 字节, 与设置界面的界面顶点一致), 而且菜单一帧有数万个顶点,
+ * 所以走后端内部单独的大顶点缓冲。顶点坐标是窗口逻辑像素, 原点在左上,
+ * 由 width/height 映射到裁剪空间。
+ */
+bool bongo_cat_vk_draw_dial(BongoCatVk *vk, BongoCatVkTexture *texture,
+    const void *vertices, unsigned int vertex_count, int width, int height);
 
 /* 圆角遮罩: 与 OpenGL 路径一样把 RGB 与 alpha 一起乘上覆盖率 */
 bool bongo_cat_vk_mask_corners(BongoCatVk *vk, int width, int height,

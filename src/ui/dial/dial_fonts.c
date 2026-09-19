@@ -1,4 +1,5 @@
 #include "dial_internal.h"
+#include "bongo_cat/vk_backend.h"
 #include "ui_font.h"
 #include "ui_font_atlas_internal.h"
 #include <stdlib.h>
@@ -73,9 +74,29 @@ bool dial_fonts_init(Dial *d) {
         height,p->ranges[0],p->ranges[1],p->ranges[2],p->ranges[3]);
     int width = 0, rows = 0, maximum = 0;
     const void *pixels = p->font ? nk_font_atlas_bake(&p->atlas,&width,&rows,NK_FONT_ATLAS_ALPHA8) : NULL;
-    glGetIntegerv(GL_MAX_TEXTURE_SIZE,&maximum);
+    /*
+     * Vulkan 菜单的字体图集不能用 GL 上传: 从设备限值取尺寸上限, 走 vk_backend
+     * 的单通道纹理接口, 再把句柄登记进纹理表 (与设置窗口同一套做法)。
+     */
+    if (d->vk) maximum = bongo_cat_vk_max_texture_dimension(d->vk);
+    else glGetIntegerv(GL_MAX_TEXTURE_SIZE,&maximum);
     bool ok = pixels && width > 0 && rows > 0 && width <= maximum && rows <= maximum;
-    if (ok) {
+    if (ok && d->vk) {
+        BongoCatError error = {0};
+        BongoCatVkTexture *texture = bongo_cat_vk_texture_from_alpha(d->vk,pixels,
+            width,rows,"dial-font-atlas",&error);
+        int id = texture ? dial_vk_texture_register(d,texture) : 0;
+        if (id) {
+            p->font_texture = (GLuint)id;
+            nk_font_atlas_end(&p->atlas,nk_handle_id(id),NULL);
+        } else {
+            if (texture) bongo_cat_vk_texture_destroy(d->vk,texture);
+            SDL_LogError(SDL_LOG_CATEGORY_APPLICATION,
+                "Dial font atlas upload failed: %s",error.message);
+            ok = false;
+        }
+    }
+    if (ok && !d->vk) {
         glGenTextures(1,&p->font_texture);
         glBindTexture(GL_TEXTURE_2D,p->font_texture);
         glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_MIN_FILTER,GL_LINEAR);

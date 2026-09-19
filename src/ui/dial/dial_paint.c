@@ -17,23 +17,25 @@ static const char *fragment_shader =
 bool dial_paint_init(Dial *d) {
     DialPaint *p = &d->paint;
     BongoCatError error = {0};
-    if (!bongo_cat_gl_load(&p->gl, &error)) return SDL_SetError("Radial menu GL loader: %s",error.message);
-    bongo_cat_gl_clear_errors();
-    p->program = bongo_cat_gl_program(&p->gl,vertex_shader,fragment_shader,&error);
-    if (!p->program) { SDL_SetError("%s",error.message); return false; }
-    p->projection = p->gl.uniform_location(p->program,"Projection");
-    p->sampler = p->gl.uniform_location(p->program,"Texture");
+    /*
+     * Vulkan 菜单窗口没有 GL 上下文: 绝不能去加载 GL 函数 (那正是
+     * "Radial menu GL loader: Missing OpenGL function" 的来源), 也不建
+     * program/VAO/VBO。白点纹理改走后端接口, 登记进纹理表 (p->white 存 id,
+     * 与句柄约定一致)。
+     */
     if (d->vk) {
-        /*
-         * Vulkan 菜单: VAO/VBO 与顶点属性是 GL 专有, 整段跳过;
-         * 白点纹理走后端接口创建并登记到纹理表 (id 存进 p->white, 与句柄约定一致)。
-         */
         const unsigned char white_pixel[4] = {255, 255, 255, 255};
         BongoCatError dial_error = {0};
         p->white = (GLuint)dial_vk_texture_register(d,
             bongo_cat_vk_texture_from_pixels(d->vk, white_pixel, 1, 1,
                 "dial-white", &dial_error));
     } else {
+    if (!bongo_cat_gl_load(&p->gl, &error)) return SDL_SetError("Radial menu GL loader: %s",error.message);
+    bongo_cat_gl_clear_errors();
+    p->program = bongo_cat_gl_program(&p->gl,vertex_shader,fragment_shader,&error);
+    if (!p->program) { SDL_SetError("%s",error.message); return false; }
+    p->projection = p->gl.uniform_location(p->program,"Projection");
+    p->sampler = p->gl.uniform_location(p->program,"Texture");
     p->gl.gen_vertex_arrays(1,&p->vao);
     p->gl.gen_buffers(1,&p->vbo);
     p->gl.bind_vertex_array(p->vao);
@@ -46,7 +48,7 @@ bool dial_paint_init(Dial *d) {
     const uint8_t white[] = {255,255,255,255};
     glTexImage2D(GL_TEXTURE_2D,0,GL_RGBA8,1,1,0,GL_RGBA,GL_UNSIGNED_BYTE,white);
     glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_MIN_FILTER,GL_LINEAR);
-    glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_MAG_FILTER,GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_MAG_FILTER,GL_LINEAR);
     }
     if (!dial_fonts_init(d)) return SDL_SetError("Radial menu font atlas could not be created");
     for (int i = 0; i < d->count; ++i) {
@@ -55,6 +57,7 @@ bool dial_paint_init(Dial *d) {
         dial_sector(&p->roots[i],82,184,angle-half,angle+half);
         if (!p->roots[i].triangle_count) return SDL_SetError("Radial menu sector %d could not be triangulated",i);
     }
+    if (d->vk) return true; /* Vulkan 侧没有 GL 错误状态可查 */
     GLenum status = glGetError();
     return status == GL_NO_ERROR || SDL_SetError("Radial menu GL initialization error: 0x%x",(unsigned)status);
 }
@@ -78,10 +81,10 @@ bool dial_paint_frame(Dial *d) {
             return SDL_SetError("Radial menu Vulkan frame failed");
         for (int i = 0; i < p->batch_count; ++i) {
             DialBatch batch = p->batches[i];
-            bongo_cat_vk_draw_triangles(d->vk,
+            bongo_cat_vk_draw_dial(d->vk,
                 dial_vk_texture_lookup(d, batch.texture),
-                (const float *)&p->vertices[batch.first],
-                (unsigned)batch.count, true);
+                &p->vertices[batch.first], (unsigned)batch.count,
+                d->width, d->height);
         }
         if (!bongo_cat_vk_end_frame(d->vk))
             return SDL_SetError("Radial menu Vulkan present failed");

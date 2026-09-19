@@ -29,10 +29,13 @@ static bool SDLCALL collect_event(void *userdata, SDL_Event *event) {
 
 void dial_preview(Dial *d, BongoCatMenuAction action) {
     if (!d->labels->preview) return;
-    if (d->previous_window && d->previous_context)
-        SDL_GL_MakeCurrent(d->previous_window,d->previous_context);
+    /* Vulkan 菜单没有 GL 上下文: 预览回调在主窗口自己的上下文里跑, 不用切换。 */
+    if (!d->vk) {
+        if (d->previous_window && d->previous_context)
+            SDL_GL_MakeCurrent(d->previous_window,d->previous_context);
+    }
     d->labels->preview(d->labels->preview_userdata,action);
-    if (!SDL_GL_MakeCurrent(d->window,d->context)) d->done = true;
+    if (!d->vk && !SDL_GL_MakeCurrent(d->window,d->context)) d->done = true;
 }
 
 static void animate(Dial *d, uint64_t now) {
@@ -73,12 +76,10 @@ static bool create(Dial *d) {
         x = (float)width/2; y = (float)height/2;
     }
     /*
-     * 菜单窗口的 Vulkan 通路: 开关与窗口 flags 已就位, 但 dial_paint 的 Vulkan
-     * 绘制 (纹理 + bongo_cat_vk_draw_triangles) 还没落地, 所以在此之前保持关闭 ——
-     * 否则会用 Vulkan 窗口去跑 GL 绘制。施工图: docs/vulkan-dial-port-recipe.md
-     * 翻开关的时机: dial_paint 的 Vulkan 分支完成后, 把 dial_vulkan_enabled 改成 true。
+     * 菜单窗口的 Vulkan 通路: 纹理表、绘制、封面、字体图集与窗口生命周期都已
+     * 落地, 所以在 renderer=vulkan 时启用。施工图: docs/vulkan-dial-port-recipe.md
      */
-    const bool dial_vulkan_enabled = false;
+    const bool dial_vulkan_enabled = true;
     const bool dial_vulkan = dial_vulkan_enabled &&
         bongo_cat_renderer_active() == BONGO_CAT_RENDERER_VULKAN;
     SDL_WindowFlags flags = (dial_vulkan ? SDL_WINDOW_VULKAN : SDL_WINDOW_OPENGL) |
@@ -119,7 +120,7 @@ static bool create(Dial *d) {
     d->context = SDL_GL_CreateContext(d->window);
     SDL_GL_SetAttribute(SDL_GL_SHARE_WITH_CURRENT_CONTEXT,sharing);
     if (!d->context || !SDL_GL_MakeCurrent(d->window,d->context)) return false;
-    SDL_GL_SetSwapInterval(0); /* The modal tick supplies a 16 ms frame budget. */
+    SDL_GL_SetSwapInterval(0); /* The modal tick supplies a 16 ms frame budget. */
     } /* dial_vulkan ? ... : GL */
     if (!SDL_GetWindowSize(d->window,&d->width,&d->height) ||
         !SDL_GetWindowSizeInPixels(d->window,&d->pixel_width,&d->pixel_height) ||
@@ -168,11 +169,11 @@ BongoCatMenuAction bongo_cat_platform_context_menu(BongoCatPlatform *platform,
         }
         if (d->done) break;
         if (labels->preview_tick) {
-            if (d->previous_window && d->previous_context)
+            if (!d->vk && d->previous_window && d->previous_context)
                 SDL_GL_MakeCurrent(d->previous_window,d->previous_context);
             labels->preview_tick(labels->preview_userdata);
         }
-        if (!SDL_GL_MakeCurrent(d->window,d->context)) {
+        if (!d->vk && !SDL_GL_MakeCurrent(d->window,d->context)) {
             SDL_LogError(SDL_LOG_CATEGORY_VIDEO,"Radial menu context activation failed: %s",SDL_GetError());
             break;
         }
@@ -188,7 +189,7 @@ BongoCatMenuAction bongo_cat_platform_context_menu(BongoCatPlatform *platform,
         uint64_t elapsed = SDL_GetTicks()-start;
         if (elapsed < 16) SDL_Delay((Uint32)(16-elapsed));
     }
-    if (!d->context || (SDL_GetWindowFromID(d->window_id) &&
+    if (d->vk || !d->context || (SDL_GetWindowFromID(d->window_id) &&
         SDL_GL_MakeCurrent(d->window,d->context))) dial_paint_free(d);
     else {
         /* A destroyed window cannot safely own GL deletion calls. Its context
@@ -197,6 +198,8 @@ BongoCatMenuAction bongo_cat_platform_context_menu(BongoCatPlatform *platform,
         for (int i = 0; i < 4; ++i) free(d->paint.ranges[i]);
         free(d->paint.vertices);
     }
+    /* 交换链/表面必须在窗口销毁之前释放。 */
+    if (d->vk) bongo_cat_vk_destroy(d->vk);
     if (d->context) SDL_GL_DestroyContext(d->context);
     if (d->window_id && SDL_GetWindowFromID(d->window_id)) SDL_DestroyWindow(d->window);
     if (d->previous_window && d->previous_context)

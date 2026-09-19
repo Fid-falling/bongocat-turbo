@@ -15,8 +15,20 @@ typedef struct PointerVertex {
     float x, y, u, v, r, g, b, a;
 } PointerVertex;
 
+/* 径向菜单的顶点: y 向上为正 (与 OpenGL 约定一致, 着色器末尾取反) */
+typedef struct DialVertexIn {
+    float x, y, u, v;
+    unsigned char r, g, b, a;
+} DialVertexIn;
+
 #define BONGO_CAT_VK_ARENA_BYTES (256u * 1024u)
 #define BONGO_CAT_VK_INDEX_ARENA_BYTES (128u * 1024u)
+/*
+ * 径向菜单的顶点缓冲: 一帧实测约 6 万个顶点, 展开成指针格式 (32 字节) 接近
+ * 2 MB, 通用缓冲的 256 KB 远远不够 —— 之前菜单在 Vulkan 下整片空白就是这里
+ * 静默失败。4 MB 留一倍余量。
+ */
+#define BONGO_CAT_VK_DIAL_ARENA_BYTES (4u * 1024u * 1024u)
 /* Nuklear 的 UIVertex: pos(2f) + uv(2f) + color(RGBA8) */
 #define BONGO_CAT_VK_UI_VERTEX_BYTES 20u
 
@@ -37,7 +49,9 @@ bool bongo_cat_vk_create_draw_resources(BongoCatVk *vk, BongoCatError *error) {
         if (!create_arena(vk, &vk->arenas[i], BONGO_CAT_VK_ARENA_BYTES,
                 VK_BUFFER_USAGE_VERTEX_BUFFER_BIT, error, "顶点缓冲") ||
             !create_arena(vk, &vk->index_arenas[i], BONGO_CAT_VK_INDEX_ARENA_BYTES,
-                VK_BUFFER_USAGE_INDEX_BUFFER_BIT, error, "索引缓冲"))
+                VK_BUFFER_USAGE_INDEX_BUFFER_BIT, error, "索引缓冲") ||
+            !create_arena(vk, &vk->dial_arenas[i], BONGO_CAT_VK_DIAL_ARENA_BYTES,
+                VK_BUFFER_USAGE_VERTEX_BUFFER_BIT, error, "菜单顶点缓冲"))
             return false;
     }
     /* 命中测试回读缓冲: 指针附近的一小块 RGBA8 */
@@ -100,6 +114,7 @@ void bongo_cat_vk_destroy_draw_resources(BongoCatVk *vk) {
     for (uint32_t i = 0; i < BONGO_CAT_VK_FRAMES_IN_FLIGHT; ++i) {
         destroy_arena(vk, &vk->arenas[i]);
         destroy_arena(vk, &vk->index_arenas[i]);
+        destroy_arena(vk, &vk->dial_arenas[i]);
     }
     for (uint32_t i = 0; i < BONGO_CAT_VK_FRAMES_IN_FLIGHT; ++i) {
         BongoCatVkReadback *readback = &vk->readback[i];
@@ -254,6 +269,38 @@ bool bongo_cat_vk_draw_triangles(BongoCatVk *vk, BongoCatVkTexture *texture,
     VkDeviceSize vertex_offset = offset;
     vkCmdBindVertexBuffers(command, 0, 1, &vk->arenas[vk->frame_index].buffer,
         &vertex_offset);
+    vkCmdDraw(command, vertex_count, 1, 0, 0);
+    return true;
+}
+
+bool bongo_cat_vk_draw_dial(BongoCatVk *vk, BongoCatVkTexture *texture,
+    const void *vertices, unsigned int vertex_count, int width, int height) {
+    if (!vk || !vk->frame_active || !vertices || vertex_count < 3) return false;
+    if (vk->dial_pipeline == VK_NULL_HANDLE || !texture) return false;
+    if (width <= 0 || height <= 0) return false;
+    /*
+     * 菜单顶点就是管线的输入格式 (pos 2f + uv 2f + RGBA8, 共 20 字节), 坐标是
+     * 窗口逻辑像素 (原点左上), 所以直接把整批顶点推进专用缓冲, 再用 scale/offset
+     * push constant 映射到裁剪空间 —— 与设置界面 ui.vert 的映射一致。
+     */
+    BongoCatVkArena *arena = &vk->dial_arenas[vk->frame_index];
+    size_t bytes = (size_t)vertex_count * sizeof(DialVertexIn);
+    VkDeviceSize offset = 0;
+    if (!arena_push_into(arena, vertices, bytes, &offset)) return false;
+    UiPush push = {{0}};
+    push.scale[0] = 2.0f / (float)width;
+    push.scale[1] = 2.0f / (float)height;
+    push.offset[0] = -1.0f;
+    push.offset[1] = -1.0f;
+    VkCommandBuffer command = vk->frames[vk->frame_index].command;
+    vkCmdBindPipeline(command, VK_PIPELINE_BIND_POINT_GRAPHICS, vk->dial_pipeline);
+    vkCmdBindDescriptorSets(command, VK_PIPELINE_BIND_POINT_GRAPHICS,
+        vk->ui_layout, 0, 1, &texture->descriptor, 0, NULL);
+    vkCmdPushConstants(command, vk->ui_layout,
+        VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT, 0,
+        (uint32_t)sizeof(push), &push);
+    VkDeviceSize vertex_offset = offset;
+    vkCmdBindVertexBuffers(command, 0, 1, &arena->buffer, &vertex_offset);
     vkCmdDraw(command, vertex_count, 1, 0, 0);
     return true;
 }
