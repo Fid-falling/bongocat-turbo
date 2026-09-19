@@ -54,10 +54,6 @@ bool bongo_cat_live2d_vulkan_attach(struct BongoCatVk *vk, int width, int height
         info.image_count);
     g_device = (VkDevice)info.device;
     g_format = (VkFormat)info.image_format;
-    if (!Csm::Rendering::CubismDeviceInfo_Vulkan::GetDeviceInfo(g_device)) {
-        SDL_LogWarn(SDL_LOG_CATEGORY_VIDEO, "[live2d/vk] attach: GetDeviceInfo 失败");
-        return false;
-    }
 
     VkExtent2D extent = {(unsigned int)width, (unsigned int)height};
     /*
@@ -78,6 +74,16 @@ bool bongo_cat_live2d_vulkan_attach(struct BongoCatVk *vk, int width, int height
     Csm::Rendering::CubismRenderer_Vulkan::EnableChangeRenderTarget();
     SDL_LogWarn(SDL_LOG_CATEGORY_VIDEO,
         "[live2d/vk] attach: Step 2 SetConstantSettings 返回");
+    /*
+     * GetDeviceInfo 必须放在 SetConstantSettings 之后: SDK 示例的顺序是
+     * LAppDelegate 先 SetConstantSettings, LAppManager 之后才 GetDeviceInfo。
+     * 它内部会建 CubismPipeline_Vulkan (近 500 条管线 + 加载 .spv),
+     * 在静态设置尚未建立时调用会直接崩。
+     */
+    if (!Csm::Rendering::CubismDeviceInfo_Vulkan::GetDeviceInfo(g_device)) {
+        SDL_LogWarn(SDL_LOG_CATEGORY_VIDEO, "[live2d/vk] attach: GetDeviceInfo 失败");
+        return false;
+    }
     SDL_LogWarn(SDL_LOG_CATEGORY_VIDEO,
         "[live2d/vk] attach: Step 3 CreateRenderTarget %dx%d", width, height);
     auto *target = CSM_NEW Csm::Rendering::CubismRenderTarget_Vulkan();
