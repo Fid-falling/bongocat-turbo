@@ -15,11 +15,11 @@ void bongo_cat_overlay_clear_textures(BongoCatOverlay *value) {
     value->model_pointer_preferred = false;
     value->reference_width = value->reference_height = 0;
     for (size_t i = 0; i < 4; ++i) {
-        if (value->cache[i].texture) glDeleteTextures(1, &value->cache[i].texture);
+        bongo_cat_texture_release(&value->cache[i].texture);
         memset(&value->cache[i], 0, sizeof(value->cache[i]));
     }
-    value->left = value->right = 0;
-    value->effect = 0;
+    value->left = value->right = NULL;
+    value->effect = NULL;
     value->left_name[0] = value->right_name[0] = '\0';
     value->left_path[0] = value->right_path[0] = '\0';
     value->effect_path[0] = '\0';
@@ -96,27 +96,35 @@ BongoCatResult bongo_cat_overlay_load(BongoCatOverlay *value,
 }
 
 #ifdef BONGO_CAT_HAS_CUBISM
-GLuint bongo_cat_overlay_cached_texture(BongoCatOverlay *value, const char *path) {
+BongoCatTexture *bongo_cat_overlay_cached_texture(BongoCatOverlay *value,
+    const char *path) {
     value->clock++;
     TextureSlot *oldest = NULL;
     for (size_t i = 0; i < 4; ++i) {
         TextureSlot *slot = &value->cache[i];
-        if (slot->texture && strcmp(slot->path, path) == 0) {
+        if (bongo_cat_texture_ready(&slot->texture) &&
+            strcmp(slot->path, path) == 0) {
             slot->used = value->clock;
-            return slot->texture;
+            return &slot->texture;
         }
-        if (slot->texture &&
-            (slot->texture == value->left || slot->texture == value->right ||
-            slot->texture == value->effect)) continue;
-        if (!oldest || !slot->texture || slot->used < oldest->used) oldest = slot;
+        if (bongo_cat_texture_ready(&slot->texture) &&
+            (&slot->texture == value->left || &slot->texture == value->right ||
+            &slot->texture == value->effect)) continue;
+        if (!oldest || !bongo_cat_texture_ready(&slot->texture) ||
+            slot->used < oldest->used) oldest = slot;
     }
-    if (!oldest) return 0;
-    if (oldest->texture) glDeleteTextures(1, &oldest->texture);
+    if (!oldest) return NULL;
+    /* 后端无关加载: OpenGL 走 GL 上传, Vulkan 走 vk_backend 的纹理 */
+    bongo_cat_texture_release(&oldest->texture);
     BongoCatError ignored = {0};
-    oldest->texture = bongo_cat_image_texture(path, NULL, NULL, &ignored);
+    if (!bongo_cat_texture_from_file(&oldest->texture, path, &ignored)) {
+        oldest->path[0] = '\0';
+        oldest->used = value->clock;
+        return NULL;
+    }
     snprintf(oldest->path, sizeof(oldest->path), "%s", path);
     oldest->used = value->clock;
-    return oldest->texture;
+    return &oldest->texture;
 }
 #endif
 

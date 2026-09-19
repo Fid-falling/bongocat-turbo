@@ -14,8 +14,8 @@ static void refresh_composite(BongoCatOverlay *value) {
     BongoCatError ignored = {0};
     BongoCatImage image = {0};
     if (bongo_cat_image_composite(value->background_path, value->left_path,
-            value->right_path, value->clean_paws && value->left,
-            value->clean_paws && value->right, &image, &ignored) != BONGO_CAT_OK) {
+            value->right_path, value->clean_paws && value->left != NULL,
+            value->clean_paws && value->right != NULL, &image, &ignored) != BONGO_CAT_OK) {
         if (ignored.message[0])
             SDL_LogWarn(SDL_LOG_CATEGORY_APPLICATION, "%s", ignored.message);
         return;
@@ -35,9 +35,9 @@ static void draw(BongoCatOverlay *value, const BongoCatTexture *texture,
     bool mirror, bool blend) {
     if (!value || !bongo_cat_texture_ready(texture)) return;
     const bool erase_left = !blend && value->composed_cover &&
-        !has_composite(value) && value->left != 0;
+        !has_composite(value) && value->left != NULL;
     const bool erase_right = !blend && value->composed_cover &&
-        !has_composite(value) && value->right != 0;
+        !has_composite(value) && value->right != NULL;
     if (bongo_cat_renderer_active() == BONGO_CAT_RENDERER_VULKAN) {
         bongo_cat_vk_draw_overlay_quad(bongo_cat_vk_current(), texture->vk,
             mirror, value->reference_width, value->reference_height,
@@ -74,13 +74,9 @@ void bongo_cat_overlay_draw_background(BongoCatOverlay *value, bool mirror) {
 void bongo_cat_overlay_draw_keys(BongoCatOverlay *value, bool mirror) {
     if (!value) return;
 #ifdef BONGO_CAT_HAS_CUBISM
-    /* Cubism 构建里左右手是独立的贴图 (GLuint), 这里仍是 OpenGL 专用路径。 */
-    BongoCatTexture left = {.gl = value->left};
-    BongoCatTexture right = {.gl = value->right};
-    BongoCatTexture effect = {.gl = value->effect};
-    draw(value, &left, mirror, true);
-    draw(value, &right, mirror, true);
-    (void)effect;
+    /* Cubism 构建里左右按键是独立的贴图 (后端无关句柄), 与背景一样走 draw() */
+    draw(value, value->left, mirror, true);
+    draw(value, value->right, mirror, true);
 #else
     (void)mirror;
 #endif
@@ -94,8 +90,7 @@ void bongo_cat_overlay_draw_pointer_before_keys(BongoCatOverlay *value) {
 void bongo_cat_overlay_draw_effect(BongoCatOverlay *value, bool mirror) {
     if (!value) return;
 #ifdef BONGO_CAT_HAS_CUBISM
-    BongoCatTexture effect = {.gl = value->effect};
-    draw(value, &effect, mirror, true);
+    draw(value, value->effect, mirror, true);
 #else
     (void)mirror;
 #endif

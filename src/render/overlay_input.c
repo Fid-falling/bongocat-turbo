@@ -26,7 +26,7 @@ int bongo_cat_overlay_key(BongoCatOverlay *value, const char *name, bool pressed
     else if (key_path(value, "left-keys", name, path)) right = false;
     else return -1;
     char *active_name = right ? value->right_name : value->left_name;
-    GLuint *active = right ? &value->right : &value->left;
+    BongoCatTexture **active = right ? &value->right : &value->left;
     char *active_path = right ? value->right_path : value->left_path;
     if (pressed) {
         snprintf(active_name, BONGO_CAT_ID_CAP, "%s", name);
@@ -34,11 +34,12 @@ int bongo_cat_overlay_key(BongoCatOverlay *value, const char *name, bool pressed
         *active = bongo_cat_overlay_cached_texture(value, path);
 #else
         snprintf(active_path, BONGO_CAT_PATH_CAP, "%s", path);
-        *active = 1;
+        /* 非 Cubism 构建把左右手合成进一张图, 这里只需要一个"有效"标记 */
+        *active = (BongoCatTexture *)1;
 #endif
     } else if (strcmp(active_name, name) == 0) {
         active_name[0] = '\0';
-        *active = 0;
+        *active = NULL;
         active_path[0] = '\0';
     }
 #ifndef BONGO_CAT_HAS_CUBISM
@@ -48,20 +49,20 @@ int bongo_cat_overlay_key(BongoCatOverlay *value, const char *name, bool pressed
 }
 
 bool bongo_cat_overlay_hand_active(const BongoCatOverlay *value, bool right) {
-    return value && (right ? value->right : value->left) != 0;
+    return value && (right ? value->right : value->left) != NULL;
 }
 
 bool bongo_cat_overlay_effect(BongoCatOverlay *value, const char *path) {
     if (!value) return false;
-    value->effect = 0;
+    value->effect = NULL;
     value->effect_path[0] = '\0';
     if (!path || !*path) return true;
     if (!bongo_cat_path_is_file(path)) return false;
 #ifdef BONGO_CAT_HAS_CUBISM
     value->effect = bongo_cat_overlay_cached_texture(value, path);
 #else
-    value->effect = 1;
+    value->effect = (BongoCatTexture *)1;
 #endif
     snprintf(value->effect_path, sizeof(value->effect_path), "%s", path);
-    return value->effect != 0;
+    return value->effect != NULL;
 }

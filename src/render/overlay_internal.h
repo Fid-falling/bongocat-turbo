@@ -11,7 +11,8 @@
 
 typedef struct TextureSlot {
     char path[BONGO_CAT_PATH_CAP];
-    GLuint texture;
+    /* 后端无关句柄: OpenGL 纹理名或 Vulkan 纹理对象 (Vulkan 后端没有 GL 上下文) */
+    BongoCatTexture texture;
     uint64_t used;
 } TextureSlot;
 
@@ -37,9 +38,15 @@ struct BongoCatOverlay {
     int reference_width;
     int reference_height;
     TextureSlot cache[4];
-    GLuint left;
-    GLuint right;
-    GLuint effect;
+    /*
+     * 按键/特效贴图指向 cache 里的槽位 (不拷贝句柄): 拷贝的话, 槽位被复用并
+     * 释放纹理之后, 拷贝体就成了野指针。NULL 表示当前没有这张贴图。
+     * 之前这里是 GLuint, 在 Vulkan 后端下画不出来 —— 那些 id 不是 GL 纹理名,
+     * 而且根本没有 GL 上下文可以创建它们。
+     */
+    BongoCatTexture *left;
+    BongoCatTexture *right;
+    BongoCatTexture *effect;
     char left_name[BONGO_CAT_ID_CAP];
     char right_name[BONGO_CAT_ID_CAP];
     char background_path[BONGO_CAT_PATH_CAP];
@@ -55,7 +62,8 @@ void bongo_cat_overlay_clear_textures(BongoCatOverlay *value);
 /* 合成背景 (基图 + 左右按键图), 供叠加层绘制前调用 */
 void bongo_cat_overlay_refresh_composite(BongoCatOverlay *value);
 #ifdef BONGO_CAT_HAS_CUBISM
-GLuint bongo_cat_overlay_cached_texture(BongoCatOverlay *value, const char *path);
+BongoCatTexture *bongo_cat_overlay_cached_texture(BongoCatOverlay *value,
+    const char *path);
 #endif
 
 #endif
