@@ -41,7 +41,6 @@ typedef struct DialPaint {
      * 与设置窗口里 BongoCatUIBackend.vk_textures[] 同一套做法。
      */
     struct BongoCatVkTexture *vk_textures[8];
-    struct BongoCatVk *vk;
     GLint projection, sampler;
     DialVertex *vertices;
     size_t count, capacity;
