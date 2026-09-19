@@ -113,15 +113,64 @@ Cubism 构建里 `overlay.left/right/effect` 一直是裸 `GLuint`（GL 上传�
 | Vulkan | 60 | ~60 | ~62（保持同步，`present_mode=2`） |
 | OpenGL | 无限 | 锁在刷新率 | 7402 / 10000 ms ≈ 740 FPS |
 
-## 七、已知遗留
+## 七、设置窗口 Vulkan：崩溃点已精确定位到"第二个 VkDevice"
+
+这是"完全替代 OpenGL"剩下的最后一块。本轮把它从"崩在 `vkQueuePresentKHR`"推进到
+有调用栈、有寄存器现场、有明确嫌疑点。
+
+先纠正一个中间结论：本轮一度以为它已经修好（45 秒不崩、与 GL 逐像素一致），
+但那是**测试无效**——当时存储里的 `renderer` 还是 `opengl`，而 `prefer_vulkan`
+要求主渲染器是 Vulkan，所以那几次跑的都是 GL 设置窗口。
+
+正确复现（`renderer=vulkan` + `BONGO_CAT_PREFERENCES_VULKAN=1`）：
+
+- 进程退出码 `0xC0000005`，启动后约 0.5 秒即崩；
+- 日志停在 `[prefs] stage=present-begin`（`present-done` 从未打出）；
+- 上下文创建本身正常：主窗口与设置窗口各自建出 `VkDevice`
+  （queue family 0、命令池、交换链 870x760 / 900x680 都成功）。
+
+用 cdb（`sxe av` + 原始栈）配合 `/MAP` 符号表解析出应用侧调用栈：
+
+```
+bongo_cat_vk_end_frame+0x173          <- vkQueuePresentKHR 调用点
+bongo_cat_preferences_render+0x616
+bongo_cat_preferences_show+0xa6
+bongo_cat_app_initialize+0xb17
+bongo_cat_app_run+0x1da
+SDL_main
+```
+
+崩溃现场在 `nvoglv64` 内部：
+
+```
+mov edx, dword ptr [r8+rcx*8+0FCCh]     rcx=00000002fffffffd  r8=0000022800408080
+```
+
+即驱动做了一次越界的表查找（索引是个天文数字），而 VkDevice / queue / swapchain /
+present 信号量这些对象在应用侧都是有效的（校验层只在早期一次运行里报过一条
+`vkCreateCommandPool` 的 `queueFamilyIndex` VUID，后续复现中不再出现）。
+
+嫌疑点：进程里同时注入了 RTSS、OBS graphics-hook、NVIDIA 叠加层（`lm` 里能看到
+`RTSSHooks64`、`graphics_hook64`、`nvspcap64`），这类钩子普遍假定"一个进程一个
+VkDevice"；我们为设置窗口建了第二套 instance/device/queue + 第二个交换链，正好撞上
+这个假设。另外 `bongo_cat_vk_create()` 会把全局单例 `current_context` 覆盖成设置
+窗口的上下文，主窗口叠加层随后会拿错设备（`overlay_draw.c` 用的就是
+`bongo_cat_vk_current()`），这本身也该修。
+
+下一步（下一轮）：让设置窗口**共用主窗口的 VkInstance/VkDevice/queue**，只各建各的
+交换链；顺带把 `current_context` 改成只登记主上下文。在此之前的默认行为保持 GL
+（`BONGO_CAT_PREFERENCES_VULKAN=1` 仍可复现该崩溃，`BONGO_CAT_PREFERENCES_OPENGL=1`
+用来强制 GL）。
+
+## 八、已知遗留
 
 | 项 | 状态 |
 |---|---|
-| 设置窗口 Vulkan | 仍默认 GL；Vulkan 通路崩溃点 `vkQueuePresentKHR`，未根除（开关 `BONGO_CAT_PREFERENCES_VULKAN=1`） |
+| 设置窗口 Vulkan | 仍默认 GL；崩溃点已定位到 `bongo_cat_vk_end_frame+0x173`（第七节），修复方向是共用主窗口设备 |
 | 封面截取 / 整帧回读 | 仍走 GL；配方见 `docs/vulkan-readback-recipe.md` |
 | `live2d-visual-audit` 的 `edge_pixels` | 该列用 `glReadPixels`，Vulkan 下读到的是未初始化数据；几何列可信，`edge_pixels` 列在 Vulkan 下不可用 |
 
-## 八、当前可用性总览
+## 九、当前可用性总览
 
 | 维度 | 状态 |
 |---|---|
@@ -131,4 +180,4 @@ Cubism 构建里 `overlay.left/right/effect` 一直是裸 `GLuint`（GL 上传�
 | 径向菜单 | Vulkan 通路已启用并验证（截图 + 与 GL 逐格对比） |
 | 校验洁净度 | VUID 0（含 SDK 阶段掩码配置期补丁） |
 | 三配置构建 | 全绿（Cubism+Vulkan / Cubism+Vulkan 关闭 / 另一 Vulkan 配置） |
-| 设置窗口 | GL（默认）；Vulkan 为开关后的可复现 bug |
+| 设置窗口 | GL（默认）；Vulkan 通路可复现崩溃，调用栈与嫌疑点见第七节 |
