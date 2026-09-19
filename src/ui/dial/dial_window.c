@@ -1,4 +1,5 @@
 #include "dial_internal.h"
+#include "bongo_cat/render.h"
 #include "ui_backend.h"
 #include "bongo_cat/log.h"
 #include "bongo_cat/memory.h"
@@ -70,8 +71,17 @@ static bool create(Dial *d) {
         if (!SDL_GetWindowSize(d->owner,&width,&height)) return false;
         x = (float)width/2; y = (float)height/2;
     }
-    SDL_WindowFlags flags = SDL_WINDOW_OPENGL | SDL_WINDOW_TRANSPARENT |
-        SDL_WINDOW_HIGH_PIXEL_DENSITY | SDL_WINDOW_HIDDEN;
+    /*
+     * 菜单窗口的 Vulkan 通路: 开关与窗口 flags 已就位, 但 dial_paint 的 Vulkan
+     * 绘制 (纹理 + bongo_cat_vk_draw_triangles) 还没落地, 所以在此之前保持关闭 ——
+     * 否则会用 Vulkan 窗口去跑 GL 绘制。施工图: docs/vulkan-dial-port-recipe.md
+     * 翻开关的时机: dial_paint 的 Vulkan 分支完成后, 把 dial_vulkan_enabled 改成 true。
+     */
+    const bool dial_vulkan_enabled = false;
+    const bool dial_vulkan = dial_vulkan_enabled &&
+        bongo_cat_renderer_active() == BONGO_CAT_RENDERER_VULKAN;
+    SDL_WindowFlags flags = (dial_vulkan ? SDL_WINDOW_VULKAN : SDL_WINDOW_OPENGL) |
+        SDL_WINDOW_TRANSPARENT | SDL_WINDOW_HIGH_PIXEL_DENSITY | SDL_WINDOW_HIDDEN;
     const char *driver = SDL_GetCurrentVideoDriver();
     d->popup = driver && SDL_strcmp(driver,"wayland") == 0;
     if (d->popup) {
