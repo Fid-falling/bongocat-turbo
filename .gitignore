@@ -83,3 +83,5 @@ Desktop.ini
 /.diagnostic-session/
 /.diagnostic-storage/
 /.diagnostic-storage-morning/
+
+!docs/vulkan-cubism-status.md
