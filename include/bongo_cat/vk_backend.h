@@ -1,6 +1,15 @@
 #ifndef BONGO_CAT_VK_BACKEND_H
 #define BONGO_CAT_VK_BACKEND_H
 
+/*
+ * 这个头文件同时被 C 和 C++ 使用 (C++ 侧是 Cubism 的 Vulkan 桥), 所以
+ * 必须显式给出 C 链接: 否则 C++ 调用方按名字修饰去找符号, 链接期会报
+ * "无法解析的外部符号 bongo_cat_vk_native_info" 这类错误。
+ */
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 #include "bongo_cat/common.h"
 
 /*
@@ -136,5 +145,9 @@ bool bongo_cat_vk_queue_hit_sample(BongoCatVk *vk, int x, int y);
 /* 查询已缓存的回读结果; 目标点不在缓存块内时返回 false */
 bool bongo_cat_vk_hit_alpha(const BongoCatVk *vk, int x, int y,
     unsigned char *alpha);
+
+#ifdef __cplusplus
+} /* extern "C" */
+#endif
 
 #endif
