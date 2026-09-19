@@ -16,6 +16,9 @@ typedef struct PointerVertex {
 } PointerVertex;
 
 #define BONGO_CAT_VK_ARENA_BYTES (256u * 1024u)
+#define BONGO_CAT_VK_INDEX_ARENA_BYTES (128u * 1024u)
+/* Nuklear 的 UIVertex: pos(2f) + uv(2f) + color(RGBA8) */
+#define BONGO_CAT_VK_UI_VERTEX_BYTES 20u
 
 /* OpenGL 后端 overlay.c 里那个四边形: NDC 位置 + 写死的 UV, 三角形带 */
 static const OverlayVertex k_overlay_quad[4] = {
@@ -25,52 +28,17 @@ static const OverlayVertex k_overlay_quad[4] = {
     { 1.0f,  1.0f, 1.0f, 0.0f}
 };
 
+static bool create_arena(BongoCatVk *vk, BongoCatVkArena *arena, size_t bytes,
+    VkBufferUsageFlags usage, BongoCatError *error, const char *what);
+static void destroy_arena(BongoCatVk *vk, BongoCatVkArena *arena);
+
 bool bongo_cat_vk_create_draw_resources(BongoCatVk *vk, BongoCatError *error) {
     for (uint32_t i = 0; i < BONGO_CAT_VK_FRAMES_IN_FLIGHT; ++i) {
-        BongoCatVkArena *arena = &vk->arenas[i];
-        VkBufferCreateInfo buffer = {0};
-        buffer.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
-        buffer.size = BONGO_CAT_VK_ARENA_BYTES;
-        buffer.usage = VK_BUFFER_USAGE_VERTEX_BUFFER_BIT;
-        buffer.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
-        if (vkCreateBuffer(vk->device, &buffer, NULL, &arena->buffer) != VK_SUCCESS) {
-            bongo_cat_error_set(error, BONGO_CAT_ERROR_PLATFORM,
-                "Vulkan 顶点缓冲创建失败");
+        if (!create_arena(vk, &vk->arenas[i], BONGO_CAT_VK_ARENA_BYTES,
+                VK_BUFFER_USAGE_VERTEX_BUFFER_BIT, error, "顶点缓冲") ||
+            !create_arena(vk, &vk->index_arenas[i], BONGO_CAT_VK_INDEX_ARENA_BYTES,
+                VK_BUFFER_USAGE_INDEX_BUFFER_BIT, error, "索引缓冲"))
             return false;
-        }
-        VkMemoryRequirements requirements;
-        vkGetBufferMemoryRequirements(vk->device, arena->buffer, &requirements);
-        VkPhysicalDeviceMemoryProperties memory_properties;
-        vkGetPhysicalDeviceMemoryProperties(vk->physical, &memory_properties);
-        const VkMemoryPropertyFlags wanted = VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT |
-            VK_MEMORY_PROPERTY_HOST_COHERENT_BIT;
-        uint32_t type = UINT32_MAX;
-        for (uint32_t j = 0; j < memory_properties.memoryTypeCount; ++j) {
-            if ((requirements.memoryTypeBits & (1u << j)) &&
-                (memory_properties.memoryTypes[j].propertyFlags & wanted) == wanted) {
-                type = j;
-                break;
-            }
-        }
-        if (type == UINT32_MAX) {
-            bongo_cat_error_set(error, BONGO_CAT_ERROR_PLATFORM,
-                "没有主机可见的显存类型可用于顶点缓冲");
-            return false;
-        }
-        VkMemoryAllocateInfo allocate = {0};
-        allocate.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
-        allocate.allocationSize = requirements.size;
-        allocate.memoryTypeIndex = type;
-        if (vkAllocateMemory(vk->device, &allocate, NULL, &arena->memory) != VK_SUCCESS ||
-            vkBindBufferMemory(vk->device, arena->buffer, arena->memory, 0) != VK_SUCCESS ||
-            vkMapMemory(vk->device, arena->memory, 0, VK_WHOLE_SIZE, 0,
-                (void **)&arena->mapped) != VK_SUCCESS) {
-            bongo_cat_error_set(error, BONGO_CAT_ERROR_PLATFORM,
-                "Vulkan 顶点缓冲映射失败");
-            return false;
-        }
-        arena->capacity = BONGO_CAT_VK_ARENA_BYTES;
-        arena->offset = 0;
     }
     /* 命中测试回读缓冲: 指针附近的一小块 RGBA8 */
     for (uint32_t i = 0; i < BONGO_CAT_VK_FRAMES_IN_FLIGHT; ++i) {
@@ -90,14 +58,12 @@ bool bongo_cat_vk_create_draw_resources(BongoCatVk *vk, BongoCatError *error) {
         vkGetBufferMemoryRequirements(vk->device, readback->buffer, &requirements);
         VkPhysicalDeviceMemoryProperties memory_properties;
         vkGetPhysicalDeviceMemoryProperties(vk->physical, &memory_properties);
+        const VkMemoryPropertyFlags wanted = VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT |
+            VK_MEMORY_PROPERTY_HOST_COHERENT_BIT;
         uint32_t type = UINT32_MAX;
         for (uint32_t j = 0; j < memory_properties.memoryTypeCount; ++j) {
             if ((requirements.memoryTypeBits & (1u << j)) &&
-                (memory_properties.memoryTypes[j].propertyFlags &
-                    (VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT |
-                     VK_MEMORY_PROPERTY_HOST_COHERENT_BIT)) ==
-                    (VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT |
-                     VK_MEMORY_PROPERTY_HOST_COHERENT_BIT)) {
+                (memory_properties.memoryTypes[j].propertyFlags & wanted) == wanted) {
                 type = j;
                 break;
             }
@@ -132,21 +98,8 @@ void bongo_cat_vk_destroy_draw_resources(BongoCatVk *vk) {
     /* 管线与布置在 vk_pipeline.c, 这里只释放缓冲 */
     bongo_cat_vk_destroy_pipelines(vk);
     for (uint32_t i = 0; i < BONGO_CAT_VK_FRAMES_IN_FLIGHT; ++i) {
-        BongoCatVkArena *arena = &vk->arenas[i];
-        if (arena->mapped) {
-            vkUnmapMemory(vk->device, arena->memory);
-            arena->mapped = NULL;
-        }
-        if (arena->buffer != VK_NULL_HANDLE) {
-            vkDestroyBuffer(vk->device, arena->buffer, NULL);
-            arena->buffer = VK_NULL_HANDLE;
-        }
-        if (arena->memory != VK_NULL_HANDLE) {
-            vkFreeMemory(vk->device, arena->memory, NULL);
-            arena->memory = VK_NULL_HANDLE;
-        }
-        arena->capacity = 0;
-        arena->offset = 0;
+        destroy_arena(vk, &vk->arenas[i]);
+        destroy_arena(vk, &vk->index_arenas[i]);
     }
     for (uint32_t i = 0; i < BONGO_CAT_VK_FRAMES_IN_FLIGHT; ++i) {
         BongoCatVkReadback *readback = &vk->readback[i];
@@ -167,9 +120,8 @@ void bongo_cat_vk_destroy_draw_resources(BongoCatVk *vk) {
     vk->hit_valid = false;
 }
 
-static bool arena_push(BongoCatVk *vk, const void *data, size_t size,
+static bool arena_push_into(BongoCatVkArena *arena, const void *data, size_t size,
     VkDeviceSize *offset) {
-    BongoCatVkArena *arena = &vk->arenas[vk->frame_index];
     if (!arena->mapped || arena->offset + size > arena->capacity) {
         SDL_LogWarn(SDL_LOG_CATEGORY_VIDEO,
             "[vulkan] 顶点缓冲不足 (需要 %zu 字节, 剩余 %zu)", size,
@@ -180,6 +132,74 @@ static bool arena_push(BongoCatVk *vk, const void *data, size_t size,
     memcpy(arena->mapped + arena->offset, data, size);
     arena->offset += size;
     return true;
+}
+
+static bool arena_push(BongoCatVk *vk, const void *data, size_t size,
+    VkDeviceSize *offset) {
+    return arena_push_into(&vk->arenas[vk->frame_index], data, size, offset);
+}
+
+static bool create_arena(BongoCatVk *vk, BongoCatVkArena *arena, size_t bytes,
+    VkBufferUsageFlags usage, BongoCatError *error, const char *what) {
+    VkBufferCreateInfo buffer = {0};
+    buffer.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
+    buffer.size = bytes;
+    buffer.usage = usage;
+    buffer.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
+    if (vkCreateBuffer(vk->device, &buffer, NULL, &arena->buffer) != VK_SUCCESS) {
+        bongo_cat_error_set(error, BONGO_CAT_ERROR_PLATFORM, "%s创建失败", what);
+        return false;
+    }
+    VkMemoryRequirements requirements;
+    vkGetBufferMemoryRequirements(vk->device, arena->buffer, &requirements);
+    VkPhysicalDeviceMemoryProperties memory_properties;
+    vkGetPhysicalDeviceMemoryProperties(vk->physical, &memory_properties);
+    const VkMemoryPropertyFlags wanted = VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT |
+        VK_MEMORY_PROPERTY_HOST_COHERENT_BIT;
+    uint32_t type = UINT32_MAX;
+    for (uint32_t j = 0; j < memory_properties.memoryTypeCount; ++j) {
+        if ((requirements.memoryTypeBits & (1u << j)) &&
+            (memory_properties.memoryTypes[j].propertyFlags & wanted) == wanted) {
+            type = j;
+            break;
+        }
+    }
+    if (type == UINT32_MAX) {
+        bongo_cat_error_set(error, BONGO_CAT_ERROR_PLATFORM,
+            "没有主机可见的显存类型可用于%s", what);
+        return false;
+    }
+    VkMemoryAllocateInfo allocate = {0};
+    allocate.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
+    allocate.allocationSize = requirements.size;
+    allocate.memoryTypeIndex = type;
+    if (vkAllocateMemory(vk->device, &allocate, NULL, &arena->memory) != VK_SUCCESS ||
+        vkBindBufferMemory(vk->device, arena->buffer, arena->memory, 0) != VK_SUCCESS ||
+        vkMapMemory(vk->device, arena->memory, 0, VK_WHOLE_SIZE, 0,
+            (void **)&arena->mapped) != VK_SUCCESS) {
+        bongo_cat_error_set(error, BONGO_CAT_ERROR_PLATFORM, "%s映射失败", what);
+        return false;
+    }
+    arena->capacity = bytes;
+    arena->offset = 0;
+    return true;
+}
+
+static void destroy_arena(BongoCatVk *vk, BongoCatVkArena *arena) {
+    if (arena->mapped) {
+        vkUnmapMemory(vk->device, arena->memory);
+        arena->mapped = NULL;
+    }
+    if (arena->buffer != VK_NULL_HANDLE) {
+        vkDestroyBuffer(vk->device, arena->buffer, NULL);
+        arena->buffer = VK_NULL_HANDLE;
+    }
+    if (arena->memory != VK_NULL_HANDLE) {
+        vkFreeMemory(vk->device, arena->memory, NULL);
+        arena->memory = VK_NULL_HANDLE;
+    }
+    arena->capacity = 0;
+    arena->offset = 0;
 }
 
 bool bongo_cat_vk_draw_overlay_quad(BongoCatVk *vk, BongoCatVkTexture *texture,
@@ -254,6 +274,68 @@ bool bongo_cat_vk_mask_corners(BongoCatVk *vk, int width, int height,
         (uint32_t)sizeof(push), &push);
     vkCmdDraw(command, 3, 1, 0, 0);
     return true;
+}
+
+void bongo_cat_vk_set_scissor(BongoCatVk *vk, int x, int y, int width, int height) {
+    if (!vk || !vk->frame_active) return;
+    if (x < 0) { width += x; x = 0; }
+    if (y < 0) { height += y; y = 0; }
+    if (x + width > (int)vk->extent.width) width = (int)vk->extent.width - x;
+    if (y + height > (int)vk->extent.height) height = (int)vk->extent.height - y;
+    if (width < 0) width = 0;
+    if (height < 0) height = 0;
+    VkRect2D scissor = {{x, y}, {(uint32_t)width, (uint32_t)height}};
+    vkCmdSetScissor(vk->frames[vk->frame_index].command, 0, 1, &scissor);
+}
+
+bool bongo_cat_vk_ui_upload_vertices(BongoCatVk *vk, const void *vertices,
+    unsigned int vertex_count) {
+    vk->ui_vertices_ready = false;
+    if (!vk || !vk->frame_active || !vertices || !vertex_count) return false;
+    if (vk->ui_pipeline == VK_NULL_HANDLE) return false;
+    VkDeviceSize offset = 0;
+    if (!arena_push_into(&vk->arenas[vk->frame_index], vertices,
+            (size_t)vertex_count * BONGO_CAT_VK_UI_VERTEX_BYTES, &offset))
+        return false;
+    vk->ui_vertex_offset = offset;
+    vk->ui_vertices_ready = true;
+    return true;
+}
+
+bool bongo_cat_vk_ui_draw(BongoCatVk *vk, BongoCatVkTexture *texture,
+    const void *indices, unsigned int index_count, float scale_x, float scale_y) {
+    if (!vk || !vk->frame_active || !texture || !indices || !index_count) return false;
+    if (vk->ui_pipeline == VK_NULL_HANDLE || !vk->ui_vertices_ready) return false;
+    VkDeviceSize index_offset = 0;
+    if (!arena_push_into(&vk->index_arenas[vk->frame_index], indices,
+            (size_t)index_count * sizeof(uint16_t), &index_offset))
+        return false;
+    UiPush push = {{0}};
+    push.scale[0] = scale_x;
+    push.scale[1] = scale_y;
+    push.offset[0] = -1.0f;
+    push.offset[1] = -1.0f;
+    VkCommandBuffer command = vk->frames[vk->frame_index].command;
+    vkCmdBindPipeline(command, VK_PIPELINE_BIND_POINT_GRAPHICS, vk->ui_pipeline);
+    vkCmdBindDescriptorSets(command, VK_PIPELINE_BIND_POINT_GRAPHICS, vk->ui_layout,
+        0, 1, &texture->descriptor, 0, NULL);
+    vkCmdPushConstants(command, vk->ui_layout,
+        VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT, 0,
+        (uint32_t)sizeof(push), &push);
+    VkDeviceSize vertex_offset = vk->ui_vertex_offset;
+    vkCmdBindVertexBuffers(command, 0, 1, &vk->arenas[vk->frame_index].buffer,
+        &vertex_offset);
+    vkCmdBindIndexBuffer(command, vk->index_arenas[vk->frame_index].buffer,
+        index_offset, VK_INDEX_TYPE_UINT16);
+    vkCmdDrawIndexed(command, index_count, 1, 0, 0, 0);
+    return true;
+}
+
+int bongo_cat_vk_max_texture_dimension(const BongoCatVk *vk) {
+    if (!vk || vk->physical == VK_NULL_HANDLE) return 0;
+    VkPhysicalDeviceProperties properties;
+    vkGetPhysicalDeviceProperties(vk->physical, &properties);
+    return (int)properties.limits.maxImageDimension2D;
 }
 
 #endif /* BONGO_CAT_HAS_VULKAN */

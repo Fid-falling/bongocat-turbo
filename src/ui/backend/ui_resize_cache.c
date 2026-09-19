@@ -18,6 +18,8 @@ void bongo_cat_ui_resize_cache_destroy(BongoCatUIBackend *ui) {
 
 bool bongo_cat_ui_resize_cache_capture(BongoCatUIBackend *ui) {
     if (!ui || !ui->window) return false;
+    /* Vulkan 模式还没有帧缓存回拷这条路: 让调用方走正常的重绘 */
+    if (bongo_cat_ui_uses_vulkan(ui)) return false;
     int width = 0, height = 0;
     SDL_GetWindowSizeInPixels(ui->window, &width, &height);
     if (width < 1 || height < 1) return false;

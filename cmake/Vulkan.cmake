@@ -11,7 +11,9 @@ set(BONGO_CAT_VK_SHADERS
   pointer.vert
   pointer.frag
   corner.vert
-  corner.frag)
+  corner.frag
+  ui.vert
+  ui.frag)
 
 function(bongo_cat_embed_vulkan_shaders header)
   if(NOT Vulkan_GLSLC_EXECUTABLE)

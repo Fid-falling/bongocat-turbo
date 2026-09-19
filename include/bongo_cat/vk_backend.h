@@ -65,6 +65,10 @@ void bongo_cat_vk_set_clear_color(BongoCatVk *vk, float red, float green,
 BongoCatVkTexture *bongo_cat_vk_texture_from_pixels(BongoCatVk *vk,
     const unsigned char *rgba, int width, int height, const char *label,
     BongoCatError *error);
+/* 单通道 (R8) 纹理: 设置界面的字体图集与图标缓存用, 着色器把 r 当 alpha */
+BongoCatVkTexture *bongo_cat_vk_texture_from_alpha(BongoCatVk *vk,
+    const unsigned char *alpha, int width, int height, const char *label,
+    BongoCatError *error);
 BongoCatVkTexture *bongo_cat_vk_texture_load(BongoCatVk *vk, const char *path,
     int *width, int *height, BongoCatError *error);
 void bongo_cat_vk_texture_destroy(BongoCatVk *vk, BongoCatVkTexture *texture);
@@ -87,6 +91,22 @@ bool bongo_cat_vk_draw_triangles(BongoCatVk *vk, BongoCatVkTexture *texture,
 /* 圆角遮罩: 与 OpenGL 路径一样把 RGB 与 alpha 一起乘上覆盖率 */
 bool bongo_cat_vk_mask_corners(BongoCatVk *vk, int width, int height,
     float radius_percent);
+
+/*
+ * 设置界面 (Nuklear) 的绘制支持。
+ *  - set_scissor: 像素坐标, 原点在左上 (Vulkan 约定), 超出范围自动裁剪;
+ *  - ui_upload_vertices: 一帧开始时把整块顶点 (pos 2f + uv 2f + color RGBA8,
+ *    共 20 字节) 放进显存, 索引里引用的是这块顶点的绝对下标;
+ *  - ui_draw: 逐条绘制命令只提交索引 (16 位) 与裁剪矩形, scale_x/scale_y 是
+ *    2/宽 与 2/高 的投影缩放。
+ */
+void bongo_cat_vk_set_scissor(BongoCatVk *vk, int x, int y, int width, int height);
+bool bongo_cat_vk_ui_upload_vertices(BongoCatVk *vk, const void *vertices,
+    unsigned int vertex_count);
+bool bongo_cat_vk_ui_draw(BongoCatVk *vk, BongoCatVkTexture *texture,
+    const void *indices, unsigned int index_count, float scale_x, float scale_y);
+/* 设备允许的最大 2D 图像边长 (界面用它判断字体图集是否过大) */
+int bongo_cat_vk_max_texture_dimension(const BongoCatVk *vk);
 
 /*
  * 命中测试回读。请求发生在帧内 (end_frame 之前), 拷贝与主机映射在下一次使用

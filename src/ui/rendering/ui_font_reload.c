@@ -17,6 +17,8 @@ bool bongo_cat_ui_font_atlas_reload(BongoCatUIBackend *ui,
     }
     BongoCatUIBackend next;
     memset(&next, 0, sizeof(next));
+    /* Vulkan 模式下临时后端要用同一个上下文, 图集才会走 vk 纹理路径 */
+    next.vk = ui->vk;
     if (!nk_init_default(&next.context, NULL)) return false;
     bool created = bongo_cat_ui_font_atlas_create(&next, body_path,
         body_fallback_path, body_korean_fallback_path, heading_path,
@@ -24,12 +26,24 @@ bool bongo_cat_ui_font_atlas_reload(BongoCatUIBackend *ui,
         raster_scale);
     nk_free(&next.context);
     if (!created) {
-        if (next.font_texture) glDeleteTextures(1, &next.font_texture);
+        if (bongo_cat_ui_uses_vulkan(&next)) {
+            for (int i = 0; i < BONGO_CAT_UI_VK_TEXTURES; ++i) {
+                if (!next.vk_textures[i]) continue;
+                bongo_cat_vk_texture_destroy(next.vk, next.vk_textures[i]);
+                next.vk_textures[i] = NULL;
+            }
+        } else if (next.font_texture) glDeleteTextures(1, &next.font_texture);
         if (next.atlas.permanent.alloc)
             bongo_cat_ui_font_atlas_destroy(&next);
         return false;
     }
-    if (ui->font_texture) glDeleteTextures(1, &ui->font_texture);
+    if (bongo_cat_ui_uses_vulkan(ui)) {
+        /* 新图集落在临时后端的第一个空槽 (通常就是 1)。先把旧图集腾掉, 再把新
+           纹理搬到同一个 id 上, Nuklear 里已经烘好的 id 就不用改了。 */
+        int id = (int)next.font_texture;
+        bongo_cat_ui_texture_unregister(ui, id);
+        bongo_cat_ui_texture_move(ui, &next, id);
+    } else if (ui->font_texture) glDeleteTextures(1, &ui->font_texture);
     bongo_cat_ui_font_atlas_destroy(ui);
     ui->atlas = next.atlas;
     ui->null_texture = next.null_texture;

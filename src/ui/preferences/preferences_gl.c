@@ -1,5 +1,6 @@
 #include "preferences_gl.h"
 #include "preferences_state.h"
+#include "bongo_cat/render.h"
 
 #include <SDL3/SDL_opengl.h>
 #include <stdio.h>
@@ -23,6 +24,23 @@ static bool fail(BongoCatPreferences *value, const char *message) {
 bool bongo_cat_preferences_gl_create(BongoCatPreferences *value) {
     if (!value || !value->app || !value->window || !value->app->window)
         return false;
+    /* renderer=vulkan 且这个窗口允许时: 设置界面走自己的 Vulkan 上下文 */
+    if (value->prefer_vulkan &&
+        bongo_cat_renderer_active() == BONGO_CAT_RENDERER_VULKAN) {
+        BongoCatError error = {0};
+        value->vk = bongo_cat_vk_create(value->window, &error);
+        if (!value->vk) {
+            SDL_LogError(SDL_LOG_CATEGORY_VIDEO,
+                "Preferences Vulkan context failed: %s",
+                error.message[0] ? error.message : "unknown");
+            return false;
+        }
+        BongoCatVkInfo info = {0};
+        if (bongo_cat_vk_info(value->vk, &info))
+            SDL_Log("[runtime] Preferences Vulkan context: device=%s driver=%s "
+                "swapchain=%dx%d", info.device, info.driver, info.width, info.height);
+        return true;
+    }
     /* 主窗口是 OpenGL 时共享它的上下文 (贴图互通、省显存); 主窗口是 Vulkan 时
        没有可共享的对象, 设置窗口自己建一个独立的上下文。 */
     const bool share = value->app->gl_context != NULL;
@@ -70,7 +88,12 @@ bool bongo_cat_preferences_gl_create(BongoCatPreferences *value) {
 }
 
 void bongo_cat_preferences_gl_destroy(BongoCatPreferences *value) {
-    if (!value || !value->gl_context) return;
+    if (!value) return;
+    if (value->vk) {
+        bongo_cat_vk_destroy(value->vk);
+        value->vk = NULL;
+    }
+    if (!value->gl_context) return;
     SDL_Log("[runtime] Preferences OpenGL context release: "
         "settings_window=%p settings_context=%p current_window=%p "
         "current_context=%p", (void *)value->window,

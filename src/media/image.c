@@ -101,46 +101,58 @@ void bongo_cat_image_release_texture(unsigned int texture) {
     glDeleteTextures(1, &name);
 }
 
-unsigned int bongo_cat_image_texture_thumbnail(const char *path, int max_width,
-    int max_height, int *width, int *height, BongoCatError *error) {
-    BongoCatImage image;
+BongoCatResult bongo_cat_image_fit(const char *path, int max_width,
+    int max_height, BongoCatImage *out, BongoCatError *error) {
+    if (!path || !out) return BONGO_CAT_ERROR_ARGUMENT;
+    BongoCatImage image = {0};
 #ifdef _WIN32
     if (max_width > 0 && max_height > 0 &&
-        bongo_cat_image_decode_wic_responsive(path, &image,
-            max_width, max_height, NULL, NULL)) {
-        GLuint texture = upload(&image, 0, false);
-        if (width) *width = image.width;
-        if (height) *height = image.height;
-        bongo_cat_image_free(&image);
-        return texture;
+        bongo_cat_image_decode_wic_responsive(path, &image, max_width, max_height,
+            NULL, NULL)) {
+        *out = image;
+        return BONGO_CAT_OK;
     }
 #endif
-    if (bongo_cat_image_load(path, &image, error) != BONGO_CAT_OK) return 0;
-    int target_width = image.width, target_height = image.height;
+    BongoCatResult result = bongo_cat_image_load(path, &image, error);
+    if (result != BONGO_CAT_OK) return result;
     if (max_width > 0 && max_height > 0 &&
-        (target_width > max_width || target_height > max_height)) {
-        float scale = SDL_min((float)max_width / target_width,
-            (float)max_height / target_height);
-        target_width = SDL_max(1, (int)(target_width * scale + .5f));
-        target_height = SDL_max(1, (int)(target_height * scale + .5f));
+        (image.width > max_width || image.height > max_height) && image.surface) {
+        float scale = SDL_min((float)max_width / image.width,
+            (float)max_height / image.height);
+        int target_width = SDL_max(1, (int)(image.width * scale + .5f));
+        int target_height = SDL_max(1, (int)(image.height * scale + .5f));
         SDL_Surface *scaled = SDL_ScaleSurface(image.surface, target_width,
             target_height, SDL_SCALEMODE_LINEAR);
         if (scaled) {
-            BongoCatImage thumbnail = {
-                .pixels = scaled->pixels, .width = scaled->w, .height = scaled->h};
-            GLuint texture = upload(&thumbnail, 0, false);
-            if (width) *width = thumbnail.width;
-            if (height) *height = thumbnail.height;
+            size_t bytes = (size_t)target_width * (size_t)target_height * 4u;
+            unsigned char *pixels = malloc(bytes);
+            if (pixels) {
+                memcpy(pixels, scaled->pixels, bytes);
+                SDL_DestroySurface(scaled);
+                bongo_cat_image_free(&image);
+                memset(out, 0, sizeof(*out));
+                out->pixels = pixels;
+                out->width = target_width;
+                out->height = target_height;
+                out->surface = SDL_CreateSurfaceFrom(target_width, target_height,
+                    SDL_PIXELFORMAT_RGBA32, pixels, target_width * 4);
+                return BONGO_CAT_OK;
+            }
             SDL_DestroySurface(scaled);
-            bongo_cat_image_free(&image);
-            return texture;
         }
-        target_width = image.width;
-        target_height = image.height;
     }
+    *out = image;
+    return BONGO_CAT_OK;
+}
+
+unsigned int bongo_cat_image_texture_thumbnail(const char *path, int max_width,
+    int max_height, int *width, int *height, BongoCatError *error) {
+    BongoCatImage image = {0};
+    if (bongo_cat_image_fit(path, max_width, max_height, &image, error) !=
+        BONGO_CAT_OK) return 0;
     GLuint texture = upload(&image, 0, false);
-    if (width) *width = target_width;
-    if (height) *height = target_height;
+    if (width) *width = image.width;
+    if (height) *height = image.height;
     bongo_cat_image_free(&image);
     return texture;
 }

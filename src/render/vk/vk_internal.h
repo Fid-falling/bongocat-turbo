@@ -81,6 +81,19 @@ typedef struct CornerPush {
     int radius_milli;
 } CornerPush;
 
+/* 设置界面: 逻辑像素 -> 裁剪空间的缩放与偏移 */
+typedef struct UiPush {
+    float scale[2];
+    float offset[2];
+} UiPush;
+
+/* 混合模式, 与 OpenGL 路径逐条对应 */
+typedef enum BongoCatVkBlend {
+    BONGO_CAT_VK_BLEND_PREMULTIPLIED,  /* ONE, ONE_MINUS_SRC_ALPHA */
+    BONGO_CAT_VK_BLEND_MULTIPLY,       /* ZERO, SRC_ALPHA (圆角遮罩) */
+    BONGO_CAT_VK_BLEND_ALPHA           /* SRC_ALPHA, ONE_MINUS_SRC_ALPHA (界面) */
+} BongoCatVkBlend;
+
 struct BongoCatVk {
     SDL_Window *window;
     VkInstance instance;
@@ -124,11 +137,18 @@ struct BongoCatVk {
     VkPipelineLayout overlay_layout;
     VkPipelineLayout pointer_layout;
     VkPipelineLayout corner_layout;
+    VkPipelineLayout ui_layout;
     VkPipeline overlay_pipeline;
     VkPipeline pointer_pipeline;
     VkPipeline corner_pipeline;
+    VkPipeline ui_pipeline;
     BongoCatVkArena arenas[BONGO_CAT_VK_FRAMES_IN_FLIGHT];
+    /* 设置界面的索引缓冲 (16 位), 与顶点一样每帧从零开始追加 */
+    BongoCatVkArena index_arenas[BONGO_CAT_VK_FRAMES_IN_FLIGHT];
     BongoCatVkReadback readback[BONGO_CAT_VK_FRAMES_IN_FLIGHT];
+    /* 设置界面这一帧的顶点在顶点缓冲里的起点 (ui_upload_vertices 记录) */
+    VkDeviceSize ui_vertex_offset;
+    bool ui_vertices_ready;
     /* 最近一次成功回读的 alpha 块 */
     unsigned char hit_alpha[BONGO_CAT_VK_HIT_TILE * BONGO_CAT_VK_HIT_TILE];
     int hit_x;

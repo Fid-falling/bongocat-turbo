@@ -7,6 +7,31 @@ bool bongo_cat_ui_font_upload_atlas(BongoCatUIBackend *ui) {
     const void *pixels = nk_font_atlas_bake(&ui->atlas, &width, &height,
         NK_FONT_ATLAS_ALPHA8);
     if (!pixels || width < 1 || height < 1) return false;
+    if (bongo_cat_ui_uses_vulkan(ui)) {
+        /* Vulkan: 单通道图集交给 vk_backend, 拿到 id 后告诉 Nuklear */
+        BongoCatError error = {0};
+        BongoCatVkTexture *texture = bongo_cat_vk_texture_from_alpha(ui->vk,
+            pixels, width, height, "ui-font-atlas", &error);
+        if (!texture) {
+            SDL_LogError(SDL_LOG_CATEGORY_APPLICATION,
+                "Preferences font atlas upload failed: %s", error.message);
+            return false;
+        }
+        int id = bongo_cat_ui_texture_register(ui, texture);
+        if (!id) {
+            bongo_cat_vk_texture_destroy(ui->vk, texture);
+            SDL_LogError(SDL_LOG_CATEGORY_APPLICATION,
+                "Preferences font atlas texture table is full");
+            return false;
+        }
+        ui->font_texture = (GLuint)id;
+        ui->font_atlas_width = width;
+        ui->font_atlas_height = height;
+        nk_font_atlas_end(&ui->atlas, nk_handle_id(id), &ui->null_texture);
+        SDL_Log("Preferences font atlas ready (vulkan): id=%d size=%dx%d",
+            id, width, height);
+        return true;
+    }
     SDL_Window *window = SDL_GL_GetCurrentWindow();
     SDL_GLContext context = SDL_GL_GetCurrentContext();
     SDL_Log("Preferences font atlas upload starting: %dx%d window=%u "

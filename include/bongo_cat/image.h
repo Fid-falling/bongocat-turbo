@@ -27,6 +27,10 @@ extern "C" {
 BongoCatResult bongo_cat_image_load(const char *path, BongoCatImage *image, BongoCatError *error);
 bool bongo_cat_image_info(const char *path, int *width, int *height);
 void bongo_cat_image_free(BongoCatImage *image);
+/* 只做 CPU 处理: 载入图片, 超过上限时等比缩小 (不涉及任何 GPU 资源)。
+   Vulkan 的界面纹理用它, OpenGL 侧继续用下面返回纹理名的接口。 */
+BongoCatResult bongo_cat_image_fit(const char *path, int max_width,
+    int max_height, BongoCatImage *out, BongoCatError *error);
 unsigned int bongo_cat_image_texture(const char *path, int *width, int *height,
     BongoCatError *error);
 /* 把已解码的像素上传到 texture (0 表示新建)。premultiply 为真时就地预乘 alpha。

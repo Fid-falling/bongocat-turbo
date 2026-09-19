@@ -22,7 +22,8 @@ void bongo_cat_preferences_render(BongoCatPreferences *value) {
         1.0f / 60.0f) : 1.0f / 60.0f;
     value->last_render_ns = now;
     bongo_cat_preferences_input_end(value);
-    if (!SDL_GL_MakeCurrent(value->window, value->gl_context)) {
+    const bool vulkan = bongo_cat_ui_uses_vulkan(&value->ui);
+    if (!vulkan && !SDL_GL_MakeCurrent(value->window, value->gl_context)) {
         value->render_dirty = true;
         value->render_retry_ns = now + 1000000000ull;
         SDL_LogWarn(SDL_LOG_CATEGORY_VIDEO,
@@ -60,21 +61,46 @@ void bongo_cat_preferences_render(BongoCatPreferences *value) {
     value->ui.frame_building = false;
     bongo_cat_preferences_shortcut_smoke(value);
     BongoCatUIPalette palette = bongo_cat_ui_palette(dark);
-    glDisable(GL_SCISSOR_TEST);
-    glColorMask(GL_TRUE, GL_TRUE, GL_TRUE, GL_TRUE);
-    glClearColor(
-        value->transparent_window ? 0.0f : palette.background.r / 255.0f,
-        value->transparent_window ? 0.0f : palette.background.g / 255.0f,
-        value->transparent_window ? 0.0f : palette.background.b / 255.0f,
-        value->transparent_window ? 0.0f : 1.0f);
-    glClear(GL_COLOR_BUFFER_BIT);
+    if (vulkan) {
+        /* Vulkan: 清屏由渲染通道的 clear 值完成, 与 GL 的 glClearColor 对应 */
+        int pixel_width = 0, pixel_height = 0;
+        SDL_GetWindowSizeInPixels(value->window, &pixel_width, &pixel_height);
+        bongo_cat_vk_set_clear_color(value->vk,
+            value->transparent_window ? 0.0f : palette.background.r / 255.0f,
+            value->transparent_window ? 0.0f : palette.background.g / 255.0f,
+            value->transparent_window ? 0.0f : palette.background.b / 255.0f,
+            value->transparent_window ? 0.0f : 1.0f);
+        if (!bongo_cat_vk_begin_frame(value->vk, pixel_width, pixel_height)) {
+            value->render_dirty = true;
+            value->render_retry_ns = now + 1000000000ull;
+            SDL_LogWarn(SDL_LOG_CATEGORY_VIDEO, "Preferences Vulkan frame failed");
+            return;
+        }
+    } else {
+        glDisable(GL_SCISSOR_TEST);
+        glColorMask(GL_TRUE, GL_TRUE, GL_TRUE, GL_TRUE);
+        glClearColor(
+            value->transparent_window ? 0.0f : palette.background.r / 255.0f,
+            value->transparent_window ? 0.0f : palette.background.g / 255.0f,
+            value->transparent_window ? 0.0f : palette.background.b / 255.0f,
+            value->transparent_window ? 0.0f : 1.0f);
+        glClear(GL_COLOR_BUFFER_BIT);
+    }
     bongo_cat_ui_render(&value->ui);
     bongo_cat_preferences_smoke_frame(value);
-    if (!SDL_GL_SwapWindow(value->window)) {
-        value->render_dirty = true;
-        value->render_retry_ns = now + 1000000000ull;
+    bool presented = true;
+    if (vulkan) {
+        presented = bongo_cat_vk_end_frame(value->vk);
+            if (!presented)
+            SDL_LogWarn(SDL_LOG_CATEGORY_VIDEO, "Preferences Vulkan present failed");
+    } else if (!SDL_GL_SwapWindow(value->window)) {
+        presented = false;
         SDL_LogWarn(SDL_LOG_CATEGORY_VIDEO,
             "Preferences frame presentation failed: %s", SDL_GetError());
+    }
+    if (!presented) {
+        value->render_dirty = true;
+        value->render_retry_ns = now + 1000000000ull;
     } else bongo_cat_memory_policy_ui_frame_presented();
     bongo_cat_preferences_record_frame(value);
     if (value->shortcut_recording || value->model_load_visual_active ||
@@ -83,7 +109,7 @@ void bongo_cat_preferences_render(BongoCatPreferences *value) {
         value->render_dirty = true;
     else if (!value->chrome_dragging && !value->live_resize_active)
         bongo_cat_ui_trim_idle(&value->ui);
-    SDL_GL_MakeCurrent(value->app->window, value->app->gl_context);
+    if (!vulkan) SDL_GL_MakeCurrent(value->app->window, value->app->gl_context);
     bongo_cat_ui_cursor_apply(&value->ui);
     if (close_requested) {
         bongo_cat_preferences_close(value);

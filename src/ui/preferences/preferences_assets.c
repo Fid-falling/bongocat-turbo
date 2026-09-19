@@ -13,12 +13,11 @@ static unsigned int load(BongoCatPreferences *value, const char *name,
     if (!bongo_cat_path_join(path, sizeof(path), value->app->asset_root,
         name)) return 0;
     BongoCatError error = {0};
-    bongo_cat_gl_clear_errors();
-    unsigned int texture = bongo_cat_image_texture_thumbnail(path, size,
-        size, width, height, &error);
-    GLenum upload_error = glGetError();
+    unsigned int texture = (unsigned int)bongo_cat_ui_texture_from_file(&value->ui,
+        path, size, size, width, height, &error);
+    GLenum upload_error = texture ? GL_NO_ERROR : GL_INVALID_VALUE;
     if (texture && upload_error != GL_NO_ERROR) {
-        glDeleteTextures(1, &texture);
+        bongo_cat_ui_texture_release_id(&value->ui, (int)texture);
         texture = 0;
     }
     if (upload_error != GL_NO_ERROR)
@@ -75,31 +74,36 @@ void bongo_cat_preferences_support_assets_load(BongoCatPreferences *value) {
     if (bongo_cat_path_join(path, sizeof(path), value->app->asset_root,
         "vlaina.jpg")) {
         BongoCatError error = {0};
-        value->vlaina_texture = bongo_cat_image_texture_resampled(path,
-            image_size, image_size, (float)raster_size(value, 48),
-            &value->vlaina_width, &value->vlaina_height, &error);
+        if (bongo_cat_ui_uses_vulkan(&value->ui))
+            value->vlaina_texture = (unsigned int)bongo_cat_ui_texture_from_file(
+                &value->ui, path, image_size, image_size, &value->vlaina_width,
+                &value->vlaina_height, &error);
+        else
+            value->vlaina_texture = bongo_cat_image_texture_resampled(path,
+                image_size, image_size, (float)raster_size(value, 48),
+                &value->vlaina_width, &value->vlaina_height, &error);
         if (!value->vlaina_texture && error.message[0])
             SDL_LogWarn(SDL_LOG_CATEGORY_APPLICATION, "%s", error.message);
     }
 }
 
-static void clear(unsigned int *texture) {
-    if (*texture) glDeleteTextures(1, texture);
+static void clear_texture(BongoCatPreferences *value, unsigned int *texture) {
+    if (*texture) bongo_cat_ui_texture_release_id(&value->ui, (int)*texture);
     *texture = 0;
 }
 
 void bongo_cat_preferences_support_assets_clear(BongoCatPreferences *value) {
     if (!value) return;
-    clear(&value->catime_texture);
-    clear(&value->vlaina_texture);
+    clear_texture(value, &value->catime_texture);
+    clear_texture(value, &value->vlaina_texture);
     value->support_assets_loaded = false;
 }
 
 void bongo_cat_preferences_assets_clear(BongoCatPreferences *value) {
     if (!value) return;
-    clear(&value->logo_texture);
-    clear(&value->icon_texture);
-    clear(&value->icon_texture_hidpi);
+    clear_texture(value, &value->logo_texture);
+    clear_texture(value, &value->icon_texture);
+    clear_texture(value, &value->icon_texture_hidpi);
     value->icon_hidpi_attempted = false;
     bongo_cat_preferences_support_assets_clear(value);
 }
@@ -114,3 +118,4 @@ void bongo_cat_preferences_assets_abandon(BongoCatPreferences *value) {
     value->icon_hidpi_attempted = false;
     value->support_assets_loaded = false;
 }
+

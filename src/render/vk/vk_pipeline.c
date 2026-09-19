@@ -30,6 +30,10 @@ void bongo_cat_vk_destroy_pipelines(BongoCatVk *vk) {
         vkDestroyPipeline(vk->device, vk->corner_pipeline, NULL);
         vk->corner_pipeline = VK_NULL_HANDLE;
     }
+    if (vk->ui_pipeline != VK_NULL_HANDLE) {
+        vkDestroyPipeline(vk->device, vk->ui_pipeline, NULL);
+        vk->ui_pipeline = VK_NULL_HANDLE;
+    }
     if (vk->overlay_layout != VK_NULL_HANDLE) {
         vkDestroyPipelineLayout(vk->device, vk->overlay_layout, NULL);
         vk->overlay_layout = VK_NULL_HANDLE;
@@ -41,6 +45,10 @@ void bongo_cat_vk_destroy_pipelines(BongoCatVk *vk) {
     if (vk->corner_layout != VK_NULL_HANDLE) {
         vkDestroyPipelineLayout(vk->device, vk->corner_layout, NULL);
         vk->corner_layout = VK_NULL_HANDLE;
+    }
+    if (vk->ui_layout != VK_NULL_HANDLE) {
+        vkDestroyPipelineLayout(vk->device, vk->ui_layout, NULL);
+        vk->ui_layout = VK_NULL_HANDLE;
     }
 }
 
@@ -80,7 +88,7 @@ static VkPipeline build_pipeline(BongoCatVk *vk, VkPipelineLayout layout,
     const uint32_t *vertex_code, size_t vertex_bytes, const uint32_t *fragment_code,
     size_t fragment_bytes, VkVertexInputBindingDescription binding,
     uint32_t attribute_count, const VkVertexInputAttributeDescription *attributes,
-    VkPrimitiveTopology topology, bool multiply_blend) {
+    VkPrimitiveTopology topology, BongoCatVkBlend blend_mode) {
     VkShaderModule vertex = create_module(vk, vertex_code, vertex_bytes);
     VkShaderModule fragment = create_module(vk, fragment_code, fragment_bytes);
     VkPipeline pipeline = VK_NULL_HANDLE;
@@ -118,15 +126,28 @@ static VkPipeline build_pipeline(BongoCatVk *vk, VkPipelineLayout layout,
         multisample.rasterizationSamples = VK_SAMPLE_COUNT_1_BIT;
         VkPipelineColorBlendAttachmentState blend = {0};
         blend.blendEnable = VK_TRUE;
-        blend.srcColorBlendFactor = multiply_blend ? VK_BLEND_FACTOR_ZERO :
-            VK_BLEND_FACTOR_ONE;
-        blend.dstColorBlendFactor = multiply_blend ? VK_BLEND_FACTOR_SRC_ALPHA :
-            VK_BLEND_FACTOR_ONE_MINUS_SRC_ALPHA;
+        switch (blend_mode) {
+        case BONGO_CAT_VK_BLEND_MULTIPLY:
+            blend.srcColorBlendFactor = VK_BLEND_FACTOR_ZERO;
+            blend.dstColorBlendFactor = VK_BLEND_FACTOR_SRC_ALPHA;
+            blend.srcAlphaBlendFactor = VK_BLEND_FACTOR_ZERO;
+            blend.dstAlphaBlendFactor = VK_BLEND_FACTOR_SRC_ALPHA;
+            break;
+        case BONGO_CAT_VK_BLEND_ALPHA:
+            blend.srcColorBlendFactor = VK_BLEND_FACTOR_SRC_ALPHA;
+            blend.dstColorBlendFactor = VK_BLEND_FACTOR_ONE_MINUS_SRC_ALPHA;
+            blend.srcAlphaBlendFactor = VK_BLEND_FACTOR_ONE;
+            blend.dstAlphaBlendFactor = VK_BLEND_FACTOR_ONE_MINUS_SRC_ALPHA;
+            break;
+        case BONGO_CAT_VK_BLEND_PREMULTIPLIED:
+        default:
+            blend.srcColorBlendFactor = VK_BLEND_FACTOR_ONE;
+            blend.dstColorBlendFactor = VK_BLEND_FACTOR_ONE_MINUS_SRC_ALPHA;
+            blend.srcAlphaBlendFactor = VK_BLEND_FACTOR_ONE;
+            blend.dstAlphaBlendFactor = VK_BLEND_FACTOR_ONE_MINUS_SRC_ALPHA;
+            break;
+        }
         blend.colorBlendOp = VK_BLEND_OP_ADD;
-        blend.srcAlphaBlendFactor = multiply_blend ? VK_BLEND_FACTOR_ZERO :
-            VK_BLEND_FACTOR_ONE;
-        blend.dstAlphaBlendFactor = multiply_blend ? VK_BLEND_FACTOR_SRC_ALPHA :
-            VK_BLEND_FACTOR_ONE_MINUS_SRC_ALPHA;
         blend.alphaBlendOp = VK_BLEND_OP_ADD;
         blend.colorWriteMask = VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT |
             VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT;
@@ -198,8 +219,9 @@ void bongo_cat_vk_rebuild_pipelines(BongoCatVk *vk) {
     vk->overlay_layout = create_layout(vk, (uint32_t)sizeof(OverlayPush), true);
     vk->pointer_layout = create_layout(vk, (uint32_t)sizeof(PointerPush), true);
     vk->corner_layout = create_layout(vk, (uint32_t)sizeof(CornerPush), false);
+    vk->ui_layout = create_layout(vk, (uint32_t)sizeof(UiPush), true);
     if (vk->overlay_layout == VK_NULL_HANDLE || vk->pointer_layout == VK_NULL_HANDLE ||
-        vk->corner_layout == VK_NULL_HANDLE) {
+        vk->corner_layout == VK_NULL_HANDLE || vk->ui_layout == VK_NULL_HANDLE) {
         SDL_LogError(SDL_LOG_CATEGORY_VIDEO, "[vulkan] 管线布局创建失败");
         bongo_cat_vk_destroy_pipelines(vk);
         return;
@@ -208,19 +230,42 @@ void bongo_cat_vk_rebuild_pipelines(BongoCatVk *vk) {
         bongo_cat_spv_overlay_vert, sizeof(bongo_cat_spv_overlay_vert),
         bongo_cat_spv_overlay_frag, sizeof(bongo_cat_spv_overlay_frag),
         overlay_binding, 2, overlay_attributes, VK_PRIMITIVE_TOPOLOGY_TRIANGLE_STRIP,
-        false);
+        BONGO_CAT_VK_BLEND_PREMULTIPLIED);
     vk->pointer_pipeline = build_pipeline(vk, vk->pointer_layout,
         bongo_cat_spv_pointer_vert, sizeof(bongo_cat_spv_pointer_vert),
         bongo_cat_spv_pointer_frag, sizeof(bongo_cat_spv_pointer_frag),
         pointer_binding, 3, pointer_attributes, VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST,
-        false);
+        BONGO_CAT_VK_BLEND_PREMULTIPLIED);
     VkVertexInputBindingDescription no_binding = {0};
     vk->corner_pipeline = build_pipeline(vk, vk->corner_layout,
         bongo_cat_spv_corner_vert, sizeof(bongo_cat_spv_corner_vert),
         bongo_cat_spv_corner_frag, sizeof(bongo_cat_spv_corner_frag),
-        no_binding, 0, NULL, VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST, true);
+        no_binding, 0, NULL, VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST,
+        BONGO_CAT_VK_BLEND_MULTIPLY);
+
+    /* 设置界面: pos(2f) + uv(2f) + color(RGBA8) */
+    VkVertexInputBindingDescription ui_binding = {0};
+    ui_binding.binding = 0;
+    ui_binding.stride = 20;
+    ui_binding.inputRate = VK_VERTEX_INPUT_RATE_VERTEX;
+    VkVertexInputAttributeDescription ui_attributes[3] = {{0}};
+    ui_attributes[0].location = 0;
+    ui_attributes[0].format = VK_FORMAT_R32G32_SFLOAT;
+    ui_attributes[0].offset = 0;
+    ui_attributes[1].location = 1;
+    ui_attributes[1].format = VK_FORMAT_R32G32_SFLOAT;
+    ui_attributes[1].offset = 8;
+    ui_attributes[2].location = 2;
+    ui_attributes[2].format = VK_FORMAT_R8G8B8A8_UNORM;
+    ui_attributes[2].offset = 16;
+    vk->ui_pipeline = build_pipeline(vk, vk->ui_layout,
+        bongo_cat_spv_ui_vert, sizeof(bongo_cat_spv_ui_vert),
+        bongo_cat_spv_ui_frag, sizeof(bongo_cat_spv_ui_frag),
+        ui_binding, 3, ui_attributes, VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST,
+        BONGO_CAT_VK_BLEND_ALPHA);
+
     if (vk->overlay_pipeline == VK_NULL_HANDLE || vk->pointer_pipeline == VK_NULL_HANDLE ||
-        vk->corner_pipeline == VK_NULL_HANDLE) {
+        vk->corner_pipeline == VK_NULL_HANDLE || vk->ui_pipeline == VK_NULL_HANDLE) {
         SDL_LogError(SDL_LOG_CATEGORY_VIDEO, "[vulkan] 图形管线创建失败");
         bongo_cat_vk_destroy_pipelines(vk);
     }

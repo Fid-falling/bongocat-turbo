@@ -2,9 +2,13 @@
 #define BONGO_CAT_UI_BACKEND_H
 
 #include "bongo_cat/gl_api.h"
+#include "bongo_cat/vk_backend.h"
 #include <SDL3/SDL.h>
 #include "nuklear_config.h"
 #include <stdint.h>
+
+/* 设置界面在 Vulkan 模式下使用的纹理表: Nuklear 的纹理 id = 下标 + 1 */
+#define BONGO_CAT_UI_VK_TEXTURES 64
 
 typedef enum BongoCatUICursor {
     BONGO_CAT_UI_CURSOR_DEFAULT,
@@ -15,6 +19,9 @@ typedef enum BongoCatUICursor {
 
 typedef struct BongoCatUIBackend {
     SDL_Window *window;
+    /* 非空表示这个界面由 Vulkan 渲染 (设置窗口的独立上下文) */
+    BongoCatVk *vk;
+    BongoCatVkTexture *vk_textures[BONGO_CAT_UI_VK_TEXTURES];
     float layout_scale;
     float raster_scale;
     BongoCatGL gl;
@@ -76,12 +83,27 @@ typedef struct BongoCatUIBackend {
 } BongoCatUIBackend;
 
 bool bongo_cat_ui_init(BongoCatUIBackend *ui, SDL_Window *window,
+    BongoCatVk *vk,
     const char *body_font_path, const char *body_fallback_path,
     const char *body_korean_fallback_path, const char *heading_font_path,
     const char *heading_fallback_path,
     const char *heading_korean_fallback_path,
     const nk_rune *glyph_ranges, float layout_scale, float raster_scale,
     BongoCatError *error);
+/* Vulkan 模式下界面纹理的登记与查找 (Nuklear 用返回的 id 引用它) */
+int bongo_cat_ui_texture_register(BongoCatUIBackend *ui,
+    BongoCatVkTexture *texture);
+void bongo_cat_ui_texture_unregister(BongoCatUIBackend *ui, int id);
+BongoCatVkTexture *bongo_cat_ui_texture_lookup(const BongoCatUIBackend *ui,
+    int id);
+/* 把 src 在 id 上的纹理转交给 dst 的同一个 id (字体图集重建时保持 id 不变) */
+void bongo_cat_ui_texture_move(BongoCatUIBackend *dst, BongoCatUIBackend *src,
+    int id);
+/* 图片文件 -> 界面纹理, 返回 Nuklear 用的 id (0 表示失败) */
+int bongo_cat_ui_texture_from_file(BongoCatUIBackend *ui, const char *path,
+    int max_width, int max_height, int *width, int *height, BongoCatError *error);
+void bongo_cat_ui_texture_release_id(BongoCatUIBackend *ui, int id);
+bool bongo_cat_ui_uses_vulkan(const BongoCatUIBackend *ui);
 void bongo_cat_ui_destroy(BongoCatUIBackend *ui);
 void bongo_cat_ui_abandon(BongoCatUIBackend *ui);
 void bongo_cat_ui_input_begin(BongoCatUIBackend *ui);

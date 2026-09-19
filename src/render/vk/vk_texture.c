@@ -170,10 +170,11 @@ static void transition_image(VkCommandBuffer command, VkImage image,
         0, NULL, 1, &barrier);
 }
 
-BongoCatVkTexture *bongo_cat_vk_texture_from_pixels(BongoCatVk *vk,
-    const unsigned char *rgba, int width, int height, const char *label,
-    BongoCatError *error) {
-    if (!vk || !rgba || width <= 0 || height <= 0) {
+/* 共用实现: 暂存缓冲 -> 图像, 再建视图与描述符集。format 决定通道数 (RGBA8/R8) */
+static BongoCatVkTexture *bongo_cat_vk_texture_create(BongoCatVk *vk,
+    const unsigned char *pixels, int width, int height, VkFormat format,
+    int bytes_per_pixel, const char *label, BongoCatError *error) {
+    if (!vk || !pixels || width <= 0 || height <= 0 || bytes_per_pixel <= 0) {
         bongo_cat_error_set(error, BONGO_CAT_ERROR_ARGUMENT, "Vulkan 纹理参数无效");
         return NULL;
     }
@@ -185,12 +186,13 @@ BongoCatVkTexture *bongo_cat_vk_texture_from_pixels(BongoCatVk *vk,
     texture->width = width;
     texture->height = height;
     snprintf(texture->label, sizeof(texture->label), "%s", label ? label : "texture");
-    VkDeviceSize bytes = (VkDeviceSize)width * (VkDeviceSize)height * 4u;
+    VkDeviceSize bytes = (VkDeviceSize)width * (VkDeviceSize)height *
+        (VkDeviceSize)bytes_per_pixel;
 
     VkImageCreateInfo image = {0};
     image.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
     image.imageType = VK_IMAGE_TYPE_2D;
-    image.format = VK_FORMAT_R8G8B8A8_UNORM;
+    image.format = format;
     image.extent.width = (uint32_t)width;
     image.extent.height = (uint32_t)height;
     image.extent.depth = 1;
@@ -247,7 +249,7 @@ BongoCatVkTexture *bongo_cat_vk_texture_from_pixels(BongoCatVk *vk,
         bongo_cat_vk_texture_destroy(vk, texture);
         return NULL;
     }
-    memcpy(mapped, rgba, (size_t)bytes);
+    memcpy(mapped, pixels, (size_t)bytes);
     vkUnmapMemory(vk->device, staging_memory);
 
     VkCommandBuffer command = begin_upload(vk);
@@ -278,7 +280,7 @@ BongoCatVkTexture *bongo_cat_vk_texture_from_pixels(BongoCatVk *vk,
     view.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
     view.image = texture->image;
     view.viewType = VK_IMAGE_VIEW_TYPE_2D;
-    view.format = VK_FORMAT_R8G8B8A8_UNORM;
+    view.format = format;
     view.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
     view.subresourceRange.levelCount = 1;
     view.subresourceRange.layerCount = 1;
@@ -311,6 +313,20 @@ BongoCatVkTexture *bongo_cat_vk_texture_from_pixels(BongoCatVk *vk,
     write.pImageInfo = &info;
     vkUpdateDescriptorSets(vk->device, 1, &write, 0, NULL);
     return texture;
+}
+
+BongoCatVkTexture *bongo_cat_vk_texture_from_pixels(BongoCatVk *vk,
+    const unsigned char *rgba, int width, int height, const char *label,
+    BongoCatError *error) {
+    return bongo_cat_vk_texture_create(vk, rgba, width, height,
+        VK_FORMAT_R8G8B8A8_UNORM, 4, label, error);
+}
+
+BongoCatVkTexture *bongo_cat_vk_texture_from_alpha(BongoCatVk *vk,
+    const unsigned char *alpha, int width, int height, const char *label,
+    BongoCatError *error) {
+    return bongo_cat_vk_texture_create(vk, alpha, width, height,
+        VK_FORMAT_R8_UNORM, 1, label, error);
 }
 
 BongoCatVkTexture *bongo_cat_vk_texture_load(BongoCatVk *vk, const char *path,

@@ -1,4 +1,5 @@
 #include "ui_backend.h"
+#include "bongo_cat/image.h"
 #include "ui_font_atlas.h"
 #include "ui_paint.h"
 #include "ui_paint_cache.h"
@@ -47,7 +48,74 @@ static void clipboard_paste(nk_handle user, struct nk_text_edit *edit) {
     }
 }
 
+bool bongo_cat_ui_uses_vulkan(const BongoCatUIBackend *ui) {
+    return ui && ui->vk != NULL;
+}
+
+int bongo_cat_ui_texture_register(BongoCatUIBackend *ui,
+    BongoCatVkTexture *texture) {
+    if (!ui || !texture) return 0;
+    for (int i = 0; i < BONGO_CAT_UI_VK_TEXTURES; ++i) {
+        if (ui->vk_textures[i]) continue;
+        ui->vk_textures[i] = texture;
+        return i + 1;
+    }
+    return 0;
+}
+
+void bongo_cat_ui_texture_unregister(BongoCatUIBackend *ui, int id) {
+    if (!ui || id <= 0 || id > BONGO_CAT_UI_VK_TEXTURES) return;
+    BongoCatVkTexture *texture = ui->vk_textures[id - 1];
+    ui->vk_textures[id - 1] = NULL;
+    if (texture) bongo_cat_vk_texture_destroy(ui->vk, texture);
+}
+
+BongoCatVkTexture *bongo_cat_ui_texture_lookup(const BongoCatUIBackend *ui,
+    int id) {
+    if (!ui || id <= 0 || id > BONGO_CAT_UI_VK_TEXTURES) return NULL;
+    return ui->vk_textures[id - 1];
+}
+
+void bongo_cat_ui_texture_move(BongoCatUIBackend *dst, BongoCatUIBackend *src,
+    int id) {
+    if (!dst || !src || id <= 0 || id > BONGO_CAT_UI_VK_TEXTURES) return;
+    dst->vk_textures[id - 1] = src->vk_textures[id - 1];
+    src->vk_textures[id - 1] = NULL;
+}
+
+int bongo_cat_ui_texture_from_file(BongoCatUIBackend *ui, const char *path,
+    int max_width, int max_height, int *width, int *height, BongoCatError *error) {
+    if (!ui || !path) return 0;
+    if (bongo_cat_ui_uses_vulkan(ui)) {
+        BongoCatImage image = {0};
+        if (bongo_cat_image_fit(path, max_width, max_height, &image, error) !=
+            BONGO_CAT_OK) return 0;
+        BongoCatVkTexture *texture = bongo_cat_vk_texture_from_pixels(ui->vk,
+            image.pixels, image.width, image.height, path, error);
+        int id = texture ? bongo_cat_ui_texture_register(ui, texture) : 0;
+        if (texture && !id) bongo_cat_vk_texture_destroy(ui->vk, texture);
+        if (width) *width = image.width;
+        if (height) *height = image.height;
+        bongo_cat_image_free(&image);
+        return id;
+    }
+    return (int)bongo_cat_image_texture_thumbnail(path, max_width, max_height,
+        width, height, error);
+}
+
+void bongo_cat_ui_texture_release_id(BongoCatUIBackend *ui, int id) {
+    if (!ui || id <= 0) return;
+    if (bongo_cat_ui_uses_vulkan(ui)) {
+        bongo_cat_ui_texture_unregister(ui, id);
+        return;
+    }
+    GLuint name = (GLuint)id;
+    glDeleteTextures(1, &name);
+}
+
 static bool create_device(BongoCatUIBackend *ui, BongoCatError *error) {
+    /* Vulkan 模式下界面纹理与管线由 vk_backend 提供, 这里不碰 OpenGL */
+    if (bongo_cat_ui_uses_vulkan(ui)) return true;
     if (!bongo_cat_gl_load(&ui->gl, error)) return false;
     ui->program = bongo_cat_gl_program(&ui->gl, vertex_source, fragment_source, error);
     if (!ui->program) return false;
@@ -78,6 +146,7 @@ static void trim_commands(BongoCatUIBackend *ui) {
 }
 
 bool bongo_cat_ui_init(BongoCatUIBackend *ui, SDL_Window *window,
+    BongoCatVk *vk,
     const char *body_font_path, const char *body_fallback_path,
     const char *body_korean_fallback_path, const char *heading_font_path,
     const char *heading_fallback_path,
@@ -86,6 +155,7 @@ bool bongo_cat_ui_init(BongoCatUIBackend *ui, SDL_Window *window,
     BongoCatError *error) {
     memset(ui, 0, sizeof(*ui));
     ui->window = window;
+    ui->vk = vk;
     ui->layout_scale = layout_scale;
     ui->raster_scale = raster_scale;
     ui->vertex_capacity = 256 * 1024;
@@ -112,6 +182,27 @@ bool bongo_cat_ui_init(BongoCatUIBackend *ui, SDL_Window *window,
 static void release(BongoCatUIBackend *ui, bool release_gl) {
     if (!ui) return;
     if (context_backend == ui) context_backend = NULL;
+    if (bongo_cat_ui_uses_vulkan(ui)) {
+        if (release_gl) {
+            bongo_cat_ui_paint_destroy(ui);
+            bongo_cat_ui_resize_cache_destroy(ui);
+        } else {
+            bongo_cat_ui_paint_cache_abandon(ui);
+        }
+        if (ui->atlas.permanent.alloc) bongo_cat_ui_font_atlas_destroy(ui);
+        nk_buffer_free(&ui->commands);
+        nk_free(&ui->context);
+        /* 剩下的登记纹理统一释放 (字体图集等) */
+        for (int i = 0; i < BONGO_CAT_UI_VK_TEXTURES; ++i) {
+            if (!ui->vk_textures[i]) continue;
+            bongo_cat_vk_texture_destroy(ui->vk, ui->vk_textures[i]);
+            ui->vk_textures[i] = NULL;
+        }
+        free(ui->vertices);
+        free(ui->elements);
+        memset(ui, 0, sizeof(*ui));
+        return;
+    }
     if (release_gl) {
         bongo_cat_ui_paint_destroy(ui);
         bongo_cat_ui_resize_cache_destroy(ui);
@@ -173,15 +264,68 @@ static void convert(BongoCatUIBackend *ui) {
             if (sample[i].color[3] > ui->max_alpha) ui->max_alpha = sample[i].color[3];
         }
     }
+}
+
+/* OpenGL 路径把这一帧的顶点/索引上传到流式缓冲 */
+static void upload_buffers_gl(BongoCatUIBackend *ui) {
     ui->gl.bind_buffer(GL_ARRAY_BUFFER, ui->vbo);
-    ui->gl.buffer_data(GL_ARRAY_BUFFER, (GLsizeiptr)vertices.allocated,
+    ui->gl.buffer_data(GL_ARRAY_BUFFER, (GLsizeiptr)ui->last_vertex_bytes,
         ui->vertices, GL_STREAM_DRAW);
     ui->gl.bind_buffer(GL_ELEMENT_ARRAY_BUFFER, ui->ebo);
-    ui->gl.buffer_data(GL_ELEMENT_ARRAY_BUFFER, (GLsizeiptr)elements.allocated,
+    ui->gl.buffer_data(GL_ELEMENT_ARRAY_BUFFER, (GLsizeiptr)ui->last_element_bytes,
         ui->elements, GL_STREAM_DRAW);
 }
 
+/*
+ * Vulkan 路径: 顶点整块上传一次, 之后每条绘制命令只提交索引与裁剪矩形。
+ * 顶点在缓冲里的下标与索引一致, 所以只要上传一次就能被所有命令引用。
+ */
+static void render_vulkan(BongoCatUIBackend *ui) {
+    int pixel_width = 0, pixel_height = 0;
+    float width = 0.0f, height = 0.0f;
+    bongo_cat_ui_logical_size(ui, &width, &height);
+    SDL_GetWindowSizeInPixels(ui->window, &pixel_width, &pixel_height);
+    if (width <= 0.0f || height <= 0.0f || pixel_width <= 0 || pixel_height <= 0)
+        return;
+    convert(ui);
+    float scale_x = pixel_width / width, scale_y = pixel_height / height;
+    const size_t vertex_count = ui->last_vertex_bytes / sizeof(UIVertex);
+    if (!bongo_cat_vk_ui_upload_vertices(ui->vk, ui->vertices,
+            (unsigned int)vertex_count)) return;
+    const struct nk_draw_command *command;
+    const nk_draw_index *offset = NULL;
+    ui->last_draw_commands = 0;
+    ui->last_draw_elements = 0;
+    nk_draw_foreach(command, &ui->context, &ui->commands) {
+        if (!command->elem_count) continue;
+        ui->last_draw_commands++;
+        ui->last_draw_elements += command->elem_count;
+        BongoCatVkTexture *texture =
+            bongo_cat_ui_texture_lookup(ui, (int)command->texture.id);
+        if (!texture) {
+            offset += command->elem_count;
+            continue;
+        }
+        bongo_cat_vk_set_scissor(ui->vk,
+            (int)(command->clip_rect.x * scale_x),
+            (int)(command->clip_rect.y * scale_y),
+            (int)(command->clip_rect.w * scale_x),
+            (int)(command->clip_rect.h * scale_y));
+        bongo_cat_vk_ui_draw(ui->vk, texture, offset, command->elem_count,
+            scale_x, scale_y);
+        offset += command->elem_count;
+    }
+    nk_clear(&ui->context);
+    nk_buffer_clear(&ui->commands);
+    if (ui->last_draw_commands < 256) trim_commands(ui);
+    ui->last_gl_error = GL_NO_ERROR;
+}
+
 void bongo_cat_ui_render(BongoCatUIBackend *ui) {
+    if (bongo_cat_ui_uses_vulkan(ui)) {
+        render_vulkan(ui);
+        return;
+    }
     int pixel_width, pixel_height;
     float width = 0.0f, height = 0.0f;
     bongo_cat_ui_logical_size(ui, &width, &height);
@@ -190,6 +334,7 @@ void bongo_cat_ui_render(BongoCatUIBackend *ui) {
         {0, 0, -1, 0}, {-1, 1, 0, 1}};
     bongo_cat_gl_clear_errors();
     convert(ui);
+    upload_buffers_gl(ui);
     glViewport(0, 0, pixel_width, pixel_height);
     glEnable(GL_BLEND);
     ui->gl.blend_equation(GL_FUNC_ADD);

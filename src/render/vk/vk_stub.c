@@ -116,4 +116,35 @@ bool bongo_cat_vk_hit_alpha(const BongoCatVk *vk, int x, int y,
     return false;
 }
 
+BongoCatVkTexture *bongo_cat_vk_texture_from_alpha(BongoCatVk *vk,
+    const unsigned char *alpha, int width, int height, const char *label,
+    BongoCatError *error) {
+    (void)vk; (void)alpha; (void)width; (void)height; (void)label;
+    bongo_cat_error_set(error, BONGO_CAT_ERROR_PLATFORM,
+        "此构建未启用 Vulkan (需要 -DBONGO_CAT_ENABLE_VULKAN=ON)");
+    return NULL;
+}
+
+void bongo_cat_vk_set_scissor(BongoCatVk *vk, int x, int y, int width, int height) {
+    (void)vk; (void)x; (void)y; (void)width; (void)height;
+}
+
+bool bongo_cat_vk_ui_upload_vertices(BongoCatVk *vk, const void *vertices,
+    unsigned int vertex_count) {
+    (void)vk; (void)vertices; (void)vertex_count;
+    return false;
+}
+
+bool bongo_cat_vk_ui_draw(BongoCatVk *vk, BongoCatVkTexture *texture,
+    const void *indices, unsigned int index_count, float scale_x, float scale_y) {
+    (void)vk; (void)texture; (void)indices; (void)index_count;
+    (void)scale_x; (void)scale_y;
+    return false;
+}
+
+int bongo_cat_vk_max_texture_dimension(const BongoCatVk *vk) {
+    (void)vk;
+    return 0;
+}
+
 #endif /* !BONGO_CAT_HAS_VULKAN */

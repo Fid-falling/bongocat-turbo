@@ -82,7 +82,9 @@ void bongo_cat_preferences_smoke_frame(BongoCatPreferences *value) {
     SDL_GetWindowSizeInPixels(value->window, &pixel_width, &pixel_height);
     bongo_cat_ui_logical_size(&value->ui, &logical_width, &logical_height);
     unsigned char corners[4][4] = {{0}};
-    if (pixel_width > 0 && pixel_height > 0) {
+    /* Vulkan 模式下没有可读的 GL 前后缓冲, 角点透明度采样暂时跳过 */
+    if (!bongo_cat_ui_uses_vulkan(&value->ui) &&
+        pixel_width > 0 && pixel_height > 0) {
         const int points[4][2] = {{0, 0}, {pixel_width - 1, 0},
             {0, pixel_height - 1}, {pixel_width - 1, pixel_height - 1}};
         for (int i = 0; i < 4; ++i) glReadPixels(points[i][0], points[i][1],

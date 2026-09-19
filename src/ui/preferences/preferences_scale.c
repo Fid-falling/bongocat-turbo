@@ -1,4 +1,5 @@
 #include "preferences_state.h"
+#include "bongo_cat/render.h"
 #include "preferences_fonts.h"
 #include "preferences_gl.h"
 #include "ui_catime.h"
@@ -107,7 +108,15 @@ static bool create_window(BongoCatPreferences *value, int width, int height,
 }
 
 bool bongo_cat_preferences_open_window(BongoCatPreferences *value) {
-    SDL_WindowFlags flags = SDL_WINDOW_OPENGL | SDL_WINDOW_BORDERLESS |
+    /* renderer=vulkan 时设置窗口也走 Vulkan; 建不起来就退回 OpenGL 那一套 */
+    /* 设置窗口的 Vulkan 渲染器还没跑通 (首帧崩溃), 默认仍用 OpenGL 渲染;
+       验证时用 BONGO_CAT_PREFERENCES_VULKAN=1 打开。 */
+    value->prefer_vulkan =
+        bongo_cat_renderer_active() == BONGO_CAT_RENDERER_VULKAN &&
+        SDL_getenv("BONGO_CAT_PREFERENCES_VULKAN") != NULL;
+    SDL_WindowFlags backend_flag = value->prefer_vulkan ? SDL_WINDOW_VULKAN :
+        SDL_WINDOW_OPENGL;
+    SDL_WindowFlags flags = backend_flag | SDL_WINDOW_BORDERLESS |
         SDL_WINDOW_HIGH_PIXEL_DENSITY | SDL_WINDOW_RESIZABLE | SDL_WINDOW_HIDDEN;
     SDL_DisplayID display = SDL_GetPrimaryDisplay();
     float layout_scale = bongo_cat_ui_display_layout_scale(display);
@@ -153,22 +162,31 @@ bool bongo_cat_preferences_open_window(BongoCatPreferences *value) {
         bongo_cat_platform_configure_preferences_window(value->window);
         context_ready = bongo_cat_preferences_gl_create(value);
     }
-    if (!context_ready) return false;
+    if (!context_ready) {
+        if (value->prefer_vulkan) {
+            SDL_LogWarn(SDL_LOG_CATEGORY_VIDEO,
+                "Preferences Vulkan context unavailable; falling back to OpenGL");
+            value->prefer_vulkan = false;
+            discard_window(value);
+            return bongo_cat_preferences_open_window(value);
+        }
+        return false;
+    }
     BongoCatPreferenceFonts fonts;
     bongo_cat_preferences_fonts_resolve(value, &fonts);
     BongoCatError error = {0};
-    if (!bongo_cat_ui_init(&value->ui, value->window, fonts.body,
+        if (!bongo_cat_ui_init(&value->ui, value->window, value->vk, fonts.body,
         fonts.body_fallback, fonts.body_korean_fallback, fonts.heading,
         fonts.heading_fallback, fonts.heading_korean_fallback, fonts.ranges,
         layout_scale, raster_scale, &error)) {
         SDL_LogError(SDL_LOG_CATEGORY_APPLICATION, "%s", error.message);
         return false;
     }
-    value->ui_initialized = true;
+        value->ui_initialized = true;
     SDL_SetWindowHitTest(value->window, preference_hit_test, value);
     value->native_drag = false;
-    bongo_cat_preferences_assets_load(value);
-    bongo_cat_memory_policy_ui_loaded();
+        bongo_cat_preferences_assets_load(value);
+        bongo_cat_memory_policy_ui_loaded();
     value->style_theme = -1;
     value->font_language = value->app->settings.app.language;
     int pixel_width = 0, pixel_height = 0;

@@ -32,7 +32,9 @@ static void render_live(BongoCatPreferences *value) {
 }
 
 static bool capture_live(BongoCatPreferences *value) {
-    if (!value || !SDL_GL_MakeCurrent(value->window, value->gl_context))
+    /* Vulkan 模式没有帧缓存回拷这条路, 直接走正常重绘 */
+    if (!value || bongo_cat_ui_uses_vulkan(&value->ui)) return false;
+    if (!SDL_GL_MakeCurrent(value->window, value->gl_context))
         return false;
     bool result = bongo_cat_ui_resize_cache_capture(&value->ui);
     SDL_GL_MakeCurrent(value->app->window, value->app->gl_context);
@@ -40,7 +42,8 @@ static bool capture_live(BongoCatPreferences *value) {
 }
 
 static bool present_live(BongoCatPreferences *value) {
-    if (!value || !SDL_GL_MakeCurrent(value->window, value->gl_context))
+    if (!value || bongo_cat_ui_uses_vulkan(&value->ui)) return false;
+    if (!SDL_GL_MakeCurrent(value->window, value->gl_context))
         return false;
     bool result = bongo_cat_ui_resize_cache_present(&value->ui) &&
         SDL_GL_SwapWindow(value->window);

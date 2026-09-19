@@ -26,6 +26,9 @@ struct BongoCatPreferences {
     SDL_Window *window;
     SDL_GLContext gl_context;
     bool owns_gl_context;
+    /* 设置窗口自己的 Vulkan 上下文 (renderer=vulkan 时非空) */
+    BongoCatVk *vk;
+    bool prefer_vulkan;
     bool transparent_window;
     bool visible;
     bool ui_initialized;

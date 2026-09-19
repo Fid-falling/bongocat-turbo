@@ -1,4 +1,5 @@
 #include "ui_paint_cache.h"
+#include "ui_backend.h"
 
 #include <SDL3/SDL_opengl.h>
 #include <stddef.h>
@@ -21,7 +22,12 @@ static BongoCatUIPaintTexture textures[PAINT_CACHE_COUNT];
 static uint64_t use_counter;
 
 static void release_texture(BongoCatUIPaintTexture *item) {
-    if (item->texture) glDeleteTextures(1, &item->texture);
+    if (item->texture) {
+        if (bongo_cat_ui_uses_vulkan(item->backend))
+            bongo_cat_ui_texture_unregister(item->backend, (int)item->texture);
+        else
+            glDeleteTextures(1, &item->texture);
+    }
     memset(item, 0, sizeof(*item));
 }
 
@@ -91,6 +97,28 @@ bool bongo_cat_ui_paint_cache_upload(BongoCatUIPaintTexture *item,
             "UI paint cache limit rejected a %llu-byte texture",
             (unsigned long long)bytes);
         return false;
+    }
+    if (bongo_cat_ui_uses_vulkan(item->backend)) {
+        BongoCatError error = {0};
+        BongoCatVkTexture *texture = single_channel
+            ? bongo_cat_vk_texture_from_alpha(item->backend->vk, pixels,
+                item->key.width, item->key.height, "ui-paint", &error)
+            : bongo_cat_vk_texture_from_pixels(item->backend->vk, pixels,
+                item->key.width, item->key.height, "ui-paint", &error);
+        if (!texture) {
+            SDL_LogWarn(SDL_LOG_CATEGORY_VIDEO,
+                "UI paint texture upload failed (vulkan) for %dx%d: %s",
+                item->key.width, item->key.height, error.message);
+            return false;
+        }
+        int id = bongo_cat_ui_texture_register(item->backend, texture);
+        if (!id) {
+            bongo_cat_vk_texture_destroy(item->backend->vk, texture);
+            return false;
+        }
+        item->texture = (GLuint)id;
+        item->bytes = bytes;
+        return true;
     }
     bongo_cat_gl_clear_errors();
     glGenTextures(1, &item->texture);

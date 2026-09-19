@@ -61,7 +61,10 @@ bool bongo_cat_ui_font_atlas_create(BongoCatUIBackend *ui,
     nk_font_atlas_init_default(&ui->atlas);
     nk_font_atlas_begin(&ui->atlas);
     GLint maximum_texture = 0;
-    glGetIntegerv(GL_MAX_TEXTURE_SIZE, &maximum_texture);
+    if (bongo_cat_ui_uses_vulkan(ui))
+        maximum_texture = bongo_cat_vk_max_texture_dimension(ui->vk);
+    else
+        glGetIntegerv(GL_MAX_TEXTURE_SIZE, &maximum_texture);
     /* Keep the atlas bounded on high-DPI displays. The UI is laid out in
        logical pixels, so a 1.5x raster is enough for crisp text while a 2x
        atlas can quadruple both the texture and bake working memory. */
