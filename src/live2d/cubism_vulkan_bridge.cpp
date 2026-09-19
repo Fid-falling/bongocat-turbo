@@ -14,6 +14,8 @@
 #include "bongo_cat/vk_backend.h"
 
 #include <SDL3/SDL.h>
+#include <filesystem>
+#include <fstream>
 
 #ifdef BONGO_CAT_HAS_VULKAN
 
@@ -67,6 +69,28 @@ bool bongo_cat_live2d_vulkan_attach(struct BongoCatVk *vk, int width, int height
         "format=%d depth=%d images=%d)",
         (void *)info.image_view, width, height, (int)g_format,
         (int)kDepthFormat, info.image_count);
+    /*
+     * SDK 的 Vulkan 渲染器按相对路径 "FrameworkShaders/*.spv" 打开着色器, 而
+     * .spv 是随程序分发在 exe 目录下的。进程的工作目录不一定是 exe 目录, 所以
+     * 这里显式切过去, 并打一条探针确认第一个着色器真的能打开。
+     * 注意: SDL_GetBasePath() 返回 const char * 且由 SDL 自己持有, 不要 free。
+     */
+    {
+        const char *base = SDL_GetBasePath();
+        if (base) {
+            std::error_code error_code;
+            std::filesystem::current_path(base, error_code);
+            std::ifstream probe("FrameworkShaders/FragShaderSrc.spv",
+                std::ios::binary);
+            SDL_LogWarn(SDL_LOG_CATEGORY_VIDEO,
+                "[live2d/vk] attach: cwd=%s shader=%s",
+                std::filesystem::current_path().string().c_str(),
+                probe.is_open() ? "ok" : "MISSING");
+        } else {
+            SDL_LogWarn(SDL_LOG_CATEGORY_VIDEO,
+                "[live2d/vk] attach: SDL_GetBasePath 失败");
+        }
+    }
     Csm::Rendering::CubismRenderer_Vulkan::SetConstantSettings(g_device,
         (VkPhysicalDevice)info.physical_device, (VkCommandPool)info.command_pool,
         (VkQueue)info.queue, (unsigned int)info.image_count, extent,
