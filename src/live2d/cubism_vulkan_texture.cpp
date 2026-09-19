@@ -119,3 +119,15 @@ void *bongo_cat_live2d_vulkan_create_texture(struct BongoCatVk *vk,
 void bongo_cat_live2d_vulkan_destroy_texture(void *texture) {
     delete (VulkanTexture *)texture;
 }
+
+/*
+ * 把贴图绑到渲染器上, 两个参数都是不透明句柄: renderer 是
+ * CubismRenderer_Vulkan*, texture 是 create_texture_attached() 的返回值。
+ * SDK 的 CubismImageVulkan 类型只在这个文件里出现。
+ */
+bool bongo_cat_live2d_vulkan_bind_texture(void *renderer, void *texture) {
+    if (!renderer || !texture) return false;
+    ((Live2D::Cubism::Framework::Rendering::CubismRenderer_Vulkan *)renderer)
+        ->BindTexture(((VulkanTexture *)texture)->image);
+    return true;
+}

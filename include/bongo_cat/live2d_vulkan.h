@@ -31,6 +31,9 @@ void bongo_cat_live2d_vulkan_destroy_texture(void *texture);
 void *bongo_cat_live2d_vulkan_create_texture_attached(const void *pixels,
     int width, int height);
 
+/* 把贴图绑到渲染器上 (两个参数都是不透明句柄) */
+bool bongo_cat_live2d_vulkan_bind_texture(void *renderer, void *texture);
+
 /* 离屏结果 (纹理与尺寸), 供合成到宠物窗口时使用 */
 bool bongo_cat_live2d_vulkan_target_info(void **image, void **view, void **sampler,
     int *width, int *height);
