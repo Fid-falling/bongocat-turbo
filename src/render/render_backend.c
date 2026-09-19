@@ -48,7 +48,13 @@ const char *bongo_cat_renderer_unavailable_reason(BongoCatRenderer value) {
 #elif defined(BONGO_CAT_HAS_CUBISM)
         /* Cubism 模型的渲染器仍然是 OpenGL 实现, 在它移植完成之前, 让带
            Cubism 的构建明确地留在 OpenGL 上, 而不是画出一个没有模型的窗口。 */
-        return "Vulkan 后端尚未支持 Cubism 模型渲染, 请使用 OpenGL";
+        /*
+         * 带 Cubism 的构建现在也能用 Vulkan: Live2D 走 SDK 自带的
+         * CubismRenderer_Vulkan, 先渲染到离屏纹理, 再由 Vulkan 后端的合成
+         * 路径画进宠物窗口 (src/live2d/cubism_vulkan_bridge.cpp)。
+         * 返回 NULL = 没有不可用原因, 即允许选择这个后端。
+         */
+        return NULL;
 #else
         {
             BongoCatError probe = {0};

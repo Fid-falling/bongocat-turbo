@@ -220,12 +220,38 @@ bool bongo_cat_vk_create_device(BongoCatVk *vk, BongoCatError *error) {
     queue.queueFamilyIndex = best_family;
     queue.queueCount = 1;
     queue.pQueuePriorities = &priority;
-    const char *extensions[] = {VK_KHR_SWAPCHAIN_EXTENSION_NAME};
+    /*
+     * Cubism 自带的 Vulkan 渲染器需要这些设备特性 (校验层点名):
+     *   - VK_EXT_extended_dynamic_state: 管线用 VK_DYNAMIC_STATE_CULL_MODE 等
+     *   - dynamicRendering (1.3): 它的图形管线 pNext/ renderPass = NULL
+     *   - samplerAnisotropy: 它的采样器 anisotropyEnable = VK_TRUE
+     * 不启用的话建出来的管线/采样器都是无效对象, 绘制时直接崩。
+     * 全部按设备实际支持情况启用, 不支持就保持关闭, 不影响我们自己的后端。
+     */
+    const bool extended_dynamic_state =
+        device_extension_supported(vk->physical, "VK_EXT_extended_dynamic_state");
+    const char *extensions[2] = {VK_KHR_SWAPCHAIN_EXTENSION_NAME, NULL};
+    uint32_t extension_count = 1;
+    if (extended_dynamic_state)
+        extensions[extension_count++] = "VK_EXT_extended_dynamic_state";
+    VkPhysicalDeviceExtendedDynamicStateFeaturesEXT extended = {0};
+    extended.sType =
+        VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_EXTENDED_DYNAMIC_STATE_FEATURES_EXT;
+    VkPhysicalDeviceVulkan13Features features13 = {0};
+    features13.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_3_FEATURES;
+    features13.pNext = extended_dynamic_state ? &extended : NULL;
+    VkPhysicalDeviceFeatures2 features = {0};
+    features.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2;
+    features.pNext = &features13;
+    vkGetPhysicalDeviceFeatures2(vk->physical, &features);
+    if (properties.apiVersion < VK_API_VERSION_1_3) features13.dynamicRendering = VK_FALSE;
+    if (!extended_dynamic_state) extended.extendedDynamicState = VK_FALSE;
     VkDeviceCreateInfo create = {0};
     create.sType = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO;
+    create.pNext = &features;
     create.queueCreateInfoCount = 1;
     create.pQueueCreateInfos = &queue;
-    create.enabledExtensionCount = 1;
+    create.enabledExtensionCount = extension_count;
     create.ppEnabledExtensionNames = extensions;
     VkResult result = vkCreateDevice(vk->physical, &create, NULL, &vk->device);
     if (result != VK_SUCCESS) {
