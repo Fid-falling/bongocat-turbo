@@ -1,7 +1,7 @@
 #include "dial_internal.h"
 #include <stdlib.h>
 
-static void vertex(Dial *d, GLuint texture, float x, float y, float u, float v,
+static void vertex(Dial *d, unsigned int texture, float x, float y, float u, float v,
     uint32_t color) {
     DialPaint *p = &d->paint;
     if (p->failed) return;
@@ -32,7 +32,7 @@ void dial_triangle(Dial *d, DialPoint a, DialPoint b, DialPoint c,
     vertex(d,d->paint.white,c.x,c.y,0,0,cc);
 }
 
-void dial_quad(Dial *d, GLuint texture, float x, float y, float w, float h,
+void dial_quad(Dial *d, unsigned int texture, float x, float y, float w, float h,
     float u0, float v0, float u1, float v1, uint32_t color) {
     vertex(d,texture,x,y,u0,v0,color);
     vertex(d,texture,x+w,y,u1,v0,color);

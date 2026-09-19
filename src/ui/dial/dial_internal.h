@@ -29,8 +29,9 @@ typedef struct DialItem {
     size_t children;
 } DialItem;
 typedef struct DialVertex { float x, y, u, v; uint8_t r, g, b, a; } DialVertex;
-typedef struct DialBatch { GLuint texture; int first, count; } DialBatch;
-typedef struct DialCover { GLuint texture; float width, height; bool attempted; } DialCover;
+/* 纹理句柄与后端无关: GL 下是 GL 纹理名, Vulkan 下是界面纹理表的 id */
+typedef struct DialBatch { unsigned int texture; int first, count; } DialBatch;
+typedef struct DialCover { unsigned int texture; float width, height; bool attempted; } DialCover;
 typedef struct DialPaint {
     BongoCatGL gl;
     GLuint program, vao, vbo, white, font_texture;
@@ -92,7 +93,7 @@ bool dial_paint_frame(Dial *d);
 void dial_scene(Dial *d);
 void dial_triangle(Dial *d, DialPoint a, DialPoint b, DialPoint c,
     uint32_t ca, uint32_t cb, uint32_t cc);
-void dial_quad(Dial *d, GLuint texture, float x, float y, float w, float h,
+void dial_quad(Dial *d, unsigned int texture, float x, float y, float w, float h,
     float u0, float v0, float u1, float v1, uint32_t color);
 void dial_stroke(Dial *d, const DialPoint *points, int count, float width,
     uint32_t color, bool smooth);
