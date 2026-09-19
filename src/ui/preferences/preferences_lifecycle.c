@@ -53,8 +53,15 @@ static void release_window(BongoCatPreferences *value) {
     value->raster_retry_ns = 0;
     value->render_retry_ns = 0;
     value->shown_ns = 0;
-    SDL_GL_MakeCurrent(value->app->window, value->app->gl_context);
-    SDL_GL_SetSwapInterval(1);
+    /*
+     * 只有 GL 窗口才碰 GL: 主窗口是 Vulkan 时 app->gl_context 为 NULL, 这里的
+     * SDL_GL_SetSwapInterval 会进 nvoglv64.dll 崩掉 (与 preferences_scale.c 里
+     * 那处同一类问题)。
+     */
+    if (!value->prefer_vulkan) {
+        SDL_GL_MakeCurrent(value->app->window, value->app->gl_context);
+        SDL_GL_SetSwapInterval(1);
+    }
 }
 
 void bongo_cat_preferences_show(BongoCatPreferences *value) {
