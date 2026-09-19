@@ -102,7 +102,7 @@ void dial_vk_texture_release(Dial *d, unsigned int id) {
     if (!d || id == 0 || id > 8) return;
     struct BongoCatVkTexture *texture = d->paint.vk_textures[id - 1];
     d->paint.vk_textures[id - 1] = NULL;
-    if (texture && d->paint.vk) bongo_cat_vk_texture_destroy(d->paint.vk, texture);
+    if (texture && d->vk) bongo_cat_vk_texture_destroy(d->vk, texture);
 }
 
 void dial_paint_free(Dial *d) {
