@@ -1,4 +1,5 @@
 #include "dial_internal.h"
+#include "bongo_cat/vk_backend.h"
 #include "bongo_cat/image.h"
 #include "bongo_cat/path.h"
 
@@ -17,7 +18,22 @@ void dial_covers_tick(Dial *d) {
             int width = 0, height = 0;
             BongoCatError ignored = {0};
             int pixels = (int)fminf(160,ceilf(44*d->scale*d->raster_scale*1.25f));
-            cover->texture = bongo_cat_image_texture_thumbnail(path,pixels,pixels,&width,&height,&ignored);
+            if (d->vk) {
+            /* Vulkan 菜单: 用后端纹理接口创建封面并登记到纹理表 */
+            BongoCatImage image = {0};
+            if (bongo_cat_image_fit(path, pixels, pixels, &image, &ignored) ==
+                    BONGO_CAT_OK && image.pixels) {
+                width = image.width;
+                height = image.height;
+                BongoCatVkTexture *texture = bongo_cat_vk_texture_from_pixels(d->vk,
+                    image.pixels, image.width, image.height, path, &ignored);
+                bongo_cat_image_free(&image);
+                cover->texture = texture
+                    ? (unsigned int)dial_vk_texture_register(d, texture) : 0;
+            }
+        } else {
+        cover->texture = bongo_cat_image_texture_thumbnail(path,pixels,pixels,&width,&height,&ignored);
+        }
             if (cover->texture && width > 0 && height > 0) {
                 float fit = fminf(44.0f/(float)width,40.0f/(float)height);
                 cover->width = (float)width*fit; cover->height = (float)height*fit;
