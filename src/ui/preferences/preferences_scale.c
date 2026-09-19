@@ -90,7 +90,11 @@ static void discard_window(BongoCatPreferences *value) {
     if (value->window) SDL_DestroyWindow(value->window);
     value->window = NULL;
     value->transparent_window = false;
-    SDL_GL_MakeCurrent(value->app->window, value->app->gl_context);
+    if (!value->prefer_vulkan)
+        if (!value->prefer_vulkan)
+        if (!value->prefer_vulkan)
+        if (!value->prefer_vulkan)
+        SDL_GL_MakeCurrent(value->app->window, value->app->gl_context);
 }
 
 static bool create_window(BongoCatPreferences *value, int width, int height,

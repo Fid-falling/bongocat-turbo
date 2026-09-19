@@ -105,7 +105,8 @@ static LRESULT CALLBACK live_resize_proc(HWND window, UINT message,
         render_live(value);
         pump_pet(value);
         value->live_resize_modal_ready = false;
-        if (SDL_GL_MakeCurrent(value->window, value->gl_context)) {
+        if (!bongo_cat_ui_uses_vulkan(&value->ui) &&
+        SDL_GL_MakeCurrent(value->window, value->gl_context)) {
             bongo_cat_ui_resize_cache_destroy(&value->ui);
             SDL_GL_MakeCurrent(value->app->window, value->app->gl_context);
         }
