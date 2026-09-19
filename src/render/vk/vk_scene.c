@@ -69,14 +69,6 @@ bool bongo_cat_vk_render_main(BongoCatApp *app, bool present) {
      * Live2D 先画到它自己的离屏目标: SDK 的 Vulkan 渲染器会自行提交命令并
      * 等待完成, 所以必须在开始录制本帧之前做, 不能和我们的命令缓冲交错。
      */
-    /*
-     * 桥必须在这里挂载, 不能在窗口创建阶段: SDK 的 csmMap 用全局分配器,
-     * 而那个分配器是 CubismFramework::StartUp 里设置的; 早于它调用
-     * GetDeviceInfo 会在容器插入时崩 (已用 cdb + map 定位到
-     * csmMap<...>::AppendKey)。attach 是幂等的。
-     */
-    if (!bongo_cat_live2d_vulkan_ready())
-        bongo_cat_live2d_vulkan_attach(app->vk, width, height);
     if (bongo_cat_live2d_vulkan_ready()) {
         bongo_cat_live2d_set_mirror(app->live2d, app->settings.model.mirror);
         bongo_cat_live2d_draw(app->live2d);

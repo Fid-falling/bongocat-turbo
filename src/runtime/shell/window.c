@@ -45,10 +45,18 @@ static bool try_vulkan_window(BongoCatApp *app, BongoCatError *error) {
     }
     BongoCatVkInfo info = {0};
     /*
-     * Live2D 的 Vulkan 桥不在这里挂载: SDK 的设备表用的是全局分配器, 要等
-     * CubismFramework::StartUp 之后才能用。这里只记下后端, 真正挂载放到渲染
-     * 阶段 (见 src/render/vk/vk_scene.c)。
+     * 只记下后端与尺寸并打开渲染器工厂开关 —— 不调用任何 SDK 函数, 因为 SDK 的
+     * csmMap 依赖 CubismFramework::StartUp 设置的全局分配器, 早于它调用会崩。
+     * 真正的挂载由模型在创建渲染器时完成 (那时框架已经启动)。
      */
+    {
+        BongoCatVkInfo remember_info = {0};
+        if (bongo_cat_vk_info(app->vk, &remember_info) &&
+            !bongo_cat_live2d_vulkan_remember(app->vk, remember_info.width,
+                remember_info.height))
+            SDL_LogWarn(SDL_LOG_CATEGORY_VIDEO,
+                "[vulkan] Live2D 的 Vulkan 渲染器未登记, Live2D 将回退 OpenGL");
+    }
 
     if (bongo_cat_vk_info(app->vk, &info))
         SDL_Log("[runtime] Vulkan 窗口就绪 (transparent=%d, device=%s, driver=%s, "

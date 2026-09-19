@@ -138,6 +138,9 @@ bool NativeModel::create_renderer(BongoCatError *error) {
      */
 #ifdef BONGO_CAT_HAS_VULKAN
     if (bongo_cat_cubism_renderer_uses_vulkan()) {
+        /* 框架已经启动, 现在才能安全地让 SDK 建它的设备表 */
+        if (!bongo_cat_live2d_vulkan_ready())
+            bongo_cat_live2d_vulkan_attach(NULL, 0, 0);
         if (!bongo_cat_live2d_vulkan_ready()) {
             bongo_cat_error_set(error, BONGO_CAT_ERROR_PLATFORM,
                 "Live2D Vulkan renderer is not attached");

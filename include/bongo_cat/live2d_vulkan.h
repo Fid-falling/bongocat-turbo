@@ -24,6 +24,12 @@ struct BongoCatVk;
  * 所有函数在下面这些情况下都必须能安全失败 (返回 false), 让上层回退 OpenGL:
  * 没有编译 Vulkan 后端、没有编译 Cubism、设备没就绪。
  */
+/*
+ * 窗口创建时调用: 只记住后端指针与尺寸并打开渲染器工厂开关, 不碰任何 SDK 函数
+ * (SDK 的 csmMap 依赖 CubismFramework::StartUp 设置的全局分配器)。
+ * 真正的挂载 attach() 推迟到模型创建渲染器时, 那时框架已经启动。
+ */
+bool bongo_cat_live2d_vulkan_remember(struct BongoCatVk *vk, int width, int height);
 bool bongo_cat_live2d_vulkan_attach(struct BongoCatVk *vk, int width, int height);
 bool bongo_cat_live2d_vulkan_ready(void);
 bool bongo_cat_live2d_vulkan_begin_frame(void);

@@ -12,6 +12,7 @@
 #include "bongo_cat/live2d_vulkan.h"
 
 #include "bongo_cat/vk_backend.h"
+#include "cubism_renderer_select.hpp"
 
 #include <SDL3/SDL.h>
 #include <filesystem>
@@ -27,6 +28,10 @@ namespace {
 
 bool g_attached = false;
 BongoCatVk *g_vk = nullptr;
+/* remember() 记下的待挂载信息 */
+BongoCatVk *g_pending_vk = nullptr;
+int g_pending_width = 0;
+int g_pending_height = 0;
 Csm::Rendering::CubismRenderTarget_Vulkan *g_target = nullptr;
 VkDevice g_device = VK_NULL_HANDLE;
 VkFormat g_format = VK_FORMAT_UNDEFINED;
@@ -36,8 +41,20 @@ const VkFormat kDepthFormat = VK_FORMAT_D24_UNORM_S8_UINT;
 
 } // namespace
 
+bool bongo_cat_live2d_vulkan_remember(struct BongoCatVk *vk, int width, int height) {
+    if (!vk || width <= 0 || height <= 0) return false;
+    g_pending_vk = vk;
+    g_pending_width = width;
+    g_pending_height = height;
+    /* 只切工厂开关: 这一步不调用任何 SDK 函数, 可以在框架启动前做 */
+    bongo_cat::bongo_cat_cubism_renderer_use_vulkan(true);
+    return true;
+}
+
 bool bongo_cat_live2d_vulkan_attach(struct BongoCatVk *vk, int width, int height) {
     if (g_attached) return true;
+    /* 模型侧调用时可以不带参数, 用 remember() 记下的值 */
+    if (!vk) { vk = g_pending_vk; width = g_pending_width; height = g_pending_height; }
     if (!vk || width <= 0 || height <= 0) return false;
     BongoCatVkNativeInfo info = {0};
     if (!bongo_cat_vk_native_info(vk, &info)) {
