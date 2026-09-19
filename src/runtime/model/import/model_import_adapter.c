@@ -96,9 +96,26 @@ bool bongo_cat_import_prepare_adapter(const BongoCatImportCandidate *candidate,
     const char *target, BongoCatError *error) {
     if (!candidate || !target || (!bongo_cat_path_is_dir(target) &&
         !bongo_cat_path_create_directory(target))) return false;
-    return copy_preview(candidate, target, error) &&
-        bongo_cat_import_mver_assets(candidate, target, error) &&
-        bongo_cat_import_adapter_metadata(candidate, target, error) &&
-        bongo_cat_import_write_report(candidate, target, error) &&
-        write_mode(target, candidate->mode, error);
+    /* 每一步单独判断, 失败时把步骤名写进日志 —— 否则只会看到一句
+       "import failed", 无法定位是预览图、素材转换还是元数据出错。 */
+    struct { const char *name; bool (*run)(const BongoCatImportCandidate *,
+        const char *, BongoCatError *); } steps[] = {
+        {"preview", copy_preview},
+        {"mver-assets", bongo_cat_import_mver_assets},
+        {"metadata", bongo_cat_import_adapter_metadata},
+        {"report", bongo_cat_import_write_report}
+    };
+    for (size_t i = 0; i < sizeof(steps) / sizeof(steps[0]); ++i) {
+        if (steps[i].run(candidate, target, error)) continue;
+        SDL_LogWarn(SDL_LOG_CATEGORY_APPLICATION,
+            "Model import adapter step '%s' failed: %s (source=%s)",
+            steps[i].name, error && error->message[0] ? error->message : "unknown",
+            candidate->assets);
+        return false;
+    }
+    if (write_mode(target, candidate->mode, error)) return true;
+    SDL_LogWarn(SDL_LOG_CATEGORY_APPLICATION,
+        "Model import adapter step 'mode' failed: %s",
+        error && error->message[0] ? error->message : "unknown");
+    return false;
 }

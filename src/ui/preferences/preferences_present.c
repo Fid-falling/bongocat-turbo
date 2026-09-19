@@ -52,13 +52,16 @@ void bongo_cat_preferences_render(BongoCatPreferences *value) {
     bongo_cat_preferences_apply_theme(value);
     float width = 0.0f, height = 0.0f;
     bongo_cat_ui_logical_size(&value->ui, &width, &height);
+    SDL_LogWarn(SDL_LOG_CATEGORY_VIDEO, "[prefs] stage=enter-render");
     bongo_cat_ui_paint_begin_frame(&value->ui);
+    SDL_LogWarn(SDL_LOG_CATEGORY_VIDEO, "[prefs] stage=paint-begin-done");
     bongo_cat_ui_cursor_begin(&value->ui);
     bool dark = bongo_cat_preferences_resolved_theme(value) != 0;
     value->ui.frame_building = true;
     bool close_requested = bongo_cat_preferences_draw_frame(
         value, width, height, dark);
     value->ui.frame_building = false;
+    SDL_LogWarn(SDL_LOG_CATEGORY_VIDEO, "[prefs] stage=drawn");
     bongo_cat_preferences_shortcut_smoke(value);
     BongoCatUIPalette palette = bongo_cat_ui_palette(dark);
     if (vulkan) {
@@ -86,7 +89,9 @@ void bongo_cat_preferences_render(BongoCatPreferences *value) {
             value->transparent_window ? 0.0f : 1.0f);
         glClear(GL_COLOR_BUFFER_BIT);
     }
+    SDL_LogWarn(SDL_LOG_CATEGORY_VIDEO, "[prefs] stage=vk-begun");
     bongo_cat_ui_render(&value->ui);
+    SDL_LogWarn(SDL_LOG_CATEGORY_VIDEO, "[prefs] stage=ui-rendered");
     bongo_cat_preferences_smoke_frame(value);
     bool presented = true;
     if (vulkan) {

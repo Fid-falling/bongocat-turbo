@@ -41,8 +41,15 @@ static bool add_stat(yyjson_mut_doc *output, yyjson_mut_val *stats,
     const char *key, const char *directory, bool sound) {
     yyjson_val *rows = yyjson_obj_get(mode, key);
     if (!rows) return true;
-    if (!yyjson_is_arr(rows)) return false;
-    size_t declared = yyjson_arr_size(rows), available = 0;
+    /*
+     * Mver 配置用 null (或其它非数组值) 表示"这个模式没有这类素材", 例如没有
+     * 手部贴图的模型。这不是格式错误: 记 0 个素材即可, 与
+     * bongo_cat_import_mver_assets 里对 null 的宽松处理保持一致。以前这里直接
+     * 返回 false, 会让整个 adapter 生成失败, 结果是导入的模型没有预览图、
+     * 也渲染不出来。
+     */
+    size_t declared = yyjson_is_arr(rows) ? yyjson_arr_size(rows) : 0;
+    size_t available = 0;
     for (size_t i = 0; i < declared; ++i)
         if (sound ? source_sound(candidate, i) : source_asset(candidate, directory, i))
             available++;
