@@ -91,7 +91,29 @@ Cubism 构建里 `overlay.left/right/effect` 一直是裸 `GLuint`（GL 上传�
 实测：Vulkan 下右键宠物窗口，菜单正常打开并绘制 12 个扇区与彩色图标；
 与 OpenGL 的稳定帧逐格对比，菜单区域差异 ≤0.8%（其余差异来自宠物动画与任务栏时钟）。
 
-## 六、已知遗留
+## 六、"无限"帧率：垂直同步被无条件打开
+
+界面里的最大帧率是 30 / 60 / 无限（`BONGO_CAT_MAX_FPS_UNLIMITED = 0`），但两个后端
+都无条件开着垂直同步：
+
+- Vulkan 的交换链固定用 `VK_PRESENT_MODE_FIFO_KHR`（`vk_swapchain.c` 里那句
+  "支持 FIFO 就用 FIFO" 的循环永远走同一分支）→ 帧率被锁在显示器刷新率上，
+  100 Hz 屏就是 100 FPS；
+- OpenGL 在窗口创建时固定 `SDL_GL_SetSwapInterval(1)`。
+
+帧节奏本来就由 `frame_clock.c` 的 `frame_interval_ns()` 决定，呈现侧只需如实反映
+设置。现在由 `bongo_cat_app_apply_frame_pacing()` 统一下发：无限 → 关同步，
+30/60 → 保持开启；值变化时 Vulkan 重建交换链（呈现模式是创建时定下的）。
+
+实测（内置 `standard` 模型，统计 10 秒窗口内的帧数）：
+
+| 后端 | 最大帧率 | 修前 | 修后 |
+|---|---|---|---|
+| Vulkan | 无限 | 锁在刷新率 | 5927 / 10000 ms ≈ 593 FPS |
+| Vulkan | 60 | ~60 | ~62（保持同步，`present_mode=2`） |
+| OpenGL | 无限 | 锁在刷新率 | 7402 / 10000 ms ≈ 740 FPS |
+
+## 七、已知遗留
 
 | 项 | 状态 |
 |---|---|
@@ -99,7 +121,7 @@ Cubism 构建里 `overlay.left/right/effect` 一直是裸 `GLuint`（GL 上传�
 | 封面截取 / 整帧回读 | 仍走 GL；配方见 `docs/vulkan-readback-recipe.md` |
 | `live2d-visual-audit` 的 `edge_pixels` | 该列用 `glReadPixels`，Vulkan 下读到的是未初始化数据；几何列可信，`edge_pixels` 列在 Vulkan 下不可用 |
 
-## 七、当前可用性总览
+## 八、当前可用性总览
 
 | 维度 | 状态 |
 |---|---|
