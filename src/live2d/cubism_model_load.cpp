@@ -277,6 +277,15 @@ bool NativeModel::load_textures(BongoCatError *error,
                 release_textures();
                 return false;
             }
+            /*
+             * 贴图的 alpha 掩码必须在这里生成: 它是纯 CPU 数据, 但后面
+             * prepare_expression_frame 要靠它剔除全透明的三角形来算"可见包络",
+             * 包络又决定窗口的 frame 内边距 —— 少了它, 透明画布会被当成可见内容,
+             * 窗口按错误的尺寸开出来, 模型看起来就没跟着缩放走。
+             * GL 分支由 bongo_cat_image_texture_model 顺手填好, Vulkan 分支
+             * 之前一直是空的。
+             */
+            bongo_cat_image_make_alpha_mask(&image, &texture_alpha_[(size_t)i]);
             vulkan_textures_[(size_t)i] = bongo_cat_live2d_vulkan_create_texture_attached(
                 image.pixels, image.width, image.height);
             bongo_cat_image_free(&image);
