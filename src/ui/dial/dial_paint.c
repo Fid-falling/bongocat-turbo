@@ -29,10 +29,10 @@ bool dial_paint_init(Dial *d) {
          * 白点纹理走后端接口创建并登记到纹理表 (id 存进 p->white, 与句柄约定一致)。
          */
         const unsigned char white_pixel[4] = {255, 255, 255, 255};
-        BongoCatError error = {0};
+        BongoCatError dial_error = {0};
         p->white = (GLuint)dial_vk_texture_register(d,
             bongo_cat_vk_texture_from_pixels(d->vk, white_pixel, 1, 1,
-                "dial-white", &error));
+                "dial-white", &dial_error));
     } else {
     p->gl.gen_vertex_arrays(1,&p->vao);
     p->gl.gen_buffers(1,&p->vbo);
