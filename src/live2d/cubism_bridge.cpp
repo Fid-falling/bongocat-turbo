@@ -1,4 +1,5 @@
 #include "bongo_cat/file.h"
+#include "bongo_cat/render.h"
 #include "bongo_cat/model.h"
 #if defined(CSM_TARGET_WIN_GL) || defined(CSM_TARGET_LINUX_GL) || defined(CSM_TARGET_MAC_GL)
 #include <GL/glew.h>
@@ -77,6 +78,14 @@ void release_file(Csm::csmByte *bytes) { std::free(bytes); }
 bool start_framework(BongoCatError *error) {
     if (runtime_count++) return true;
 #if defined(CSM_TARGET_WIN_GL) || defined(CSM_TARGET_LINUX_GL) || defined(CSM_TARGET_MAC_GL)
+    /*
+     * Vulkan 后端下没有 OpenGL 上下文: glewInit 必然失败, 而这条路径根本不会用到
+     * GL。所以先看当前后端, 选中 Vulkan 时跳过整段 GL 初始化与函数检查, 直接进入
+     * CubismFramework::StartUp。
+     */
+    const bool vulkan_backend =
+        bongo_cat_renderer_active() == BONGO_CAT_RENDERER_VULKAN;
+    if (!vulkan_backend) {
     glewExperimental = GL_TRUE;
     GLenum glew_result = glewInit();
     glGetError();
@@ -96,6 +105,7 @@ bool start_framework(BongoCatError *error) {
             "Required OpenGL 3.3 functions are unavailable");
         return false;
     }
+    } /* !vulkan_backend */
 #endif
     framework_option = CubismFramework::Option{};
     framework_option.LogFunction = log_message;
