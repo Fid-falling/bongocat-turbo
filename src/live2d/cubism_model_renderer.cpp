@@ -2,6 +2,7 @@
 #include "bongo_cat/gl_api.h"
 
 #include <SDL3/SDL_video.h>
+#include <SDL3/SDL_log.h>
 #include <algorithm>
 #include <cstdint>
 #include <utility>
@@ -132,6 +133,10 @@ void NativeModel::update_mask_buffers() {
 }
 
 bool NativeModel::create_renderer(BongoCatError *error) {
+    SDL_LogWarn(SDL_LOG_CATEGORY_VIDEO,
+        "[live2d/vk] create_renderer: uses_vulkan=%d bridge_ready=%d",
+        (int)bongo_cat_cubism_renderer_uses_vulkan(),
+        (int)bongo_cat_live2d_vulkan_ready());
     /*
      * Vulkan: 设备与离屏目标由桥在窗口创建时准备好 (attach), 这里只确认它就绪;
      * GL 那一套 context / 错误检查 / 遮罩尺寸查询全部跳过。

@@ -69,10 +69,13 @@ bool bongo_cat_vk_render_main(BongoCatApp *app, bool present) {
      * Live2D 先画到它自己的离屏目标: SDK 的 Vulkan 渲染器会自行提交命令并
      * 等待完成, 所以必须在开始录制本帧之前做, 不能和我们的命令缓冲交错。
      */
-    if (bongo_cat_live2d_vulkan_ready()) {
-        bongo_cat_live2d_set_mirror(app->live2d, app->settings.model.mirror);
-        bongo_cat_live2d_draw(app->live2d);
-    }
+    /*
+     * 这里必须无条件画一次: 模型的渲染器是惰性创建的 (GL 时代是因为需要当前
+     * 上下文), 由这次 draw 触发。之前用 bongo_cat_live2d_vulkan_ready() 把它
+     * 挡住, 就变成"不 ready 不画, 不画永远不 ready"的死锁 —— 桥也就永远挂不上。
+     */
+    bongo_cat_live2d_set_mirror(app->live2d, app->settings.model.mirror);
+    bongo_cat_live2d_draw(app->live2d);
     if (!bongo_cat_vk_begin_frame(app->vk, width, height)) {
         app->dirty = true;
         app->render_retry_ns = now + 1000000000ull;

@@ -254,6 +254,14 @@ bool NativeModel::load_textures(BongoCatError *error,
     release_textures();
     int count = setting_->GetTextureCount();
     textures_.assign((size_t)count, 0);
+    /*
+     * 必须在创建贴图之前挂载: Vulkan 分支的贴图上传要用后端句柄, 而挂载本身
+     * 依赖 CubismFramework 已启动 (这里已满足 —— 模型加载发生在框架启动之后)。
+     * 之前把挂载放在 create_renderer 里, 比贴图创建晚, 于是贴图失败、整个模型
+     * 加载失败、渲染器永远不会被创建。
+     */
+    if (bongo_cat_cubism_renderer_uses_vulkan() && !bongo_cat_live2d_vulkan_ready())
+        bongo_cat_live2d_vulkan_attach(NULL, 0, 0);
     vulkan_textures_.assign((size_t)count, nullptr);
     texture_alpha_.assign((size_t)count, {});
     TextureProgressContext texture_context = {progress, userdata, .50f,

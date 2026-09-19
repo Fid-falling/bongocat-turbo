@@ -48,6 +48,9 @@ bool bongo_cat_live2d_vulkan_remember(struct BongoCatVk *vk, int width, int heig
     g_pending_height = height;
     /* 只切工厂开关: 这一步不调用任何 SDK 函数, 可以在框架启动前做 */
     bongo_cat::bongo_cat_cubism_renderer_use_vulkan(true);
+    SDL_LogWarn(SDL_LOG_CATEGORY_VIDEO,
+        "[live2d/vk] remember: vk=%p %dx%d (工厂开关已打开)",
+        (void *)vk, width, height);
     return true;
 }
 
