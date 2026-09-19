@@ -53,7 +53,13 @@ typedef struct DialPaint {
 } DialPaint;
 typedef struct Dial {
     SDL_Window *window, *owner;
-    SDL_GLContext context, previous_context;
+    SDL_GLContext context, previous_context;
+    /*
+     * 菜单窗口自己的 Vulkan 上下文 (renderer=vulkan 时非空, 否则为 NULL 走 GL)。
+     * 用前置声明避免这个头文件依赖 vk_backend.h。
+     * 施工图: docs/vulkan-dial-port-recipe.md
+     */
+    struct BongoCatVk *vk;
     SDL_Window *previous_window;
     SDL_WindowID window_id;
     const BongoCatMenuLabels *labels;
