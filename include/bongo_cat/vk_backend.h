@@ -109,6 +109,25 @@ bool bongo_cat_vk_ui_draw(BongoCatVk *vk, BongoCatVkTexture *texture,
 int bongo_cat_vk_max_texture_dimension(const BongoCatVk *vk);
 
 /*
+ * 把 Vulkan 的原始句柄交给别的渲染器 (目前是 Cubism 的 Live2D 渲染器)。
+ * 字段都是不透明的 void* / 整数: 这个头文件是 C 的, 调用方 (C++) 自行转成
+ * VkDevice / VkPhysicalDevice / VkCommandPool / VkQueue / VkFormat 等。
+ * 返回 false 表示后端没就绪, 调用方应当回退 OpenGL。
+ */
+typedef struct BongoCatVkNativeInfo {
+    void *device;
+    void *physical_device;
+    void *command_pool;
+    void *queue;
+    int width;
+    int height;
+    int image_format;   /* VkFormat */
+    int image_count;    /* 交换链图像数 */
+} BongoCatVkNativeInfo;
+
+bool bongo_cat_vk_native_info(const BongoCatVk *vk, BongoCatVkNativeInfo *info);
+
+/*
  * 命中测试回读。请求发生在帧内 (end_frame 之前), 拷贝与主机映射在下一次使用
  * 同一个帧槽时完成, 所以结果有一帧延迟 —— 与 OpenGL 路径读前/后台缓冲的时序
  * 相当, 远快于命中测试的调度间隔 (100 ms)。

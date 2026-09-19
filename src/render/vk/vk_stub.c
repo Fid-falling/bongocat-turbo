@@ -147,4 +147,10 @@ int bongo_cat_vk_max_texture_dimension(const BongoCatVk *vk) {
     return 0;
 }
 
+bool bongo_cat_vk_native_info(const BongoCatVk *vk, BongoCatVkNativeInfo *info) {
+    (void)vk;
+    (void)info;
+    return false;
+}
+
 #endif /* !BONGO_CAT_HAS_VULKAN */

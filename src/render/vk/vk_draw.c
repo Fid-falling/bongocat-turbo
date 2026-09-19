@@ -338,4 +338,18 @@ int bongo_cat_vk_max_texture_dimension(const BongoCatVk *vk) {
     return (int)properties.limits.maxImageDimension2D;
 }
 
+bool bongo_cat_vk_native_info(const BongoCatVk *vk, BongoCatVkNativeInfo *info) {
+    if (!vk || !info || vk->device == VK_NULL_HANDLE) return false;
+    memset(info, 0, sizeof(*info));
+    info->device = (void *)vk->device;
+    info->physical_device = (void *)vk->physical;
+    info->command_pool = (void *)vk->command_pool;
+    info->queue = (void *)vk->queue;
+    info->width = (int)vk->extent.width;
+    info->height = (int)vk->extent.height;
+    info->image_format = (int)vk->format;
+    info->image_count = (int)vk->image_count;
+    return true;
+}
+
 #endif /* BONGO_CAT_HAS_VULKAN */
