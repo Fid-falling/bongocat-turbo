@@ -177,6 +177,7 @@ void bongo_cat_vk_destroy_swapchain(BongoCatVk *vk);
 
 /* vk_frame.c */
 bool bongo_cat_vk_create_frame_sync(BongoCatVk *vk, BongoCatError *error);
+bool bongo_cat_vk_reset_frame_semaphores(BongoCatVk *vk);
 void bongo_cat_vk_destroy_frame_sync(BongoCatVk *vk);
 
 /* vk_texture.c */

@@ -291,6 +291,8 @@ bool bongo_cat_vk_create_swapchain(BongoCatVk *vk, int width, int height,
 bool bongo_cat_vk_recreate_swapchain(BongoCatVk *vk, int width, int height) {
     if (!vk || vk->device == VK_NULL_HANDLE || vk->surface == VK_NULL_HANDLE) return false;
     vkDeviceWaitIdle(vk->device);
+    /* 已经等待空闲, 顺手把各帧的获取信号量重建掉, 避免复用未消费的信号量 */
+    if (!bongo_cat_vk_reset_frame_semaphores(vk)) return false;
     bongo_cat_vk_destroy_swapchain(vk);
     BongoCatError error = {0};
     if (!bongo_cat_vk_create_swapchain(vk, width, height, &error)) {

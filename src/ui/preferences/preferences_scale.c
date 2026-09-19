@@ -108,12 +108,12 @@ static bool create_window(BongoCatPreferences *value, int width, int height,
 }
 
 bool bongo_cat_preferences_open_window(BongoCatPreferences *value) {
-    /* renderer=vulkan 时设置窗口也走 Vulkan; 建不起来就退回 OpenGL 那一套 */
-    /* 设置窗口的 Vulkan 渲染器还没跑通 (首帧崩溃), 默认仍用 OpenGL 渲染;
-       验证时用 BONGO_CAT_PREFERENCES_VULKAN=1 打开。 */
+    /* renderer=vulkan 时设置窗口也走 Vulkan; 建不起来就退回 OpenGL 那一套。
+       默认跟随渲染后端, 万一遇到问题可以用 BONGO_CAT_PREFERENCES_OPENGL=1
+       强制这个窗口用 OpenGL。 */
     value->prefer_vulkan =
         bongo_cat_renderer_active() == BONGO_CAT_RENDERER_VULKAN &&
-        SDL_getenv("BONGO_CAT_PREFERENCES_VULKAN") != NULL;
+        SDL_getenv("BONGO_CAT_PREFERENCES_OPENGL") == NULL;
     SDL_WindowFlags backend_flag = value->prefer_vulkan ? SDL_WINDOW_VULKAN :
         SDL_WINDOW_OPENGL;
     SDL_WindowFlags flags = backend_flag | SDL_WINDOW_BORDERLESS |

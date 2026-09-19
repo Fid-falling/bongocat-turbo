@@ -50,6 +50,30 @@ bool bongo_cat_vk_create_frame_sync(BongoCatVk *vk, BongoCatError *error) {
     return true;
 }
 
+/*
+ * 重建各帧的 image_available 信号量。
+ *
+ * vkAcquireNextImageKHR 可能已经把信号量置为已触发, 但这一帧最终没有提交
+ * (例如返回 OUT_OF_DATE 或拿到的下标失效)。未消费的信号量再次传给 acquire 是
+ * 未定义行为, 驱动的表现就是偶发崩溃。调用前必须已经 vkDeviceWaitIdle。
+ */
+bool bongo_cat_vk_reset_frame_semaphores(BongoCatVk *vk) {
+    if (!vk || vk->device == VK_NULL_HANDLE) return false;
+    VkSemaphoreCreateInfo semaphore = {0};
+    semaphore.sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO;
+    for (uint32_t i = 0; i < BONGO_CAT_VK_FRAMES_IN_FLIGHT; ++i) {
+        BongoCatVkFrame *frame = &vk->frames[i];
+        if (frame->image_available != VK_NULL_HANDLE)
+            vkDestroySemaphore(vk->device, frame->image_available, NULL);
+        frame->image_available = VK_NULL_HANDLE;
+        if (vkCreateSemaphore(vk->device, &semaphore, NULL,
+                &frame->image_available) != VK_SUCCESS) return false;
+    }
+    /* 所有帧都空闲了, 从第一个帧槽重新开始 */
+    vk->frame_index = 0;
+    return true;
+}
+
 void bongo_cat_vk_destroy_frame_sync(BongoCatVk *vk) {
     if (!vk || vk->device == VK_NULL_HANDLE) return;
     for (uint32_t i = 0; i < BONGO_CAT_VK_FRAMES_IN_FLIGHT; ++i) {
@@ -181,16 +205,23 @@ bool bongo_cat_vk_begin_frame(BongoCatVk *vk, int width, int height) {
     VkResult acquired = vkAcquireNextImageKHR(vk->device, vk->swapchain, UINT64_MAX,
         frame->image_available, VK_NULL_HANDLE, &index);
     if (acquired == VK_ERROR_OUT_OF_DATE_KHR) {
-        if (!bongo_cat_vk_recreate_swapchain(vk, width, height)) return false;
-        acquired = vkAcquireNextImageKHR(vk->device, vk->swapchain, UINT64_MAX,
-            frame->image_available, VK_NULL_HANDLE, &index);
+        /*
+         * 尺寸/表面变了。此时 image_available 的状态是未定义的, 不能拿它继续提交,
+         * 所以重建交换链 (重建时会一并重建各帧的信号量) 并放弃这一帧。
+         */
+        bongo_cat_vk_recreate_swapchain(vk, width, height);
+        return false;
     }
     if (acquired != VK_SUCCESS && acquired != VK_SUBOPTIMAL_KHR) {
         SDL_LogError(SDL_LOG_CATEGORY_VIDEO,
             "[vulkan] 获取交换链图像失败 (VkResult=%d)", (int)acquired);
         return false;
     }
-    if (index >= vk->image_count) return false;
+    if (index >= vk->image_count) {
+        /* 刚拿到的下标不属于当前交换链: 同样重建后跳过这一帧 */
+        bongo_cat_vk_recreate_swapchain(vk, width, height);
+        return false;
+    }
     if (vkResetFences(vk->device, 1, &frame->fence) != VK_SUCCESS) return false;
     if (vkResetCommandBuffer(frame->command, 0) != VK_SUCCESS) return false;
 
