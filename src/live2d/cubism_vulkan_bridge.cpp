@@ -13,6 +13,7 @@
 
 #include "bongo_cat/vk_backend.h"
 #include "cubism_renderer_select.hpp"
+#include "live2d_vulkan_internal.h"
 
 #include <SDL3/SDL.h>
 #include <filesystem>
@@ -34,10 +35,43 @@ int g_pending_width = 0;
 int g_pending_height = 0;
 Csm::Rendering::CubismRenderTarget_Vulkan *g_target = nullptr;
 VkDevice g_device = VK_NULL_HANDLE;
+VkPhysicalDevice g_physical = VK_NULL_HANDLE;
 VkFormat g_format = VK_FORMAT_UNDEFINED;
 
 /* 24 位深度 + 模板在桌面 Vulkan 上普遍可用, SDK 的样例也用这一档 */
 const VkFormat kDepthFormat = VK_FORMAT_D24_UNORM_S8_UINT;
+
+/*
+ * 离屏目标必须跟着交换链尺寸走。
+ *
+ * 之前只在 attach 时按当时的窗口尺寸建了一次: 之后用户改"缩放"或拖动窗口,
+ * 交换链重建了, 目标却还是旧尺寸 —— SDK 按旧尺寸投影, 合成时又按新窗口尺寸
+ * 取 image/reference 比例, 结果模型既不跟着缩放放大, 还被挤到一角或被裁掉。
+ * 每帧进来比一次尺寸, 不一致就重建 (重建前等设备空, 免得还有在飞的采样)。
+ */
+bool ensure_target_size(int width, int height) {
+    if (width <= 0 || height <= 0) return false;
+    if (g_target && (int)g_target->GetBufferWidth() == width &&
+        (int)g_target->GetBufferHeight() == height) return true;
+    auto *target = CSM_NEW Csm::Rendering::CubismRenderTarget_Vulkan();
+    target->CreateRenderTarget(g_device, g_physical, (unsigned int)width,
+        (unsigned int)height, g_format, kDepthFormat);
+    if (!target->IsValid()) {
+        SDL_LogWarn(SDL_LOG_CATEGORY_VIDEO,
+            "[live2d/vk] 离屏目标重建失败 (%dx%d)", width, height);
+        CSM_DELETE(target);
+        return false;
+    }
+    if (g_target) {
+        if (g_device) vkDeviceWaitIdle(g_device);
+        g_target->DestroyRenderTarget();
+        CSM_DELETE(g_target);
+    }
+    g_target = target;
+    SDL_LogWarn(SDL_LOG_CATEGORY_VIDEO,
+        "[live2d/vk] 离屏目标跟随窗口尺寸: %dx%d", width, height);
+    return true;
+}
 
 } // namespace
 
@@ -75,6 +109,7 @@ bool bongo_cat_live2d_vulkan_attach(struct BongoCatVk *vk, int width, int height
         info.device, info.image_view, info.width, info.height, info.image_format,
         info.image_count);
     g_device = (VkDevice)info.device;
+    g_physical = (VkPhysicalDevice)info.physical_device;
     g_format = (VkFormat)info.image_format;
 
     VkExtent2D extent = {(unsigned int)width, (unsigned int)height};
@@ -149,6 +184,9 @@ bool bongo_cat_live2d_vulkan_attach(struct BongoCatVk *vk, int width, int height
     g_target = target;
     g_vk = vk;
     g_attached = true;
+    SDL_LogWarn(SDL_LOG_CATEGORY_VIDEO,
+        "[live2d/vk] attach: 完成 目标=%dx%d device=%p", width, height,
+        (void *)g_device);
     return true;
 }
 
@@ -156,60 +194,14 @@ bool bongo_cat_live2d_vulkan_ready(void) {
     return g_attached && g_target && g_target->IsValid();
 }
 
-
-/*
- * SDK 的 Vulkan 渲染器把模型画进离屏图像后, 图像停在 COLOR_ATTACHMENT_OPTIMAL;
- * 要被我们的合成着色器采样, 必须先转成 SHADER_READ_ONLY_OPTIMAL。
- * 这里用后端自己的命令池做一次单次提交, 与贴图上传同样的做法。
- */
-static void transition_target_to_sampled(const BongoCatVkNativeInfo &info,
-    VkImage image) {
-    if (!info.device || !info.command_pool || !info.queue || !image) return;
-    VkCommandBufferAllocateInfo allocate = {0};
-    allocate.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
-    allocate.commandPool = (VkCommandPool)info.command_pool;
-    allocate.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
-    allocate.commandBufferCount = 1;
-    VkCommandBuffer command = VK_NULL_HANDLE;
-    if (vkAllocateCommandBuffers((VkDevice)info.device, &allocate, &command) != VK_SUCCESS)
-        return;
-    VkCommandBufferBeginInfo begin = {0};
-    begin.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
-    begin.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
-    if (vkBeginCommandBuffer(command, &begin) != VK_SUCCESS) {
-        vkFreeCommandBuffers((VkDevice)info.device, (VkCommandPool)info.command_pool,
-            1, &command);
-        return;
-    }
-    VkImageMemoryBarrier barrier = {0};
-    barrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
-    barrier.oldLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
-    barrier.newLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-    barrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
-    barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
-    barrier.image = image;
-    barrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-    barrier.subresourceRange.levelCount = 1;
-    barrier.subresourceRange.layerCount = 1;
-    barrier.srcAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
-    barrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
-    vkCmdPipelineBarrier(command, VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
-        VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, 0, 0, NULL, 0, NULL, 1, &barrier);
-    vkEndCommandBuffer(command);
-    VkSubmitInfo submit = {0};
-    submit.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
-    submit.commandBufferCount = 1;
-    submit.pCommandBuffers = &command;
-    if (vkQueueSubmit((VkQueue)info.queue, 1, &submit, VK_NULL_HANDLE) == VK_SUCCESS)
-        vkQueueWaitIdle((VkQueue)info.queue);
-    vkFreeCommandBuffers((VkDevice)info.device, (VkCommandPool)info.command_pool, 1,
-        &command);
-}
-
 bool bongo_cat_live2d_vulkan_begin_frame(void) {
     if (!bongo_cat_live2d_vulkan_ready()) return false;
     auto *device_info = Csm::Rendering::CubismDeviceInfo_Vulkan::GetDeviceInfo(g_device);
     if (!device_info || !device_info->GetOffscreenManager()) return false;
+    BongoCatVkNativeInfo current = {0};
+    if (!g_vk || !bongo_cat_vk_native_info(g_vk, &current)) return false;
+    /* 窗口尺寸变了就重建离屏目标, 模型才会跟着"缩放"一起变 */
+    if (!ensure_target_size(current.width, current.height)) return false;
     device_info->GetOffscreenManager()->BeginFrameProcess();
     VkExtent2D extent = {g_target->GetBufferWidth(), g_target->GetBufferHeight()};
     /*
@@ -218,15 +210,12 @@ bool bongo_cat_live2d_vulkan_begin_frame(void) {
      * 它仍按旧 extent/旧 imageView 记账, 在遮罩目标 BeginDraw 里越界
      * (校验层拖慢时稳定复现)。SetConstantSettings 只是纯赋值, 每帧调用开销可忽略。
      */
-    BongoCatVkNativeInfo current = {0};
-    if (g_vk && bongo_cat_vk_native_info(g_vk, &current)) {
-        Csm::Rendering::CubismRenderer_Vulkan::SetConstantSettings(
-            (VkDevice)current.device, (VkPhysicalDevice)current.physical_device,
-            (VkCommandPool)current.command_pool, (VkQueue)current.queue,
-            (unsigned int)current.image_count, extent,
-            (VkImageView)current.image_view, (VkFormat)current.image_format,
-            kDepthFormat);
-    }
+    Csm::Rendering::CubismRenderer_Vulkan::SetConstantSettings(
+        (VkDevice)current.device, (VkPhysicalDevice)current.physical_device,
+        (VkCommandPool)current.command_pool, (VkQueue)current.queue,
+        (unsigned int)current.image_count, extent,
+        (VkImageView)current.image_view, (VkFormat)current.image_format,
+        kDepthFormat);
     Csm::Rendering::CubismRenderer_Vulkan::SetImageExtent(extent);
     Csm::Rendering::CubismRenderer_Vulkan::SetRenderTarget(g_target->GetTextureImage(),
         g_target->GetTextureView(), g_format, extent);
@@ -242,7 +231,8 @@ bool bongo_cat_live2d_vulkan_end_frame(void) {
     /* 交给合成着色器之前必须换成可采样布局 */
     BongoCatVkNativeInfo native = {0};
     if (g_vk && bongo_cat_vk_native_info(g_vk, &native)) {
-        transition_target_to_sampled(native, g_target->GetTextureImage());
+        bongo_cat_live2d_vulkan_transition_sampled(&native,
+            (void *)g_target->GetTextureImage());
         /*
          * SDK 的 Vulkan 渲染器自己提交命令 (DrawModel / 遮罩), 而我们的帧随后要采样
          * 这张离屏图像。开校验层时曾出现 ~2 秒后的崩溃, 像是提交与采样之间的竞态,
@@ -262,6 +252,7 @@ void bongo_cat_live2d_vulkan_detach(void) {
     if (g_device != VK_NULL_HANDLE)
         Csm::Rendering::CubismDeviceInfo_Vulkan::ReleaseDeviceInfo(g_device);
     g_device = VK_NULL_HANDLE;
+    g_physical = VK_NULL_HANDLE;
     g_vk = nullptr;
     g_format = VK_FORMAT_UNDEFINED;
     g_attached = false;

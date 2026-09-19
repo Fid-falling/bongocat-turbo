@@ -66,6 +66,15 @@ bool bongo_cat_vk_render_main(BongoCatApp *app, bool present) {
     bongo_cat_window_background_rgba(app, rgba);
     bongo_cat_vk_set_clear_color(app->vk, rgba[0], rgba[1], rgba[2], rgba[3]);
     /*
+     * 交换链先跟上窗口尺寸, 再画 Live2D。
+     *
+     * Live2D 的离屏目标是按交换链尺寸重建的 (见 cubism_vulkan_bridge.cpp 的
+     * ensure_target_size), 而交换链本来要到下面的 begin_frame 才重建 —— 那样
+     * 改"缩放"后的第一帧 Sdk 拿到的还是旧尺寸, 画面会先错一帧。这里提前重建,
+     * 尺寸没变时是空操作 (bongo_cat_vk_resize 自己比 extent)。
+     */
+    bongo_cat_vk_resize(app->vk, width, height);
+    /*
      * Live2D 先画到它自己的离屏目标: SDK 的 Vulkan 渲染器会自行提交命令并
      * 等待完成, 所以必须在开始录制本帧之前做, 不能和我们的命令缓冲交错。
      */
