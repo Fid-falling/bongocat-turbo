@@ -226,8 +226,15 @@ bool bongo_cat_live2d_vulkan_end_frame(void) {
     device_info->GetOffscreenManager()->ReleaseStaleRenderTextures();
     /* 交给合成着色器之前必须换成可采样布局 */
     BongoCatVkNativeInfo native = {0};
-    if (g_vk && bongo_cat_vk_native_info(g_vk, &native))
+    if (g_vk && bongo_cat_vk_native_info(g_vk, &native)) {
         transition_target_to_sampled(native, g_target->GetTextureImage());
+        /*
+         * SDK 的 Vulkan 渲染器自己提交命令 (DrawModel / 遮罩), 而我们的帧随后要采样
+         * 这张离屏图像。开校验层时曾出现 ~2 秒后的崩溃, 像是提交与采样之间的竞态,
+         * 所以这里显式把设备等空, 让"SDK 提交"与"我们录制帧"完全串行。
+         */
+        if (native.device) vkDeviceWaitIdle((VkDevice)native.device);
+    }
     return true;
 }
 
