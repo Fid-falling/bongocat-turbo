@@ -1,6 +1,7 @@
 #include "runtime.h"
 #include "window_wheel_internal.h"
 #include "bongo_cat/preferences.h"
+#include "bongo_cat/vk_backend.h"
 #include <stdlib.h>
 
 static uint64_t frame_interval_ns(const BongoCatApp *app) {
@@ -28,6 +29,40 @@ bool bongo_cat_model_frame_due(const BongoCatApp *app, uint64_t now) {
     return app && app->session.window.visible && !app->window_minimized &&
         (!app->last_frame_ns || now >= app->last_frame_ns +
             frame_interval_ns(app));
+}
+
+/*
+ * 把"最大帧率"设置下发给后端的呈现路径。
+ *
+ * 界面里的三档是 30 / 60 / 无限 (BONGO_CAT_MAX_FPS_UNLIMITED)。之前两个后端都
+ * 无条件开着垂直同步: 选"无限"也被锁在显示器刷新率上 (100 Hz 屏 = 100 FPS),
+ * 所以这里在"无限"时关掉同步, 30/60 时保持同步 (与 OpenGL 路径原来的行为一致)。
+ *
+ * 帧率上限本身由 frame_interval_ns() 决定, 这个函数只负责呈现侧的同步策略。
+ * 设置变化时 Vulkan 会重建交换链 (呈现模式是创建时定下的), 所以只在值变化时下发。
+ */
+void bongo_cat_app_apply_frame_pacing(BongoCatApp *app) {
+    if (!app) return;
+    int fps = app->settings.model.max_fps;
+    if (fps == app->applied_max_fps) return;
+    bool vsync = fps != BONGO_CAT_MAX_FPS_UNLIMITED;
+    app->applied_max_fps = fps;
+    if (app->vk) {
+        bongo_cat_vk_set_vsync(app->vk, vsync);
+        return;
+    }
+    if (!app->window || !app->gl_context) return;
+    if (!SDL_GL_MakeCurrent(app->window, app->gl_context)) {
+        SDL_LogWarn(SDL_LOG_CATEGORY_VIDEO,
+            "Frame pacing could not activate the main GL context: %s",
+            SDL_GetError());
+        return;
+    }
+    if (!SDL_GL_SetSwapInterval(vsync ? 1 : 0))
+        SDL_LogWarn(SDL_LOG_CATEGORY_VIDEO,
+            "Frame pacing could not set vertical sync (%d): %s", vsync ? 1 : 0,
+            SDL_GetError());
+    SDL_Log("[runtime] 垂直同步已%s (最大帧率=%d)", vsync ? "开启" : "关闭", fps);
 }
 
 int bongo_cat_window_wait_timeout(const BongoCatApp *app, uint64_t now) {

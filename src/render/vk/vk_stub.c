@@ -117,6 +117,10 @@ void bongo_cat_vk_set_viewport(BongoCatVk *vk, int x, int y, int width,
     (void)vk; (void)x; (void)y; (void)width; (void)height;
 }
 
+void bongo_cat_vk_set_vsync(BongoCatVk *vk, bool vsync) {
+    (void)vk; (void)vsync;
+}
+
 bool bongo_cat_vk_queue_hit_sample(BongoCatVk *vk, int x, int y) {
     (void)vk; (void)x; (void)y;
     return false;

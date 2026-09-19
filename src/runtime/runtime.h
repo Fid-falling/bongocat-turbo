@@ -54,6 +54,8 @@ int bongo_cat_window_wait_timeout(const BongoCatApp *app, uint64_t now);
 bool bongo_cat_window_wait_timeout_self_test(void);
 bool bongo_cat_modal_frame_self_test(void);
 bool bongo_cat_model_frame_due(const BongoCatApp *app, uint64_t now);
+/* 把"最大帧率"设置下发给呈现路径 (无限 -> 关闭垂直同步); 值变化时才生效 */
+void bongo_cat_app_apply_frame_pacing(BongoCatApp *app);
 bool bongo_cat_wait_event(SDL_Event *event, int timeout_ms);
 bool bongo_cat_app_step_live2d(BongoCatApp *app, float elapsed_seconds);
 void bongo_cat_window_sync_click_through(BongoCatApp *app);

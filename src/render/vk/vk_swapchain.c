@@ -159,9 +159,29 @@ bool bongo_cat_vk_create_swapchain(BongoCatVk *vk, int width, int height,
         return false;
     }
     vkGetPhysicalDeviceSurfacePresentModesKHR(vk->physical, vk->surface, &mode_count, modes);
+    /*
+     * 呈现模式: 关掉垂直同步 (无限帧率) 时优先 IMMEDIATE, 其次 MAILBOX, 都没有
+     * 才退回 FIFO; 开着同步时固定 FIFO。
+     *
+     * 之前是无条件 FIFO —— 即使用户把最大帧率设成"无限", 帧率也永远被锁在显示器
+     * 刷新率上 (100 Hz 屏 = 100 FPS)。帧节奏本来就由应用侧 (frame_clock.c) 控制,
+     * 这里只需要如实反映设置。
+     */
+    VkPresentModeKHR fallback = VK_PRESENT_MODE_FIFO_KHR;
+    VkPresentModeKHR wanted = vk->vsync ? VK_PRESENT_MODE_FIFO_KHR :
+        VK_PRESENT_MODE_IMMEDIATE_KHR;
     vk->present_mode = VK_PRESENT_MODE_FIFO_KHR;
+    bool found = false;
     for (uint32_t i = 0; i < mode_count; ++i)
-        if (modes[i] == VK_PRESENT_MODE_FIFO_KHR) vk->present_mode = VK_PRESENT_MODE_FIFO_KHR;
+        if (modes[i] == wanted) { vk->present_mode = wanted; found = true; }
+    if (!found && !vk->vsync) {
+        for (uint32_t i = 0; i < mode_count; ++i)
+            if (modes[i] == VK_PRESENT_MODE_MAILBOX_KHR) {
+                vk->present_mode = VK_PRESENT_MODE_MAILBOX_KHR;
+                found = true;
+            }
+    }
+    if (!found) vk->present_mode = fallback;
     free(modes);
 
     VkExtent2D extent = {0};
@@ -327,6 +347,21 @@ bool bongo_cat_vk_resize(BongoCatVk *vk, int width, int height) {
     if (vk->extent_valid && (uint32_t)width == vk->extent.width &&
         (uint32_t)height == vk->extent.height) return true;
     return bongo_cat_vk_recreate_swapchain(vk, width, height);
+}
+
+void bongo_cat_vk_set_vsync(BongoCatVk *vk, bool vsync) {
+    if (!vk || vk->vsync == vsync) return;
+    vk->vsync = vsync;
+    /*
+     * 呈现模式是创建交换链时定下的, 只能重建才能换。尺寸没变也要重建, 所以
+     * 不能走 bongo_cat_vk_resize (它按 extent 提前返回)。
+     */
+    if (vk->device == VK_NULL_HANDLE || vk->surface == VK_NULL_HANDLE ||
+        !vk->extent_valid) return;
+    bongo_cat_vk_recreate_swapchain(vk, (int)vk->extent.width,
+        (int)vk->extent.height);
+    SDL_Log("[vulkan] 垂直同步已%s (present_mode=%d)", vsync ? "开启" : "关闭",
+        (int)vk->present_mode);
 }
 
 #endif /* BONGO_CAT_HAS_VULKAN */

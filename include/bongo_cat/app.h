@@ -132,6 +132,8 @@ typedef struct BongoCatApp {
     int smoke_preference_page;
     int exit_code;
     bool dirty;
+    /* 已经下发给后端的 max_fps (垂直同步跟随它变化), -1 表示还没下发过 */
+    int applied_max_fps;
     uint64_t last_frame_ns;
     uint64_t render_retry_ns;
     uint64_t smoke_deadline_ns;

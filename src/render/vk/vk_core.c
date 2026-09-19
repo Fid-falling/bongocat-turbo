@@ -321,6 +321,8 @@ BongoCatVk *bongo_cat_vk_create(SDL_Window *window, BongoCatError *error) {
         return NULL;
     }
     vk->window = window;
+    /* 默认跟着 OpenGL 路径的老行为 (垂直同步开); 运行时再按最大帧率设置更新 */
+    vk->vsync = true;
     if (!bongo_cat_vk_create_instance(vk, error)) {
         bongo_cat_vk_destroy(vk);
         return NULL;

@@ -156,8 +156,8 @@ BongoCatResult bongo_cat_window_create(BongoCatApp *app, BongoCatError *error) {
                 vendor ? (const char *)vendor : "unknown",
                 renderer ? (const char *)renderer : "unknown",
                 version ? (const char *)version : "unknown");
-            if (!SDL_GL_SetSwapInterval(1)) SDL_LogWarn(SDL_LOG_CATEGORY_VIDEO,
-                "Vertical sync unavailable: %s", SDL_GetError());
+            if (!SDL_GL_SetSwapInterval(0)) SDL_LogWarn(SDL_LOG_CATEGORY_VIDEO,
+                "Vertical sync could not be disabled: %s", SDL_GetError());
             return BONGO_CAT_OK;
         }
         SDL_LogWarn(SDL_LOG_CATEGORY_VIDEO, "OpenGL attempt %llu failed: %s",

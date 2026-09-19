@@ -112,6 +112,8 @@ struct BongoCatVk {
     VkFormat format;
     VkColorSpaceKHR color_space;
     VkPresentModeKHR present_mode;
+    /* 垂直同步开关 (由最大帧率设置决定: "无限" -> false) */
+    bool vsync;
     VkExtent2D extent;
     bool extent_valid;
     uint32_t image_count;

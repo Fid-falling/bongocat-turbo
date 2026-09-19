@@ -52,6 +52,7 @@ bool bongo_cat_app_initialize(BongoCatApp *app, int argc, char **argv,
     app->smoke_language = -1;
     app->smoke_theme = -1;
     app->smoke_preference_page = -1;
+    app->applied_max_fps = -1;
     bongo_cat_settings_defaults(&app->settings);
     bongo_cat_session_defaults(&app->session);
     bongo_cat_input_init(&app->input);

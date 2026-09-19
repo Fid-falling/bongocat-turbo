@@ -58,6 +58,13 @@ bool bongo_cat_vk_info(const BongoCatVk *vk, BongoCatVkInfo *info);
 bool bongo_cat_vk_resize(BongoCatVk *vk, int width, int height);
 
 /*
+ * 垂直同步开关 (对应界面里的最大帧率设置: "无限" -> false)。
+ * 呈现模式是创建交换链时定下的, 值变化时这里会重建交换链;
+ * 页面尺寸没变也会重建, 所以不要用 bongo_cat_vk_resize 代替。
+ */
+void bongo_cat_vk_set_vsync(BongoCatVk *vk, bool vsync);
+
+/*
  * 帧的生命周期: begin 会获取交换链图像并开始渲染通道 (使用 clear 颜色清屏),
  * end 结束渲染通道 / 提交 / 呈现。begin 与 end 之间才可以录制绘制命令。
  */

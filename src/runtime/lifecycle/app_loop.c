@@ -186,6 +186,7 @@ static bool take_update_shutdown(BongoCatApp *app) {
 
 void bongo_cat_app_loop(BongoCatApp *app) {
     while (app->running) {
+        bongo_cat_app_apply_frame_pacing(app);
         int wait_ms = bongo_cat_window_wait_timeout(app, SDL_GetTicksNS());
         if (app->secondary_pet && wait_ms > 100) wait_ms = 100;
         bongo_cat_preferences_input_begin(app->preferences);
