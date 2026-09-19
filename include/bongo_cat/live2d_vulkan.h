@@ -22,6 +22,11 @@ bool bongo_cat_live2d_vulkan_begin_frame(void);
 bool bongo_cat_live2d_vulkan_end_frame(void);
 void bongo_cat_live2d_vulkan_detach(void);
 
+/* 模型贴图: 返回 SDK 的 CubismImageVulkan 句柄 (void*), 失败返回 NULL */
+void *bongo_cat_live2d_vulkan_create_texture(struct BongoCatVk *vk,
+    const void *pixels, int width, int height);
+void bongo_cat_live2d_vulkan_destroy_texture(void *texture);
+
 /* 离屏结果 (纹理与尺寸), 供合成到宠物窗口时使用 */
 bool bongo_cat_live2d_vulkan_target_info(void **image, void **view, void **sampler,
     int *width, int *height);
