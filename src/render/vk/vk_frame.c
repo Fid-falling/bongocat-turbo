@@ -259,6 +259,9 @@ bool bongo_cat_vk_begin_frame(BongoCatVk *vk, int width, int height) {
 
 bool bongo_cat_vk_end_frame(BongoCatVk *vk) {
     if (!vk || !vk->frame_active) return false;
+    SDL_LogWarn(SDL_LOG_CATEGORY_VIDEO,
+        "[vulkan] endframe: idx=%u count=%u frame=%u", vk->image_index,
+        vk->image_count, vk->frame_index);
     BongoCatVkFrame *frame = &vk->frames[vk->frame_index];
     vkCmdEndRenderPass(frame->command);
     /* 命中测试需要这一帧的 alpha: 在提交前把指针附近的小块拷回主机 */
@@ -281,6 +284,7 @@ bool bongo_cat_vk_end_frame(BongoCatVk *vk) {
     submit.signalSemaphoreCount = 1;
     submit.pSignalSemaphores = &present_semaphore;
     vk->frame_active = false;
+    SDL_LogWarn(SDL_LOG_CATEGORY_VIDEO, "[vulkan] endframe: submit…");
     if (vkQueueSubmit(vk->queue, 1, &submit, frame->fence) != VK_SUCCESS) {
         SDL_LogError(SDL_LOG_CATEGORY_VIDEO, "[vulkan] 命令提交失败");
         return false;
@@ -292,6 +296,7 @@ bool bongo_cat_vk_end_frame(BongoCatVk *vk) {
     present.swapchainCount = 1;
     present.pSwapchains = &vk->swapchain;
     present.pImageIndices = &vk->image_index;
+    SDL_LogWarn(SDL_LOG_CATEGORY_VIDEO, "[vulkan] endframe: present…");
     VkResult result = vkQueuePresentKHR(vk->queue, &present);
     vk->frame_index = (vk->frame_index + 1) % BONGO_CAT_VK_FRAMES_IN_FLIGHT;
     vk->frame_counter++;
