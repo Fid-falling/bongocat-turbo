@@ -1,4 +1,5 @@
 #include "vk_internal.h"
+#include "bongo_cat/live2d_vulkan.h"
 #include "runtime.h"
 #include "bongo_cat/log.h"
 #include "bongo_cat/overlay.h"
@@ -19,6 +20,35 @@
  * 测试回读属于后续阶段。
  */
 
+
+/*
+ * Live2D (Cubism) 的 Vulkan 渲染器把模型画进自己的离屏图像, 这里把它包成纹理,
+ * 供宠物窗口的合成使用。尺寸变化或目标消失时重建; 销毁走后端的退休队列, 避免
+ * 描述符还在飞行中就被回收。
+ */
+static BongoCatVkTexture *live2d_target_texture(BongoCatApp *app) {
+    static BongoCatVkTexture *texture;
+    static int width, height;
+    void *image = NULL, *view = NULL;
+    int target_width = 0, target_height = 0;
+    if (!app || !app->vk ||
+        !bongo_cat_live2d_vulkan_target_info(&image, &view, NULL, &target_width,
+            &target_height)) {
+        if (texture && app && app->vk) bongo_cat_vk_texture_destroy(app->vk, texture);
+        texture = NULL;
+        width = height = 0;
+        return NULL;
+    }
+    if (texture && target_width == width && target_height == height) return texture;
+    if (texture) bongo_cat_vk_texture_destroy(app->vk, texture);
+    BongoCatError error = {0};
+    texture = bongo_cat_vk_texture_from_external(app->vk, image, view, target_width,
+        target_height, "live2d", &error);
+    width = target_width;
+    height = target_height;
+    return texture;
+}
+
 bool bongo_cat_vk_render_main(BongoCatApp *app, bool present) {
     if (!app || !app->vk || !app->window) return false;
     if (!present) {
@@ -35,6 +65,14 @@ bool bongo_cat_vk_render_main(BongoCatApp *app, bool present) {
     float rgba[4];
     bongo_cat_window_background_rgba(app, rgba);
     bongo_cat_vk_set_clear_color(app->vk, rgba[0], rgba[1], rgba[2], rgba[3]);
+    /*
+     * Live2D 先画到它自己的离屏目标: SDK 的 Vulkan 渲染器会自行提交命令并
+     * 等待完成, 所以必须在开始录制本帧之前做, 不能和我们的命令缓冲交错。
+     */
+    if (bongo_cat_live2d_vulkan_ready()) {
+        bongo_cat_live2d_set_mirror(app->live2d, app->settings.model.mirror);
+        bongo_cat_live2d_draw(app->live2d);
+    }
     if (!bongo_cat_vk_begin_frame(app->vk, width, height)) {
         app->dirty = true;
         app->render_retry_ns = now + 1000000000ull;
@@ -43,6 +81,13 @@ bool bongo_cat_vk_render_main(BongoCatApp *app, bool present) {
     }
 
     bongo_cat_overlay_draw_background(app->overlay, app->settings.model.mirror);
+    /* Live2D 的离屏结果按整窗四边形合成 (离屏目标就是按窗口尺寸建的) */
+    if (bongo_cat_live2d_vulkan_ready()) {
+        BongoCatVkTexture *live2d = live2d_target_texture(app);
+        if (live2d)
+            bongo_cat_vk_draw_overlay_quad(app->vk, live2d,
+                app->settings.model.mirror, width, height, false, false);
+    }
     bongo_cat_overlay_draw_pointer_before_keys(app->overlay);
     bongo_cat_overlay_draw_keys(app->overlay, app->settings.model.mirror);
     bongo_cat_overlay_draw_effect(app->overlay, app->settings.model.mirror);
