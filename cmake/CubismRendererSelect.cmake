@@ -62,8 +62,42 @@ endfunction()
 function(bongo_cat_prepare_cubism_renderer_selection)
   # 无论是否启用 Vulkan 后端都要打: 唯一的工厂实现固定由
   # src/live2d/cubism_renderer_factory.cpp 提供, 否则两者的定义会重复。
+  bongo_cat_patch_cubism_vulkan_stage_mask_if_needed()
   bongo_cat_guard_cubism_renderer_factory(
     "OpenGL" "OpenGL/CubismRenderer_OpenGLES2.cpp" "CubismRenderer_OpenGLES2")
   bongo_cat_guard_cubism_renderer_factory(
     "Vulkan" "Vulkan/CubismRenderer_Vulkan.cpp" "CubismRenderer_Vulkan")
+endfunction()
+
+# SDK 的 CubismImageVulkan::SetImageLayout 把图像屏障的目标阶段写成
+# VK_PIPELINE_STAGE_RAY_TRACING_SHADER_BIT_KHR, 而设备并没有开启光线追踪 —— 校验层
+# 会持续报 VUID (实测 6 条)。这里在配置阶段替换成真正的使用阶段 (片元着色器采样该
+# 图像), 与其它 SDK 补丁一样, 每次配置重新应用。
+function(bongo_cat_patch_cubism_vulkan_stage_mask)
+  set(path "${BONGO_CAT_CUBISM_SDK}/Framework/src/Rendering/Vulkan/CubismClass_Vulkan.cpp")
+  if(NOT EXISTS "${path}")
+    message(FATAL_ERROR "Cubism Vulkan source missing: ${path}")
+  endif()
+  file(READ "${path}" text)
+  string(REPLACE "\r\n" "\n" text "${text}")
+  set(old "destinationStage = VK_PIPELINE_STAGE_RAY_TRACING_SHADER_BIT_KHR;")
+  set(new "destinationStage = VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT;")
+  string(FIND "${text}" "${new}" already)
+  if(NOT already EQUAL -1)
+    message(STATUS "Cubism Vulkan 阶段掩码补丁已应用")
+    return()
+  endif()
+  string(FIND "${text}" "${old}" position)
+  if(position EQUAL -1)
+    message(FATAL_ERROR "无法在 ${path} 中定位光追阶段掩码; SDK 版本可能已改变。")
+  endif()
+  string(REPLACE "${old}" "${new}" text "${text}")
+  file(WRITE "${path}" "${text}")
+  message(STATUS "Cubism Vulkan 阶段掩码补丁已写入 (${path})")
+endfunction()
+
+function(bongo_cat_patch_cubism_vulkan_stage_mask_if_needed)
+  if(BONGO_CAT_ENABLE_VULKAN)
+    bongo_cat_patch_cubism_vulkan_stage_mask()
+  endif()
 endfunction()
