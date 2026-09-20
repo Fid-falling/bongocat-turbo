@@ -107,11 +107,28 @@ struct BongoCatVk {
     VkQueue queue;
     VkCommandPool command_pool;
     bool validation;
+    /*
+     * 这个上下文是否自己拥有 instance/device (以及 queue/物理设备)。
+     *
+     * 第二个窗口 (设置窗口) 通过 bongo_cat_vk_create_shared() 复用主窗口的
+     * instance/device/queue, 只建自己的交换链与设备级资源 (命令池/描述符池/
+     * 管线都是一次性对象, 同一个设备上再来一套没问题); 销毁时不能去销毁借来的
+     * instance/device。一个进程只保留一套 VkDevice 也让注入式图形钩子
+     * (RTSS / OBS / NVIDIA 叠加层) 的单设备假设成立。
+     */
+    bool owns_device;
 
     VkSwapchainKHR swapchain;
     VkFormat format;
     VkColorSpaceKHR color_space;
     VkPresentModeKHR present_mode;
+    /*
+     * 逐像素合成: 窗口透明时必须是 PRE_MULTIPLIED, 否则 DWM 把清屏 alpha 当成
+     * 不透明, 桌面宠物的背景就是黑的 (见 vk_swapchain.c 的 choose_composite_alpha)。
+     * 两个字段只用于日志与诊断, 便于测试断言 "透明窗口真的拿到了 alpha 合成"。
+     */
+    VkCompositeAlphaFlagBitsKHR composite_alpha;
+    VkCompositeAlphaFlagsKHR composite_supported;
     /* 垂直同步开关 (由最大帧率设置决定: "无限" -> false) */
     bool vsync;
     VkExtent2D extent;

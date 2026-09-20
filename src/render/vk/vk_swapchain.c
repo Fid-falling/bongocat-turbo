@@ -31,18 +31,41 @@ static bool choose_format(const VkSurfaceFormatKHR *formats, uint32_t count,
     return false;
 }
 
+/*
+ * 窗口透明时交换链必须声明 PRE_MULTIPLIED, 否则清屏的 (0,0,0,0) 会被合成为黑底。
+ *
+ * Windows 上 SDL 用 DwmEnableBlurBehindWindow (空模糊区域) 让 DWM 按窗口重定向
+ * 表面的 alpha 逐像素合成 (见 sdl3-src/src/video/windows/SDL_windowswindow.c)。
+ * OpenGL 的 GDI 表面天然带 alpha, 所以 GL 后端一直是透明的; 而 Vulkan 的
+ * DXGI 交换链默认按不透明合成 (compositeAlpha=OPAQUE), DWM 拿到的 alpha 全是 1,
+ * 于是桌面宠物的背景变成黑色方块。声明 PRE_MULTIPLIED 后 DWM 才会尊重
+ * 帧缓冲里的 alpha —— 与 OpenGL 路径的观感一致 (两条路径都是非预乘内容,
+ * 半透明边缘的处理也就与 GL 完全一致)。
+ */
 static VkCompositeAlphaFlagBitsKHR choose_composite_alpha(
-    VkCompositeAlphaFlagsKHR supported) {
-    /* 桌面宠物的透明度由窗口/平台层负责, 交换链先按不透明合成, 免得驱动
-       在把 alpha 交给合成器时改变 RGB。 */
-    const VkCompositeAlphaFlagBitsKHR order[] = {
+    VkCompositeAlphaFlagsKHR supported, bool transparent) {
+    const VkCompositeAlphaFlagBitsKHR transparent_order[] = {
+        VK_COMPOSITE_ALPHA_PRE_MULTIPLIED_BIT_KHR,
+        VK_COMPOSITE_ALPHA_POST_MULTIPLIED_BIT_KHR,
+        VK_COMPOSITE_ALPHA_INHERIT_BIT_KHR,
+        VK_COMPOSITE_ALPHA_OPAQUE_BIT_KHR
+    };
+    const VkCompositeAlphaFlagBitsKHR opaque_order[] = {
         VK_COMPOSITE_ALPHA_OPAQUE_BIT_KHR, VK_COMPOSITE_ALPHA_INHERIT_BIT_KHR,
         VK_COMPOSITE_ALPHA_PRE_MULTIPLIED_BIT_KHR,
         VK_COMPOSITE_ALPHA_POST_MULTIPLIED_BIT_KHR
     };
-    for (size_t i = 0; i < sizeof(order) / sizeof(order[0]); ++i)
+    const VkCompositeAlphaFlagBitsKHR *order = transparent ? transparent_order
+        : opaque_order;
+    for (size_t i = 0; i < 4; ++i)
         if (supported & order[i]) return order[i];
     return VK_COMPOSITE_ALPHA_OPAQUE_BIT_KHR;
+}
+
+/* 窗口是否要求逐像素透明 (关掉透明后就没必要让合成器去读 alpha)。 */
+static bool window_is_transparent(const BongoCatVk *vk) {
+    return vk->window &&
+        (SDL_GetWindowFlags(vk->window) & SDL_WINDOW_TRANSPARENT) != 0;
 }
 
 static bool create_render_pass(BongoCatVk *vk, BongoCatError *error) {
@@ -222,10 +245,26 @@ bool bongo_cat_vk_create_swapchain(BongoCatVk *vk, int width, int height,
     create.imageUsage = usage;
     create.imageSharingMode = VK_SHARING_MODE_EXCLUSIVE;
     create.preTransform = capabilities.currentTransform;
-    create.compositeAlpha = choose_composite_alpha(capabilities.supportedCompositeAlpha);
+    const bool transparent = window_is_transparent(vk);
+    create.compositeAlpha = choose_composite_alpha(
+        capabilities.supportedCompositeAlpha, transparent);
     create.presentMode = vk->present_mode;
     create.clipped = VK_TRUE;
     VkResult result = vkCreateSwapchainKHR(vk->device, &create, NULL, &vk->swapchain);
+    if (result != VK_SUCCESS && create.compositeAlpha != VK_COMPOSITE_ALPHA_OPAQUE_BIT_KHR) {
+        /*
+         * 个别驱动会把 PRE_MULTIPLIED 报进 supportedCompositeAlpha 却拒绝创建
+         * (预览版驱动/远程会话)。宁可退回不透明黑底, 也不能让整个 Vulkan 后端
+         * 起不来。
+         */
+        SDL_LogWarn(SDL_LOG_CATEGORY_VIDEO,
+            "[vulkan] compositeAlpha=0x%x 创建失败 (VkResult=%d), 退回不透明合成",
+            (unsigned)create.compositeAlpha, (int)result);
+        create.compositeAlpha = VK_COMPOSITE_ALPHA_OPAQUE_BIT_KHR;
+        result = vkCreateSwapchainKHR(vk->device, &create, NULL, &vk->swapchain);
+    }
+    vk->composite_alpha = create.compositeAlpha;
+    vk->composite_supported = capabilities.supportedCompositeAlpha;
     if (result != VK_SUCCESS) {
         bongo_cat_error_set(error, BONGO_CAT_ERROR_PLATFORM,
             "Vulkan 交换链创建失败 (VkResult=%d, %ux%u)", (int)result,
@@ -302,9 +341,11 @@ bool bongo_cat_vk_create_swapchain(BongoCatVk *vk, int width, int height,
     /* 管线绑定渲染通道, 交换链重建后必须跟着重建 */
     bongo_cat_vk_rebuild_pipelines(vk);
     SDL_LogInfo(BONGO_CAT_LOG_LIFECYCLE,
-        "[vulkan] 交换链 %ux%u images=%u format=%d present_mode=%d",
+        "[vulkan] 交换链 %ux%u images=%u format=%d present_mode=%d "
+        "composite_alpha=0x%x supported=0x%x transparent=%d",
         extent.width, extent.height, vk->image_count, (int)vk->format,
-        (int)vk->present_mode);
+        (int)vk->present_mode, (unsigned)vk->composite_alpha,
+        (unsigned)vk->composite_supported, transparent ? 1 : 0);
     return true;
 }
 
