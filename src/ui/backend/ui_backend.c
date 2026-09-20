@@ -288,7 +288,17 @@ static void render_vulkan(BongoCatUIBackend *ui) {
     if (width <= 0.0f || height <= 0.0f || pixel_width <= 0 || pixel_height <= 0)
         return;
     convert(ui);
-    float scale_x = pixel_width / width, scale_y = pixel_height / height;
+    /*
+     * 两套缩放不能混用:
+     *  - 裁剪矩形是像素坐标, 要乘 "像素/逻辑像素";
+     *  - 顶点着色器的投影是 2/像素尺寸 (见 shaders/ui.vert 的 Push 注释)。
+     * 以前这里把前者也当成投影传了下去, 于是整块界面被映射到裁剪空间之外 ——
+     * 设置窗口在 Vulkan 下只剩背景和圆角, 一个字都看不见。
+     */
+    const float scissor_scale_x = pixel_width / width;
+    const float scissor_scale_y = pixel_height / height;
+    const float projection_scale_x = 2.0f / (float)pixel_width;
+    const float projection_scale_y = 2.0f / (float)pixel_height;
     const size_t vertex_count = ui->last_vertex_bytes / sizeof(UIVertex);
     if (!bongo_cat_vk_ui_upload_vertices(ui->vk, ui->vertices,
             (unsigned int)vertex_count)) return;
@@ -312,12 +322,12 @@ static void render_vulkan(BongoCatUIBackend *ui) {
             continue;
         }
         bongo_cat_vk_set_scissor(ui->vk,
-            (int)(command->clip_rect.x * scale_x),
-            (int)(command->clip_rect.y * scale_y),
-            (int)(command->clip_rect.w * scale_x),
-            (int)(command->clip_rect.h * scale_y));
+            (int)(command->clip_rect.x * scissor_scale_x),
+            (int)(command->clip_rect.y * scissor_scale_y),
+            (int)(command->clip_rect.w * scissor_scale_x),
+            (int)(command->clip_rect.h * scissor_scale_y));
         bongo_cat_vk_ui_draw(ui->vk, texture, offset, command->elem_count,
-            scale_x, scale_y);
+            projection_scale_x, projection_scale_y);
         offset += command->elem_count;
     }
     nk_clear(&ui->context);
