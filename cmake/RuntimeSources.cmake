@@ -39,6 +39,7 @@ set(BONGO_CAT_RENDER_SOURCES
   src/render/vk/vk_core.c
   src/render/vk/vk_stub.c
   src/render/vk/vk_swapchain.c
+  src/render/vk/vk_swapchain_rebuild.c
   src/render/vk/vk_frame.c
   src/render/vk/vk_texture.c
   src/render/vk/vk_pipeline.c
