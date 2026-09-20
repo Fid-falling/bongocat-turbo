@@ -31,15 +31,27 @@ void bongo_cat_platform_set_click_through(BongoCatPlatform *platform,
     HWND window = native_window(platform);
     /*
      * 仅录屏可见时窗口在桌面上完全看不见 (DWM 隐藏), 所以必须整体穿透点击。
-     * 这里不能走 forced 分支: 那条路会启用 layered presenter —— 它用一个代理窗口
-     * 把画面重新显示到桌面上, 正好和"桌面不显示"冲突。
+     * 这里同样不能走 forced 分支: 那条路会启用 layered presenter —— 它用一个代理
+     * 窗口把画面重新显示到桌面上, 正好和"桌面不显示"冲突。
      */
     if (platform->capture_only) {
         bongo_cat_windows_layered_set_click_through(platform, false);
         bongo_cat_windows_borderless_set_click_through(window, true, true);
         return;
     }
-    bongo_cat_windows_layered_set_click_through(platform, forced);
+    /*
+     * 穿透点击不再启用 layered presenter。
+     *
+     * presenter 的做法是把真实窗口压成完全透明 (SetLayeredWindowAttributes
+     * alpha=0), 再用一个代理窗口把画面重新显示出来 —— 代理的帧来自 GL 前缓冲的
+     * glReadPixels (windows_layered.c 的 read_frame)。实践中有两个问题:
+     *   1) 用户在 OBS 里采集的是那个真实窗口(按标题选), 一开鼠标穿透它就变成全
+     *      透明, OBS 里看到的画面就"卡住"不动了 (用户报告);
+     *   2) Vulkan 渲染时根本没有 GL 前缓冲可读, 代理窗口永远拿不到新帧。
+     * 而真实窗口本身就能被采集 (游戏采集 / 窗口采集), 像素级透明的实现也早就
+     * 修好了, 所以这里只做点击穿透, 让窗口保持在正常的合成路径上。
+     */
+    bongo_cat_windows_layered_set_click_through(platform, false);
     bongo_cat_windows_borderless_set_click_through(window, forced,
         pointer_transparent);
 }
