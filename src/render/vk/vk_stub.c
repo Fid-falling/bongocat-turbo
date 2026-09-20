@@ -31,6 +31,12 @@ BongoCatVk *bongo_cat_vk_create(SDL_Window *window, BongoCatError *error) {
 
 void bongo_cat_vk_destroy(BongoCatVk *vk) { (void)vk; }
 
+BongoCatVk *bongo_cat_vk_create_shared(SDL_Window *window, const BongoCatVk *owner,
+    BongoCatError *error) {
+    (void)window; (void)owner; (void)error;
+    return NULL;
+}
+
 bool bongo_cat_vk_info(const BongoCatVk *vk, BongoCatVkInfo *info) {
     (void)vk; (void)info;
     return false;

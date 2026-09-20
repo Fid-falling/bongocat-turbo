@@ -50,6 +50,18 @@ BongoCatVk *bongo_cat_vk_current(void);
 
 /* window 必须带 SDL_WINDOW_VULKAN 标志创建 */
 BongoCatVk *bongo_cat_vk_create(SDL_Window *window, BongoCatError *error);
+/*
+ * 在已有上下文 (主窗口) 的 VkInstance/VkDevice/queue 上再建一个上下文, 用于第二个
+ * 窗口 (设置窗口): 交换链、命令池、描述符池、管线都是自己的一份, 但设备与队列是
+ * 借来的, 销毁时不会动它们。
+ *
+ * 一个进程只保留一套 VkDevice 是刻意的: 注入式图形钩子 (RTSS / OBS /
+ * NVIDIA 叠加层) 普遍假定单设备, 第二套设备会让它们在呈现路径上越界 (实测
+ * nvoglv64 内部崩在 vkQueuePresentKHR)。
+ * owner 为 NULL 时等价于 bongo_cat_vk_create()。owner 必须比这个上下文活得久。
+ */
+BongoCatVk *bongo_cat_vk_create_shared(SDL_Window *window, const BongoCatVk *owner,
+    BongoCatError *error);
 void bongo_cat_vk_destroy(BongoCatVk *vk);
 
 bool bongo_cat_vk_info(const BongoCatVk *vk, BongoCatVkInfo *info);

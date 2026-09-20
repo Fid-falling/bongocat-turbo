@@ -116,28 +116,18 @@ bool bongo_cat_preferences_open_window(BongoCatPreferences *value) {
        默认跟随渲染后端, 万一遇到问题可以用 BONGO_CAT_PREFERENCES_OPENGL=1
        强制这个窗口用 OpenGL。 */
     /*
-     * 注意: 设置窗口的 Vulkan 通路在最基本的"第一帧呈现"上就会崩, 所以默认
-     * 仍是 OpenGL。
+     * 设置窗口的 Vulkan 通路: 第 73 轮起共用主窗口的 VkInstance/VkDevice/queue
+     * (见 bongo_cat_vk_create_shared 的注释)。
      *
-     * 第 72 轮实测 (renderer=vulkan, 内置模型):
-     *   - 主窗口 Vulkan 上下文与设置窗口 Vulkan 上下文各自创建成功
-     *     (两个 VkDevice, queue family 0, 交换链 870x760 / 900x680);
-     *   - 设置窗口第一帧走到 present 就崩 (exit 0xC0000005), 用 cdb + /MAP 解析
-     *     调用栈得到 bongo_cat_vk_end_frame+0x173 -> bongo_cat_preferences_render
-     *     -> bongo_cat_preferences_show, 即 vkQueuePresentKHR 内部;
-     *   - 崩溃指令是驱动里的越界表查找 ([r8+rcx*8+0xFCCh], rcx 是个天文数字),
-     *     命令池/信号量/交换链对象本身都有效 (校验层只报过一条命令池
-     *     queueFamilyIndex 的旧 VUID, 后续复现中不再出现);
-     *   - 进程里同时注入了 RTSS / OBS graphics-hook / NVIDIA 叠加层, 这类钩子
-     *     普遍假定"一个进程一个 VkDevice", 两个设备两个交换链正是可疑点。
-     *
-     * 下一步: 让设置窗口共用主窗口的 VkInstance/VkDevice/queue (只各建各的
-     * 交换链), 既消掉第二套设备, 也顺手修掉 bongo_cat_vk_current() 会被设置
-     * 窗口覆盖的单例问题。在此之前保持 GL 默认。
+     * 修前: 这个窗口自带第二套 instance/device/queue + 第二个交换链, 第一帧走到
+     * 呈现就崩 (0xC0000005)。用 cdb + /MAP 解析出的应用侧调用栈是
+     * bongo_cat_vk_end_frame+0x173 -> bongo_cat_preferences_render+0x616, 即
+     * vkQueuePresentKHR 内部; 驱动现场是越界表查找, 而对象本身都有效 —— 进程里
+     * 注入的 RTSS / OBS graphics-hook / NVIDIA 叠加层普遍假定单设备。
+     * 默认仍留 BONGO_CAT_PREFERENCES_OPENGL=1 这个退回开关。
      */
     value->prefer_vulkan =
-        (bongo_cat_renderer_active() == BONGO_CAT_RENDERER_VULKAN &&
-            SDL_getenv("BONGO_CAT_PREFERENCES_VULKAN") != NULL) &&
+        bongo_cat_renderer_active() == BONGO_CAT_RENDERER_VULKAN &&
         SDL_getenv("BONGO_CAT_PREFERENCES_OPENGL") == NULL;
     SDL_WindowFlags backend_flag = value->prefer_vulkan ? SDL_WINDOW_VULKAN :
         SDL_WINDOW_OPENGL;

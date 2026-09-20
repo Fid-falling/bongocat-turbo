@@ -310,9 +310,15 @@ bool bongo_cat_vk_probe(BongoCatError *error) {
     return usable;
 }
 
-BongoCatVk *bongo_cat_vk_create(SDL_Window *window, BongoCatError *error) {
+static BongoCatVk *create_context(SDL_Window *window, const BongoCatVk *owner,
+    BongoCatError *error) {
     if (!window) {
         bongo_cat_error_set(error, BONGO_CAT_ERROR_ARGUMENT, "Vulkan 后端缺少窗口");
+        return NULL;
+    }
+    if (owner && owner->device == VK_NULL_HANDLE) {
+        bongo_cat_error_set(error, BONGO_CAT_ERROR_ARGUMENT,
+            "Vulkan 共享上下文的主设备无效");
         return NULL;
     }
     BongoCatVk *vk = calloc(1, sizeof(*vk));
@@ -323,7 +329,20 @@ BongoCatVk *bongo_cat_vk_create(SDL_Window *window, BongoCatError *error) {
     vk->window = window;
     /* 默认跟着 OpenGL 路径的老行为 (垂直同步开); 运行时再按最大帧率设置更新 */
     vk->vsync = true;
-    if (!bongo_cat_vk_create_instance(vk, error)) {
+    if (owner) {
+        /* 复用主窗口的 instance/device/queue: 只借句柄, 不接管所有权 */
+        vk->instance = owner->instance;
+        vk->physical = owner->physical;
+        vk->device = owner->device;
+        vk->queue = owner->queue;
+        vk->queue_family = owner->queue_family;
+        vk->owns_device = false;
+        /* 校验层消息由主上下文的 messenger 负责, 这里不重复安装 */
+        vk->validation = false;
+    } else {
+        vk->owns_device = true;
+    }
+    if (!owner && !bongo_cat_vk_create_instance(vk, error)) {
         bongo_cat_vk_destroy(vk);
         return NULL;
     }
@@ -336,7 +355,7 @@ BongoCatVk *bongo_cat_vk_create(SDL_Window *window, BongoCatError *error) {
         bongo_cat_vk_destroy(vk);
         return NULL;
     }
-    if (!bongo_cat_vk_create_device(vk, error)) {
+    if (!owner && !bongo_cat_vk_create_device(vk, error)) {
         bongo_cat_vk_destroy(vk);
         return NULL;
     }
@@ -350,28 +369,46 @@ BongoCatVk *bongo_cat_vk_create(SDL_Window *window, BongoCatError *error) {
     }
     vk->info.width = (int)vk->extent.width;
     vk->info.height = (int)vk->extent.height;
-    current_context = vk;
+    /* 单例只登记主上下文: 叠加层绘制走 bongo_cat_vk_current(), 不能拿到设置窗口的 */
+    if (!owner) current_context = vk;
     SDL_LogInfo(BONGO_CAT_LOG_LIFECYCLE,
         "[vulkan] 设备就绪 device=%s driver=%s api=%s swapchain=%ux%u format=%d "
-        "present_mode=%d validation=%d",
+        "present_mode=%d validation=%d shared=%d",
         vk->info.device, vk->info.driver, vk->info.api,
         (unsigned)vk->extent.width, (unsigned)vk->extent.height,
-        (int)vk->format, (int)vk->present_mode, vk->validation ? 1 : 0);
+        (int)vk->format, (int)vk->present_mode, vk->validation ? 1 : 0,
+        owner ? 1 : 0);
     return vk;
+}
+
+BongoCatVk *bongo_cat_vk_create(SDL_Window *window, BongoCatError *error) {
+    return create_context(window, NULL, error);
+}
+
+BongoCatVk *bongo_cat_vk_create_shared(SDL_Window *window, const BongoCatVk *owner,
+    BongoCatError *error) {
+    if (!owner) return bongo_cat_vk_create(window, error);
+    return create_context(window, owner, error);
 }
 
 void bongo_cat_vk_destroy(BongoCatVk *vk) {
     if (!vk) return;
     if (current_context == vk) current_context = NULL;
     if (vk->device != VK_NULL_HANDLE) {
-        vkDeviceWaitIdle(vk->device);
+        if (!vk->owns_device) vkDeviceWaitIdle(vk->device);
         /* 管线先于渲染通道销毁, 纹理后于使用它们的帧同步销毁 */
         bongo_cat_vk_destroy_draw_resources(vk);
         bongo_cat_vk_destroy_swapchain(vk);
         bongo_cat_vk_destroy_texture_resources(vk);
         bongo_cat_vk_destroy_frame_sync(vk);
     }
-    bongo_cat_vk_destroy_device(vk);
+    if (vk->owns_device) {
+        bongo_cat_vk_destroy_device(vk);
+    } else if (vk->surface != VK_NULL_HANDLE && vk->instance != VK_NULL_HANDLE) {
+        /* 表面是自己建的, 用借来的 instance 销毁; device/queue 归主上下文 */
+        vkDestroySurfaceKHR(vk->instance, vk->surface, NULL);
+        vk->surface = VK_NULL_HANDLE;
+    }
     free(vk);
 }
 

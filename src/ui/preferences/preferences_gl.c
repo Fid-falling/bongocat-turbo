@@ -28,7 +28,12 @@ bool bongo_cat_preferences_gl_create(BongoCatPreferences *value) {
     if (value->prefer_vulkan &&
         bongo_cat_renderer_active() == BONGO_CAT_RENDERER_VULKAN) {
         BongoCatError error = {0};
-        value->vk = bongo_cat_vk_create(value->window, &error);
+        /*
+         * 共用主窗口的设备与队列 (只各建各的交换链)。之前这里建的是第二套
+         * VkInstance/VkDevice, 在注入了 RTSS / OBS / NVIDIA 叠加层钩子的环境里
+         * 第一帧呈现就会崩在 vkQueuePresentKHR 内部 (见 preferences_scale.c 的注释)。
+         */
+        value->vk = bongo_cat_vk_create_shared(value->window, value->app->vk, &error);
         if (!value->vk) {
             SDL_LogError(SDL_LOG_CATEGORY_VIDEO,
                 "Preferences Vulkan context failed: %s",
