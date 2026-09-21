@@ -78,13 +78,15 @@ bool bongo_cat_renderer_available(BongoCatRenderer value) {
 
 BongoCatRenderer bongo_cat_renderer_resolve(BongoCatRenderer requested) {
     /*
-     * AUTO 现在优先选 Vulkan: 主窗口的绘制 (Live2D 渲染、圆角遮罩、命中回读)
-     * 都已在 Vulkan 上验证可用, 且初始化失败会回退 OpenGL
-     * (见 window.c 的回退路径与 BONGO_CAT_TEST_VULKAN_FALLBACK 钩子)。
+     * AUTO 现在优先 OpenGL, Vulkan 需要用户显式选择。
+     *
+     * Vulkan 后端已经能跑通主窗口/设置窗口/Live2D, 但还有几处没到"可以当默认"
+     * 的程度 (设置界面里的图片贴图、部分采集路径)。默认落在 OpenGL 上, 用户
+     * 想尝鲜就在设置里选 Vulkan; 等 Vulkan 完全追平之后, 把这里改回优先
+     * Vulkan 即可 (旧的 "auto" 配置会立刻跟着升级)。
      */
     if (requested == BONGO_CAT_RENDERER_AUTO)
-        return bongo_cat_renderer_available(BONGO_CAT_RENDERER_VULKAN)
-            ? BONGO_CAT_RENDERER_VULKAN : BONGO_CAT_RENDERER_OPENGL;
+        return BONGO_CAT_RENDERER_OPENGL;
     if (bongo_cat_renderer_available(requested)) return requested;
     SDL_LogWarn(BONGO_CAT_LOG_LIFECYCLE,
         "[render] 请求的后端 %s 不可用 (%s), 回退到 OpenGL",

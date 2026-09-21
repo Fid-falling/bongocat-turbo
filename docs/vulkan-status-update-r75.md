@@ -60,15 +60,45 @@ instance/physical/device/queue，只建自己的表面、交换链与设备级�
 （窗口中心）命中其它进程，说明点击穿透生效；渲染没有中断（10 s 内 13518 帧）；
 日志 `[runtime] capture-only=1` 可断言。Vulkan 与 OpenGL 两条路径都生效。
 
-## 四、验证工具
+## 五、默认渲染后端改回 OpenGL
+
+Vulkan 后端现在能跑通主窗口、设置窗口和 Live2D，但还没到"可以当默认"的程度
+（设置界面里的图片贴图仍是纯色方块，采集路径也有差异）。所以：
+
+- `AUTO` 解析为 **OpenGL**（`src/render/render_backend.c` 的 `resolve`），
+  Vulkan 需要用户在设置里显式选择；
+- 新配置的默认值写成 `"renderer": "opengl"`（`config_defaults.c`）；
+- 旧配置里的 `"auto"` 会跟着落到 OpenGL，选过 Vulkan 的配置不受影响。
+
+实测：`renderer=auto → 实际使用=opengl`、`=vulkan → vulkan`、`=opengl → opengl`。
+等 Vulkan 追平之后，把 `resolve` 里那三行改回"优先 Vulkan"即可整体切回去。
+
+## 六、鼠标穿透不再藏起真实窗口
+
+用户报告"开启鼠标穿透后 OBS 的捕获就卡住了"。原因是穿透模式会启用
+**layered presenter**：把真实窗口压成完全透明（`SetLayeredWindowAttributes`
+alpha=0），再用一个代理窗口（逐帧 `glReadPixels` + `UpdateLayeredWindow`）把画面
+重新显示出来。OBS 里采集的是那个真实窗口，一开穿透它就全透明，画面自然"卡住"；
+Vulkan 下更是连 GL 前缓冲都没有，代理永远拿不到新帧。
+
+现在穿透只设置 `WS_EX_TRANSPARENT`，真实窗口留在正常合成路径上（它本身就能被
+游戏采集/窗口采集抓到）。实测 OpenGL/Vulkan 两条路径：开穿透后桌面上只剩一个
+`ex=0x28`（WS_EX_TRANSPARENT|TOPMOST）的可见窗口，没有 `WS_EX_LAYERED`、没有
+代理窗口，宠物照常动（3 s 帧差 2.16% / 1.34%）。
+
+## 七、验证工具
 
 - `build-vulkan/.test/alpha-screen.ps1`：等日志标记再截窗口（本机启动有时很慢，
   不能靠 `MainWindowHandle` 轮询）；
 - `build-vulkan/.test/capture-only-probe.ps1`：`captureOnly` 的 A/B 截屏 +
-  `WindowFromPoint` 穿透检查。
+  `WindowFromPoint` 穿透检查；
+- `build-vulkan/.test/passthrough-probe.ps1`：开穿透后枚举进程的顶层窗口
+  （看有没有被压成全透明的源窗口和代理窗口）+ 两次截屏算帧差（冻结帧差≈0）。
 
-## 五、已知遗留
+## 八、已知遗留
 
+- 设置界面里的图片贴图（logo、侧边栏图标、关闭按钮）在 Vulkan 下仍画成纯色
+  方块（paint cache 那几张纹理采样不到内容），字体图集不受影响；
 - 构建环境在本次会话中途被 C 盘格式化清空，恢复过程见
   `docs/build-environment-restore.md`；
 - 覆盖截帧 / 整帧回读仍只有 OpenGL 路径（`docs/vulkan-readback-recipe.md`）；

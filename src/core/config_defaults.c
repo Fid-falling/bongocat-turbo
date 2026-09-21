@@ -194,7 +194,8 @@ void bongo_cat_settings_defaults(BongoCatSettings *config) {
     memset(config, 0, sizeof(*config));
     config->model.mouse_centered = true;
     config->model.max_fps = BONGO_CAT_DEFAULT_MAX_FPS;
-    config->model.renderer = BONGO_CAT_RENDERER_AUTO;
+    /* 默认走 OpenGL: Vulkan 现在是显式选项 (见 render_backend.c 的 resolve) */
+    config->model.renderer = BONGO_CAT_RENDERER_OPENGL;
     config->window.always_on_top = true;
     config->window.keep_in_screen = false;
     config->window.obs_background_color = BONGO_CAT_OBS_BACKGROUND_GREEN;
@@ -216,7 +217,7 @@ void bongo_cat_settings_validate(BongoCatSettings *config) {
         max_fps = max_fps > 0 && max_fps <= 30 ? 30 : BONGO_CAT_DEFAULT_MAX_FPS;
     config->model.max_fps = max_fps;
     if ((unsigned)config->model.renderer >= BONGO_CAT_RENDERER_COUNT)
-        config->model.renderer = BONGO_CAT_RENDERER_AUTO;
+        config->model.renderer = BONGO_CAT_RENDERER_OPENGL;
     config->window.hide_delay_seconds = clampf_or(
         config->window.hide_delay_seconds, 0.0f, 60.0f, 0.0f);
     config->window.hide_fade_seconds = clampf_or(
