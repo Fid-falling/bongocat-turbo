@@ -113,12 +113,19 @@ bool bongo_cat_vk_render_main(BongoCatApp *app, bool present) {
             height - content_y - content_height, content_width, content_height);
     bongo_cat_overlay_draw_background(app->overlay, app->settings.model.mirror);
     bongo_cat_vk_set_viewport(app->vk, 0, 0, width, height);
-    /* Live2D 的离屏结果按整窗四边形合成 (离屏目标就是按窗口尺寸建的) */
+    /*
+     * Live2D 的离屏结果按整窗四边形合成。reference 传纹理自己的像素尺寸:
+     * (image_size / reference) 在顶点着色器里就是"这张图按多大铺开", 传自身尺寸
+     * 得到 1.0, 整张目标正好铺满窗口。超采样之后目标是窗口的 2 倍 (见
+     * cubism_vulkan_bridge.cpp 的 kSupersample), 于是这里正好做一次线性缩小 ——
+     * 抗锯齿就是靠这一步 + 2 倍分辨率渲染。
+     */
     if (bongo_cat_live2d_vulkan_ready()) {
         BongoCatVkTexture *live2d = live2d_target_texture(app);
         if (live2d)
             bongo_cat_vk_draw_overlay_quad(app->vk, live2d,
-                app->settings.model.mirror, width, height, false, false);
+                app->settings.model.mirror, live2d->width, live2d->height,
+                false, false);
     }
     if (content_viewport)
         bongo_cat_vk_set_viewport(app->vk, content_x,

@@ -60,7 +60,7 @@ instance/physical/device/queue，只建自己的表面、交换链与设备级�
 （窗口中心）命中其它进程，说明点击穿透生效；渲染没有中断（10 s 内 13518 帧）；
 日志 `[runtime] capture-only=1` 可断言。Vulkan 与 OpenGL 两条路径都生效。
 
-## 五、默认渲染后端改回 OpenGL
+## 四、默认渲染后端改回 OpenGL
 
 Vulkan 后端现在能跑通主窗口、设置窗口和 Live2D，但还没到"可以当默认"的程度
 （设置界面里的图片贴图仍是纯色方块，采集路径也有差异）。所以：
@@ -73,7 +73,7 @@ Vulkan 后端现在能跑通主窗口、设置窗口和 Live2D，但还没到"�
 实测：`renderer=auto → 实际使用=opengl`、`=vulkan → vulkan`、`=opengl → opengl`。
 等 Vulkan 追平之后，把 `resolve` 里那三行改回"优先 Vulkan"即可整体切回去。
 
-## 六、鼠标穿透不再藏起真实窗口
+## 五、鼠标穿透不再藏起真实窗口
 
 用户报告"开启鼠标穿透后 OBS 的捕获就卡住了"。原因是穿透模式会启用
 **layered presenter**：把真实窗口压成完全透明（`SetLayeredWindowAttributes`
@@ -86,7 +86,7 @@ Vulkan 下更是连 GL 前缓冲都没有，代理永远拿不到新帧。
 `ex=0x28`（WS_EX_TRANSPARENT|TOPMOST）的可见窗口，没有 `WS_EX_LAYERED`、没有
 代理窗口，宠物照常动（3 s 帧差 2.16% / 1.34%）。
 
-## 七、单独复制 exe 导致 Vulkan 画坏（用户报告）
+## 六、单独复制 exe 导致 Vulkan 画坏（用户报告）
 
 用户报告：把 `BongoCat.exe` 单独复制到桌面后打开，Vulkan 下渲染不正常。
 
@@ -103,6 +103,34 @@ Vulkan 下更是连 GL 前缓冲都没有，代理永远拿不到新帧。
    Vulkan 正常出画。代价是 exe 从 6.2 MB 变成 9.6 MB。
 2. 两处都找不到时**明确失败并回退 OpenGL**，而不是画出一堆碎片：日志会写
    `vulkan 初始化失败 (缺少 Live2D 的 Vulkan 着色器 (FrameworkShaders/*.spv): ...)`。
+
+## 七、模型边缘锯齿：Vulkan 下"锐化太严重"
+
+用户反馈 Vulkan 渲染看起来"锐化太严重"，截图对比确认是**模型边缘没有抗锯齿**：
+黑色描边和轮廓有明显的阶梯，而 OpenGL 路径看不到。
+
+根因：Cubism 的 Vulkan 渲染器把采样数写死成 `VK_SAMPLE_COUNT_1_BIT`（管线里硬编码，
+开不了 MSAA），而 OpenGL 路径是直接画在 SDL 建的 **MSAA 默认帧缓冲**里（4x/2x 重试
+阶梯），所以 GL 有边缘抗锯齿、Vulkan 没有。
+
+改法（超采样）：
+
+1. 桥的离屏目标按 **2 倍分辨率**创建（`BONGO_CAT_LIVE2D_VULKAN_SUPERSAMPLE`，
+   见 `live2d_vulkan_internal.h`），SDK 的 `s_renderExtent` 也跟着变成 2 倍；
+2. SDK 内部那套模型/遮罩目标同步放大（`cubism_model_update.cpp` 的
+   `SetRenderTargetSize(width * 2, height * 2)`，仅 Vulkan 路径）—— 两处尺寸必须
+   一致，否则遮罩与成品对不上；
+3. 合成时整张目标铺满窗口：`vk_scene.c` 给 `bongo_cat_vk_draw_overlay_quad` 传
+   **纹理自身的像素尺寸**当 reference，使顶点着色器里的 `image_size / reference = 1`
+   （传窗口尺寸的话，2 倍的目标会被放大成 2 倍画面、只剩一角 —— 实测踩过）；
+4. 采样器本来就是线性过滤，所以这一步天然是一次 2x2 平均。
+
+实测：
+```
+[live2d/vk] attach: Step 3 CreateRenderTarget 870x760 (超采样 1740x1520)
+窗口 resize: 700x620 -> 超采样 1400x1240;  900x800 -> 超采样 1800x1600 (不崩)
+```
+截图对比：Vulkan 的描边/轮廓与 OpenGL 一致（阶梯消失），无限帧率下 1500+ FPS。
 
 ## 八、验证工具
 

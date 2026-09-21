@@ -1,5 +1,6 @@
 #include "cubism_model.hpp"
 #include "cubism_viewer_look.hpp"
+#include "live2d_vulkan_internal.h"
 
 #include <Id/CubismIdManager.hpp>
 #include <Math/CubismMatrix44.hpp>
@@ -27,6 +28,18 @@ void NativeModel::resize(int width, int height) {
     SDL_LogDebug(SDL_LOG_CATEGORY_VIDEO,
         "Live2D render target resized in place: %dx%d -> %dx%d",
         renderer_width_, renderer_height_, width_, height_);
+    /*
+     * SDK 内部的模型/遮罩目标要和桥的超采样目标同尺寸, 否则遮罩与成品对不上。
+     * 注意桥的离屏目标就是 2 倍分辨率 (见 live2d_vulkan_internal.h 的
+     * BONGO_CAT_LIVE2D_VULKAN_SUPERSAMPLE), 合成时再线性缩小回窗口。
+     */
+#ifdef BONGO_CAT_HAS_VULKAN
+    if (bongo_cat_cubism_renderer_uses_vulkan()) {
+        SetRenderTargetSize(
+            (Csm::csmUint32)(width_ * BONGO_CAT_LIVE2D_VULKAN_SUPERSAMPLE),
+            (Csm::csmUint32)(height_ * BONGO_CAT_LIVE2D_VULKAN_SUPERSAMPLE));
+    } else
+#endif
     SetRenderTargetSize((Csm::csmUint32)width_, (Csm::csmUint32)height_);
     renderer_width_ = width_;
     renderer_height_ = height_;

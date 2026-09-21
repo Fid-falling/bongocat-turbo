@@ -3,6 +3,15 @@
 
 #include "bongo_cat/vk_backend.h"
 
+/*
+ * Live2D 的 Vulkan 离屏目标超采样倍数。
+ *
+ * SDK 的 Vulkan 渲染器把采样数写死为 VK_SAMPLE_COUNT_1_BIT (开不了 MSAA), 而
+ * OpenGL 路径画在 MSAA 默认帧缓冲里。不超采样时模型的描边/轮廓会有明显锯齿,
+ * 看起来就是"锐化过头"。2 倍分辨率渲染 + 合成时线性缩小 = 2x2 超采样。
+ */
+#define BONGO_CAT_LIVE2D_VULKAN_SUPERSAMPLE 2
+
 #ifdef __cplusplus
 extern "C" {
 #endif

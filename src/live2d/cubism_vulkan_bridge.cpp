@@ -60,22 +60,27 @@ std::filesystem::path shader_parent_directory() {
 
 /* 24 位深度 + 模板在桌面 Vulkan 上普遍可用, SDK 的样例也用这一档 */
 const VkFormat kDepthFormat = VK_FORMAT_D24_UNORM_S8_UINT;
+/* 见 live2d_vulkan_internal.h: SDK 的 Vulkan 渲染器开不了 MSAA, 只能超采样 */
+const int kSupersample = BONGO_CAT_LIVE2D_VULKAN_SUPERSAMPLE;
+/* 目标尺寸 (超采样之后) 与请求尺寸 (窗口/内容尺寸) 的记忆值 */
+int g_target_width = 0;
+int g_target_height = 0;
 
-/*
- * 离屏目标必须跟着交换链尺寸走。
- *
- * 之前只在 attach 时按当时的窗口尺寸建了一次: 之后用户改"缩放"或拖动窗口,
- * 交换链重建了, 目标却还是旧尺寸 —— SDK 按旧尺寸投影, 合成时又按新窗口尺寸
- * 取 image/reference 比例, 结果模型既不跟着缩放放大, 还被挤到一角或被裁掉。
- * 每帧进来比一次尺寸, 不一致就重建 (重建前等设备空, 免得还有在飞的采样)。
- */
+VkExtent2D target_extent(int width, int height) {
+    VkExtent2D extent = {(unsigned int)(width * kSupersample),
+        (unsigned int)(height * kSupersample)};
+    return extent;
+}
+
+/* 离屏目标跟着窗口尺寸走: 尺寸变了就重建 (重建前等设备空, 免得还有在飞的采样) */
 bool ensure_target_size(int width, int height) {
     if (width <= 0 || height <= 0) return false;
-    if (g_target && (int)g_target->GetBufferWidth() == width &&
-        (int)g_target->GetBufferHeight() == height) return true;
+    if (g_target && g_target_width == width && g_target_height == height)
+        return true;
+    VkExtent2D extent = target_extent(width, height);
     auto *target = CSM_NEW Csm::Rendering::CubismRenderTarget_Vulkan();
-    target->CreateRenderTarget(g_device, g_physical, (unsigned int)width,
-        (unsigned int)height, g_format, kDepthFormat);
+    target->CreateRenderTarget(g_device, g_physical, extent.width,
+        extent.height, g_format, kDepthFormat);
     if (!target->IsValid()) {
         SDL_LogWarn(SDL_LOG_CATEGORY_VIDEO,
             "[live2d/vk] 离屏目标重建失败 (%dx%d)", width, height);
@@ -88,8 +93,11 @@ bool ensure_target_size(int width, int height) {
         CSM_DELETE(g_target);
     }
     g_target = target;
+    g_target_width = width;
+    g_target_height = height;
     SDL_LogWarn(SDL_LOG_CATEGORY_VIDEO,
-        "[live2d/vk] 离屏目标跟随窗口尺寸: %dx%d", width, height);
+        "[live2d/vk] 离屏目标跟随窗口尺寸: %dx%d (超采样 %dx%d)",
+        width, height, (int)extent.width, (int)extent.height);
     return true;
 }
 
@@ -143,22 +151,15 @@ bool bongo_cat_live2d_vulkan_attach(struct BongoCatVk *vk, int width, int height
 
     VkExtent2D extent = {(unsigned int)width, (unsigned int)height};
     /*
-     * 顺序与 SDK 示例一致 (LAppDelegate::initialize 先 SetConstantSettings,
-     * LAppView 之后才 CreateRenderTarget): 设备级的管线/描述符是在
-     * SetConstantSettings 里建的, 提前建离屏目标会因为拿不到它们而失败。
-     * 默认目标先用交换链第 0 张图像 (没有视图时传 NULL)。
+     * 顺序按 SDK 示例: 先 SetConstantSettings (它建管线/描述符), 之后才能建离屏
+     * 目标。着色器按相对路径打开, 所以先把工作目录切到能看见 FrameworkShaders 的
+     * 地方 (exe 目录或解出来的内嵌资源目录)。
      */
     SDL_LogWarn(SDL_LOG_CATEGORY_VIDEO,
         "[live2d/vk] attach: Step 1 SetConstantSettings (view=%p extent=%dx%d "
         "format=%d depth=%d images=%d)",
         (void *)info.image_view, width, height, (int)g_format,
         (int)kDepthFormat, info.image_count);
-    /*
-     * SDK 的 Vulkan 渲染器按相对路径 "FrameworkShaders/*.spv" 打开着色器, 而
-     * .spv 是随程序分发在 exe 目录下的。进程的工作目录不一定是 exe 目录, 所以
-     * 这里显式切过去, 并打一条探针确认第一个着色器真的能打开。
-     * 注意: SDL_GetBasePath() 返回 const char * 且由 SDL 自己持有, 不要 free。
-     */
     {
         std::filesystem::path parent = shader_parent_directory();
         if (!parent.empty()) {
@@ -178,28 +179,24 @@ bool bongo_cat_live2d_vulkan_attach(struct BongoCatVk *vk, int width, int height
         /*
          * 默认目标视图传 NULL: 我们每帧都用 SetRenderTarget 指向自己的离屏
          * 图像 (配合 EnableChangeRenderTarget), 从不通过 Cubism 渲染到交换链。
-         * 之前传的交换链视图在本环境里是无效句柄, SDK 用它建 framebuffer
-         * 时会崩。
+         * 之前传的交换链视图在本环境里是无效句柄, SDK 用它建 framebuffer 时会崩。
          */
         VK_NULL_HANDLE, g_format, kDepthFormat);
     Csm::Rendering::CubismRenderer_Vulkan::EnableChangeRenderTarget();
     SDL_LogWarn(SDL_LOG_CATEGORY_VIDEO,
         "[live2d/vk] attach: Step 2 SetConstantSettings 返回");
-    /*
-     * GetDeviceInfo 必须放在 SetConstantSettings 之后: SDK 示例的顺序是
-     * LAppDelegate 先 SetConstantSettings, LAppManager 之后才 GetDeviceInfo。
-     * 它内部会建 CubismPipeline_Vulkan (近 500 条管线 + 加载 .spv),
-     * 在静态设置尚未建立时调用会直接崩。
-     */
+    /* GetDeviceInfo 内部会建近 500 条管线并加载 .spv, 必须在静态设置之后调用 */
     if (!Csm::Rendering::CubismDeviceInfo_Vulkan::GetDeviceInfo(g_device)) {
         SDL_LogWarn(SDL_LOG_CATEGORY_VIDEO, "[live2d/vk] attach: GetDeviceInfo 失败");
         return false;
     }
+    VkExtent2D target_size = target_extent(width, height);
     SDL_LogWarn(SDL_LOG_CATEGORY_VIDEO,
-        "[live2d/vk] attach: Step 3 CreateRenderTarget %dx%d", width, height);
+        "[live2d/vk] attach: Step 3 CreateRenderTarget %dx%d (超采样 %dx%d)",
+        width, height, (int)target_size.width, (int)target_size.height);
     auto *target = CSM_NEW Csm::Rendering::CubismRenderTarget_Vulkan();
     target->CreateRenderTarget(g_device, (VkPhysicalDevice)info.physical_device,
-        (unsigned int)width, (unsigned int)height, g_format, kDepthFormat);
+        target_size.width, target_size.height, g_format, kDepthFormat);
     if (!target->IsValid()) {
         SDL_LogWarn(SDL_LOG_CATEGORY_VIDEO,
             "[live2d/vk] attach: 离屏目标创建失败 (%dx%d format=%d depth=%d)",
@@ -208,6 +205,8 @@ bool bongo_cat_live2d_vulkan_attach(struct BongoCatVk *vk, int width, int height
         return false;
     }
     g_target = target;
+    g_target_width = width;
+    g_target_height = height;
     g_vk = vk;
     g_attached = true;
     SDL_LogWarn(SDL_LOG_CATEGORY_VIDEO,
