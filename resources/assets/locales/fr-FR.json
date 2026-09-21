@@ -219,6 +219,7 @@
       "diagnosticLog": "Journal de diagnostic :"
     },
     "support": {
+      "experimentalNotice": "Cette version est une version expérimentale de test et ne représente pas le produit final.",
       "title": "À propos",
       "website": "Site web: bongocat.pet",
       "heroText": "Merci pour votre soutien. Chaque utilisation et chaque partage aide BongoCat à continuer de grandir.",

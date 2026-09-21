@@ -219,6 +219,7 @@
       "diagnosticLog": "Registro de diagnóstico:"
     },
     "support": {
+      "experimentalNotice": "Esta versión es una versión experimental de prueba y no representa el producto final.",
       "title": "Acerca de",
       "website": "Sitio web: bongocat.pet",
       "heroText": "Gracias por su apoyo. Cada uso y cada difusión ayudan a BongoCat a seguir creciendo.",

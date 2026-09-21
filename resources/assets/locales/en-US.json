@@ -219,6 +219,7 @@
       "diagnosticLog": "Diagnostic log:"
     },
     "support": {
+      "experimentalNotice": "This program is a functional-test experimental build and does not represent the final product.",
       "title": "About",
       "website": "Website: bongocat.pet",
       "heroText": "Thank you for your support. Every use and share helps BongoCat continue to grow.",

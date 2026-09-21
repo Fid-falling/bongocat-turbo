@@ -151,6 +151,24 @@ static void hero_title(BongoCatPreferences *value, struct nk_context *context,
 }
 void bongo_cat_preferences_about_hero(BongoCatPreferences *value,
     struct nk_context *context) {
+    /*
+     * 实验版声明: 放在"关于"页最上面一行, 打开这一页第一眼就能看到, 不打扰
+     * 下面的 logo / 作者 / 社区布局。
+     */
+    BongoCatUIPalette notice_palette =
+        bongo_cat_ui_palette(bongo_cat_ui_dark(context));
+    const float notice_height = value->ui.caption_font &&
+        value->ui.caption_font->height > 0.0f ?
+        value->ui.caption_font->height + 14.0f : 32.0f;
+    nk_layout_row_dynamic(context, notice_height, 1);
+    struct nk_rect notice_bounds;
+    if (nk_widget(&notice_bounds, context) != NK_WIDGET_INVALID) {
+        centered_wrapped(nk_window_get_canvas(context), notice_bounds,
+            tr(value, "native.support.experimentalNotice",
+            "This program is a functional-test experimental build and does not "
+            "represent the final product."),
+            value->ui.caption_font, notice_palette.accent);
+    }
     struct nk_rect bounds;
     nk_layout_row_dynamic(context, 340, 1);
     if (nk_widget(&bounds, context) == NK_WIDGET_INVALID) return;

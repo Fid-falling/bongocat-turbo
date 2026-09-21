@@ -219,6 +219,7 @@
       "diagnosticLog": "診断ログ："
     },
     "support": {
+      "experimentalNotice": "本プログラムは機能テスト用の実験版であり、最終製品ではありません",
       "title": "このアプリについて",
       "website": "公式サイト: bongocat.pet",
       "heroText": "ご支援ありがとうございます。利用や共有の一つひとつがBongoCatの成長につながります。",

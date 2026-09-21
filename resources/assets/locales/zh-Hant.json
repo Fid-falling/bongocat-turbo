@@ -219,6 +219,7 @@
       "diagnosticLog": "診斷日誌："
     },
     "support": {
+      "experimentalNotice": "本程式僅為功能測試實驗版，不代表最終成品",
       "title": "關於",
       "website": "官網: bongocat.pet",
       "heroText": "感謝你的支持。每一次使用與分享，都讓 BongoCat 持續成長。",
