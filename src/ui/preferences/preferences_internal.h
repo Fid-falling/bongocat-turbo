@@ -70,6 +70,9 @@ void bongo_cat_preferences_cache_path_draw(BongoCatPreferences *value,
     struct nk_context *context);
 bool bongo_cat_preferences_cache_path_event(BongoCatPreferences *value,
     const SDL_Event *event);
+/* 异步文件夹对话框的结果是 SDL 用户事件, 没有窗口 ID, 必须在按窗口过滤之前处理 */
+bool bongo_cat_preferences_cache_path_dialog_event(BongoCatPreferences *value,
+    const SDL_Event *event);
 void bongo_cat_preferences_cache_path_browse(BongoCatPreferences *value);
 void bongo_cat_preferences_cache_path_cancel(BongoCatPreferences *value);
 

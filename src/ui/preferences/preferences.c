@@ -207,6 +207,12 @@ bool bongo_cat_preferences_event(BongoCatPreferences *value, const SDL_Event *ev
     if (bongo_cat_preferences_import_event(value->import_dialog, value->app,
         event)) { value->render_dirty = value->visible;
         return true; }
+    /*
+     * "浏览"选择缓存目录的结果是异步对话框推回来的 SDL 用户事件: 它没有窗口 ID,
+     * 一旦走到下面那道 event_window(...) != 本窗口 的过滤就会被丢掉 —— 这正是
+     * "选完文件夹毫无反应"的原因, 所以必须在过滤之前处理。
+     */
+    if (bongo_cat_preferences_cache_path_dialog_event(value, event)) return true;
     if (!value->window) return false;
     if (event->type == SDL_EVENT_SYSTEM_THEME_CHANGED) {
         value->render_dirty = true; return false;

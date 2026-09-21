@@ -2,6 +2,7 @@
 #include "runtime.h"
 
 #include "bongo_cat/file.h"
+#include "bongo_cat/log.h"
 #include "bongo_cat/path.h"
 
 #include <SDL3/SDL.h>
@@ -139,6 +140,34 @@ bool bongo_cat_storage_paths_prepare(BongoCatApp *app,
     return false;
 }
 
+/*
+ * 缓存目录里也要有一份 Live2D 的 Vulkan 着色器。
+ *
+ * 单独复制 exe 的用法下 (用户把 exe 拷到桌面), 桥是从缓存里解出来的资源目录找
+ * FrameworkShaders 的。用户指定缓存目录时, 这里保证那份资源确实被解出来 ——
+ * 已有一份就直接返回 (内嵌资源的 complete 标记会拦住重复解包)。
+ */
+static void ensure_cache_shaders(BongoCatApp *app) {
+    if (!app || !app->cache_root[0]) return;
+    char probe[BONGO_CAT_PATH_CAP];
+    if (!bongo_cat_path_join(probe, sizeof(probe), app->cache_root,
+            "embedded-assets-" BONGO_CAT_VERSION
+            "/assets/FrameworkShaders/FragShaderSrc.spv")) return;
+    uint64_t size = 0;
+    if (bongo_cat_path_file_size(probe, &size) && size) return;
+    char target[BONGO_CAT_PATH_CAP];
+    if (!bongo_cat_path_join(target, sizeof(target), app->cache_root,
+            "embedded-assets-" BONGO_CAT_VERSION)) return;
+    BongoCatError embedded = {0};
+    if (bongo_cat_platform_embedded_assets(target, &embedded) == BONGO_CAT_OK) {
+        SDL_LogInfo(BONGO_CAT_LOG_LIFECYCLE,
+            "[runtime] 缓存目录已解出内嵌资源 (含 FrameworkShaders 着色器): %s",
+            target);
+    } else if (embedded.message[0]) {
+        SDL_LogWarn(SDL_LOG_CATEGORY_APPLICATION, "%s", embedded.message);
+    }
+}
+
 bool bongo_cat_storage_paths_apply_cache(BongoCatApp *app,
     BongoCatError *error) {
     if (!app) return true;
@@ -156,5 +185,6 @@ bool bongo_cat_storage_paths_apply_cache(BongoCatApp *app,
             configured);
         return false;
     }
+    ensure_cache_shaders(app);
     return true;
 }

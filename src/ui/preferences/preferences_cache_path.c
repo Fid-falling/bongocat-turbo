@@ -25,17 +25,23 @@ typedef struct BongoCatCacheBrowseContext {
     Uint32 event_type;
 } BongoCatCacheBrowseContext;
 
+static void queue_folder_result(BongoCatApp *app, Uint32 type,
+    const char *path) {
+    if (!type) return;
+    SDL_Event event = {0};
+    event.type = type;
+    event.user.data1 = path ? SDL_strdup(path) : NULL;
+    event.user.data2 = app;
+    SDL_PushEvent(&event);
+}
+
 static void folder_callback(void *userdata, const char *const *files,
     int filter) {
     (void)filter;
     BongoCatCacheBrowseContext *ctx = userdata;
     if (!ctx) return;
     const char *path = files && files[0] ? files[0] : NULL;
-    SDL_Event event = {0};
-    event.type = ctx->event_type;
-    event.user.data1 = path ? SDL_strdup(path) : NULL;
-    event.user.data2 = ctx->app;
-    SDL_PushEvent(&event);
+    queue_folder_result(ctx->app, ctx->event_type, path);
     SDL_free(ctx);
 }
 
@@ -75,6 +81,23 @@ static bool cache_path_save(BongoCatPreferences *value) {
 void bongo_cat_preferences_cache_path_draw(BongoCatPreferences *value,
     struct nk_context *context) {
     if (!value || !value->app) return;
+    /*
+     * 测试钩子: BONGO_CAT_TEST_CACHE_DIALOG=<目录> 会在这一帧模拟"用户点了浏览并
+     * 选中该目录"。它走的是和原生文件夹对话框完全相同的事件通道 (SDL 用户事件 ->
+     * 主循环 -> preferences.c 里的 dialog_event), 所以能覆盖"选完没反应"这类问题。
+     * 放在函数最前面: 这一行滚出可见区域时下面的 form 会直接返回, 钩子就跑不到了。
+     */
+    {
+        static bool hook_used;
+        const char *hook = SDL_getenv("BONGO_CAT_TEST_CACHE_DIALOG");
+        if (!hook_used && hook && hook[0]) {
+            hook_used = true;
+            if (!cache_folder_event_type)
+                cache_folder_event_type = SDL_RegisterEvents(1);
+            if (cache_folder_event_type != (Uint32)-1)
+                queue_folder_result(value->app, cache_folder_event_type, hook);
+        }
+    }
     const char *label = tr(value->app,
         "pages.preference.general.labels.cacheDirectory", "Cache directory");
     const char *detail = tr(value->app,
@@ -200,33 +223,37 @@ void bongo_cat_preferences_cache_path_draw(BongoCatPreferences *value,
     bongo_cat_pref_form_end(context, &saved);
 }
 
-bool bongo_cat_preferences_cache_path_event(BongoCatPreferences *value,
+bool bongo_cat_preferences_cache_path_dialog_event(BongoCatPreferences *value,
     const SDL_Event *event) {
-    if (!value) return false;
-    if (event->type == cache_folder_event_type) {
-        const char *path = (const char *)event->user.data1;
-        if (event->user.data2 == value->app) {
-            if (path) {
-                snprintf(value->app->settings.cache_root,
-                    sizeof(value->app->settings.cache_root), "%s", path);
-                BongoCatError error = {0};
-                if (bongo_cat_storage_paths_apply_cache(value->app, &error))
-                    bongo_cat_preferences_notice_show(value->app, tr(value->app,
-                        "pages.preference.general.hints.cacheApplied",
-                        "Cache directory updated"), false);
-                else
-                    bongo_cat_preferences_notice_show(value->app,
-                        error.message, true);
-            } else {
+    if (!value || !event || !cache_folder_event_type ||
+        event->type != cache_folder_event_type) return false;
+    const char *path = (const char *)event->user.data1;
+    if (event->user.data2 == value->app) {
+        if (path) {
+            snprintf(value->app->settings.cache_root,
+                sizeof(value->app->settings.cache_root), "%s", path);
+            BongoCatError error = {0};
+            if (bongo_cat_storage_paths_apply_cache(value->app, &error))
                 bongo_cat_preferences_notice_show(value->app, tr(value->app,
-                    "pages.preference.general.hints.cacheCancelled",
-                    "Cache directory selection cancelled"), false);
-            }
-            SDL_free((void *)path);
-            value->render_dirty = true;
-            return true;
+                    "pages.preference.general.hints.cacheApplied",
+                    "Cache directory updated"), false);
+            else
+                bongo_cat_preferences_notice_show(value->app,
+                    error.message, true);
+        } else {
+            bongo_cat_preferences_notice_show(value->app, tr(value->app,
+                "pages.preference.general.hints.cacheCancelled",
+                "Cache directory selection cancelled"), false);
         }
     }
+    SDL_free((void *)path);
+    value->render_dirty = true;
+    return true;
+}
+
+bool bongo_cat_preferences_cache_path_event(BongoCatPreferences *value,
+    const SDL_Event *event) {
+    if (!value || !event) return false;
     if (bongo_cat_preferences_text_session_event(&value->cache_path, event,
         value->ui.layout_scale, value->ui.label_font, 0.0f).handled) {
         value->render_dirty = true;

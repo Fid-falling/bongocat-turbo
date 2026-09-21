@@ -40,7 +40,7 @@ VkDevice g_device = VK_NULL_HANDLE;
 VkPhysicalDevice g_physical = VK_NULL_HANDLE;
 VkFormat g_format = VK_FORMAT_UNDEFINED;
 
-/* SDK 打开的第一个着色器文件, 用它判断一份 FrameworkShaders 是不是完整可用 */
+/* SDK 打开的第一个着色器文件, 用它判断一份 FrameworkShaders 是否可用 */
 const char *kShaderProbe = "FrameworkShaders/FragShaderSrc.spv";
 
 bool has_shader_probe(const std::filesystem::path &parent) {
@@ -49,21 +49,12 @@ bool has_shader_probe(const std::filesystem::path &parent) {
     return std::filesystem::exists(parent / kShaderProbe, error);
 }
 
-/*
- * 着色器父目录: 优先 exe 目录 (发布包把 FrameworkShaders 放在 exe 旁边), 其次
- * 内嵌资源目录 (只复制了 exe 时, 资源是从 pak 解出来的, FrameworkShaders 也在
- * 里面)。两者都没有就返回空, 由调用方给出明确错误 —— 以前这里直接 chdir 到 exe
- * 目录, 结果是模型用不上着色器, 画出一小块破碎的画面。
- */
+/* 着色器父目录: exe 目录 -> 内嵌资源目录 (只复制 exe 时资源是从 pak 解出来的) */
 std::filesystem::path shader_parent_directory() {
-    std::error_code error;
     std::filesystem::path base = SDL_GetBasePath() ? SDL_GetBasePath() : "";
     if (has_shader_probe(base)) return base;
-    if (!g_assets_root.empty()) {
-        std::filesystem::path assets = g_assets_root;
-        if (has_shader_probe(assets)) return assets;
-    }
-    (void)error;
+    if (!g_assets_root.empty() && has_shader_probe(g_assets_root))
+        return std::filesystem::path(g_assets_root);
     return {};
 }
 
@@ -106,12 +97,7 @@ bool ensure_target_size(int width, int height) {
 
 bool bongo_cat_live2d_vulkan_shaders_available(const char *assets_root) {
     if (!shader_parent_directory().empty()) return true;
-    if (assets_root && assets_root[0]) {
-        std::error_code error;
-        if (has_shader_probe(std::filesystem::path(assets_root))) return true;
-        (void)error;
-    }
-    return false;
+    return assets_root && assets_root[0] && has_shader_probe(assets_root);
 }
 
 void bongo_cat_live2d_vulkan_set_shader_root(const char *assets_root) {
