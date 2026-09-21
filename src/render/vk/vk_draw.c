@@ -278,11 +278,8 @@ bool bongo_cat_vk_draw_dial(BongoCatVk *vk, BongoCatVkTexture *texture,
     if (!vk || !vk->frame_active || !vertices || vertex_count < 3) return false;
     if (vk->dial_pipeline == VK_NULL_HANDLE || !texture) return false;
     if (width <= 0 || height <= 0) return false;
-    /*
-     * 菜单顶点就是管线的输入格式 (pos 2f + uv 2f + RGBA8, 共 20 字节), 坐标是
-     * 窗口逻辑像素 (原点左上), 所以直接把整批顶点推进专用缓冲, 再用 scale/offset
-     * push constant 映射到裁剪空间 —— 与设置界面 ui.vert 的映射一致。
-     */
+    /* 菜单顶点就是管线输入格式 (pos 2f + uv 2f + RGBA8), 坐标是窗口逻辑像素,
+       整批推进专用缓冲后用 scale/offset 映射到裁剪空间 (与 ui.vert 一致) */
     BongoCatVkArena *arena = &vk->dial_arenas[vk->frame_index];
     size_t bytes = (size_t)vertex_count * sizeof(DialVertexIn);
     VkDeviceSize offset = 0;
@@ -387,6 +384,7 @@ bool bongo_cat_vk_ui_draw(BongoCatVk *vk, BongoCatVkTexture *texture,
     push.scale[1] = scale_y;
     push.offset[0] = -1.0f;
     push.offset[1] = -1.0f;
+    push.color_texture = texture->alpha_mask ? 0 : 1; /* 见 ui.frag: 遮罩取 R, RGBA 整体采样 */
     VkCommandBuffer command = vk->frames[vk->frame_index].command;
     vkCmdBindPipeline(command, VK_PIPELINE_BIND_POINT_GRAPHICS, vk->ui_pipeline);
     vkCmdBindDescriptorSets(command, VK_PIPELINE_BIND_POINT_GRAPHICS, vk->ui_layout,

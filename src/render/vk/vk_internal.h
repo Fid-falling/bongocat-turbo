@@ -59,6 +59,13 @@ struct BongoCatVkTexture {
     VkDescriptorSet descriptor;
     /* 外部拥有的图像: 只借用, 释放时不动 image/memory/view */
     bool external;
+    /*
+     * 单通道遮罩纹理 (字体图集、设置界面的 paint cache): 界面着色器对它取 R 通道
+     * 当覆盖率、RGB 当 1。普通 RGBA 图 (图标图集 ui-symbols.png / logo) 整体采样,
+     * 形状在 alpha 里。以前不区分, 于是"白色 RGB + alpha 遮罩"的图标图集被整块
+     * 涂成纯色方块。
+     */
+    bool alpha_mask;
     int width;
     int height;
     char label[64];
@@ -83,10 +90,12 @@ typedef struct CornerPush {
     int radius_milli;
 } CornerPush;
 
-/* 设置界面: 逻辑像素 -> 裁剪空间的缩放与偏移 */
+/* 设置界面: 逻辑像素 -> 裁剪空间的缩放与偏移, 以及纹理的取样方式 */
 typedef struct UiPush {
     float scale[2];
     float offset[2];
+    /* 1 = 普通 RGBA 纹理 (整体采样, 形状在 alpha); 0 = 单通道遮罩 (R 当覆盖率) */
+    int color_texture;
 } UiPush;
 
 /* 混合模式, 与 OpenGL 路径逐条对应 */

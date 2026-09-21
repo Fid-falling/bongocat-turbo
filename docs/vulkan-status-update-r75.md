@@ -63,7 +63,7 @@ instance/physical/device/queue，只建自己的表面、交换链与设备级�
 ## 四、默认渲染后端改回 OpenGL
 
 Vulkan 后端现在能跑通主窗口、设置窗口和 Live2D，但还没到"可以当默认"的程度
-（设置界面里的图片贴图仍是纯色方块，采集路径也有差异）。所以：
+（设置界面贴图、模型锯齿都已修，剩下采集路径的差异）。所以：
 
 - `AUTO` 解析为 **OpenGL**（`src/render/render_backend.c` 的 `resolve`），
   Vulkan 需要用户在设置里显式选择；
@@ -132,7 +132,29 @@ Vulkan 下更是连 GL 前缓冲都没有，代理永远拿不到新帧。
 ```
 截图对比：Vulkan 的描边/轮廓与 OpenGL 一致（阶梯消失），无限帧率下 1500+ FPS。
 
-## 八、验证工具
+## 八、设置界面的图标 / logo 在 Vulkan 下变成纯色方块（已修复）
+
+设置界面里的贴图（logo、侧边栏图标、关闭按钮、Discord/QQ 徽标）在 Vulkan 下整体
+画成纯色方块，文字却正常。
+
+根因在 `shaders/ui.frag`：它统一按**单通道遮罩**处理 —— `coverage = texture().r`、
+RGB 当 1（对应 GL 的 `TEXTURE_SWIZZLE`，字体图集和 paint cache 确实是这样）。
+但 `ui-symbols.png` / `bongocat.png` 是**白色 RGB + alpha 遮罩**的普通 RGBA 图
+（实测图集第 0 格中心 R=G=B=255 A=255、角落 A=0），R 通道恒为 255 ⇒ coverage 恒为 1
+⇒ 整个四边形被涂成顶点色。
+
+修法（管线侧）：给`UiPush`加一个 `color_texture` 开关，UI 着色器据此二选一：
+
+- 单通道遮罩（字体图集、paint cache）：`coverage = r`，`tint = 1`（原行为）；
+- 普通 RGBA 图（图标图集、logo）：`coverage = a`，`tint = rgb`（整体采样）。
+
+`BongoCatVkTexture` 增加 `alpha_mask`（由 `bytes_per_pixel == 1` 判定，
+`vk_texture.c` 里设置），`bongo_cat_vk_ui_draw` 按它填 push constant。
+
+实测：`--ci-preference-page=0/3` 截图，logo、侧边栏四个图标、行图标、关闭按钮、
+社区徽标全部与 OpenGL 一致。
+
+## 九、验证工具
 
 - `build-vulkan/.test/alpha-screen.ps1`：等日志标记再截窗口（本机启动有时很慢，
   不能靠 `MainWindowHandle` 轮询）；
@@ -141,10 +163,8 @@ Vulkan 下更是连 GL 前缓冲都没有，代理永远拿不到新帧。
 - `build-vulkan/.test/passthrough-probe.ps1`：开穿透后枚举进程的顶层窗口
   （看有没有被压成全透明的源窗口和代理窗口）+ 两次截屏算帧差（冻结帧差≈0）。
 
-## 九、已知遗留
+## 十、已知遗留
 
-- 设置界面里的图片贴图（logo、侧边栏图标、关闭按钮）在 Vulkan 下仍画成纯色
-  方块（paint cache 那几张纹理采样不到内容），字体图集不受影响；
 - 构建环境在本次会话中途被 C 盘格式化清空，恢复过程见
   `docs/build-environment-restore.md`；
 - 覆盖截帧 / 整帧回读仍只有 OpenGL 路径（`docs/vulkan-readback-recipe.md`）；

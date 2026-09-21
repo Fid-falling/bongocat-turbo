@@ -185,6 +185,7 @@ static BongoCatVkTexture *bongo_cat_vk_texture_create(BongoCatVk *vk,
     }
     texture->width = width;
     texture->height = height;
+    texture->alpha_mask = bytes_per_pixel == 1; /* 单通道 = 遮罩, 见 ui.frag */
     snprintf(texture->label, sizeof(texture->label), "%s", label ? label : "texture");
     VkDeviceSize bytes = (VkDeviceSize)width * (VkDeviceSize)height *
         (VkDeviceSize)bytes_per_pixel;
@@ -314,7 +315,6 @@ static BongoCatVkTexture *bongo_cat_vk_texture_create(BongoCatVk *vk,
     vkUpdateDescriptorSets(vk->device, 1, &write, 0, NULL);
     return texture;
 }
-
 BongoCatVkTexture *bongo_cat_vk_texture_from_pixels(BongoCatVk *vk,
     const unsigned char *rgba, int width, int height, const char *label,
     BongoCatError *error) {
