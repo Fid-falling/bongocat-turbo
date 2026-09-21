@@ -29,6 +29,7 @@
           "hideOnHover": "Hide on Hover",
           "hideFadeSeconds": "Fade Duration (s)",
           "maxFPS": "Max Frame Rate",
+          "unlimitedFps": "Unlimited",
           "renderer": "Renderer"
         },
         "hints": {

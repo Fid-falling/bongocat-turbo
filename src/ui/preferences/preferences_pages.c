@@ -179,7 +179,8 @@ static void page_display(BongoCatApp *app, struct nk_context *context) {
     }
     bongo_cat_pref_row_icon(context, BONGO_CAT_PREF_ICON_MAX_FPS);
     model->max_fps = bongo_cat_pref_fps(context, "max-fps", tr(app,
-        "pages.preference.cat.labels.maxFPS", "Max Frame Rate"), model->max_fps);
+        "pages.preference.cat.labels.maxFPS", "Max Frame Rate"), model->max_fps,
+        tr(app, "pages.preference.cat.labels.unlimitedFps", "Unlimited"));
     bongo_cat_pref_row_icon(context, BONGO_CAT_PREF_ICON_RENDERER);
     BongoCatRenderer previous_renderer = model->renderer;
     model->renderer = (BongoCatRenderer)bongo_cat_pref_renderer(context,

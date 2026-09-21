@@ -29,6 +29,7 @@
           "hideOnHover": "Masquer au survol",
           "hideFadeSeconds": "Durée du fondu (s)",
           "maxFPS": "Fréquence d'images maximale",
+          "unlimitedFps": "Illimité",
           "renderer": "Moteur de rendu"
         },
         "hints": {

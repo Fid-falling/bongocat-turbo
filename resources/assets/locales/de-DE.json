@@ -29,6 +29,7 @@
           "hideOnHover": "Beim Darüberfahren ausblenden",
           "hideFadeSeconds": "Ausblendedauer (s)",
           "maxFPS": "Maximale Bildrate",
+          "unlimitedFps": "Unbegrenzt",
           "renderer": "Renderer"
         },
         "hints": {

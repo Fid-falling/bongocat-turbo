@@ -29,6 +29,7 @@
           "hideOnHover": "滑鼠游標移入隱藏",
           "hideFadeSeconds": "隱藏漸變時長 (秒)",
           "maxFPS": "最大幀率",
+          "unlimitedFps": "無限制",
           "renderer": "渲染後端"
         },
         "hints": {

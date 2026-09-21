@@ -208,9 +208,10 @@ int bongo_cat_pref_renderer(struct nk_context *context, const char *id,
 }
 
 int bongo_cat_pref_fps(struct nk_context *context, const char *id,
-    const char *title, int fps) {
+    const char *title, int fps, const char *unlimited_label) {
     /* 比主题行宽: "Unlimited" 比图标占地方, 沿用 156px 三段会挤到一起 */
-    static const char *labels[] = {"30 FPS", "60 FPS", "Unlimited"};
+    const char *labels[] = {"30 FPS", "60 FPS",
+        unlimited_label && unlimited_label[0] ? unlimited_label : "Unlimited"};
     int selected = fps == 30 ? 0 : (fps == BONGO_CAT_DEFAULT_MAX_FPS ? 1 : 2);
     int picked = choice_row(context, id, title, labels, 3, false, selected, 192.0f, -1);
     return picked == 0 ? 30 : (picked == 1 ? BONGO_CAT_DEFAULT_MAX_FPS

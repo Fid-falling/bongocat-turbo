@@ -29,6 +29,7 @@
           "hideOnHover": "ホバー時に非表示",
           "hideFadeSeconds": "フェード時間 (秒)",
           "maxFPS": "最大フレームレート",
+          "unlimitedFps": "無制限",
           "renderer": "レンダラー"
         },
         "hints": {
