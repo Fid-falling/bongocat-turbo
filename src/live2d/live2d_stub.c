@@ -202,3 +202,13 @@ bool bongo_cat_live2d_vulkan_target_info(void **image, void **view, void **sampl
     (void)image; (void)view; (void)sampler; (void)width; (void)height;
     return false;
 }
+
+/* 没有 Cubism/Vulkan 的构建走不到 Vulkan 模型路径, 这里一律当作"可用" */
+bool bongo_cat_live2d_vulkan_shaders_available(const char *assets_root) {
+    (void)assets_root;
+    return true;
+}
+
+void bongo_cat_live2d_vulkan_set_shader_root(const char *assets_root) {
+    (void)assets_root;
+}

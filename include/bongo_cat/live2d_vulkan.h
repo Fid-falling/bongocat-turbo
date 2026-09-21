@@ -30,6 +30,14 @@ struct BongoCatVk;
  * 真正的挂载 attach() 推迟到模型创建渲染器时, 那时框架已经启动。
  */
 bool bongo_cat_live2d_vulkan_remember(struct BongoCatVk *vk, int width, int height);
+/*
+ * Cubism 的 Vulkan 渲染器按相对路径 "FrameworkShaders/*.spv" 打开着色器, 所以
+ * 进程的工作目录必须是这些文件的父目录。发布包把它们放在 exe 旁边, 但"只复制
+ * 一个 exe"的情况很常见 (用户把 exe 拷到桌面就跑), 那时要去解出来的内嵌资源
+ * 目录里找。set_shader_root 在窗口创建时把内嵌资源根目录告诉桥。
+ */
+bool bongo_cat_live2d_vulkan_shaders_available(const char *assets_root);
+void bongo_cat_live2d_vulkan_set_shader_root(const char *assets_root);
 bool bongo_cat_live2d_vulkan_attach(struct BongoCatVk *vk, int width, int height);
 bool bongo_cat_live2d_vulkan_ready(void);
 bool bongo_cat_live2d_vulkan_begin_frame(void);

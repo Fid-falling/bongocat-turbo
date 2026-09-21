@@ -23,6 +23,21 @@ static bool try_vulkan_window(BongoCatApp *app, BongoCatError *error) {
             "test hook BONGO_CAT_TEST_VULKAN_FALLBACK");
         return false;
     }
+#if defined(BONGO_CAT_HAS_CUBISM)
+    /*
+     * Live2D 的 Vulkan 渲染器按相对路径打开 SDK 的 FrameworkShaders/*.spv。
+     * 用户经常只把 exe 复制到别处 (比如桌面) 就跑: 那时 exe 旁边没有这些文件,
+     * 模型会画成一小块破碎的画面。这里提前判断, 找不到就明确失败并让上层回退
+     * OpenGL —— 与其画坏, 不如用能正常工作的后端。
+     */
+    bongo_cat_live2d_vulkan_set_shader_root(app->asset_root);
+    if (!bongo_cat_live2d_vulkan_shaders_available(app->asset_root)) {
+        bongo_cat_error_set(error, BONGO_CAT_ERROR_PLATFORM,
+            "缺少 Live2D 的 Vulkan 着色器 (FrameworkShaders/*.spv): 请把 Release "
+            "目录里的 FrameworkShaders 文件夹和 exe 放在一起");
+        return false;
+    }
+#endif
     bool transparent = !test_transparency_disabled();
     SDL_WindowFlags flags = SDL_WINDOW_VULKAN | SDL_WINDOW_BORDERLESS |
         SDL_WINDOW_HIGH_PIXEL_DENSITY | SDL_WINDOW_HIDDEN;

@@ -86,7 +86,25 @@ Vulkan 下更是连 GL 前缓冲都没有，代理永远拿不到新帧。
 `ex=0x28`（WS_EX_TRANSPARENT|TOPMOST）的可见窗口，没有 `WS_EX_LAYERED`、没有
 代理窗口，宠物照常动（3 s 帧差 2.16% / 1.34%）。
 
-## 七、验证工具
+## 七、单独复制 exe 导致 Vulkan 画坏（用户报告）
+
+用户报告：把 `BongoCat.exe` 单独复制到桌面后打开，Vulkan 下渲染不正常。
+
+原因：Cubism 的 Vulkan 渲染器按**相对路径** `FrameworkShaders/*.spv` 打开 510 个
+编译好的着色器，它们本来是随发布包放在 exe 旁边的。只复制一个 exe 时这些文件
+就没了，模型管线建不起来，画面上只剩一小块破碎的图形。
+
+修法（两层）：
+
+1. 这些 `.spv` 现在也打进内嵌资源（`assets/FrameworkShaders/`）。桥在挂载时按
+   "exe 目录 → 解出来的内嵌资源目录"的顺序找着色器，并 `chdir` 到它的父目录
+   （SDK 用的是相对路径）。所以单独一个 exe 也能跑 Vulkan —— 实测：把 exe 复制
+   到别的目录，日志里 `着色器目录=...\cache\embedded-assets-<ver>\assets`，
+   Vulkan 正常出画。代价是 exe 从 6.2 MB 变成 9.6 MB。
+2. 两处都找不到时**明确失败并回退 OpenGL**，而不是画出一堆碎片：日志会写
+   `vulkan 初始化失败 (缺少 Live2D 的 Vulkan 着色器 (FrameworkShaders/*.spv): ...)`。
+
+## 八、验证工具
 
 - `build-vulkan/.test/alpha-screen.ps1`：等日志标记再截窗口（本机启动有时很慢，
   不能靠 `MainWindowHandle` 轮询）；
@@ -95,7 +113,7 @@ Vulkan 下更是连 GL 前缓冲都没有，代理永远拿不到新帧。
 - `build-vulkan/.test/passthrough-probe.ps1`：开穿透后枚举进程的顶层窗口
   （看有没有被压成全透明的源窗口和代理窗口）+ 两次截屏算帧差（冻结帧差≈0）。
 
-## 八、已知遗留
+## 九、已知遗留
 
 - 设置界面里的图片贴图（logo、侧边栏图标、关闭按钮）在 Vulkan 下仍画成纯色
   方块（paint cache 那几张纹理采样不到内容），字体图集不受影响；

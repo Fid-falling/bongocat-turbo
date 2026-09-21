@@ -58,6 +58,11 @@ if(WIN32)
       bongo_cat_asset_packer
     VERBATIM)
   add_custom_target(bongo_cat_asset_pack DEPENDS "${BONGO_CAT_ASSET_PACK}")
+  # 内嵌资源里也放一份编译好的 Cubism Vulkan 着色器, 所以先让 FrameworkShaders
+  # 目标把 .spv 生成出来, 否则打包时会拷到一个还不存在的目录。
+  if(TARGET FrameworkShaders)
+    add_dependencies(bongo_cat_asset_pack FrameworkShaders)
+  endif()
   file(TO_CMAKE_PATH "${BONGO_CAT_ASSET_PACK}" BONGO_CAT_ASSET_PACK_RC)
   file(TO_CMAKE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/resources/icons/icon.ico"
     BONGO_CAT_ICON_RC)

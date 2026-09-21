@@ -33,10 +33,39 @@ BongoCatVk *g_vk = nullptr;
 BongoCatVk *g_pending_vk = nullptr;
 int g_pending_width = 0;
 int g_pending_height = 0;
+/* 窗口创建时记下的内嵌资源根目录 (assets/), 里面也有一份 FrameworkShaders */
+std::string g_assets_root;
 Csm::Rendering::CubismRenderTarget_Vulkan *g_target = nullptr;
 VkDevice g_device = VK_NULL_HANDLE;
 VkPhysicalDevice g_physical = VK_NULL_HANDLE;
 VkFormat g_format = VK_FORMAT_UNDEFINED;
+
+/* SDK 打开的第一个着色器文件, 用它判断一份 FrameworkShaders 是不是完整可用 */
+const char *kShaderProbe = "FrameworkShaders/FragShaderSrc.spv";
+
+bool has_shader_probe(const std::filesystem::path &parent) {
+    if (parent.empty()) return false;
+    std::error_code error;
+    return std::filesystem::exists(parent / kShaderProbe, error);
+}
+
+/*
+ * 着色器父目录: 优先 exe 目录 (发布包把 FrameworkShaders 放在 exe 旁边), 其次
+ * 内嵌资源目录 (只复制了 exe 时, 资源是从 pak 解出来的, FrameworkShaders 也在
+ * 里面)。两者都没有就返回空, 由调用方给出明确错误 —— 以前这里直接 chdir 到 exe
+ * 目录, 结果是模型用不上着色器, 画出一小块破碎的画面。
+ */
+std::filesystem::path shader_parent_directory() {
+    std::error_code error;
+    std::filesystem::path base = SDL_GetBasePath() ? SDL_GetBasePath() : "";
+    if (has_shader_probe(base)) return base;
+    if (!g_assets_root.empty()) {
+        std::filesystem::path assets = g_assets_root;
+        if (has_shader_probe(assets)) return assets;
+    }
+    (void)error;
+    return {};
+}
 
 /* 24 位深度 + 模板在桌面 Vulkan 上普遍可用, SDK 的样例也用这一档 */
 const VkFormat kDepthFormat = VK_FORMAT_D24_UNORM_S8_UINT;
@@ -74,6 +103,20 @@ bool ensure_target_size(int width, int height) {
 }
 
 } // namespace
+
+bool bongo_cat_live2d_vulkan_shaders_available(const char *assets_root) {
+    if (!shader_parent_directory().empty()) return true;
+    if (assets_root && assets_root[0]) {
+        std::error_code error;
+        if (has_shader_probe(std::filesystem::path(assets_root))) return true;
+        (void)error;
+    }
+    return false;
+}
+
+void bongo_cat_live2d_vulkan_set_shader_root(const char *assets_root) {
+    g_assets_root = assets_root ? assets_root : "";
+}
 
 bool bongo_cat_live2d_vulkan_remember(struct BongoCatVk *vk, int width, int height) {
     if (!vk || width <= 0 || height <= 0) return false;
@@ -131,19 +174,16 @@ bool bongo_cat_live2d_vulkan_attach(struct BongoCatVk *vk, int width, int height
      * 注意: SDL_GetBasePath() 返回 const char * 且由 SDL 自己持有, 不要 free。
      */
     {
-        const char *base = SDL_GetBasePath();
-        if (base) {
+        std::filesystem::path parent = shader_parent_directory();
+        if (!parent.empty()) {
             std::error_code error_code;
-            std::filesystem::current_path(base, error_code);
-            std::ifstream probe("FrameworkShaders/FragShaderSrc.spv",
-                std::ios::binary);
+            std::filesystem::current_path(parent, error_code);
             SDL_LogWarn(SDL_LOG_CATEGORY_VIDEO,
-                "[live2d/vk] attach: cwd=%s shader=%s",
-                std::filesystem::current_path().string().c_str(),
-                probe.is_open() ? "ok" : "MISSING");
+                "[live2d/vk] attach: 着色器目录=%s",
+                std::filesystem::current_path().string().c_str());
         } else {
             SDL_LogWarn(SDL_LOG_CATEGORY_VIDEO,
-                "[live2d/vk] attach: SDL_GetBasePath 失败");
+                "[live2d/vk] attach: 找不到 FrameworkShaders (exe 目录与内嵌资源里都没有)");
         }
     }
     Csm::Rendering::CubismRenderer_Vulkan::SetConstantSettings(g_device,
