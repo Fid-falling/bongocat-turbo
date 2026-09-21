@@ -248,6 +248,14 @@ bool bongo_cat_vk_create_swapchain(BongoCatVk *vk, int width, int height,
     const bool transparent = window_is_transparent(vk);
     create.compositeAlpha = choose_composite_alpha(
         capabilities.supportedCompositeAlpha, transparent);
+    /*
+     * Windows 10 的 Win32 表面常常只报 OPAQUE (实测 RTX 3060 Ti + 驱动 1.4.303:
+     * supported=0x1), 但 NVIDIA 这类驱动实际接受预乘合成。先按预乘试一次, 失败
+     * 下面的梯子会退回不透明 —— 否则桌宠背景在 Win10 上永远是黑的。
+     */
+    if (transparent &&
+        create.compositeAlpha == VK_COMPOSITE_ALPHA_OPAQUE_BIT_KHR)
+        create.compositeAlpha = VK_COMPOSITE_ALPHA_PRE_MULTIPLIED_BIT_KHR;
     create.presentMode = vk->present_mode;
     create.clipped = VK_TRUE;
     VkResult result = vkCreateSwapchainKHR(vk->device, &create, NULL, &vk->swapchain);

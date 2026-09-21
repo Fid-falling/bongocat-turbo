@@ -215,8 +215,27 @@ bool NativeModel::create_renderer(BongoCatError *error) {
         _model->GetOffscreenMasks());
     const Csm::csmInt32 buffer_count = std::max(
         mask_buffer_count(drawable_combinations), mask_buffer_count(offscreen_combinations));
+    /*
+     * 有些机器上模型创建早于窗口尺寸生效, width_/height_ 会是 0: SDK 用 0 尺寸建
+     * 遮罩帧缓冲会直接抛 GL_INVALID_VALUE (0x501), 表现就是"猫不见了"。这里兜底
+     * 用窗口像素尺寸, 再不行用 1x1; 窗口尺寸变化后遮罩会按新尺寸重建。
+     */
+    if (width_ <= 0 || height_ <= 0) {
+        int pixel_width = 0, pixel_height = 0;
+        SDL_Window *window = SDL_GL_GetCurrentWindow();
+        if (window) SDL_GetWindowSizeInPixels(window, &pixel_width, &pixel_height);
+        width_ = pixel_width > 0 ? pixel_width : 1;
+        height_ = pixel_height > 0 ? pixel_height : 1;
+        SDL_LogWarn(SDL_LOG_CATEGORY_VIDEO,
+            "[live2d] 创建渲染器时尺寸无效, 兜底用 %dx%d", width_, height_);
+    }
     CreateRenderer((Csm::csmUint32)width_, (Csm::csmUint32)height_,
         buffer_count);
+    const GLenum create_error = glGetError();
+    if (create_error != GL_NO_ERROR)
+        SDL_LogWarn(SDL_LOG_CATEGORY_VIDEO,
+            "[live2d] CreateRenderer(%dx%d buffers=%d) 之后 gl=0x%x",
+            width_, height_, (int)buffer_count, (unsigned)create_error);
     auto *renderer = GetRenderer<Csm::Rendering::CubismRenderer_OpenGLES2>();
     if (renderer) {
         GLint texture_limit = 0;
@@ -236,6 +255,12 @@ bool NativeModel::create_renderer(BongoCatError *error) {
             mask_texture_limit_ = std::max(256, mask_texture_limit_ - 256);
         bind_textures();
         update_mask_buffers();
+        const GLenum mask_error = glGetError();
+        if (mask_error != GL_NO_ERROR)
+            SDL_LogWarn(SDL_LOG_CATEGORY_VIDEO,
+                "[live2d] 遮罩缓冲 (limit=%d divisions=%d buffers=%d) 之后 gl=0x%x",
+                mask_texture_limit_, mask_layout_divisions_, (int)buffer_count,
+                (unsigned)mask_error);
     }
     GLenum renderer_error = glGetError();
     if (renderer && renderer_error == GL_NO_ERROR) return true;

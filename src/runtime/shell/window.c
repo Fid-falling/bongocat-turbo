@@ -1,4 +1,5 @@
 #include "runtime.h"
+#include "bongo_cat/log.h"
 #include "bongo_cat/render.h"
 #include "bongo_cat/vk_backend.h"
 #include "bongo_cat/live2d_vulkan.h"
@@ -167,10 +168,18 @@ BongoCatResult bongo_cat_window_create(BongoCatApp *app, BongoCatError *error) {
             SDL_Log("[runtime] OpenGL window ready (transparent=%d, MSAA=%d, "
                 "sample_buffers=%d, sample_count=%d)", options[i][0], options[i][1],
                 sample_buffers, sample_count);
-            SDL_Log("[runtime] OpenGL context: vendor=%s renderer=%s version=%s",
+            SDL_LogInfo(BONGO_CAT_LOG_LIFECYCLE,
+                "[runtime] OpenGL 上下文: vendor=%s renderer=%s version=%s MSAA=%d/%d",
                 vendor ? (const char *)vendor : "unknown",
                 renderer ? (const char *)renderer : "unknown",
-                version ? (const char *)version : "unknown");
+                version ? (const char *)version : "unknown",
+                sample_buffers, sample_count);
+            {
+                GLint max_texture = 0;
+                glGetIntegerv(GL_MAX_TEXTURE_SIZE, &max_texture);
+                SDL_LogInfo(BONGO_CAT_LOG_LIFECYCLE,
+                    "[runtime] OpenGL 限制: max_texture=%d", (int)max_texture);
+            }
             if (!SDL_GL_SetSwapInterval(0)) SDL_LogWarn(SDL_LOG_CATEGORY_VIDEO,
                 "Vertical sync could not be disabled: %s", SDL_GetError());
             return BONGO_CAT_OK;
