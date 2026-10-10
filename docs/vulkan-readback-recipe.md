@@ -1,6 +1,10 @@
 # 整帧回读实现配方（封面截取 / 窗口快照共用）
 
-面向"让 Vulkan 完全替代 OpenGL"的后续工作。现状与总览见 `docs/vulkan-cubism-status.md`。
+> **状态：已实现**（本文保留为设计记录）。落地位置：
+> `src/render/vk/vk_readback.c`（缓冲与采集）、`include/bongo_cat/vk_backend.h` 的
+> `bongo_cat_vk_queue_frame_sample()` / `bongo_cat_vk_take_frame_sample()`；封面接线见
+> `src/runtime/model/model_cover.c` 与 `src/runtime/lifecycle/app_loop.c`（Vulkan 分叉处）。
+> 窗口快照没有走回读：Vulkan 下显式降级为实时渲染。
 
 ## 现有回读设施（已勘察）
 

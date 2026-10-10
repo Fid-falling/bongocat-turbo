@@ -163,9 +163,34 @@ RGB 当 1（对应 GL 的 `TEXTURE_SWIZZLE`，字体图集和 paint cache 确实
 - `build-vulkan/.test/passthrough-probe.ps1`：开穿透后枚举进程的顶层窗口
   （看有没有被压成全透明的源窗口和代理窗口）+ 两次截屏算帧差（冻结帧差≈0）。
 
-## 十、已知遗留
+## 十、收尾：Vulkan 追平 OpenGL
 
-- 构建环境在本次会话中途被 C 盘格式化清空，恢复过程见
-  `docs/build-environment-restore.md`；
-- 覆盖截帧 / 整帧回读仍只有 OpenGL 路径（`docs/vulkan-readback-recipe.md`）；
-- `live2d-visual-audit` 的 `edge_pixels` 列依赖 `glReadPixels`，Vulkan 下无意义。
+原先列在这里的遗留已经全部处理完：
+
+- **轮盘字形**：`shaders/dial.frag` 之前把单通道字形图集当 RGBA 采样（R8 采出
+  `(r,0,0,1)`），文字渲染成黑块。现在与 `ui.frag` 一样按纹理类型取样（遮罩取
+  `(1,1,1,r)`、普通 RGBA 整体采样），开关由 `BongoCatVkTexture.alpha_mask` 决定；
+- **整帧回读**：新增 `src/render/vk/vk_readback.c`，公开
+  `bongo_cat_vk_queue_frame_sample()` / `bongo_cat_vk_take_frame_sample()`
+  （一帧延迟、take 一次性取走），替代原先只有 OpenGL 才有的 `glReadPixels`；
+  命中测试的小块回读与它共用一个帧槽缓冲，整帧请求优先；
+- **模型封面**：Vulkan 下由“照常渲染并 present + 整帧入队回读 + 下一帧写 PNG”
+  完成。实测两后端封面统计一致（不透明 42~43%、彩色 39%）；
+- **冒烟与诊断**：`frame-series.csv`、`frame.bmp`、首帧诊断都改走回读；首帧诊断
+  改成“取不到像素就下次再试”（回读有一帧延迟，只试一次必然错过）。实测
+  Vulkan 与 OpenGL 的 visible/alpha 统计对等；
+- **交互快照**：Vulkan 没有 GL 上下文，快照机制不可用 —— 现在显式标记并退回
+  实时渲染（不再每次拖动都白试一遍）；
+- **默认后端**：`bongo_cat_renderer_resolve()` 的 AUTO 改为优先 Vulkan，探测
+  失败（没有设备/驱动太旧）才回退 OpenGL。
+
+仍然只属于 OpenGL 的：`live2d-visual-audit` 与 `live2d-viewer-audit` 这两项
+测试工具 —— 它们靠“自己清屏画一帧再读像素”，Vulkan 需要一条独立的离屏渲染
+路径，目前在 Vulkan 下明确跳过并记日志。
+
+待验证（需要另一台机器）：
+
+- Windows 10 + NVIDIA 的预乘合成：本轮改成“能力掩码只报 OPAQUE 时也先试一次
+  PRE_MULTIPLIED”，失败仍回退不透明；
+- OpenGL 下 Live2D 渲染器创建失败的兜底（尺寸为 0 时改用窗口像素尺寸），以及
+  新增的 `[runtime] OpenGL 上下文:` / `[live2d] 遮罩预算=` 诊断行。

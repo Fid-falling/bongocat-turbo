@@ -1,4 +1,6 @@
 #include "runtime.h"
+#include "bongo_cat/log.h"
+#include "bongo_cat/render.h"
 
 #ifdef _WIN32
 #include "windows_snapshot.h"
@@ -11,6 +13,17 @@ void bongo_cat_window_snapshot_begin(BongoCatApp *app) {
     app->snapshot_deadline_ns = SDL_GetTicksNS() + SNAPSHOT_IDLE_NS;
     if (app->window_snapshot || app->snapshot_blocked) return;
 #ifdef _WIN32
+    /*
+     * 快照 (windows_snapshot_image.c 的 glReadPixels) 需要 GL 上下文, Vulkan 后端
+     * 没有: 拖动/缩放时退回实时渲染。这里显式标记不可用, 免得每次交互都白试一遍。
+     */
+    if (bongo_cat_renderer_active() == BONGO_CAT_RENDERER_VULKAN) {
+        if (!app->snapshot_blocked)
+            SDL_LogInfo(BONGO_CAT_LOG_LIFECYCLE,
+                "[runtime] 交互快照在 Vulkan 下不可用, 使用实时渲染");
+        app->snapshot_blocked = true;
+        return;
+    }
     if (!app->window || !app->live2d || !app->session.window.visible ||
         app->startup_visibility_pending || app->window_minimized || app->hover_hidden ||
         app->hover_fade_active ||
