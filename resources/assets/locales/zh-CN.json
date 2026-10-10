@@ -29,6 +29,8 @@
           "hideOnHover": "鼠标移入隐藏",
           "hideFadeSeconds": "鼠标移入淡出时长（秒）",
           "maxFPS": "最大帧率",
+          "disableUiEffects": "关闭界面特效",
+          "disableUiEffectsHint": "关掉发光与阴影, 设置界面每帧省约 5ms",
           "fontRasterCapHint": "HiDPI 下字体图集限制在 2 倍 (默认 4 倍), 更省内存",
           "fontRasterCap": "字体清晰度上限",
           "ssMemory": "省内存",

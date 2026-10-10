@@ -29,6 +29,8 @@
           "hideOnHover": "ホバー時に非表示",
           "hideFadeSeconds": "フェード時間 (秒)",
           "maxFPS": "最大フレームレート",
+          "disableUiEffects": "UI 効果を無効化",
+          "disableUiEffectsHint": "グローと影を無して設定画面を軽くします",
           "fontRasterCapHint": "HiDPI ではフォントアトラスを 4 倍ではなく 2 倍に制限します",
           "fontRasterCap": "フォント解像度の上限",
           "ssMemory": "省メモリ",

@@ -174,6 +174,20 @@ static void page_display(BongoCatApp *app, struct nk_context *context) {
         }
     }
     {
+        /* 关掉界面的发光/阴影: 浅色主题下那几项全屏模糊是每帧最贵的一项 */
+        bool effects_off = app->settings.window.disable_effects != 0;
+        bongo_cat_pref_row_icon(context, BONGO_CAT_PREF_ICON_RENDERER);
+        if (bongo_cat_pref_toggle(context, "disable-ui-effects", tr(app,
+                "pages.preference.cat.labels.disableUiEffects",
+                "Disable UI effects"),
+                tr(app, "pages.preference.cat.labels.disableUiEffectsHint",
+                    "Turn off glows and shadows for a smoother settings window"),
+                &effects_off)) {
+            app->settings.window.disable_effects = effects_off ? 1 : 0;
+            app->dirty = true;
+        }
+    }
+    {
         bool capped = app->settings.window.font_raster_cap != 0;
         bongo_cat_pref_row_icon(context, BONGO_CAT_PREF_ICON_MAX_FPS);
         if (bongo_cat_pref_toggle(context, "font-raster-cap", tr(app,

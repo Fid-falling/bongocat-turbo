@@ -32,6 +32,8 @@ typedef struct BongoCatUIPalette {
 } BongoCatUIPalette;
 
 BongoCatUIPalette bongo_cat_ui_palette(bool dark);
+/* 关闭发光/阴影类特效 (设置界面的[性能]区) */
+void bongo_cat_ui_set_effects_enabled(bool enabled);
 bool bongo_cat_ui_dark(const struct nk_context *context);
 void bongo_cat_ui_apply_theme(struct nk_context *context, bool dark);
 void bongo_cat_ui_shell_draw(struct nk_context *context, float width,

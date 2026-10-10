@@ -29,6 +29,8 @@
           "hideOnHover": "Скрывать при наведении",
           "hideFadeSeconds": "Длительность затухания (с)",
           "maxFPS": "Максимальная частота кадров",
+          "disableUiEffects": "Отключить эффекты",
+          "disableUiEffectsHint": "Без свечения и теней — окно быстрее",
           "fontRasterCapHint": "В HiDPI атлас шрифтов ограничен 2x вместо 4x",
           "fontRasterCap": "Ограничить чёткость",
           "ssMemory": "Экономия памяти",

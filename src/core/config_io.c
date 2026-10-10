@@ -76,6 +76,7 @@ static bool read_window(yyjson_val *object, BongoCatWindowPreferences *value,
         !read_bool(object, "captureOnly", &value->capture_only, error) ||
         !read_int(object, "supersample", &value->supersample, error) ||
         !read_int(object, "fontRasterCap", &value->font_raster_cap, error) ||
+        !read_int(object, "disableUiEffects", &value->disable_effects, error) ||
         !read_bool(object, "captureBackground", &value->obs_background,
             error) ||
         !read_bool(object, "randomExpression", &value->random_expression,

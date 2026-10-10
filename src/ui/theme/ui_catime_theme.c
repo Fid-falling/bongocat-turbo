@@ -34,6 +34,13 @@ static bool high_contrast(BongoCatUIPalette *value) {
 }
 #endif
 
+/* [性能] 区的"关闭界面特效": 关掉发光/阴影后浅色主题每帧省约 5ms */
+static bool ui_effects_enabled = true;
+
+void bongo_cat_ui_set_effects_enabled(bool enabled) {
+    ui_effects_enabled = enabled;
+}
+
 BongoCatUIPalette bongo_cat_ui_palette(bool dark) {
     BongoCatUIPalette value;
 #ifdef _WIN32
@@ -57,7 +64,7 @@ BongoCatUIPalette bongo_cat_ui_palette(bool dark) {
     value.selection = rgb(dark ? 0x27384B : 0xE7F3FE);
     value.danger = rgb(dark ? 0xFFA4A4 : 0xFF4D6D);
     value.danger_background = rgb(dark ? 0x4B2B31 : 0xFFECF0);
-    value.effects = true;
+    value.effects = ui_effects_enabled;
     return value;
 }
 

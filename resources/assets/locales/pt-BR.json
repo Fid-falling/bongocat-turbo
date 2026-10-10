@@ -29,6 +29,8 @@
           "hideOnHover": "Ocultar ao Passar o Mouse",
           "hideFadeSeconds": "Duração do fade (s)",
           "maxFPS": "Taxa Máxima de Quadros",
+          "disableUiEffects": "Desativar efeitos",
+          "disableUiEffectsHint": "Remove brilhos e sombras para uma janela mais fluida",
           "fontRasterCapHint": "Em HiDPI o atlas de fontes fica em 2x em vez de 4x",
           "fontRasterCap": "Limitar a nitidez",
           "ssMemory": "Economia de memória",

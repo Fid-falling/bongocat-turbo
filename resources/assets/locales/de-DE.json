@@ -29,6 +29,8 @@
           "hideOnHover": "Beim Darüberfahren ausblenden",
           "hideFadeSeconds": "Ausblendedauer (s)",
           "maxFPS": "Maximale Bildrate",
+          "disableUiEffects": "UI-Effekte deaktivieren",
+          "disableUiEffectsHint": "Schaltet Glow und Schatten für ein flüssigeres Fenster ab",
           "fontRasterCapHint": "HiDPI-Schriftatlas bleibt bei 2x statt 4x",
           "fontRasterCap": "Schärfe begrenzen",
           "ssMemory": "Speichersparend",

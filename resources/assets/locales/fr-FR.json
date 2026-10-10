@@ -29,6 +29,8 @@
           "hideOnHover": "Masquer au survol",
           "hideFadeSeconds": "Durée du fondu (s)",
           "maxFPS": "Fréquence d'images maximale",
+          "disableUiEffects": "Désactiver les effets",
+          "disableUiEffectsHint": "Coupe les lueurs et ombres pour une fenêtre plus fluide",
           "fontRasterCapHint": "Atlas de police limité à 2x au lieu de 4x en HiDPI",
           "fontRasterCap": "Limiter la netteté",
           "ssMemory": "Économe en mémoire",

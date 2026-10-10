@@ -29,6 +29,8 @@
           "hideOnHover": "Hide on Hover",
           "hideFadeSeconds": "Fade Duration (s)",
           "maxFPS": "Max Frame Rate",
+          "disableUiEffects": "Disable UI effects",
+          "disableUiEffectsHint": "Turn off glows and shadows for a smoother settings window",
           "fontRasterCapHint": "HiDPI font atlas stays at 2x instead of 4x",
           "fontRasterCap": "Cap font sharpness",
           "ssMemory": "Low memory",
