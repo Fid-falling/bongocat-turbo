@@ -29,6 +29,8 @@
           "hideOnHover": "Masquer au survol",
           "hideFadeSeconds": "Durée du fondu (s)",
           "maxFPS": "Fréquence d'images maximale",
+          "disableElevation": "Sans administrateur",
+          "disableElevationHint": "Ne demande plus les droits administrateur au démarrage ; le lancement auto reste possible",
           "disableUiEffects": "Désactiver les effets des réglages",
           "disableUiEffectsHint": "Sans lueurs ni ombres, la fenêtre de réglages est plus fluide",
           "fontRasterCapHint": "Netteté presque identique, moins de mémoire",

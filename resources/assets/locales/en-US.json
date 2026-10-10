@@ -29,6 +29,8 @@
           "hideOnHover": "Hide on Hover",
           "hideFadeSeconds": "Fade Duration (s)",
           "maxFPS": "Max Frame Rate",
+          "disableElevation": "Run without administrator",
+          "disableElevationHint": "Stops asking for administrator rights at startup; auto-start keeps working",
           "disableUiEffects": "Disable settings UI effects",
           "disableUiEffectsHint": "Turns off glows and shadows to make the settings window smoother",
           "fontRasterCapHint": "About the same clarity, but uses less memory",

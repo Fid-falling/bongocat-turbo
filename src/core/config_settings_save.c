@@ -40,6 +40,8 @@ static bool write_window(yyjson_mut_doc *doc, yyjson_mut_val *object,
             value->font_raster_cap) &&
         yyjson_mut_obj_add_int(doc, object, "disableUiEffects",
             value->disable_effects) &&
+        yyjson_mut_obj_add_int(doc, object, "disableElevation",
+            value->disable_elevation) &&
         yyjson_mut_obj_add_bool(doc, object, "captureBackground",
             value->obs_background) &&
         yyjson_mut_obj_add_bool(doc, object, "randomExpression",

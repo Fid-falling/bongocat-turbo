@@ -80,6 +80,8 @@ typedef struct BongoCatWindowPreferences {
     int font_raster_cap;
     /* 1 = 关掉界面发光/阴影 (浅色主题每帧省约 5ms) */
     int disable_effects;
+    /* 1 = 启动时不检查/不请求管理员权限 (默认 0 = 自动提权) */
+    int disable_elevation;
     bool obs_background;
     bool random_expression;
     bool rounded_corners;

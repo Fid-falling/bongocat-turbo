@@ -29,6 +29,8 @@
           "hideOnHover": "Ocultar ao Passar o Mouse",
           "hideFadeSeconds": "Duração do fade (s)",
           "maxFPS": "Taxa Máxima de Quadros",
+          "disableElevation": "Sem administrador",
+          "disableElevationHint": "Não pede mais permissão de administrador ao iniciar; a inicialização automática continua",
           "disableUiEffects": "Desativar efeitos das configurações",
           "disableUiEffectsHint": "Sem brilhos e sombras, a janela de ajustes fica mais fluida",
           "fontRasterCapHint": "Quase a mesma nitidez, mas menos memória",

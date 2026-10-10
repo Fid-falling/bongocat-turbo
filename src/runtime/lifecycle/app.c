@@ -100,6 +100,14 @@ bool bongo_cat_app_initialize(BongoCatApp *app, int argc, char **argv,
        buffer during model/driver startup. */
     app->startup_visibility_pending = app->session.window.visible;
     bongo_cat_startup_stage(app, "configuration-ready");
+    /*
+     * 不是管理员就以管理员身份重启自己 (ShellExecuteExW 的 runas), 旧进程退出。
+     * 放在这里是因为要先读配置: 设置里的"不以管理员运行"可以让它整条跳过
+     * (开机自启就得靠这个开关)。用户取消 UAC 或提权失败时返回 false, 照常运行。
+     */
+    if (!app->settings.window.disable_elevation &&
+        bongo_cat_platform_relaunch_elevated_if_needed())
+        return true;
     if (bongo_cat_app_locate_assets(app, error) != BONGO_CAT_OK) return false;
     bongo_cat_startup_stage(app, "assets-ready");
     BongoCatError optional = {0};

@@ -29,6 +29,8 @@
           "hideOnHover": "滑鼠游標移入隱藏",
           "hideFadeSeconds": "隱藏漸變時長 (秒)",
           "maxFPS": "最大幀率",
+          "disableElevation": "不以管理員執行",
+          "disableElevationHint": "關掉後啟動不再詢問管理員權限, 開機自動啟動也能用",
           "disableUiEffects": "關閉設定介面特效",
           "disableUiEffectsHint": "關掉發光與陰影，設定介面更流暢",
           "fontRasterCapHint": "清晰度幾乎不變, 但更省記憶體",

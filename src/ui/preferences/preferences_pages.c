@@ -343,6 +343,20 @@ static void page_general(BongoCatApp *app, struct nk_context *context) {
         BONGO_CAT_PREF_ICON_SECTION_APPLICATION);
     bool old_autostart = options->autostart;
     bongo_cat_pref_row_icon(context, BONGO_CAT_PREF_ICON_AUTOSTART);
+    {
+        /* 不勾选就以管理员身份运行 (启动时请求提权); 勾上完全跳过, 开机自启才可用 */
+        bool no_admin = app->settings.window.disable_elevation != 0;
+        bongo_cat_pref_row_icon(context, BONGO_CAT_PREF_ICON_RENDERER);
+        if (bongo_cat_pref_toggle(context, "disable-elevation", tr(app,
+                "pages.preference.cat.labels.disableElevation",
+                "Run without administrator"),
+                tr(app, "pages.preference.cat.labels.disableElevationHint",
+                    "Stops asking for administrator rights at startup; auto-start keeps working"),
+                &no_admin)) {
+            app->settings.window.disable_elevation = no_admin ? 1 : 0;
+            app->dirty = true;
+        }
+    }
     if (bongo_cat_pref_toggle(context, "autostart", tr(app,
         "pages.preference.general.labels.launchOnStartup", "Launch on Startup"), "",
         &options->autostart)) update_autostart(app, old_autostart);
