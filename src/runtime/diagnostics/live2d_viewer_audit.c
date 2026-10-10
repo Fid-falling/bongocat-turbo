@@ -1,4 +1,5 @@
 #include "runtime.h"
+#include "bongo_cat/render.h"
 #include "live2d_viewer_timing.h"
 #include "bongo_cat/file.h"
 #include "bongo_cat/path.h"
@@ -47,6 +48,8 @@ static bool parameter_near(BongoCatApp *app, const char *id,
 }
 static bool save_frame(BongoCatApp *app, const char *directory,
     const char *name, FILE *metrics) {
+    /* 该审计自己清屏画一帧再读像素, Vulkan 下先跳过 (需要独立的离屏渲染路径) */
+    if (bongo_cat_renderer_active() == BONGO_CAT_RENDERER_VULKAN) return false;
     int width = 0, height = 0;
     SDL_GetWindowSizeInPixels(app->window, &width, &height);
     if (width < 2 || height < 2) return false;

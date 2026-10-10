@@ -1,6 +1,8 @@
 #include "runtime.h"
 #include "bongo_cat/file.h"
 #include "bongo_cat/path.h"
+#include "bongo_cat/render.h"
+#include "bongo_cat/vk_backend.h"
 
 #include <SDL3/SDL_opengl.h>
 #include <stdio.h>
@@ -26,23 +28,42 @@ static FrameStats frame_stats(const unsigned char *pixels,
     return stats;
 }
 
-static void log_first_frame(BongoCatApp *app, int width, int height) {
+/* 返回 false 表示"这一帧还取不到像素" (Vulkan 整帧回读有一帧延迟), 下次再试 */
+static bool log_first_frame(BongoCatApp *app, int width, int height) {
     if (width <= 0 || height <= 0 || width > 4096 || height > 4096) {
         SDL_LogWarn(SDL_LOG_CATEGORY_VIDEO,
             "First-frame diagnostic skipped for size %dx%d", width, height);
-        return;
+        return true;
     }
     size_t pitch = (size_t)width * 4, bytes = pitch * (size_t)height;
-    if (pitch / 4 != (size_t)width || bytes / pitch != (size_t)height) return;
+    if (pitch / 4 != (size_t)width || bytes / pitch != (size_t)height) return true;
     unsigned char *pixels = calloc(1, bytes);
     if (!pixels) {
         SDL_LogWarn(SDL_LOG_CATEGORY_VIDEO,
             "First-frame diagnostic allocation failed for %zu bytes", bytes);
-        return;
+        return false;
     }
-    GLenum before = glGetError();
-    glReadPixels(0, 0, width, height, GL_RGBA, GL_UNSIGNED_BYTE, pixels);
-    GLenum after = glGetError();
+    /* Vulkan 没有可读的 GL 前后缓冲: 用整帧回读的结果 (第 0 行在视觉上方) */
+    GLenum before = GL_NO_ERROR, after = GL_NO_ERROR;
+    const bool vulkan = bongo_cat_renderer_active() == BONGO_CAT_RENDERER_VULKAN;
+    if (vulkan) {
+        int sample_width = 0, sample_height = 0;
+        const unsigned char *sample = NULL;
+        if (!bongo_cat_vk_take_frame_sample(bongo_cat_vk_current(),
+                &sample_width, &sample_height, &sample) ||
+            sample_width < width || sample_height < height || !sample) {
+            free(pixels);
+            SDL_Log("First-frame diagnostic deferred: Vulkan readback not ready");
+            return false;
+        }
+        for (int y = 0; y < height; ++y)
+            memcpy(pixels + (size_t)y * pitch,
+                sample + (size_t)y * (size_t)sample_width * 4u, pitch);
+    } else {
+        before = glGetError();
+        glReadPixels(0, 0, width, height, GL_RGBA, GL_UNSIGNED_BYTE, pixels);
+        after = glGetError();
+    }
     unsigned long long alpha = 0, opaque = 0, rgb_colored = 0;
     unsigned long long visible_colored = 0, black = 0;
     unsigned long long red = 0, green = 0, blue = 0, alpha_sum = 0;
@@ -81,7 +102,8 @@ static void log_first_frame(BongoCatApp *app, int width, int height) {
         "First-frame diagnosis: framebuffer contains only black pixels");
     else if (!visible_colored) SDL_LogWarn(SDL_LOG_CATEGORY_VIDEO,
         "First-frame diagnosis: framebuffer has RGB content but no visible color alpha");
-    else SDL_Log("First-frame diagnosis: OpenGL framebuffer contains visible content");
+    else SDL_Log("First-frame diagnosis: %s framebuffer contains visible content",
+        vulkan ? "Vulkan" : "OpenGL");
     bongo_cat_frame_presentation_prepare(app, pixels, width, height,
         after == GL_NO_ERROR && visible_colored > 0);
     if (app->smoke) {
@@ -105,6 +127,7 @@ static void log_first_frame(BongoCatApp *app, int width, int height) {
         }
     }
     free(pixels);
+    return true;
 }
 
 static void record_frame(BongoCatApp *app, const unsigned char *pixels,
@@ -137,14 +160,42 @@ static void record_frame(BongoCatApp *app, const unsigned char *pixels,
 
 void bongo_cat_frame_audit(BongoCatApp *app, int width, int height) {
     if (!app || !app->smoke || width < 2 || height < 2) return;
-    if (!app->smoke_frame_audited) {
+    /* Vulkan 的整帧回读有一帧延迟: 首帧取不到就保持未审计, 下一帧再试 */
+    if (!app->smoke_frame_audited && log_first_frame(app, width, height))
         app->smoke_frame_audited = true;
-        log_first_frame(app, width, height);
-    }
     char path[BONGO_CAT_PATH_CAP];
     size_t pitch = (size_t)width * 4, bytes = pitch * (size_t)height;
     unsigned char *pixels = malloc(bytes);
     if (!pixels) return;
+    if (bongo_cat_renderer_active() == BONGO_CAT_RENDERER_VULKAN) {
+        int sample_width = 0, sample_height = 0;
+        const unsigned char *sample = NULL;
+        if (!bongo_cat_vk_take_frame_sample(bongo_cat_vk_current(),
+                &sample_width, &sample_height, &sample) ||
+            sample_width < width || sample_height < height || !sample) {
+            free(pixels);
+            return;
+        }
+        for (int y = 0; y < height; ++y)
+            memcpy(pixels + (size_t)y * pitch,
+                sample + (size_t)y * (size_t)sample_width * 4u, pitch);
+        record_frame(app, pixels, width, height, pitch);
+        uint64_t now_ns = SDL_GetTicksNS();
+        if (app->frame_audit_bmp_ns && now_ns >= app->frame_audit_bmp_ns &&
+            now_ns - app->frame_audit_bmp_ns < 50000000ull) {
+            free(pixels);
+            return;
+        }
+        app->frame_audit_bmp_ns = now_ns;
+        char bmp_path[BONGO_CAT_PATH_CAP];
+        /* Vulkan 图像本来就是第 0 行在上方, 不需要像 GL 那样翻转 */
+        SDL_Surface *bmp = SDL_CreateSurfaceFrom(width, height,
+            SDL_PIXELFORMAT_RGBA32, pixels, (int)pitch);
+        bongo_cat_path_join(bmp_path, sizeof(bmp_path), app->state_root, "frame.bmp");
+        if (bmp) { SDL_SaveBMP(bmp, bmp_path); SDL_DestroySurface(bmp); }
+        free(pixels);
+        return;
+    }
     glReadPixels(0, 0, width, height, GL_RGBA, GL_UNSIGNED_BYTE, pixels);
     record_frame(app, pixels, width, height, pitch);
     uint64_t now = SDL_GetTicksNS();

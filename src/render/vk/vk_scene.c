@@ -161,6 +161,11 @@ bool bongo_cat_vk_render_main(BongoCatApp *app, bool present) {
         }
     }
 
+    /* 冒烟诊断: 与封面共用同一条整帧回读 (present 前入队, 下一帧 collect) */
+    if (app->smoke && !cover_capture &&
+        !bongo_cat_vk_queue_frame_sample(app->vk, 0, 0, width, height))
+        SDL_LogWarn(SDL_LOG_CATEGORY_VIDEO, "[vulkan] 冒烟整帧回读入队失败");
+
     /* 封面帧: 整帧入队, 结果由下一帧的 take_frame_sample 取走 */
     if (cover_capture &&
         !bongo_cat_vk_queue_frame_sample(app->vk, 0, 0, width, height))
@@ -189,5 +194,7 @@ bool bongo_cat_vk_render_main(BongoCatApp *app, bool present) {
     bongo_cat_memory_policy_frame_presented();
     bongo_cat_window_sync_click_through(app);
     bongo_cat_window_schedule_hit_check(app);
+    /* 与 OpenGL 路径同一处: 冒烟时统计首帧/帧序列并落盘 (app->smoke 门控) */
+    bongo_cat_frame_audit(app, width, height);
     return true;
 }

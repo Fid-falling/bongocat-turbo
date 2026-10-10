@@ -1,4 +1,5 @@
 #include "runtime.h"
+#include "bongo_cat/render.h"
 #include "bongo_cat/file.h"
 #include "bongo_cat/path.h"
 
@@ -23,6 +24,8 @@ static bool inside(const BongoCatLive2DVisualState *state) {
 }
 
 static unsigned edge_pixels(int width, int height) {
+    /* 该审计靠"自己清屏 + 画一帧"再读像素, Vulkan 需要先有离屏渲染路径 */
+    if (bongo_cat_renderer_active() == BONGO_CAT_RENDERER_VULKAN) return ~0u;
     size_t bytes = (size_t)(width > height ? width : height) * 4;
     unsigned char *pixels = malloc(bytes);
     if (!pixels) return ~0u;

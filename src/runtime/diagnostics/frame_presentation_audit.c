@@ -1,4 +1,5 @@
 #include "runtime.h"
+#include "bongo_cat/render.h"
 
 #include <SDL3/SDL_opengl.h>
 #include <stdint.h>
@@ -99,6 +100,11 @@ void bongo_cat_frame_presentation_prepare(BongoCatApp *app,
 }
 
 static void log_post_present_buffer(const char *name, GLenum buffer) {
+    if (bongo_cat_renderer_active() == BONGO_CAT_RENDERER_VULKAN) {
+        /* Vulkan 没有可回读的 GL 前/后台缓冲, 这项对比无法进行 */
+        SDL_Log("Post-presentation buffer comparison skipped on Vulkan: name=%s", name);
+        return;
+    }
     size_t total = (size_t)audit.width * (size_t)audit.height;
     size_t bytes = total * 4;
     unsigned char *pixels = calloc(1, bytes);
