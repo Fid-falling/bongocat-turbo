@@ -191,6 +191,8 @@ bool bongo_cat_vk_queue_hit_sample(BongoCatVk *vk, int x, int y);
 bool bongo_cat_vk_queue_frame_sample(BongoCatVk *vk, int x, int y, int w, int h);
 bool bongo_cat_vk_take_frame_sample(BongoCatVk *vk, int *w, int *h,
     const unsigned char **pixels);
+/* 内存清理时释放可再生的回读缓冲 (下次用到会重新分配) */
+void bongo_cat_vk_release_cached_frames(BongoCatVk *vk);
 /* 查询已缓存的回读结果; 目标点不在缓存块内时返回 false */
 bool bongo_cat_vk_hit_alpha(const BongoCatVk *vk, int x, int y,
     unsigned char *alpha);

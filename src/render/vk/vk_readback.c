@@ -146,6 +146,20 @@ void bongo_cat_vk_collect_readback(BongoCatVk *vk) {
     vk->hit_valid = true;
 }
 
+/*
+ * 释放"下次还能再拿回来"的整帧回读缓冲。内存清理 (memory_policy) 时调用:
+ * 封面/诊断用完的几 MB 没必要一直常驻, 下一次整帧回读会按需重新分配。
+ * 命中测试的固定小块不动 (它是每帧都可能用到的热路径)。
+ */
+void bongo_cat_vk_release_cached_frames(BongoCatVk *vk) {
+    if (!vk) return;
+    if (!vk->frame_pixels) return;
+    SDL_free(vk->frame_pixels);
+    vk->frame_pixels = NULL;
+    vk->frame_width = vk->frame_height = 0;
+    vk->frame_ready = false;
+}
+
 bool bongo_cat_vk_queue_hit_sample(BongoCatVk *vk, int x, int y) {
     if (!vk || !vk->frame_active || !vk->transfer_source) return false;
     const int tile = BONGO_CAT_VK_HIT_TILE;

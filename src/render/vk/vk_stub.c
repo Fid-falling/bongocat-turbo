@@ -143,6 +143,10 @@ bool bongo_cat_vk_take_frame_sample(BongoCatVk *vk, int *w, int *h,
     return false;
 }
 
+void bongo_cat_vk_release_cached_frames(BongoCatVk *vk) {
+    (void)vk;
+}
+
 bool bongo_cat_vk_hit_alpha(const BongoCatVk *vk, int x, int y,
     unsigned char *alpha) {
     (void)vk; (void)x; (void)y; (void)alpha;
