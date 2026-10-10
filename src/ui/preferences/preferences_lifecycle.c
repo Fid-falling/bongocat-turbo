@@ -38,6 +38,11 @@ static void release_window(BongoCatPreferences *value) {
     if (value->chrome_dragging) SDL_CaptureMouse(false);
     bongo_cat_preferences_gl_destroy(value);
     SDL_DestroyWindow(value->window);
+    /*
+     * 窗口、UI 后端与纹理缓存 (paint cache) 都放掉了: 顺手把空闲堆和工作集还给
+     * 系统, 否则这些页还留在工作集里, 任务管理器上看不出下降。
+     */
+    bongo_cat_platform_trim_memory();
     value->window = NULL;
     value->visible = false;
     value->transparent_window = false;
