@@ -92,64 +92,6 @@ bool bongo_cat_vk_frame_active(const BongoCatVk *vk) {
     return vk && vk->frame_active;
 }
 
-/* 上一次用这个帧槽录制的回读已经完成: 把 alpha 取出来放进缓存 */
-static void collect_readback(BongoCatVk *vk, BongoCatVkReadback *readback) {
-    if (!readback->pending || !readback->mapped) return;
-    readback->pending = false;
-    if (readback->width <= 0 || readback->height <= 0) return;
-    for (int y = 0; y < readback->height; ++y) {
-        for (int x = 0; x < readback->width; ++x) {
-            vk->hit_alpha[y * readback->width + x] =
-                readback->mapped[((size_t)y * (size_t)readback->width +
-                    (size_t)x) * 4 + 3];
-        }
-    }
-    vk->hit_x = readback->origin_x;
-    vk->hit_y = readback->origin_y;
-    vk->hit_width = readback->width;
-    vk->hit_height = readback->height;
-    if (!vk->hit_valid)
-        SDL_LogInfo(BONGO_CAT_LOG_LIFECYCLE,
-            "[vulkan] 首次命中测试回读成功: 区域=%dx%d 原点=(%d,%d)",
-            readback->width, readback->height, readback->origin_x,
-            readback->origin_y);
-    vk->hit_valid = true;
-}
-
-bool bongo_cat_vk_queue_hit_sample(BongoCatVk *vk, int x, int y) {
-    if (!vk || !vk->frame_active || !vk->transfer_source) return false;
-    const int tile = BONGO_CAT_VK_HIT_TILE;
-    if ((int)vk->extent.width < tile || (int)vk->extent.height < tile) return false;
-    if (x < 0 || y < 0 || x >= (int)vk->extent.width || y >= (int)vk->extent.height)
-        return false;
-    int origin_x = x - tile / 2;
-    int origin_y = y - tile / 2;
-    if (origin_x < 0) origin_x = 0;
-    if (origin_y < 0) origin_y = 0;
-    if (origin_x + tile > (int)vk->extent.width)
-        origin_x = (int)vk->extent.width - tile;
-    if (origin_y + tile > (int)vk->extent.height)
-        origin_y = (int)vk->extent.height - tile;
-    BongoCatVkReadback *readback = &vk->readback[vk->frame_index];
-    readback->requested = true;
-    readback->origin_x = origin_x;
-    readback->origin_y = origin_y;
-    readback->width = tile;
-    readback->height = tile;
-    return true;
-}
-
-bool bongo_cat_vk_hit_alpha(const BongoCatVk *vk, int x, int y,
-    unsigned char *alpha) {
-    if (!vk || !vk->hit_valid || !alpha) return false;
-    if (x < vk->hit_x || y < vk->hit_y ||
-        x >= vk->hit_x + vk->hit_width || y >= vk->hit_y + vk->hit_height)
-        return false;
-    *alpha = vk->hit_alpha[(size_t)(y - vk->hit_y) * (size_t)vk->hit_width +
-        (size_t)(x - vk->hit_x)];
-    return true;
-}
-
 static void record_readback(BongoCatVk *vk, BongoCatVkReadback *readback) {
     VkImageMemoryBarrier barrier = {0};
     barrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
@@ -199,7 +141,7 @@ bool bongo_cat_vk_begin_frame(BongoCatVk *vk, int width, int height) {
     if (vkWaitForFences(vk->device, 1, &frame->fence, VK_TRUE, UINT64_MAX) != VK_SUCCESS)
         return false;
     /* 栅栏已过: 上一轮用这个帧槽录制的回读数据现在是安全的 */
-    collect_readback(vk, &vk->readback[vk->frame_index]);
+    bongo_cat_vk_collect_readback(vk);
     bongo_cat_vk_collect_retired(vk);
     uint32_t index = 0;
     VkResult acquired = vkAcquireNextImageKHR(vk->device, vk->swapchain, UINT64_MAX,

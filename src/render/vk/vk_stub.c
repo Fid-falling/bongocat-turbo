@@ -132,6 +132,17 @@ bool bongo_cat_vk_queue_hit_sample(BongoCatVk *vk, int x, int y) {
     return false;
 }
 
+bool bongo_cat_vk_queue_frame_sample(BongoCatVk *vk, int x, int y, int w, int h) {
+    (void)vk; (void)x; (void)y; (void)w; (void)h;
+    return false;
+}
+
+bool bongo_cat_vk_take_frame_sample(BongoCatVk *vk, int *w, int *h,
+    const unsigned char **pixels) {
+    (void)vk; (void)w; (void)h; (void)pixels;
+    return false;
+}
+
 bool bongo_cat_vk_hit_alpha(const BongoCatVk *vk, int x, int y,
     unsigned char *alpha) {
     (void)vk; (void)x; (void)y; (void)alpha;

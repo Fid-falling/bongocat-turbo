@@ -33,7 +33,9 @@ bool bongo_cat_vk_recreate_swapchain(BongoCatVk *vk, int width, int height) {
     for (uint32_t i = 0; i < BONGO_CAT_VK_FRAMES_IN_FLIGHT; ++i) {
         vk->readback[i].requested = false;
         vk->readback[i].pending = false;
+        vk->readback[i].whole_frame = false;
     }
+    vk->frame_ready = false;
     vk->image_index = 0;
     bongo_cat_vk_destroy_swapchain(vk);
     BongoCatError error = {0};

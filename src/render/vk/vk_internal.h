@@ -44,13 +44,20 @@ typedef struct BongoCatVkReadback {
     VkBuffer buffer;
     VkDeviceMemory memory;
     unsigned char *mapped;
+    VkDeviceSize capacity;  /* buffer 字节数; 整帧回读按 w*h*4 扩容 */
     bool requested;      /* 这一帧要录制拷贝 */
     bool pending;        /* 已经录制, 等下一次复用该帧槽时读取 */
+    bool whole_frame;    /* 回读整帧 RGBA, 而不是命中点附近的 alpha 小块 */
     int origin_x;
     int origin_y;
     int width;
     int height;
 } BongoCatVkReadback;
+
+/* vk_readback.c: 回读缓冲与采集 (对外 API 见 bongo_cat/vk_backend.h) */
+bool bongo_cat_vk_create_readbacks(BongoCatVk *vk, BongoCatError *error);
+void bongo_cat_vk_destroy_readbacks(BongoCatVk *vk);
+void bongo_cat_vk_collect_readback(BongoCatVk *vk);
 
 struct BongoCatVkTexture {
     VkImage image;
@@ -183,6 +190,11 @@ struct BongoCatVk {
      */
     BongoCatVkArena dial_arenas[BONGO_CAT_VK_FRAMES_IN_FLIGHT];
     BongoCatVkReadback readback[BONGO_CAT_VK_FRAMES_IN_FLIGHT];
+    /* 最近一次整帧回读 (RGBA8, 第 0 行在视觉上方), take_frame_sample 一次性取走 */
+    unsigned char *frame_pixels;
+    int frame_width;
+    int frame_height;
+    bool frame_ready;
     /* 设置界面这一帧的顶点在顶点缓冲里的起点 (ui_upload_vertices 记录) */
     VkDeviceSize ui_vertex_offset;
     bool ui_vertices_ready;

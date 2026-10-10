@@ -187,6 +187,10 @@ BongoCatVkTexture *bongo_cat_vk_texture_from_external(BongoCatVk *vk,
  * 相当, 远快于命中测试的调度间隔 (100 ms)。
  */
 bool bongo_cat_vk_queue_hit_sample(BongoCatVk *vk, int x, int y);
+/* 整帧 RGBA 回读 (封面 / 诊断 / 审计): 一帧延迟, take 一次性取走 */
+bool bongo_cat_vk_queue_frame_sample(BongoCatVk *vk, int x, int y, int w, int h);
+bool bongo_cat_vk_take_frame_sample(BongoCatVk *vk, int *w, int *h,
+    const unsigned char **pixels);
 /* 查询已缓存的回读结果; 目标点不在缓存块内时返回 false */
 bool bongo_cat_vk_hit_alpha(const BongoCatVk *vk, int x, int y,
     unsigned char *alpha);

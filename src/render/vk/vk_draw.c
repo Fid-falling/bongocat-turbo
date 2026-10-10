@@ -54,50 +54,8 @@ bool bongo_cat_vk_create_draw_resources(BongoCatVk *vk, BongoCatError *error) {
                 VK_BUFFER_USAGE_VERTEX_BUFFER_BIT, error, "菜单顶点缓冲"))
             return false;
     }
-    /* 命中测试回读缓冲: 指针附近的一小块 RGBA8 */
-    for (uint32_t i = 0; i < BONGO_CAT_VK_FRAMES_IN_FLIGHT; ++i) {
-        BongoCatVkReadback *readback = &vk->readback[i];
-        const VkDeviceSize bytes = BONGO_CAT_VK_HIT_TILE * BONGO_CAT_VK_HIT_TILE * 4u;
-        VkBufferCreateInfo buffer = {0};
-        buffer.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
-        buffer.size = bytes;
-        buffer.usage = VK_BUFFER_USAGE_TRANSFER_DST_BIT;
-        buffer.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
-        if (vkCreateBuffer(vk->device, &buffer, NULL, &readback->buffer) != VK_SUCCESS) {
-            bongo_cat_error_set(error, BONGO_CAT_ERROR_PLATFORM,
-                "Vulkan 回读缓冲创建失败");
-            return false;
-        }
-        VkMemoryRequirements requirements;
-        vkGetBufferMemoryRequirements(vk->device, readback->buffer, &requirements);
-        VkPhysicalDeviceMemoryProperties memory_properties;
-        vkGetPhysicalDeviceMemoryProperties(vk->physical, &memory_properties);
-        const VkMemoryPropertyFlags wanted = VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT |
-            VK_MEMORY_PROPERTY_HOST_COHERENT_BIT;
-        uint32_t type = UINT32_MAX;
-        for (uint32_t j = 0; j < memory_properties.memoryTypeCount; ++j) {
-            if ((requirements.memoryTypeBits & (1u << j)) &&
-                (memory_properties.memoryTypes[j].propertyFlags & wanted) == wanted) {
-                type = j;
-                break;
-            }
-        }
-        VkMemoryAllocateInfo allocate = {0};
-        allocate.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
-        allocate.allocationSize = requirements.size;
-        allocate.memoryTypeIndex = type;
-        if (type == UINT32_MAX ||
-            vkAllocateMemory(vk->device, &allocate, NULL, &readback->memory) !=
-                VK_SUCCESS ||
-            vkBindBufferMemory(vk->device, readback->buffer, readback->memory, 0) !=
-                VK_SUCCESS ||
-            vkMapMemory(vk->device, readback->memory, 0, VK_WHOLE_SIZE, 0,
-                (void **)&readback->mapped) != VK_SUCCESS) {
-            bongo_cat_error_set(error, BONGO_CAT_ERROR_PLATFORM,
-                "Vulkan 回读缓冲映射失败");
-            return false;
-        }
-    }
+    /* 回读缓冲 (命中小块 + 整帧) 见 vk_readback.c */
+    if (!bongo_cat_vk_create_readbacks(vk, error)) return false;
     bongo_cat_vk_rebuild_pipelines(vk);
     if (vk->overlay_pipeline == VK_NULL_HANDLE || vk->pointer_pipeline == VK_NULL_HANDLE) {
         bongo_cat_error_set(error, BONGO_CAT_ERROR_PLATFORM,
@@ -116,23 +74,7 @@ void bongo_cat_vk_destroy_draw_resources(BongoCatVk *vk) {
         destroy_arena(vk, &vk->index_arenas[i]);
         destroy_arena(vk, &vk->dial_arenas[i]);
     }
-    for (uint32_t i = 0; i < BONGO_CAT_VK_FRAMES_IN_FLIGHT; ++i) {
-        BongoCatVkReadback *readback = &vk->readback[i];
-        if (readback->mapped) {
-            vkUnmapMemory(vk->device, readback->memory);
-            readback->mapped = NULL;
-        }
-        if (readback->buffer != VK_NULL_HANDLE) {
-            vkDestroyBuffer(vk->device, readback->buffer, NULL);
-            readback->buffer = VK_NULL_HANDLE;
-        }
-        if (readback->memory != VK_NULL_HANDLE) {
-            vkFreeMemory(vk->device, readback->memory, NULL);
-            readback->memory = VK_NULL_HANDLE;
-        }
-        readback->requested = readback->pending = false;
-    }
-    vk->hit_valid = false;
+    bongo_cat_vk_destroy_readbacks(vk);
 }
 
 static bool arena_push_into(BongoCatVkArena *arena, const void *data, size_t size,
