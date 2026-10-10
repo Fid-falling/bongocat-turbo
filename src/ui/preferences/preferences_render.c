@@ -15,6 +15,18 @@
 #include <stdio.h>
 typedef struct RootStyle { struct nk_vec2 padding, group_padding, spacing;
     struct nk_style_item fixed; struct nk_color background; float group_border; } RootStyle;
+/* 与 preferences_present.c 同一套开关: BONGO_CAT_TEST_PREFS_STAGES=1 时打印分段 */
+static bool stages_enabled(void) {
+    static int enabled = -1;
+    if (enabled < 0) enabled = SDL_getenv("BONGO_CAT_TEST_PREFS_STAGES") != NULL;
+    return enabled != 0;
+}
+
+static void stage_log(const char *stage) {
+    if (stages_enabled())
+        SDL_LogWarn(SDL_LOG_CATEGORY_VIDEO, "[prefs] stage=%s", stage);
+}
+
 static const char *tr(const BongoCatPreferences *value, const char *key, const char *fallback) {
     return bongo_cat_i18n_get(value->app->i18n, key, fallback);
 }
@@ -69,6 +81,7 @@ static bool draw_shell(BongoCatPreferences *value, struct nk_context *context,
     const bool native_chrome = bongo_cat_ui_native_chrome(); BongoCatUIPalette p = bongo_cat_ui_palette(dark);
     bongo_cat_ui_shell_draw(context, width, height, dark,
         !value->transparent_window);
+    stage_log("shell-bg");
     float sidebar = bongo_cat_ui_sidebar_width(width);
     float interior_height = height - BONGO_CAT_UI_MARGIN * 2.0f;
     nk_layout_row_begin(context, NK_STATIC, interior_height, 2);
@@ -103,6 +116,7 @@ static bool draw_shell(BongoCatPreferences *value, struct nk_context *context,
     }
     nk_group_end(context);
     }
+    stage_log("shell-sidebar");
     nk_layout_row_push(context, width - BONGO_CAT_UI_MARGIN * 2.0f - sidebar);
     bool close_requested = false;
     if (nk_group_begin(context, "preferences-content", NK_WINDOW_NO_SCROLLBAR)) {
@@ -189,6 +203,7 @@ static bool draw_shell(BongoCatPreferences *value, struct nk_context *context,
             (scroll_animating && !still_animating))
             value->render_dirty = true;
     } else context->style.scrollv = saved_scrollv;
+    stage_log("shell-body");
     if (modal) {
         context->input.mouse.buttons[NK_BUTTON_LEFT] = saved_left;
         context->input.mouse.scroll_delta = saved_wheel;

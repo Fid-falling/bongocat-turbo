@@ -14,9 +14,13 @@ struct BongoCatUIPaintTexture {
 };
 
 #define PAINT_CACHE_COUNT 48
-/* Effects are regenerated when evicted, so keep the cache bounded instead
-   of allowing a long settings session to retain a large GPU allocation. */
-#define PAINT_CACHE_BYTE_LIMIT (16u * 1024u * 1024u)
+/*
+ * 缓存上限。别调小: 设置界面的几个全屏项 (sidebar glow、圆角外壳、阴影) 每个就是
+ * 2 MB 级, 浅色主题下合计二十多 MB —— 16 MB 时每帧都有条目被挤出, 于是每帧重新
+ * CPU 烘焙 (900x680 的 glow 一项 15 ms) 并重新上传纹理, 界面掉到 20 FPS。
+ * 现在按"能装下整个界面"给, 只在尺寸/主题变化时重建。
+ */
+#define PAINT_CACHE_BYTE_LIMIT (64u * 1024u * 1024u)
 
 static BongoCatUIPaintTexture textures[PAINT_CACHE_COUNT];
 static uint64_t use_counter;
@@ -75,6 +79,13 @@ BongoCatUIPaintTexture *bongo_cat_ui_paint_cache_get(
     item->backend = backend;
     item->key = *key;
     item->used = ++use_counter;
+    /* 排查用: 缓存未命中 (会走 CPU 逐像素烘焙 + 上传纹理) */
+    if (SDL_getenv("BONGO_CAT_TEST_PREFS_STAGES"))
+        SDL_LogWarn(SDL_LOG_CATEGORY_VIDEO,
+            "[paint] 未命中 backend=%p kind=%d %dx%d r=%d p1=%d c=%u marker=%llu",
+            (void *)backend, (int)key->kind, key->width, key->height,
+            key->radius, key->first_parameter, (unsigned)key->first_color,
+            (unsigned long long)backend->paint_frame_marker);
     return item;
 }
 
@@ -160,13 +171,23 @@ void bongo_cat_ui_paint_cache_draw(struct nk_context *context,
 
 void bongo_cat_ui_paint_cache_begin_frame(BongoCatUIBackend *backend) {
     if (!backend) return;
-    uint64_t marker = backend->paint_frame_marker;
-    if (marker) for (size_t i = 0; i < PAINT_CACHE_COUNT; ++i) {
+    /*
+     * paint_frame_marker 存的是"上一帧开始时的 use_counter":
+     * 上一帧用过的条目 used >= 这个值, 不会被释放; 只有连续两帧都没用到的条目
+     * (used < marker) 才释放。
+     *
+     * 以前这里存的是 use_counter + 1, 于是上一帧刚用过的条目也满足
+     * used < marker —— 等于每帧把整个缓存清空重烘焙。浅色主题那个全屏的
+     * sidebar glow 一项就要 15 ms/帧, 设置界面因此只有 20 FPS 左右。
+     */
+    const uint64_t previous_frame_start = backend->paint_frame_marker;
+    if (previous_frame_start) for (size_t i = 0; i < PAINT_CACHE_COUNT; ++i) {
         BongoCatUIPaintTexture *item = &textures[i];
-        if (item->backend == backend && item->texture && item->used < marker)
+        if (item->backend == backend && item->texture &&
+            item->used < previous_frame_start)
             release_texture(item);
     }
-    backend->paint_frame_marker = use_counter + 1;
+    backend->paint_frame_marker = use_counter;
 }
 
 size_t bongo_cat_ui_paint_cache_usage(BongoCatUIBackend *backend,

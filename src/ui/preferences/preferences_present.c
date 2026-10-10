@@ -12,10 +12,15 @@
  * 会话就能把日志写到几 MB (实测 2.3 MB), 还白做每帧的字符串格式化。
  * 需要时用 BONGO_CAT_TEST_PREFS_STAGES=1 打开。
  */
-static void stage_log(const char *stage) {
+static bool stages_enabled(void) {
     static int enabled = -1;
     if (enabled < 0) enabled = SDL_getenv("BONGO_CAT_TEST_PREFS_STAGES") != NULL;
-    if (enabled) SDL_LogWarn(SDL_LOG_CATEGORY_VIDEO, "[prefs] stage=%s", stage);
+    return enabled != 0;
+}
+
+static void stage_log(const char *stage) {
+    if (stages_enabled())
+        SDL_LogWarn(SDL_LOG_CATEGORY_VIDEO, "[prefs] stage=%s", stage);
 }
 
 /*
@@ -118,6 +123,7 @@ void bongo_cat_preferences_render(BongoCatPreferences *value) {
     bongo_cat_preferences_smoke_frame(value);
     stage_log("smoke-done");
     bool presented = true;
+    const uint64_t present_start_ns = SDL_GetTicksNS();
     if (vulkan) {
     stage_log("present-begin");
         presented = bongo_cat_vk_end_frame(value->vk);
@@ -133,6 +139,19 @@ void bongo_cat_preferences_render(BongoCatPreferences *value) {
         value->render_retry_ns = now + 1000000000ull;
     } else bongo_cat_memory_policy_ui_frame_presented();
     stage_log("present-done");
+    /*
+     * 每帧耗时拆成两段: 整帧 (从 render() 开头算) 和 present 本身。开着 RTSS /
+     * 微星小飞机 OSD 时 present 会被钩子拖长, 这两个数字能直接说明瓶颈在谁身上
+     * (用 BONGO_CAT_TEST_PREFS_STAGES=1 打开)。
+     */
+    if (stages_enabled()) {
+        const uint64_t present_end_ns = SDL_GetTicksNS();
+        SDL_LogWarn(SDL_LOG_CATEGORY_VIDEO,
+            "[prefs] frame ms=%.2f present_ms=%.2f vulkan=%d",
+            (double)(present_end_ns - now) / 1000000.0,
+            (double)(present_end_ns - present_start_ns) / 1000000.0,
+            vulkan ? 1 : 0);
+    }
     bongo_cat_preferences_record_frame(value);
     stage_log("record-done");
     if (value->shortcut_recording || value->model_load_visual_active ||

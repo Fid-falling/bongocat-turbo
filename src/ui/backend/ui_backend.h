@@ -7,8 +7,15 @@
 #include "nuklear_config.h"
 #include <stdint.h>
 
-/* 设置界面在 Vulkan 模式下使用的纹理表: Nuklear 的纹理 id = 下标 + 1 */
-#define BONGO_CAT_UI_VK_TEXTURES 64
+/*
+ * 设置界面在 Vulkan 模式下使用的纹理表: Nuklear 的纹理 id = 下标 + 1。
+ *
+ * 别调小: 表满时 bongo_cat_ui_paint_cache_upload 会拿不到 id, item->texture 永远是 0,
+ * ready() 就永远为假 —— 于是每一项 (包括那张全屏的 sidebar glow) 都变成"每帧重新
+ * CPU 烘焙 + 重新上传", 设置界面直接掉到 20 FPS。常驻项就有字体图集/logo/图标图集/
+ * 模型封面, 加上 paint cache 的渐变/阴影/圆角几十项, 64 曾经刚好不够。
+ */
+#define BONGO_CAT_UI_VK_TEXTURES 256
 
 typedef enum BongoCatUICursor {
     BONGO_CAT_UI_CURSOR_DEFAULT,

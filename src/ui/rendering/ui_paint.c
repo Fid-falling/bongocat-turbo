@@ -27,6 +27,9 @@ struct nk_color bongo_cat_ui_color_alpha(struct nk_color color,
     return color;
 }
 
+/* 模糊类效果 (发光/阴影) 的烘焙分辨率倍率: 像素数按平方下降 */
+#define BONGO_CAT_UI_PAINT_BLUR_SCALE 0.5f
+
 static uint32_t pack(struct nk_color color) {
     return (uint32_t)color.r | (uint32_t)color.g << 8 |
         (uint32_t)color.b << 16 | (uint32_t)color.a << 24;
@@ -165,6 +168,15 @@ void bongo_cat_ui_paint_sidebar_glow(struct nk_context *context,
     int width, height; float sx, sy; BongoCatUIBackend *backend;
     if (!texture_dimensions(context, surface, &width, &height, &sx, &sy,
         &backend)) return;
+    /*
+     * 发光是模糊效果, 按 1/2 分辨率烘焙: 像素数降到 1/4, 每帧省 ~9ms; 绘制时由
+     * 双线性放大补回, 视觉上几乎看不出差别 (全分辨率那版是 900x680 = 61 万像素的
+     * CPU 逐像素计算)。
+     */
+    width = NK_MAX(1, (int)(width * BONGO_CAT_UI_PAINT_BLUR_SCALE));
+    height = NK_MAX(1, (int)(height * BONGO_CAT_UI_PAINT_BLUR_SCALE));
+    sx *= BONGO_CAT_UI_PAINT_BLUR_SCALE;
+    sy *= BONGO_CAT_UI_PAINT_BLUR_SCALE;
     float scale = NK_MIN(sx, sy);
     BongoCatUIPaintKey key = {BONGO_CAT_UI_PAINT_SIDEBAR_GLOW,
         width, height, (int)lroundf(rounding * scale),
