@@ -44,6 +44,13 @@ bool bongo_cat_preferences_gl_create(BongoCatPreferences *value) {
         if (bongo_cat_vk_info(value->vk, &info))
             SDL_Log("[runtime] Preferences Vulkan context: device=%s driver=%s "
                 "swapchain=%dx%d", info.device, info.driver, info.width, info.height);
+        /*
+         * 设置界面是事件驱动渲染 (滚轮/拖动一来就画一帧), 继承主窗口的 FIFO 会让每次
+         * vkQueuePresentKHR 都等一个垂直回扫 (>=16.7ms), 滚动就一顿一顿的。这里关掉
+         * 垂直同步, 呈现走 IMMEDIATE / MAILBOX —— 交换链此时还没建, 所以只改字段,
+         * 真正的呈现模式在下一帧创建交换链时生效。
+         */
+        bongo_cat_vk_set_vsync(value->vk, false);
         return true;
     }
     /* 主窗口是 OpenGL 时共享它的上下文 (贴图互通、省显存); 主窗口是 Vulkan 时
