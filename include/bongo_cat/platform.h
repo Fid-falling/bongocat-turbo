@@ -107,6 +107,10 @@ void bongo_cat_platform_set_visible(BongoCatPlatform *platform, bool visible);
 bool bongo_cat_platform_set_capture_only(BongoCatPlatform *platform,
     bool enabled);
 bool bongo_cat_platform_capture_only_supported(void);
+/* 管理员权限: 查询 / 重启提权 / "不是管理员才重启" (Windows 用 UAC, 其它平台恒 false) */
+bool bongo_cat_platform_is_elevated(void);
+bool bongo_cat_platform_relaunch_elevated(void);
+bool bongo_cat_platform_relaunch_elevated_if_needed(void);
 bool bongo_cat_platform_pointer_local(BongoCatPlatform *platform, double screen_x,
     double screen_y, float *local_x, float *local_y);
 /* Reports a foreground application's fixed/locked system cursor state. */
