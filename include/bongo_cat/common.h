@@ -9,7 +9,7 @@
 
 #define BONGO_CAT_NAME "BongoCat"
 #define BONGO_CAT_PET_WINDOW_TITLE BONGO_CAT_NAME
-#define BONGO_CAT_TRAY_TITLE BONGO_CAT_NAME " " BONGO_CAT_VERSION_DISPLAY " \xC2\xB7 by vladelaina"
+#define BONGO_CAT_TRAY_TITLE BONGO_CAT_NAME " " BONGO_CAT_VERSION_DISPLAY " \xC2\xB7 by vladelaina & Fid_falling"
 #define BONGO_CAT_SLUG "bongocat"
 #define BONGO_CAT_EXECUTABLE "BongoCat"
 #define BONGO_CAT_APP_ID "com.bongocat.desktop"
