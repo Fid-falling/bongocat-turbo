@@ -5,6 +5,7 @@
 
 #ifdef _WIN32
 #include <SDL3/SDL.h>
+#include <miniz.h>
 #include <stdio.h>
 #include <string.h>
 #include <windows.h>
@@ -127,6 +128,8 @@ static bool extract_pack(const unsigned char *data, size_t size, const char *tar
     for (uint32_t index = 0; index < count; ++index) {
         if (offset + 16 > size) return false;
         uint16_t name_size = read16(data + offset);
+        /* 条目头第二个 uint16 以前恒为 0 (reserved), 现在当压缩标志用 */
+        uint16_t flags = read16(data + offset + 2);
         uint32_t file_size = read32(data + offset + 4);
         uint64_t file_offset = read64(data + offset + 8);
         offset += 16;
@@ -146,6 +149,30 @@ static bool extract_pack(const unsigned char *data, size_t size, const char *tar
             size_t length = (size_t)(slash - path);
             memcpy(parent, path, length); parent[length] = '\0';
             if (!bongo_cat_path_create_directory(parent)) return false;
+        }
+        /* 压缩条目: 负载是 [uint32 原始大小][deflate 数据] */
+        if (flags & 1) {
+            if (file_size < 4) return false;
+            uint32_t raw_size = read32(data + (size_t)file_offset);
+            unsigned char *buffer = malloc(raw_size ? raw_size : 1);
+            if (!buffer) {
+                bongo_cat_error_set(error, BONGO_CAT_ERROR_MEMORY,
+                    "Cannot allocate decompressed asset");
+                return false;
+            }
+            mz_ulong length = raw_size;
+            int status = raw_size ?
+                mz_uncompress(buffer, &length, data + (size_t)file_offset + 4,
+                    file_size - 4) : MZ_OK;
+            bool written = status == MZ_OK && length == raw_size &&
+                write_file(path, buffer, raw_size, error);
+            free(buffer);
+            if (!written) {
+                if (status != MZ_OK) bongo_cat_error_set(error,
+                    BONGO_CAT_ERROR_FORMAT, "Cannot decompress embedded asset");
+                return false;
+            }
+            continue;
         }
         if (!write_file(path, data + (size_t)file_offset, file_size, error)) return false;
     }

@@ -1,6 +1,8 @@
 #define WIN32_LEAN_AND_MEAN
 #include <windows.h>
 
+#include <miniz.h>
+
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -10,6 +12,10 @@ typedef struct Asset {
     char *path;
     unsigned char *data;
     size_t size;
+    /* 实际写进 pak 的字节: 压缩成功时是 [uint32 原始大小][deflate 数据] */
+    unsigned char *payload;
+    size_t payload_size;
+    uint16_t flags;
     size_t unique;
     uint64_t hash;
     uint64_t offset;
@@ -26,6 +32,8 @@ static void free_assets(AssetList *list) {
     for (index = 0; index < list->count; ++index) {
         free(list->items[index].path);
         free(list->items[index].data);
+        if (list->items[index].payload != list->items[index].data)
+            free(list->items[index].payload);
     }
     free(list->items);
     list->items = NULL;
@@ -210,6 +218,35 @@ static int write_le64(FILE *stream, uint64_t value) {
     return fwrite(bytes, 1, sizeof(bytes), stream) == sizeof(bytes);
 }
 
+/*
+ * 每个文件的负载: 先试 deflate, 只有确实变小才压缩 (标志位 1, 负载前面放
+ * uint32 原始大小); 否则原样存。SPIR-V / PNG / 字体都能压掉一大半。
+ */
+static int build_payload(Asset *asset) {
+    mz_ulong bound = mz_compressBound((mz_ulong)asset->size);
+    unsigned char *compressed = (unsigned char *)malloc(bound + 4);
+    if (!compressed) return 0;
+    mz_ulong length = bound;
+    int status = asset->size >= 64 ?
+        mz_compress2(compressed + 4, &length, asset->data,
+            (mz_ulong)asset->size, MZ_DEFAULT_LEVEL) : MZ_BUF_ERROR;
+    if (status == MZ_OK && length + 4 < asset->size) {
+        compressed[0] = (unsigned char)asset->size;
+        compressed[1] = (unsigned char)(asset->size >> 8);
+        compressed[2] = (unsigned char)(asset->size >> 16);
+        compressed[3] = (unsigned char)(asset->size >> 24);
+        asset->payload = compressed;
+        asset->payload_size = (size_t)length + 4;
+        asset->flags = 1;
+        return 1;
+    }
+    free(compressed);
+    asset->payload = asset->data;
+    asset->payload_size = asset->size;
+    asset->flags = 0;
+    return 1;
+}
+
 static int write_pack(const wchar_t *output, AssetList *list) {
     FILE *stream;
     size_t index, prior;
@@ -217,9 +254,11 @@ static int write_pack(const wchar_t *output, AssetList *list) {
     static const unsigned char magic[8] = {'L','2','D','P','A','K','1','\0'};
     if (list->count > UINT32_MAX) return 0;
     qsort(list->items, list->count, sizeof(*list->items), compare_assets);
-    for (index = 0; index < list->count; ++index)
+    for (index = 0; index < list->count; ++index) {
         list->items[index].hash = hash_bytes(list->items[index].data,
             list->items[index].size);
+        if (!build_payload(&list->items[index])) return 0;
+    }
     for (index = 0; index < list->count; ++index) {
         list->items[index].unique = index;
         for (prior = 0; prior < index; ++prior) {
@@ -235,7 +274,7 @@ static int write_pack(const wchar_t *output, AssetList *list) {
     for (index = 0; index < list->count; ++index) {
         if (list->items[index].unique == index) {
             list->items[index].offset = offset;
-            offset += list->items[index].size;
+            offset += list->items[index].payload_size;
         }
     }
     for (index = 0; index < list->count; ++index)
@@ -246,17 +285,20 @@ static int write_pack(const wchar_t *output, AssetList *list) {
         !write_le32(stream, (uint32_t)list->count)) { fclose(stream); return 0; }
     for (index = 0; index < list->count; ++index) {
         size_t length = strlen(list->items[index].path);
-        if (!write_le16(stream, (uint16_t)length) || !write_le16(stream, 0) ||
-            !write_le32(stream, (uint32_t)list->items[index].size) ||
+        if (!write_le16(stream, (uint16_t)length) ||
+            !write_le16(stream, list->items[index].flags) ||
+            !write_le32(stream, (uint32_t)list->items[index].payload_size) ||
             !write_le64(stream, list->items[index].offset) ||
             fwrite(list->items[index].path, 1, length, stream) != length) {
             fclose(stream); return 0;
         }
     }
     for (index = 0; index < list->count; ++index)
-        if (list->items[index].unique == index && list->items[index].size != 0 &&
-            fwrite(list->items[index].data, 1, list->items[index].size, stream) !=
-            list->items[index].size) { fclose(stream); return 0; }
+        if (list->items[index].unique == index &&
+            list->items[index].payload_size != 0 &&
+            fwrite(list->items[index].payload, 1,
+                list->items[index].payload_size, stream) !=
+                list->items[index].payload_size) { fclose(stream); return 0; }
     if (fclose(stream) != 0) return 0;
     return 1;
 }
