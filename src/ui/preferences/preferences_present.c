@@ -7,6 +7,17 @@
 
 #include <SDL3/SDL_opengl.h>
 
+/*
+ * 冒烟/排查用的分阶段日志。默认关闭: 设置窗口每帧都走一遍这里, 开着的时候一次
+ * 会话就能把日志写到几 MB (实测 2.3 MB), 还白做每帧的字符串格式化。
+ * 需要时用 BONGO_CAT_TEST_PREFS_STAGES=1 打开。
+ */
+static void stage_log(const char *stage) {
+    static int enabled = -1;
+    if (enabled < 0) enabled = SDL_getenv("BONGO_CAT_TEST_PREFS_STAGES") != NULL;
+    if (enabled) SDL_LogWarn(SDL_LOG_CATEGORY_VIDEO, "[prefs] stage=%s", stage);
+}
+
 void bongo_cat_preferences_render(BongoCatPreferences *value) {
     bongo_cat_preferences_release_idle_window(value);
     if (!value || !value->window || !value->visible) return;
@@ -53,14 +64,14 @@ void bongo_cat_preferences_render(BongoCatPreferences *value) {
     float width = 0.0f, height = 0.0f;
     bongo_cat_ui_logical_size(&value->ui, &width, &height);
     bongo_cat_ui_paint_begin_frame(&value->ui);
-    SDL_LogWarn(SDL_LOG_CATEGORY_VIDEO, "[prefs] stage=paint-begin");
+    stage_log("paint-begin");
     bongo_cat_ui_cursor_begin(&value->ui);
     bool dark = bongo_cat_preferences_resolved_theme(value) != 0;
     value->ui.frame_building = true;
     bool close_requested = bongo_cat_preferences_draw_frame(
         value, width, height, dark);
     value->ui.frame_building = false;
-    SDL_LogWarn(SDL_LOG_CATEGORY_VIDEO, "[prefs] stage=drawn");
+    stage_log("drawn");
     bongo_cat_preferences_shortcut_smoke(value);
     BongoCatUIPalette palette = bongo_cat_ui_palette(dark);
     if (vulkan) {
@@ -89,12 +100,12 @@ void bongo_cat_preferences_render(BongoCatPreferences *value) {
         glClear(GL_COLOR_BUFFER_BIT);
     }
     bongo_cat_ui_render(&value->ui);
-    SDL_LogWarn(SDL_LOG_CATEGORY_VIDEO, "[prefs] stage=ui-rendered");
+    stage_log("ui-rendered");
     bongo_cat_preferences_smoke_frame(value);
-    SDL_LogWarn(SDL_LOG_CATEGORY_VIDEO, "[prefs] stage=smoke-done");
+    stage_log("smoke-done");
     bool presented = true;
     if (vulkan) {
-    SDL_LogWarn(SDL_LOG_CATEGORY_VIDEO, "[prefs] stage=present-begin");
+    stage_log("present-begin");
         presented = bongo_cat_vk_end_frame(value->vk);
             if (!presented)
             SDL_LogWarn(SDL_LOG_CATEGORY_VIDEO, "Preferences Vulkan present failed");
@@ -107,9 +118,9 @@ void bongo_cat_preferences_render(BongoCatPreferences *value) {
         value->render_dirty = true;
         value->render_retry_ns = now + 1000000000ull;
     } else bongo_cat_memory_policy_ui_frame_presented();
-    SDL_LogWarn(SDL_LOG_CATEGORY_VIDEO, "[prefs] stage=present-done");
+    stage_log("present-done");
     bongo_cat_preferences_record_frame(value);
-    SDL_LogWarn(SDL_LOG_CATEGORY_VIDEO, "[prefs] stage=record-done");
+    stage_log("record-done");
     if (value->shortcut_recording || value->model_load_visual_active ||
         importing || bongo_cat_pref_controls_animating(&value->ui.context) ||
         bongo_cat_ui_animations_active(&value->ui.context))
@@ -118,7 +129,7 @@ void bongo_cat_preferences_render(BongoCatPreferences *value) {
         bongo_cat_ui_trim_idle(&value->ui);
     if (!vulkan) SDL_GL_MakeCurrent(value->app->window, value->app->gl_context);
     bongo_cat_ui_cursor_apply(&value->ui);
-    SDL_LogWarn(SDL_LOG_CATEGORY_VIDEO, "[prefs] stage=cursor-done");
+    stage_log("cursor-done");
     if (close_requested) {
         bongo_cat_preferences_close(value);
         return;

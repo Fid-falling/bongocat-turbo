@@ -1,10 +1,12 @@
 #include "cubism_model.hpp"
 #include "bongo_cat/gl_api.h"
+#include "bongo_cat/log.h"
 
 #include <SDL3/SDL_video.h>
 #include <SDL3/SDL_log.h>
 #include <algorithm>
 #include <cstdint>
+#include <cstdlib>
 #include <utility>
 
 namespace bongo_cat {
@@ -247,12 +249,24 @@ bool NativeModel::create_renderer(BongoCatError *error) {
         const uint64_t total_buffers = (uint64_t)buffer_count *
             ((drawable_combinations > 0 ? 1u : 0u) +
              (offscreen_combinations > 0 ? 1u : 0u));
-        // Target 32 MiB of RGBA8 masks per model, retaining a 256px floor.
-        // This excludes model atlases, blend targets, and driver overhead.
-        constexpr uint64_t mask_budget = 32ull * 1024 * 1024;
+        /*
+         * 遮罩预算: 原来按 32 MiB RGBA8 给 (两个模型就是 64 MB 级), 遮罩其实只要
+         * 一个通道, 8 MiB 足够 —— 遮罩图集放不下时 SDK 会自动多开几个缓冲, 视觉
+         * 结果不变。有 BONGO_CAT_MASK_BUDGET_MB 可以临时调回去做对比。
+         */
+        uint64_t mask_budget = 8ull * 1024 * 1024;
+        if (const char *override_value = SDL_getenv("BONGO_CAT_MASK_BUDGET_MB")) {
+            long megabytes = strtol(override_value, nullptr, 10);
+            if (megabytes > 0 && megabytes <= 512)
+                mask_budget = (uint64_t)megabytes * 1024 * 1024;
+        }
         while (mask_texture_limit_ > 256 && total_buffers * 4 *
             (uint64_t)mask_texture_limit_ * (uint64_t)mask_texture_limit_ > mask_budget)
             mask_texture_limit_ = std::max(256, mask_texture_limit_ - 256);
+        SDL_LogInfo(BONGO_CAT_LOG_LIFECYCLE,
+            "[live2d] 遮罩预算=%lluMB 每张=%dpx 缓冲=%llu 组=%d", 
+            (unsigned long long)(mask_budget / (1024 * 1024)), mask_texture_limit_,
+            (unsigned long long)total_buffers, mask_layout_divisions_);
         bind_textures();
         update_mask_buffers();
         const GLenum mask_error = glGetError();
