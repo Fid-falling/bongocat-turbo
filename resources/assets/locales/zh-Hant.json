@@ -29,6 +29,13 @@
           "hideOnHover": "滑鼠游標移入隱藏",
           "hideFadeSeconds": "隱藏漸變時長 (秒)",
           "maxFPS": "最大幀率",
+          "fontRasterCapHint": "HiDPI 下字型圖集限制在 2 倍 (預設 4 倍), 更省記憶體",
+          "fontRasterCap": "字型清晰度上限",
+          "ssMemory": "省記憶體",
+          "ssQuality": "品質",
+          "ssAuto": "自動",
+          "supersampleQuality": "超取樣 (Live2D)",
+          "performanceSettings": "效能",
           "unlimitedFps": "無限制",
           "renderer": "渲染後端"
         },

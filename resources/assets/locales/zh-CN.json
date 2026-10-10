@@ -29,6 +29,13 @@
           "hideOnHover": "鼠标移入隐藏",
           "hideFadeSeconds": "鼠标移入淡出时长（秒）",
           "maxFPS": "最大帧率",
+          "fontRasterCapHint": "HiDPI 下字体图集限制在 2 倍 (默认 4 倍), 更省内存",
+          "fontRasterCap": "字体清晰度上限",
+          "ssMemory": "省内存",
+          "ssQuality": "质量",
+          "ssAuto": "自动",
+          "supersampleQuality": "超采样 (Live2D)",
+          "performanceSettings": "性能",
           "unlimitedFps": "无限制",
           "renderer": "渲染后端"
         },

@@ -217,6 +217,8 @@ void bongo_cat_window_apply(BongoCatApp *app) {
        样式/位置, 重新应用一次能保证隐藏状态不会在它们之后丢失。 */
     bongo_cat_platform_set_capture_only(&app->platform,
         app->settings.window.capture_only);
+    /* [性能] 区的超采样档位; 实际倍数由桥按窗口尺寸决定 (自动档会降级) */
+    bongo_cat_live2d_vulkan_set_supersample(app->settings.window.supersample);
 }
 
 void bongo_cat_window_apply_capture_only(BongoCatApp *app) {

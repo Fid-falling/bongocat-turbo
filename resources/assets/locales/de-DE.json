@@ -29,6 +29,13 @@
           "hideOnHover": "Beim Darüberfahren ausblenden",
           "hideFadeSeconds": "Ausblendedauer (s)",
           "maxFPS": "Maximale Bildrate",
+          "fontRasterCapHint": "HiDPI-Schriftatlas bleibt bei 2x statt 4x",
+          "fontRasterCap": "Schärfe begrenzen",
+          "ssMemory": "Speichersparend",
+          "ssQuality": "Qualität",
+          "ssAuto": "Automatisch",
+          "supersampleQuality": "Supersampling",
+          "performanceSettings": "Leistung",
           "unlimitedFps": "Unbegrenzt",
           "renderer": "Renderer"
         },

@@ -70,6 +70,14 @@ typedef struct BongoCatWindowPreferences {
      * (DWMWA_CLOAK) 实现, 其它平台暂不支持。
      */
     bool capture_only;
+    /*
+     * 性能相关 (设置界面的[性能]区):
+     *   supersample     0=自动 (窗口面积大时降到 1x 省显存) 1=质量 (2x) 2=省内存 (1x)
+     *   font_raster_cap 1=字体图集栅格倍率封顶 2x (HiDPI 下 4x 就是 16 倍像素)
+     * 两个都是 int 而不是 bool: 配置读取走可选的 read_int, 老配置文件缺键时保持默认。
+     */
+    int supersample;
+    int font_raster_cap;
     bool obs_background;
     bool random_expression;
     bool rounded_corners;

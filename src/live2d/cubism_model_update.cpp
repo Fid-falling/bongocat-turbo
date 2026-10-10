@@ -36,8 +36,8 @@ void NativeModel::resize(int width, int height) {
 #ifdef BONGO_CAT_HAS_VULKAN
     if (bongo_cat_cubism_renderer_uses_vulkan()) {
         SetRenderTargetSize(
-            (Csm::csmUint32)(width_ * BONGO_CAT_LIVE2D_VULKAN_SUPERSAMPLE),
-            (Csm::csmUint32)(height_ * BONGO_CAT_LIVE2D_VULKAN_SUPERSAMPLE));
+            (Csm::csmUint32)(width_ * bongo_cat_live2d_vulkan_supersample_for(width_, height_)),
+            (Csm::csmUint32)(height_ * bongo_cat_live2d_vulkan_supersample_for(width_, height_)));
     } else
 #endif
     SetRenderTargetSize((Csm::csmUint32)width_, (Csm::csmUint32)height_);

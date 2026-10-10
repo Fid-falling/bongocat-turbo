@@ -34,6 +34,10 @@ static bool write_window(yyjson_mut_doc *doc, yyjson_mut_val *object,
             value->keep_in_screen) &&
         yyjson_mut_obj_add_bool(doc, object, "captureOnly",
             value->capture_only) &&
+        yyjson_mut_obj_add_int(doc, object, "supersample",
+            value->supersample) &&
+        yyjson_mut_obj_add_int(doc, object, "fontRasterCap",
+            value->font_raster_cap) &&
         yyjson_mut_obj_add_bool(doc, object, "captureBackground",
             value->obs_background) &&
         yyjson_mut_obj_add_bool(doc, object, "randomExpression",

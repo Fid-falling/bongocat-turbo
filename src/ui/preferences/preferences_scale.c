@@ -256,7 +256,10 @@ bool bongo_cat_preferences_scale_event(BongoCatPreferences *value,
     } else {
         value->pending_raster_scale = 0.0f;
         value->raster_retry_ns = 0;
-        value->ui.raster_scale = raster_scale;
+        /* [性能] 区: 字体图集栅格倍率封顶, 4x 在 HiDPI 上是 16 倍像素 */
+    if (value->app->settings.window.font_raster_cap && raster_scale > 2.0f)
+        raster_scale = 2.0f;
+    value->ui.raster_scale = raster_scale;
     }
     SDL_SetWindowMinimumSize(value->window, minimum_width, minimum_height);
     SDL_SetWindowSize(value->window, width, height);

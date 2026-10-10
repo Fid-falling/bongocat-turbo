@@ -148,6 +148,41 @@ static void page_display(BongoCatApp *app, struct nk_context *context) {
 
     section_gap(context, 10);
     bongo_cat_pref_section_icon(context, tr(app,
+        "pages.preference.cat.labels.performanceSettings", "Performance"),
+        BONGO_CAT_PREF_ICON_SECTION_APPEARANCE);
+    {
+        /* 超采样: 质量档 2x 边缘更干净; 2x 是 4 倍面积, 大窗口很吃显存 */
+        const char *const labels[] = {
+            tr(app, "pages.preference.cat.labels.ssAuto", "Auto"),
+            tr(app, "pages.preference.cat.labels.ssQuality", "Quality"),
+            tr(app, "pages.preference.cat.labels.ssMemory", "Low memory")};
+        const int count = (int)(sizeof(labels) / sizeof(labels[0]));
+        int selected = app->settings.window.supersample;
+        if (selected < 0 || selected >= count) selected = 0;
+        bongo_cat_pref_row_icon(context, BONGO_CAT_PREF_ICON_RENDERER);
+        selected = bongo_cat_pref_theme(context, "supersample",
+            tr(app, "pages.preference.cat.labels.supersampleQuality",
+                "Supersampling"),
+            labels, selected);
+        if (selected != app->settings.window.supersample) {
+            app->settings.window.supersample = selected;
+            app->dirty = true;
+            bongo_cat_window_apply(app);
+        }
+    }
+    {
+        bool capped = app->settings.window.font_raster_cap != 0;
+        bongo_cat_pref_row_icon(context, BONGO_CAT_PREF_ICON_MAX_FPS);
+        if (bongo_cat_pref_toggle(context, "font-raster-cap", tr(app,
+                "pages.preference.cat.labels.fontRasterCap",
+                "Cap font sharpness"),
+                tr(app, "pages.preference.cat.labels.fontRasterCapHint",
+                    "HiDPI 下字体图集限制在 2 倍, 更省内存"), &capped)) {
+            app->settings.window.font_raster_cap = capped ? 1 : 0;
+            app->dirty = true;
+        }
+    }    section_gap(context, 10);
+    bongo_cat_pref_section_icon(context, tr(app,
         "pages.preference.cat.labels.modelSettings", "Model"),
         BONGO_CAT_PREF_ICON_SECTION_MODEL);
     bongo_cat_pref_row_icon(context, BONGO_CAT_PREF_ICON_MIRROR);

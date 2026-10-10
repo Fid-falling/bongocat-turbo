@@ -29,6 +29,13 @@
           "hideOnHover": "Скрывать при наведении",
           "hideFadeSeconds": "Длительность затухания (с)",
           "maxFPS": "Максимальная частота кадров",
+          "fontRasterCapHint": "В HiDPI атлас шрифтов ограничен 2x вместо 4x",
+          "fontRasterCap": "Ограничить чёткость",
+          "ssMemory": "Экономия памяти",
+          "ssQuality": "Качество",
+          "ssAuto": "Авто",
+          "supersampleQuality": "Суперсэмплинг",
+          "performanceSettings": "Производительность",
           "unlimitedFps": "Без ограничений",
           "renderer": "Рендерер"
         },

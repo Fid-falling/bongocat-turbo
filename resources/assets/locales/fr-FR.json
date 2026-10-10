@@ -29,6 +29,13 @@
           "hideOnHover": "Masquer au survol",
           "hideFadeSeconds": "Durée du fondu (s)",
           "maxFPS": "Fréquence d'images maximale",
+          "fontRasterCapHint": "Atlas de police limité à 2x au lieu de 4x en HiDPI",
+          "fontRasterCap": "Limiter la netteté",
+          "ssMemory": "Économe en mémoire",
+          "ssQuality": "Qualité",
+          "ssAuto": "Auto",
+          "supersampleQuality": "Superéchantillonnage",
+          "performanceSettings": "Performance",
           "unlimitedFps": "Illimité",
           "renderer": "Moteur de rendu"
         },

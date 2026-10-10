@@ -29,6 +29,13 @@
           "hideOnHover": "Hide on Hover",
           "hideFadeSeconds": "Fade Duration (s)",
           "maxFPS": "Max Frame Rate",
+          "fontRasterCapHint": "HiDPI font atlas stays at 2x instead of 4x",
+          "fontRasterCap": "Cap font sharpness",
+          "ssMemory": "Low memory",
+          "ssQuality": "Quality",
+          "ssAuto": "Auto",
+          "supersampleQuality": "Supersampling",
+          "performanceSettings": "Performance",
           "unlimitedFps": "Unlimited",
           "renderer": "Renderer"
         },

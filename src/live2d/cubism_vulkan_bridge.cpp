@@ -61,14 +61,15 @@ std::filesystem::path shader_parent_directory() {
 /* 24 位深度 + 模板在桌面 Vulkan 上普遍可用, SDK 的样例也用这一档 */
 const VkFormat kDepthFormat = VK_FORMAT_D24_UNORM_S8_UINT;
 /* 见 live2d_vulkan_internal.h: SDK 的 Vulkan 渲染器开不了 MSAA, 只能超采样 */
-const int kSupersample = BONGO_CAT_LIVE2D_VULKAN_SUPERSAMPLE;
+/* 实际倍数见 bongo_cat_live2d_vulkan_supersample_for (运行时档位 + 自动降级) */
 /* 目标尺寸 (超采样之后) 与请求尺寸 (窗口/内容尺寸) 的记忆值 */
 int g_target_width = 0;
 int g_target_height = 0;
 
 VkExtent2D target_extent(int width, int height) {
-    VkExtent2D extent = {(unsigned int)(width * kSupersample),
-        (unsigned int)(height * kSupersample)};
+    const int factor = bongo_cat_live2d_vulkan_supersample_for(width, height);
+    VkExtent2D extent = {(unsigned int)(width * factor),
+        (unsigned int)(height * factor)};
     return extent;
 }
 
@@ -102,6 +103,22 @@ bool ensure_target_size(int width, int height) {
 }
 
 } // namespace
+
+int bongo_cat_live2d_vulkan_supersample_mode = 0;
+
+/* 自动档: 2x 是 4 倍面积, 大窗口白吃显存, 超过 1.2M 像素就退回 1x */
+int bongo_cat_live2d_vulkan_supersample_for(int width, int height) {
+    if (bongo_cat_live2d_vulkan_supersample_mode == 1)
+        return BONGO_CAT_LIVE2D_VULKAN_SUPERSAMPLE;
+    if (bongo_cat_live2d_vulkan_supersample_mode == 2) return 1;
+    return (long)width * (long)height > 1200000L ? 1
+        : BONGO_CAT_LIVE2D_VULKAN_SUPERSAMPLE;
+}
+
+void bongo_cat_live2d_vulkan_set_supersample(int mode) {
+    bongo_cat_live2d_vulkan_supersample_mode =
+        mode == 1 || mode == 2 ? mode : 0;
+}
 
 bool bongo_cat_live2d_vulkan_shaders_available(const char *assets_root) {
     if (!shader_parent_directory().empty()) return true;

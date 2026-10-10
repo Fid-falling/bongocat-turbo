@@ -12,6 +12,13 @@
  */
 #define BONGO_CAT_LIVE2D_VULKAN_SUPERSAMPLE 2
 
+/*
+ * 运行时超采样档位 (设置界面 [性能] 区), 以及按目标尺寸算出的实际倍数:
+ *   0 = 自动 (面积超过阈值退回 1x) 1 = 质量 (2x) 2 = 省内存 (1x)
+ */
+extern int bongo_cat_live2d_vulkan_supersample_mode;
+int bongo_cat_live2d_vulkan_supersample_for(int width, int height);
+
 #ifdef __cplusplus
 extern "C" {
 #endif

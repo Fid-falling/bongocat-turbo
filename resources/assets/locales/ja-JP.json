@@ -29,6 +29,13 @@
           "hideOnHover": "ホバー時に非表示",
           "hideFadeSeconds": "フェード時間 (秒)",
           "maxFPS": "最大フレームレート",
+          "fontRasterCapHint": "HiDPI ではフォントアトラスを 4 倍ではなく 2 倍に制限します",
+          "fontRasterCap": "フォント解像度の上限",
+          "ssMemory": "省メモリ",
+          "ssQuality": "高品質",
+          "ssAuto": "自動",
+          "supersampleQuality": "スーパーサンプリング",
+          "performanceSettings": "パフォーマンス",
           "unlimitedFps": "無制限",
           "renderer": "レンダラー"
         },

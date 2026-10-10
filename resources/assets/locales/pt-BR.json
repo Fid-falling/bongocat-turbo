@@ -29,6 +29,13 @@
           "hideOnHover": "Ocultar ao Passar o Mouse",
           "hideFadeSeconds": "Duração do fade (s)",
           "maxFPS": "Taxa Máxima de Quadros",
+          "fontRasterCapHint": "Em HiDPI o atlas de fontes fica em 2x em vez de 4x",
+          "fontRasterCap": "Limitar a nitidez",
+          "ssMemory": "Economia de memória",
+          "ssQuality": "Qualidade",
+          "ssAuto": "Automático",
+          "supersampleQuality": "Superamostragem",
+          "performanceSettings": "Desempenho",
           "unlimitedFps": "Ilimitado",
           "renderer": "Renderizador"
         },
