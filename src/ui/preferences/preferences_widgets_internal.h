@@ -4,6 +4,12 @@
 #include <stdbool.h>
 #include "nuklear_config.h"
 
+/*
+ * 表单骨架的内部接口 (只在 preferences_* 之间用, 不是对外 API)。
+ * FormStyle 是"被改过的全局样式"的备份 —— form_begin 填, form_end 还原。
+ * 任何走 form_begin 的代码, 都必须在同一条路径上配对 form_end (裁剪早退那条路除外,
+ * 见 form_begin 的返回值约定)。
+ */
 typedef struct FormStyle {
     struct nk_style_item background;
     struct nk_color window_color;

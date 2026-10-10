@@ -1,3 +1,10 @@
+/*
+ * 图像归一化: 把 Tauri 源包里名字各异的图片铺成 Mver 规范包要求的固定文件名。
+ * 核心约定是“缺图不能缺文件”: 任何一层找不到源图就写一张 1x1 透明 PNG 占位, 让包的
+ * 结构始终完整 —— 下游按固定文件名取图, 而且会重新扫描产物。
+ * 源图既可能在包根的 resources/ 下, 也可能就在包根 (见 model_import_tauri_resources.c)。
+ * 调用顺序有约束: copy_preview 必须早于 copy_runtime_images。
+ */
 #include "model_import_tauri_internal.h"
 
 #include "bongo_cat/file.h"
@@ -5,6 +12,8 @@
 
 #include <stdio.h>
 
+/* 1x1 灰度 + alpha 的透明 PNG, 内嵌字节以避免依赖任何编码器: 占位图必须能被
+ * bongo_cat_image_info 解出尺寸, 所以不能写空文件。 */
 static bool write_placeholder(const char *path) {
     static const unsigned char png[] = {
         0x89,0x50,0x4e,0x47,0x0d,0x0a,0x1a,0x0a,0x00,0x00,0x00,0x0d,
@@ -21,6 +30,8 @@ static bool write_placeholder(const char *path) {
     return ok;
 }
 
+/* 源图存在就复制, 否则写占位图 —— 因此 source 不存在也算成功。返回 false 只在写目标
+ * 文件失败时发生, 并统一报 IO 错误。 */
 bool bongo_cat_tauri_copy_image_or_placeholder(const char *source,
     const char *target, BongoCatError *error) {
     bool ok = source && bongo_cat_path_is_file(source)
@@ -30,6 +41,9 @@ bool bongo_cat_tauri_copy_image_or_placeholder(const char *source,
     return ok;
 }
 
+/* 两个参数语义不同: source_name 是要在源包里查找的资源名, fallback 则是已经算好的
+ * 可用路径 (例如 standard 模式的背景先写成 mousebg.png, 再给别的图层兜底);
+ * fallback 为 NULL 表示允许直接写占位图。 */
 static bool copy_mver_image(const BongoCatImportCandidate *candidate,
     const char *mode_root, const char *source_name, const char *target_name,
     const char *fallback, BongoCatError *error) {
@@ -42,6 +56,8 @@ static bool copy_mver_image(const BongoCatImportCandidate *candidate,
     return bongo_cat_tauri_copy_image_or_placeholder(selected, target, error);
 }
 
+/* 补齐 Mver 运行时需要的图层。前提: copy_preview 已经跑过 —— standard 分支拿它写出的
+ * mousebg.png 当 tabletbg/l2dmousebg/l2dtabletbg 的兜底图源, 顺序反了会退化成占位图。 */
 bool bongo_cat_tauri_copy_runtime_images(
     const BongoCatImportCandidate *candidate, const char *mode_root,
     BongoCatError *error) {
@@ -85,6 +101,9 @@ bool bongo_cat_tauri_copy_runtime_images(
                 NULL, error)) return false;
     return true;
 }
+
+/* 预览资源: cover.png 归一化成 cat.png (预览封面), background.png 归一化成
+ * mousebg.png / bg.png (按模式当背景); 两个源图都允许缺失, 缺失时写占位图。 */
 
 bool bongo_cat_tauri_copy_preview(const BongoCatImportCandidate *candidate,
     const char *mode_root, BongoCatError *error) {

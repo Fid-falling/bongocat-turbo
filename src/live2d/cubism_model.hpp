@@ -31,6 +31,15 @@ bool validate_model_setting_json(const std::vector<unsigned char> &json,
 class ViewerLookUpdater;
 class ParameterOverrideUpdater;
 
+/*
+ * 一个 Live2D 模型实例, 也是它全部 Cubism 资源的所有者: 模型数据、动作/表情、贴图、
+ * 渲染器、遮罩缓冲都在这里。GL 与 Vulkan 两套贴图句柄 (textures_ / vulkan_textures_)
+ * 互斥使用, 由 cubism_renderer_select.hpp 的运行时开关决定, 同一时刻只有一套非空。
+ *
+ * 生命周期约定: 先 load() 读 model3.json 与动作, 再 load_textures() 上传贴图并创建
+ * 渲染器 (内部会先 release_renderer 再 create_renderer), 之后每帧 update()/draw()。
+ * 析构自己释放全部资源, 但贴图的真正释放时机受 cubism_bridge_load.cpp 的退休队列约束。
+ */
 class NativeModel final : public Csm::CubismUserModel {
 public:
     NativeModel();
@@ -159,15 +168,19 @@ private:
     std::vector<GLuint> textures_;
     /* Vulkan 后端下的贴图句柄 (CubismImageVulkan*), 与 textures_ 一一对应 */
     std::vector<void *> vulkan_textures_;
+    /* 每张贴图的 alpha 掩码, 供 capture_visible_bounds 剔除全透明三角形 */
     std::vector<BongoCatImageAlphaMask> texture_alpha_;
     mutable std::vector<std::vector<unsigned char>> triangle_alpha_;
     mutable std::vector<DrawableBounds> bounds_scratch_;
     std::vector<float> parameter_snapshot_;
     std::vector<float> part_snapshot_;
     std::vector<float> parameter_override_values_;
+    /* 动作基线: Cubism 的 SaveParameters() 存的是"没有外部输入时的参数值", 动作恢复
+     * 终态要写这里而不是覆盖值 —— 两者语义不同, 混用会让模型停在错误的姿势上。 */
     std::vector<float> parameter_baseline_values_;
     std::vector<float> parameter_save_scratch_;
     std::vector<unsigned char> parameter_overrides_;
+    /* 预览事务的快照, 仅在 motion_preview_active_ 为真时有意义 (见 cubism_motion_preview.cpp) */
     std::vector<float> motion_preview_parameters_;
     std::vector<float> motion_preview_parts_;
     Csm::csmVector<Csm::CubismIdHandle> eye_blink_ids_;
@@ -180,6 +193,7 @@ private:
     int height_ = 354;
     int renderer_width_ = 0;
     int renderer_height_ = 0;
+    /* 遮罩图集的运行时记账 (GL 路径): 纹理上限 / 当前尺寸 / 网格划分 / 上次生效的窗口尺寸 */
     int mask_texture_limit_ = 0;
     int mask_buffer_size_ = 0;
     int mask_layout_divisions_ = 1;

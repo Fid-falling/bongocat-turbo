@@ -1,3 +1,6 @@
+/* 模型切换几何适配的内部接口 (仅供 runtime 内部): anchor 必须在切换前取,
+ * apply_aspect 必须在渲染选项与 live2d 尺寸都就绪后调; 返回 true 表示窗口几何真的改了。
+ */
 #ifndef BONGO_CAT_MODEL_GEOMETRY_H
 #define BONGO_CAT_MODEL_GEOMETRY_H
 

@@ -1,3 +1,15 @@
+/*
+ * 模型卡片: 封面 + 名字 + 三个操作 (行为/目录/删除), 以及选中与加载两套动画。
+ *
+ * 卡片里的动画全部走 bongo_cat_ui_animate_* 那套按 id 的补间, 所以每张卡片必须
+ * 用带 entry->id 的唯一 id (model-hover-<id> / model-selected-<id>) —— 用固定名字
+ * 会让所有卡片共用一个动画值, 表现为"鼠标划过一张, 所有卡片一起动"。
+ *
+ * 点击的优先级也是刻意的: 名字区域 > 操作条 > 整卡选中。名字可能正在被重命名编辑,
+ * 那时点击归文本编辑; 操作条上的点击不能穿透到"选中整个模型"。
+ * 只读依赖: 本文件不直接改 settings, 一律通过 bongo_cat_preferences_model_select
+ * 等入口写 pending 状态, 由 process_model_selection 在帧末统一执行。
+ */
 #include "preferences_model_card.h"
 #include "preferences_model_card_paint.h"
 #include "preferences_model_cover.h"
@@ -15,6 +27,7 @@
 #include <stdio.h>
 #include <string.h>
 
+/* 选中态淡入时长 (毫秒), 传给补间函数 */
 #define MODEL_SELECTION_FADE_MS 240.0f
 
 static const char *tr(BongoCatApp *app, const char *key,
@@ -30,6 +43,12 @@ static void text(struct nk_context *context, struct nk_command_buffer *canvas,
         nk_rgba(0, 0, 0, 0), color);
 }
 
+/*
+ * "点这里导入"的空卡片。返回真表示用户点了它 (调用方再去开文件对话框)。
+ * 两处细节: import_drop_active 时也当作 hover —— 文件正被拖到窗口上, 这张卡要
+ * 提前高亮, 让用户知道往哪儿放; 导入进行中则沿卡片描边走一段循环的进度光带
+ * (时间取模, 所以是匀速循环而不是真实进度 —— 真实进度由页面上的状态读)。
+ */
 bool bongo_cat_preferences_model_import_card(BongoCatPreferences *value,
     struct nk_context *context) {
     struct nk_rect bounds;
@@ -93,6 +112,13 @@ static void action_icon(BongoCatPreferences *value,
             bounds.y + (bounds.h - 18) * .5f, 18, 18), color);
 }
 
+/*
+ * 请求选中/取消选中一个模型。
+ * 关键: 这里只写 pending_* 标志, 不动 settings, 也不重绘 —— 真正执行在
+ * process_model_selection (帧末)。原因见那边注释: 在点击当帧改状态会被嵌套渲染
+ * 重放这次点击, 结果刚选上的模型立刻被切回去。
+ * 多宠模式下有数量上限, 超了只弹提示不改状态; 同一个模型正在加载时忽略重复点击。
+ */
 void bongo_cat_preferences_model_select(BongoCatPreferences *value,
     const BongoCatModelEntry *entry) {
     if (!value || !entry) return;
@@ -118,6 +144,10 @@ void bongo_cat_preferences_model_select(BongoCatPreferences *value,
     bongo_cat_preferences_invalidate(value);
 }
 
+/*
+ * 优先用"安装到本地的目录", 退回模型自己的源目录; 都打不开就明确报错,
+ * 不能静默失败 —— 用户点了"打开目录"却什么都没发生是最容易被当成 bug 的行为。
+ */
 static void open_model_directory(BongoCatPreferences *value,
     const BongoCatModelEntry *entry) {
     const char *directory = entry->storage_directory[0] ?
@@ -129,6 +159,12 @@ static void open_model_directory(BongoCatPreferences *value,
         "Unable to open model directory"), true);
 }
 
+/*
+ * 画封面。请求的封面尺寸按 raster_scale 放大 (高 DPI 下要的是物理像素), 拿回来
+ * 再等比缩放进预览框 —— cover 的宽高比和预览框不一定一致, 所以用统一的 scale
+ * 而不是拉伸, 否则封面会变形。
+ * 拿不到封面时画一个占位图标, 不能留空: 空卡片看起来像加载失败。
+ */
 static void draw_cover(BongoCatPreferences *value,
     struct nk_command_buffer *canvas, struct nk_rect preview,
     const BongoCatModelEntry *entry, BongoCatUIPalette p) {
@@ -152,6 +188,15 @@ static void draw_cover(BongoCatPreferences *value,
     nk_draw_image(canvas, image, &texture, nk_rgb(255, 255, 255));
 }
 
+/*
+ * 卡片底部的操作条: 行为设置 / 打开目录 / 删除。
+ * 三格的宽度是按"可删除与否"两套算的 —— 预置模型和"附近的模型"不可删, 只分两格,
+ * 硬留三格会出现一个永远点不动的空档。
+ * behavior_enabled 的规则: 只有当前主模型能直接进行为设置; 多宠模式下其他宠物
+ * 要先切成主模型 (primary 判定), 否则改的是错的宠物。禁用态用 region_hover 和
+ * hover 分开表达, 是为了让"看起来可点但实际不可点"的项不显示悬停效果。
+ * action_hover 回传给调用方, 避免操作条上的悬停又触发整卡选中。
+ */
 static void draw_actions(BongoCatPreferences *value,
     struct nk_context *context, struct nk_command_buffer *canvas,
     struct nk_rect bounds, const BongoCatModelEntry *entry,
@@ -199,6 +244,13 @@ static void draw_actions(BongoCatPreferences *value,
         bongo_cat_preferences_remove_dialog_open(value->app, entry->id);
 }
 
+/*
+ * 一张模型卡片。
+ * 三个状态要分清: selected (在多宠集合里) / primary (主模型) / visual_target
+ * (正在加载的那张)。selected_visual 特意排除了正在加载的卡片: 加载中的卡片由
+ * 进度环表达状态, 再叠一层"已选中"的粉框会让两种反馈打架。
+ * 描边与阴影都按动画量插值, 所以卡片切换是渐变而不是硬切。
+ */
 void bongo_cat_preferences_model_card(BongoCatPreferences *value,
     struct nk_context *context, const BongoCatModelEntry *entry,
     bool storage_busy) {

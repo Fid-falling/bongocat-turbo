@@ -4,6 +4,13 @@
 #include <stdlib.h>
 #include <string.h>
 
+/*
+ * settings.json 的读取侧(写入在 config_settings_save.c, 那里才是权威)。
+ *
+ * 不变量: 所有字段先读进栈上的副本 loaded, 只有全部通过校验才会执行
+ * *settings = loaded; 任何一步失败都保留调用方原来的设置, 不会留下一个
+ * "读了一半"的残缺配置被后续逻辑当成真值使用。
+ */
 #define SETTINGS_FORMAT "bongocat/settings"
 #define type_error(error, field, expected) bongo_cat_config_type_error( \
     "Settings", error, field, expected)
@@ -17,6 +24,10 @@
     "Settings", object, key, target, error)
 #define read_int(object, key, target, error) bongo_cat_config_read_int( \
     "Settings", object, key, target, false, error)
+/*
+ * read_int 的 required 固定为 false: 设置项一律可选读, 老配置文件里缺键时
+ * 沿用 BongoCatSettings 已有的默认值, 不能因此判定配置损坏。
+ */
 #define read_float(object, key, target, error) bongo_cat_config_read_float( \
     "Settings", object, key, target, error)
 #define read_string(object, key, target, length, error) \
@@ -48,6 +59,12 @@ static bool parse_background_color(const char *value,
     return false;
 }
 
+/*
+ * 下面三个 read_* 是同一套路: 先用 && 把布尔/数值字段读完, 再单独处理枚举
+ * 字符串(renderer / theme / language)。read_string 对缺键返回 true 并把
+ * text 置 NULL, 所以 text && 表示"键确实存在", 这时才需要检查取值是否在
+ * 白名单里; 键不存在就保留默认值 —— 老配置里没有这些字段是正常情况。
+ */
 static bool read_model(yyjson_val *object, BongoCatModelPreferences *value,
     BongoCatError *error) {
     if (!read_bool(object, "multiplePets", &value->multiple_pets, error) ||
@@ -134,6 +151,12 @@ static bool read_shortcuts(yyjson_val *object,
             sizeof(value->always_on_top), error);
 }
 
+/*
+ * 三个数组字段(behaviorOverrides / modelOverrides / removedModels)共用一条
+ * 约定: 数组整体缺省(!array)属正常情况, 直接成功返回; 数组存在则先清零
+ * count 再逐项填充, 这样重复 load 不会把上一次的条目追加进来。容量检查放在
+ * 写入之前, 超限一律报错而不是截断。
+ */
 static bool read_behaviors(yyjson_val *array, BongoCatSettings *settings,
     BongoCatError *error) {
     if (!array) return true;
@@ -221,6 +244,13 @@ static bool read_removed_models(yyjson_val *array, BongoCatSettings *settings,
     return true;
 }
 
+/*
+ * extensions 是留给"未来版本或其它工具"写的未知子树: 这里把它原样序列化成
+ * 文本存进 settings->extensions_json, 下次保存时再写回文件, 于是老版本读写
+ * 一遍也不会把新版本加的字段抹掉(前向兼容)。
+ * 缓冲区放不下时宁可报错也不截断 —— 截断出来的不是合法 JSON, 会直接污染
+ * 用户的配置文件。
+ */
 static BongoCatResult read_extensions(yyjson_val *value,
     BongoCatSettings *settings, BongoCatError *error) {
     if (!value) return BONGO_CAT_OK;
@@ -251,6 +281,7 @@ static BongoCatResult read_extensions(yyjson_val *value,
 BongoCatResult bongo_cat_settings_load(const char *path,
     BongoCatSettings *settings, BongoCatError *error) {
     if (!path || !settings) return BONGO_CAT_ERROR_ARGUMENT;
+    /* 文件不存在 = 首次运行: 成功返回, 由调用方使用默认值。 */
     if (!bongo_cat_path_is_file(path)) return BONGO_CAT_OK;
     yyjson_doc *document = NULL;
     BongoCatResult result = bongo_cat_config_read_document(path,
@@ -284,10 +315,13 @@ BongoCatResult bongo_cat_settings_load(const char *path,
     /* cache_path is optional; missing means the platform default is used. */
     valid = valid && read_text(root, "cachePath", loaded.cache_root,
         sizeof(loaded.cache_root), error);
+    /* 读链失败时 result 还是上面的 OK, 这里补上总的结果码;
+       具体是哪个字段错了已经由 read_* 写进 error 了。 */
     if (!valid) result = BONGO_CAT_ERROR_FORMAT;
     if (valid) result = read_extensions(extensions_value, &loaded, error);
     yyjson_doc_free(document);
     if (result != BONGO_CAT_OK) return result;
+    /* 走到这里才交出结果: 前面的失败路径都直接 return, *settings 保持原样。 */
     bongo_cat_settings_validate(&loaded);
     *settings = loaded;
     return BONGO_CAT_OK;

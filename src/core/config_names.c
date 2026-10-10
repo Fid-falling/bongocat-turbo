@@ -2,6 +2,13 @@
 
 #include <string.h>
 
+/*
+ * 枚举 <-> 磁盘字符串的唯一映射表。
+ *
+ * 这些字符串会原样写进 settings.json 并可能被用户或外部工具阅读, 所以只能
+ * 新增、不能改已有拼写: 改了会让老配置里的值解析失败。越界的枚举值一律回落到
+ * 列表首项, 这几个函数都保证返回非空字符串。
+ */
 const char *bongo_cat_theme_name(BongoCatTheme value) {
     const char *names[] = {"auto", "light", "dark"};
     return (unsigned)value <= BONGO_CAT_THEME_DARK ? names[value] : names[0];
@@ -13,6 +20,8 @@ const char *bongo_cat_language_name(BongoCatLanguage value) {
     return (unsigned)value < BONGO_CAT_LANG_COUNT ? names[value] : names[0];
 }
 
+/* "zh-TW" 是历史写法, 不在 bongo_cat_language_name 的输出里, 但老配置可能
+   存着它, 所以这里单独接受一次并映射到繁体中文。 */
 bool bongo_cat_language_parse(const char *name, BongoCatLanguage *value) {
     if (!name || !value) return false;
     if (!strcmp(name, "zh-TW")) {
@@ -44,6 +53,10 @@ bool bongo_cat_renderer_parse(const char *name, BongoCatRenderer *value) {
     return false;
 }
 
+/*
+ * 系统 locale 的匹配规则: 大小写不敏感, 并把 "zh_CN.UTF-8" / "zh-Hans-CN"
+ * 这类串按 '-' 和 '_' 切成片段逐个比较, 因此能同时认出 Hant/Hans 和地区码。
+ */
 static bool locale_part_equal(const char *text, size_t length,
     const char *expected) {
     if (length != strlen(expected)) return false;
@@ -77,6 +90,9 @@ static bool locale_language_is(const char *language, const char *expected) {
     return locale_part_equal(language, (size_t)(end - language), expected);
 }
 
+/* 简体/繁体的判定顺序不能反: 显式写了 Hans 就一定不是繁体, 只有在没有
+   Hans/Hant 标记时才靠地区码(TW/HK/MO)推断。返回 false 表示系统语言不受
+   支持, 由调用方决定回落到哪种语言。 */
 bool bongo_cat_language_from_locale(const char *language,
     const char *country, BongoCatLanguage *value) {
     if (!language || !value) return false;
@@ -116,6 +132,8 @@ const char *bongo_cat_mode_name(BongoCatModelMode value) {
     return (unsigned)value <= BONGO_CAT_MODE_GAMEPAD ? names[value] : names[0];
 }
 
+/* 抠像背景色: name 是写进配置的字符串, rgb 是渲染用的 0xRRGGBB 值。
+   两张表必须一一对应, 不能只调其中一个的顺序。 */
 const char *bongo_cat_obs_background_color_name(
     BongoCatObsBackgroundColor value) {
     static const char *names[] = {

@@ -1,3 +1,13 @@
+/*
+ * 带换行的提示气泡。Nuklear 自带的 nk_tooltip 不会折行, 长文案会顶出屏幕, 所以
+ * 这里自己算宽度、自己按词断行 (中文没有空格, 退回"按字符断")。
+ *
+ * 两个不变量:
+ *  - 先量自然宽度再决定左右哪边放得下; 两边都放不下时强制用整窗宽度并靠左 ——
+ *    宁可窄一点, 也别把气泡推到窗口外面;
+ *  - nk_tooltip_begin_offset 返回 false 表示这一帧没能开窗 (超出 Nuklear 的弹窗
+ *    栈深度), 必须立刻 return, 不能继续调 nk_layout_*。
+ */
 #include "ui_tooltip.h"
 #include "ui_backend.h"
 #include "ui_catime.h"

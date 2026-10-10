@@ -4,6 +4,13 @@
 #include <stdio.h>
 #include <string.h>
 
+/*
+ * 纯 C 的 SHA-256 实现(自包含, 不依赖 OpenSSL), 用来校验下载到的更新包。
+ *
+ * 用法固定为 initialize -> update* -> finish; 不是线程安全的, 一个 Sha256
+ * 结构只能由同一个线程使用。bits 是 64 位, 所以只有超过 2^61 字节的输入才有
+ * 理论上的长度溢出风险。
+ */
 typedef struct Sha256 {
     uint32_t state[8];
     uint64_t bits;
@@ -25,6 +32,8 @@ static uint32_t rotate(uint32_t value, unsigned count) {
     return (value >> count) | (value << (32 - count));
 }
 
+/* 一轮压缩: 先把 64 字节块按大端展开成 16 个字并扩展到 64 个字, 再做 64 步
+   混淆。constants 就是 FIPS 180-4 定义的 K 值, 不能改。 */
 static void transform(Sha256 *value) {
     uint32_t words[64];
     for (int i = 0; i < 16; ++i) words[i] =
@@ -61,6 +70,9 @@ static void update(Sha256 *value, const unsigned char *data, size_t size) {
     }
 }
 
+/* 收尾补位: 追加一个 0x80, 补零到 56 字节, 再写 8 字节大端的原始比特长度。
+   补位必须继续走 update() 而不是直接 memset —— 只有走同一条路径, 缓冲区计数
+   和长度才会一致。output 需要 65 字节(64 个十六进制字符 + NUL)。 */
 static void finish(Sha256 *value, char output[65]) {
     uint64_t bits = value->bits;
     unsigned char tail[72] = {0x80};
@@ -86,6 +98,8 @@ void bongo_cat_sha256_bytes(const void *data, size_t size, char output[65]) {
     Sha256 value; initialize(&value); update(&value, data, size); finish(&value, output);
 }
 
+/* 按 8KB 分块流式读取。ferror 与 fclose 都要检查: 读取出错时拿到的是不完整的
+   内容, 算出来的摘要"看起来正常"但其实是错的, 那会让校验形同虚设。 */
 BongoCatResult bongo_cat_sha256_file(const char *path, char output[65], BongoCatError *error) {
     FILE *file = path ? bongo_cat_file_open(path, "rb") : NULL;
     if (!file) { bongo_cat_error_set(error, BONGO_CAT_ERROR_IO, "Cannot open file"); return BONGO_CAT_ERROR_IO; }

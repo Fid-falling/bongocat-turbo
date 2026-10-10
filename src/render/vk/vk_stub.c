@@ -10,10 +10,26 @@
  * BONGO_CAT_HAS_VULKAN: 这条后端在不可用时只是老老实实地返回失败/空指针。
  */
 
+/*
+ * 维护这个文件的两条硬约束:
+ *  1. 必须覆盖 bongo_cat/vk_backend.h 里**每一个**外部符号。少一个就是"关闭 Vulkan
+ *     的构建直接链接失败", 而这套桩代码平时不会被 CI 之外的人注意到 —— 新增对外
+ *     接口时先在这里补桩, 再去写真正的实现。
+ *  2. 返回值必须是"安全失败": 句柄给 NULL、判断给 false、尺寸给 0、销毁/设置类是空
+ *     操作。调用方普遍写成 if (vk) {...} / if (!bongo_cat_vk_xxx(...)) 回退, 所以绝不能
+ *     在桩里断言或写坏调用方的指针 —— 桩存在的意义就是让这条路可诊断地降级。
+ *
+ * 报错策略: 会在**运行时真的尝试用这条后端**的入口 (probe/create/纹理上传) 才写
+ * BongoCatError, 文案里带上启用开关的名字, 方便用户照着改构建参数; 而
+ * create_shared / texture_from_external 不填 error, 只靠返回值表示不可用。
+ */
+
 #ifndef BONGO_CAT_HAS_VULKAN
 
+/* 恒为 false: 设置界面据此把 Vulkan 选项显示成不可用, 而不是让用户选了之后静默回退 */
 bool bongo_cat_vk_compiled(void) { return false; }
 
+/* 没有活跃上下文: 所有"拿当前上下文"的调用点都会因此走 OpenGL 分支 */
 BongoCatVk *bongo_cat_vk_current(void) { return NULL; }
 
 bool bongo_cat_vk_probe(BongoCatError *error) {
@@ -147,6 +163,8 @@ void bongo_cat_vk_release_cached_frames(BongoCatVk *vk) {
     (void)vk;
 }
 
+/* 命中测试与整帧回读在这里恒为失败: 上层据此回退到几何判断/跳过诊断输出, 而不是
+   以为"回读结果还没准备好"而一直等下去 */
 bool bongo_cat_vk_hit_alpha(const BongoCatVk *vk, int x, int y,
     unsigned char *alpha) {
     (void)vk; (void)x; (void)y; (void)alpha;
@@ -179,6 +197,8 @@ bool bongo_cat_vk_ui_draw(BongoCatVk *vk, BongoCatVkTexture *texture,
     return false;
 }
 
+/* 返回 0 在真实路径里观察不到: 两个调用点 (字体图集、轮盘字体) 都以 vk 句柄非空为
+   前提, 而本构建下句柄恒为 NULL。保留 0 只是为了让"没上下文"有个明确答案。 */
 int bongo_cat_vk_max_texture_dimension(const BongoCatVk *vk) {
     (void)vk;
     return 0;

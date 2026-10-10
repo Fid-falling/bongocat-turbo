@@ -4,6 +4,14 @@
 #include <math.h>
 #include <string.h>
 
+/*
+ * 输入 -> 模型参数的映射层: 把平台层已经归一化过的 BongoCatInputEvent(键盘 /
+ * 鼠标 / 手柄)翻译成 Live2D 参数和 overlay 动作。
+ *
+ * active_inputs 是"当前仍被按住"的输入快照, 存在的唯一理由是模型切换或重新
+ * 加载后需要把还按着的键重新施加一遍(见 bongo_cat_app_reapply_input): 新模型
+ * 完全不知道之前发生过什么。数组保持紧凑, 顺序即按下顺序。
+ */
 static size_t active_input_index(const BongoCatApp *app,
     BongoCatInputKind kind, const char *name) {
     if (!app || !name) return app ? app->active_input_count : 0;
@@ -23,6 +31,8 @@ static void active_input_remove(BongoCatApp *app, size_t index) {
         sizeof(app->active_inputs[0]));
 }
 
+/* 只有"可按住"的事件才进快照(按下/抬起、手柄按钮、摇杆轴), 鼠标点击这种
+   瞬时事件不进。抬起和"值回到 0"都走删除分支, 所以先算出 active 再分发。 */
 static void active_input_update(BongoCatApp *app,
     const BongoCatInputEvent *event) {
     if (!app || !event || !event->name[0]) return;
@@ -52,6 +62,8 @@ static bool stick_active(float x, float y, bool pressed) {
     return pressed || fabsf(x) > 0.001f || fabsf(y) > 0.001f;
 }
 
+/* 左右手是否放下由两个来源共同决定: 手柄摇杆/摇杆按键, 以及 overlay(模型自带
+   的触摸区域)的动作。任意一个为真就要放下, 所以每次改动后都要重算一次。 */
 static void update_hands(BongoCatApp *app) {
     bool left_stick = stick_active(app->left_stick_x,
         app->left_stick_y, app->left_stick_pressed);
@@ -73,6 +85,8 @@ static bool apply_key(BongoCatApp *app, const char *name, bool pressed) {
     return true;
 }
 
+/* 摇杆输入取值是 [-1, 1], 而每个参数有自己的区间(还可能不对称), 所以先按
+   range.maximum 缩放再钳制。参数不存在就静默跳过 —— 模型允许只实现一部分。 */
 static void set_axis(BongoCatApp *app, const char *id, float input) {
     BongoCatParameterRange range;
     if (!bongo_cat_live2d_parameter(app->live2d, id, &range)) return;
@@ -82,6 +96,9 @@ static void set_axis(BongoCatApp *app, const char *id, float input) {
     bongo_cat_live2d_set_parameter(app->live2d, id, value);
 }
 
+/* 手柄事件分三类: 四个摇杆轴(记录最新值并写参数)、两个摇杆按键(记录按下并
+   同步 Live2D)、其余按钮/扳机(交给 overlay 的按键映射)。事件名是 SDL 的手柄
+   按键名, 属于外部契约, 不能改。 */
 static void apply_gamepad(BongoCatApp *app, const BongoCatInputEvent *event) {
     const char *id = NULL;
     if (strcmp(event->name, "LeftStickX") == 0) {
@@ -108,6 +125,12 @@ static void apply_gamepad(BongoCatApp *app, const BongoCatInputEvent *event) {
     app->dirty = true;
 }
 
+/*
+ * 手柄断开或失焦时的兜底清理: 系统不会补发"抬起", 所以只能假设所有手柄输入
+ * 都已松开, 否则猫会一直举着手。
+ * 清理范围是刻意的: 只删掉名字带 "Gamepad:" 前缀的按住记录与高亮标记, 键盘的
+ * 部分要留着 —— 用户可能正按着键盘, 只是手柄恰好断线了。
+ */
 void bongo_cat_app_reset_gamepad(BongoCatApp *app) {
     if (!app || !app->live2d) return;
     for (size_t i = app->sound_shortcut_state.count; i > 0; --i) {
@@ -143,6 +166,11 @@ void bongo_cat_app_reset_gamepad(BongoCatApp *app) {
     app->dirty = true;
 }
 
+/*
+ * 输入总入口, 由平台层的输入链路送进来。不变量: 同一时刻只有一个线程调用它
+ * (内部不加锁)。没有模型时仍然统计诊断计数, 以便区分"按键没反应"到底是没加载
+ * 模型, 还是按键没映射上。
+ */
 void bongo_cat_app_apply_input(BongoCatApp *app, const BongoCatInputEvent *event) {
     if (!app || !event) return;
     bool keyboard = event->kind == BONGO_CAT_INPUT_KEY_DOWN ||
@@ -159,6 +187,8 @@ void bongo_cat_app_apply_input(BongoCatApp *app, const BongoCatInputEvent *event
             app->input_diagnostics.mapped_keys++;
         else app->input_diagnostics.unmapped_keys++;
         break;
+    /* 左右键分别对应 ParamMouseLeftDown / ParamMouseRightDown; 侧键(Back /
+       Forward)没有独立参数, 只把"侧键状态变了"置脏交给上层处理。 */
     case BONGO_CAT_INPUT_MOUSE_DOWN:
     case BONGO_CAT_INPUT_MOUSE_UP: {
         bool left = strcmp(event->name, "Left") == 0;
@@ -200,6 +230,8 @@ void bongo_cat_app_apply_input(BongoCatApp *app, const BongoCatInputEvent *event
     }
 }
 
+/* 模型(重新)加载后调用: 把鼠标左右键状态和 active_inputs 里仍按着的键重新
+   施加一遍, 否则切模型时按住不放的键会"掉", 新模型收不到那次按下事件。 */
 void bongo_cat_app_reapply_input(BongoCatApp *app) {
     if (!app || !app->live2d) return;
     bongo_cat_live2d_set_parameter(app->live2d, "ParamMouseLeftDown",

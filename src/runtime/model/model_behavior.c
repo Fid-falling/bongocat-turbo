@@ -1,7 +1,14 @@
+/* 行为条目的执行入口: 快捷键、托盘菜单、设置界面试看都走这里。
+ * 四类条目的成功语义不同 —— 特效与声音立即生效并直接返回, 只有动作 (motion) 与表情会走到末尾,
+ * 把可见状态写回会话 (bongo_cat_app_capture_behavior_state) 并置 dirty; false = 这次没执行。
+ */
 #include "runtime.h"
 #include "bongo_cat/audio.h"
 #include "bongo_cat/overlay.h"
 
+/* 返回 false = 本次没生效; 动作成功后会顺带播放绑定音效 (音效失败只记日志, 不回滚动作);
+ * 表情是"再点一次取消"的开关语义, 用 -1 走淡出清除。
+ */
 bool bongo_cat_app_run_behavior(BongoCatApp *app,
     const BongoCatBehaviorEntry *behavior) {
     if (!app || !behavior) return false;

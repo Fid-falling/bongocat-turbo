@@ -19,6 +19,8 @@ static float rounded_distance(float x, float y, float width, float height,
     return sqrtf(ox * ox + oy * oy) + SDL_min(SDL_max(qx, qy), 0.0f) - radius;
 }
 
+/* coverage = 0.5 - distance 是一像素宽的软边: 距离为负 (在形状内部) 时饱和到 1, 为正
+ * (在外部) 时到 0, 只有跨在边界上的那些像素拿到中间值 —— 这就是抗锯齿的全部来源。 */
 static void apply_rounding(unsigned char *pixels, int width, int height,
     float radius) {
     if (radius <= 0.0f) return;
@@ -56,6 +58,13 @@ static GLuint upload(const unsigned char *pixels, int width, int height,
     return 0;
 }
 
+/*
+ * 界面图的"按比例缩放 + 圆角"一体路径。
+ *
+ * 顺序是硬要求: 先重采样、后加圆角 —— 反过来圆角会被插值糊掉。
+ * 圆角半径按实际缩放比同比缩放 (rounding * 实际比例), 这样任意目标尺寸下视觉圆角一致。
+ * 重采样走 stb_image_resize2 的 sRGB 路径 (观感与其它 UI 一致), STBIR_RGBA 保留 alpha。
+ */
 unsigned int bongo_cat_image_texture_resampled(const char *path,
     int max_width, int max_height, float rounding, int *width, int *height,
     BongoCatError *error) {

@@ -1,3 +1,9 @@
+/*
+ * --ci-runtime-flow 的脚本化流程: 每 1.5s 推进一步, 每步做一件"用户常常做、却很难
+ * 自动化"的事 (缩放 / 透明度 / 切模型 / 打开设置选模型 / 恢复), 并把步骤名写进
+ * runtime-flow-stage.txt —— CI 靠这个文件判断流程卡在哪一步。
+ * 没有 --ci-runtime-flow 时第一行就返回, 生产运行完全不走这里。
+ */
 #include "runtime.h"
 #include "bongo_cat/file.h"
 #include "bongo_cat/path.h"
@@ -6,6 +12,7 @@
 #include <stdio.h>
 #include <string.h>
 
+/* 步骤标记纯给外部 (CI) 看, 不做任何同步; 写失败也不影响流程。 */
 static void mark(BongoCatApp *app, const char *name) {
     char path[BONGO_CAT_PATH_CAP];
     bongo_cat_path_join(path, sizeof(path), app->state_root, "runtime-flow-stage.txt");
@@ -33,6 +40,8 @@ static void model_mode(BongoCatApp *app, BongoCatModelMode mode) {
         if (app->models.entries[i].mode == mode) { model(app, i); return; }
 }
 
+/* target 只增不减 (由 elapsed 算出来), 所以掉帧/卡顿不会重复执行同一步, 每步只跑一次;
+   超过最后一步就直接结束进程。 */
 void bongo_cat_runtime_flow_update(BongoCatApp *app, uint64_t now) {
     if (!app || !app->smoke_runtime_flow) return;
     if (!app->smoke_runtime_flow_ns) {
@@ -54,6 +63,8 @@ void bongo_cat_runtime_flow_update(BongoCatApp *app, uint64_t now) {
     case 6: model_mode(app, BONGO_CAT_MODE_KEYBOARD); mark(app, "model-keyboard"); break;
     case 7: model_mode(app, BONGO_CAT_MODE_STANDARD); mark(app, "model-standard"); break;
     case 8: model_mode(app, BONGO_CAT_MODE_GAMEPAD); mark(app, "model-gamepad"); break;
+/* 设置窗口这几步验证的是"打开设置 -> 选模型 -> 关闭 -> 模型是否恢复"; 步骤 11/13/15
+   都带恢复动作, 让每一步的断言不受前一步残留状态影响。 */
     case 9:
         app->smoke_preference_model_select = true;
         bongo_cat_preferences_show(app->preferences);

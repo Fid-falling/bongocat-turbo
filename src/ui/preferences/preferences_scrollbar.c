@@ -1,7 +1,23 @@
+/*
+ * 行为设置对话框专用的滚动条 —— 这不是 Nuklear 自带的 nk_scrollbar, 而是自己实现的,
+ * 因为自带的滚动条要绑在一个组上, 而这里的行列表是虚拟化的 (自己决定画哪些行、
+ * 自己算偏移), 没有可供它挂钩的组。
+ *
+ * 职责边界写清楚: 本文件只负责"把偏移量算出来 + 画条", 不负责存偏移 —— 偏移由调用方
+ * 按页/按标签页保存 (behavior_scroll[3]), 每次绘制再传进来。这样才能做到"切标签页
+ * 再切回来, 各自的滚动位置还在"。
+ *
+ * 尺寸约定也来自这里: content_width 会为滚动条预留 14px, 行的可用宽度必须用它算,
+ * 否则行会被滚动条压住右边缘。
+ */
 #include "preferences_scrollbar.h"
 
 #include "ui_backend.h"
 
+/*
+ * 轨道宽度 10px, 但给内容预留 14px —— 预留比实际宽 4px 是给"悬停时条会变宽"留余地,
+ * 否则悬停瞬间会盖住文字。
+ */
 enum { SCROLLBAR_WIDTH = 10, SCROLLBAR_RESERVE = 14 };
 static const float SCROLLBAR_WHEEL_STEP = 48.0f;
 
@@ -10,6 +26,7 @@ static struct nk_color with_opacity(struct nk_color color, float opacity) {
     return color;
 }
 
+/* 轨道样式可能来自主题 (颜色/图片/九宫格), 三种都要支持, 所以按 type 分支画 */
 static void draw_track(struct nk_command_buffer *canvas, struct nk_rect bounds,
     const struct nk_style_item *item, const struct nk_style_scrollbar *style,
     float opacity) {
@@ -42,6 +59,10 @@ float bongo_cat_preferences_scrollbar_content_width(
         viewport, content_height) ? SCROLLBAR_RESERVE : 0.0f);
 }
 
+/*
+ * 不需要滚动时也把拖拽状态清掉: 内容缩到不用滚了(比如切了标签页)而 dragging 还留着,
+ * 下次一进这一页就会自己跳。
+ */
 void bongo_cat_preferences_scrollbar_reset(
     BongoCatPreferencesScrollbar *scrollbar) {
     if (!scrollbar) return;
@@ -49,6 +70,16 @@ void bongo_cat_preferences_scrollbar_reset(
     scrollbar->dragging = false;
 }
 
+/*
+ * 画条并处理三种输入: 拖拇指、点轨道翻页、滚轮。
+ * 几个刻意的选择:
+ * - 点轨道是"翻一页"(+/- viewport.h) 而不是跳到点击位置, 这是桌面平台的惯例;
+ * - 拖拽时用 grab_y 记住"按下点距拇指顶端的距离", 不用它的话拇指会瞬间跳到指针
+ * 中心, 手感很跳;
+ * - enabled 为假时立刻结束拖拽, 但不清 offset —— 弹窗打开期间不许滚, 关掉后位置
+ * 要保持原样;
+ * - changed 只在偏移真的变了时为真, 调用方据此标脏, 免得每帧都重绘。
+ */
 BongoCatPreferencesScrollbarResult bongo_cat_preferences_scrollbar_draw(
     struct nk_context *context, struct nk_command_buffer *canvas,
     struct nk_rect viewport, float content_height, float offset,

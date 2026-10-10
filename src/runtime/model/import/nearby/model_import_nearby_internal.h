@@ -1,3 +1,8 @@
+/*
+ * nearby 模块内部接口 (不对外暴露): 缓存标记的路径与版本常量, 以及签名与缓存钩子。
+ * 契约: 调用方必须给出同一套 target、source 与 signature 才可能命中缓存; signature 是来源的轻量
+ * 指纹, identity 是内容的 sha256; 改标记字段时必须一起提升 _SCHEMA。
+ */
 #ifndef BONGO_CAT_MODEL_IMPORT_NEARBY_INTERNAL_H
 #define BONGO_CAT_MODEL_IMPORT_NEARBY_INTERNAL_H
 

@@ -3,6 +3,17 @@
 #include <stdio.h>
 #include <string.h>
 
+/*
+ * 跨线程输入队列: 生产者是平台层的钩子 / Raw Input 线程, 消费者是主循环。
+ *
+ * 结构是一个主环形队列加一个"补救"环形队列。主队列满时, 抬起事件
+ * (KEY_UP / MOUSE_UP)会转投补救队列而不是被丢掉 —— 丢一次抬起会让猫永远
+ * 按住那个键, 而丢一次按下最多只是少动一下, 所以两者的丢弃策略必须区别对待。
+ * 两个队列共用同一把自旋锁(见 lock_queue), 用 sequence 字段保证出队顺序等于
+ * 入队顺序。
+ *
+ * 队列是定长 POD 数组, 初始化时整体清零, 之后只靠原子下标通信, 不再分配内存。
+ */
 void bongo_cat_input_init(BongoCatInputState *state) {
     if (!state) return;
     atomic_init(&state->queue_busy, false);
@@ -23,6 +34,8 @@ void bongo_cat_input_init(BongoCatInputState *state) {
     state->scheduled_release_count = 0;
 }
 
+/* 边沿检测: 只在状态真的变化时返回 true。越界或空表按"总是变化"处理,
+   让上层仍然看得到事件, 而不是静默吞掉。 */
 bool bongo_cat_input_edge(bool states[BONGO_CAT_INPUT_KEY_STATE_CAP],
     unsigned code, bool down) {
     if (!states || code >= BONGO_CAT_INPUT_KEY_STATE_CAP) return true;
@@ -31,6 +44,8 @@ bool bongo_cat_input_edge(bool states[BONGO_CAT_INPUT_KEY_STATE_CAP],
     return true;
 }
 
+/* Ctrl / Shift 的按下状态单独用位掩码记录(左右各占一位), 因为快捷键判断要在
+   任意线程读它, 走原子位运算比加锁便宜; 松开时用 fetch_and 清位。 */
 static void update_modifiers(BongoCatInputState *state, const BongoCatInputEvent *event) {
     if (event->kind != BONGO_CAT_INPUT_KEY_DOWN && event->kind != BONGO_CAT_INPUT_KEY_UP) return;
     atomic_uint_fast8_t *value = &state->control;
@@ -108,6 +123,8 @@ static void lock_queue(BongoCatInputState *state) {
     while (atomic_exchange_explicit(&state->queue_busy, true, memory_order_acquire)) {}
 }
 
+/* 临界区只做定长事件的拷贝, 不等待任何 I/O, 持锁时间是纳秒级。用自旋锁而不是
+   互斥量, 是因为生产者可能来自系统钩子回调, 那里绝对不能阻塞。 */
 bool bongo_cat_input_push(BongoCatInputState *state, const BongoCatInputEvent *event) {
     if (!state || !event) return false;
     lock_queue(state);
@@ -124,6 +141,9 @@ bool bongo_cat_input_pop(BongoCatInputState *state, BongoCatInputEvent *event) {
     return popped;
 }
 
+/* 鼠标位置只保留最新值(覆盖式写入), 用 dirty 标志和消费方握手: 返回值表示
+   "我是不是第一个把它标脏的人", take_mouse 取走并清标志。中间丢掉的帧无所谓
+   —— 猫只需要追最新的位置。 */
 bool bongo_cat_input_mouse(BongoCatInputState *state, double x, double y) {
     if (!state) return false;
     atomic_store_explicit(&state->mouse_x, x, memory_order_relaxed);
@@ -162,6 +182,12 @@ static void remove_release(BongoCatInputState *state, size_t index) {
         sizeof(state->scheduled_releases[0]));
 }
 
+/*
+ * 有些平台会为同一个键连发多次按下(自动重复、钩子重入), 于是"按时松手"要靠
+ * 一个延迟队列: 每次按下就把该键的到期时间往后推, 抬起或 delay_ms 为 0 就取消。
+ * 键名就是唯一键, 同一个键只留一条记录, 后写的到期时间覆盖前一条。
+ * 不变量: scheduled_releases 不是原子的, 这一组函数必须由同一个线程调用。
+ */
 void bongo_cat_input_schedule_release(BongoCatInputState *state,
     const BongoCatInputEvent *event, uint64_t delay_ms) {
     if (!state || !event || !event->name[0] ||
@@ -182,6 +208,8 @@ void bongo_cat_input_schedule_release(BongoCatInputState *state,
         event->timestamp_ms + delay_ms;
 }
 
+/* 一次只取一个到期项(线性找第一条到期的), 调用方按帧循环调用直到返回 false。
+   生成的抬起事件时间戳用 now_ms, 让下游看到的是"此刻松开"。 */
 bool bongo_cat_input_take_scheduled_release(BongoCatInputState *state,
     uint64_t now_ms, BongoCatInputEvent *event) {
     if (!state || !event) return false;

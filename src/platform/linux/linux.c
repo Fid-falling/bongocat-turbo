@@ -22,6 +22,15 @@
 #include <sys/types.h>
 #include <unistd.h>
 
+/*
+ * Linux 平台层的装配点(X11 与 Wayland 共用同一份代码)。
+ *
+ * 两条输入路径并存: X11(XInput2)负责窗口内的键鼠与悬停, evdev 负责 Wayland 下拿不到的
+ * 全局输入(见 linux_internal.h)。单实例用一个带 flock 的锁文件, 锁文件里顺手记下主窗口
+ * 的 X11 id, 好让第二个实例把第一个唤到前台。
+ * active_platform 是给"按窗口找平台"的回调(raise_window / dynamic_hit_supported)用的:
+ * 平台层只有一份实例, 但那些接口签名只给出了 SDL_Window。
+ */
 static int instance_lock = -1;
 static BongoCatPlatform *active_platform;
 
@@ -29,6 +38,8 @@ void bongo_cat_platform_configure_preferences_window(SDL_Window *window) {
     (void)window;
 }
 
+/* 把主窗口的 X11 id 写进锁文件(并 fsync): 第二个实例靠它找到第一个的窗口。
+   写之前必须 ftruncate, 否则新的短内容会被旧内容的尾巴污染。 */
 static void publish_instance_window(SDL_Window *window) {
     if (instance_lock < 0 || !window) return;
     Window id = (Window)SDL_GetNumberProperty(SDL_GetWindowProperties(window),
@@ -41,6 +52,9 @@ static void publish_instance_window(SDL_Window *window) {
     }
 }
 
+/* 把第一个实例的窗口抬到前台: 先 XMapRaised, 再按 EWMH 约定向根窗口发一条
+   _NET_ACTIVE_WINDOW(很多窗口管理器会忽略不带这条消息的激活请求; data.l[0] = 2 表示
+   "来自用户或 pager 的操作")。这里临时开一个自己的 Display 连接, 用完即关。 */
 static void restore_instance_window(void) {
     if (instance_lock < 0) return;
     char text[32] = {0}; lseek(instance_lock, 0, SEEK_SET);
@@ -58,6 +72,8 @@ static void restore_instance_window(void) {
     XFlush(display); XCloseDisplay(display);
 }
 
+/* 取自身可执行文件路径。AppImage 必须先看 $APPIMAGE: 用户执行的其实是挂载出来的临时
+   目录里的可执行文件, 直接读 /proc/self/exe 会把自动启动项指向那个临时路径。 */
 static bool executable_path(char output[BONGO_CAT_PATH_CAP]) {
     const char *appimage = getenv("APPIMAGE");
     if (appimage && appimage[0]) {
@@ -69,6 +85,14 @@ static bool executable_path(char output[BONGO_CAT_PATH_CAP]) {
     output[length] = '\0'; return true;
 }
 
+/*
+ * 平台初始化。要点:
+ *   - hover_hide_unavailable: 悬停隐藏依赖 X11 的指针事件, Wayland 下拿不到, 直接标记
+ *     为不可用, 让上层隐藏这个选项;
+ *   - wayland 的判定同时看 WAYLAND_DISPLAY、当前视频驱动和 XDG_SESSION_TYPE(单个都
+ *     不完全可靠, 取并集);
+ *   - X11 与 evdev 两个后端都允许失败, 失败只记警告: 没有全局输入时程序仍然能跑。
+ */
 BongoCatResult bongo_cat_platform_init(BongoCatPlatform *platform, SDL_Window *window,
     BongoCatInputState *input, BongoCatError *error) {
     memset(platform, 0, sizeof(*platform));
@@ -112,6 +136,8 @@ BongoCatResult bongo_cat_platform_init(BongoCatPlatform *platform, SDL_Window *w
     }
     return BONGO_CAT_OK;
 }
+/* 关闭顺序与 init 相反; 两个后端都无条件 stop(它们自己判断有没有启动过), 最后释放
+   native 并清掉 active_platform, 免得留下悬空指针。 */
 void bongo_cat_platform_shutdown(BongoCatPlatform *platform) {
     if (!platform) return;
     bongo_cat_linux_x11_stop(platform);
@@ -120,6 +146,8 @@ void bongo_cat_platform_shutdown(BongoCatPlatform *platform) {
     platform->native = NULL;
     if (active_platform == platform) active_platform = NULL;
 }
+/* Linux 只有"整窗穿透"一种强度(靠 XShape 的空输入区域), 无法逐像素判断, 所以 forced
+   与 pointer_transparent 在这里合并处理。 */
 void bongo_cat_platform_set_click_through(BongoCatPlatform *platform,
     bool forced, bool pointer_transparent) {
     bongo_cat_linux_x11_click_through(platform, forced || pointer_transparent);
@@ -217,6 +245,8 @@ void bongo_cat_platform_begin_drag(BongoCatPlatform *platform,
     (void)modal_tick; (void)userdata;
     bongo_cat_linux_x11_begin_drag(platform);
 }
+/* 原因见下面原有的英文注释: XWayland 只在某个 surface 有指针焦点时才转发指针事件, 把
+   输入区域清空会让指针彻底消失、猫再也点不回来, 所以 XWayland 下不支持逐像素命中。 */
 bool bongo_cat_platform_dynamic_hit_supported(void) {
     /* XWayland only forwards pointer events while one of its surfaces has
        pointer focus, so an empty input region would hide the pointer
@@ -225,6 +255,8 @@ bool bongo_cat_platform_dynamic_hit_supported(void) {
         !bongo_cat_linux_x11_xwayland(active_platform);
 }
 
+/* 用 xdg-open 打开目录。double fork + setsid 是为了让 xdg-open 彻底脱离我们的进程组:
+   否则它会一直挂在我们名下, 我们退出时可能把它一起带走, 或者被它继承的 fd 拖住。 */
 bool bongo_cat_platform_open_directory(const char *path) {
     if (!path || !path[0]) return false;
     pid_t launcher = fork();
@@ -248,6 +280,9 @@ void bongo_cat_platform_set_tray_callbacks(void *tray,
     (void)tray; (void)left_click; (void)modal_tick;
     (void)restore; (void)userdata;
 }
+/* 单实例靠 /tmp 下的锁文件 + flock(LOCK_NB): 内核在进程退出时自动释放, 不会留下需要
+   清理的陈旧锁 —— 这也正是用 flock 而不是写 pid 文件的原因。拿不到锁就说明已有实例,
+   把它的窗口抬到前台后返回 false。 */
 bool bongo_cat_platform_single_instance_begin(void) {
     char path[96]; snprintf(path, sizeof(path), "/tmp/%s-%lu.lock",
         BONGO_CAT_SLUG,
@@ -261,6 +296,9 @@ void bongo_cat_platform_single_instance_end(void) {
     if (instance_lock >= 0) close(instance_lock);
     instance_lock = -1;
 }
+/* 开机自启 = 在 $XDG_CONFIG_HOME/autostart(默认 ~/.config/autostart)下写一个 .desktop
+   文件, 这是 XDG 桌面环境的标准做法。Exec 里的路径用引号包住, 所以路径含双引号时必须
+   拒绝 —— 否则能拼出一条非法甚至有害的 Exec 行。写失败要删掉半成品, 免得留下坏条目。 */
 BongoCatResult bongo_cat_platform_set_autostart(bool enabled, BongoCatError *error) {
     const char *base = getenv("XDG_CONFIG_HOME"), *home = getenv("HOME");
     char config[BONGO_CAT_PATH_CAP], directory[BONGO_CAT_PATH_CAP], path[BONGO_CAT_PATH_CAP];
@@ -290,6 +328,7 @@ BongoCatResult bongo_cat_platform_set_autostart(bool enabled, BongoCatError *err
     remove(path); bongo_cat_error_set(error, BONGO_CAT_ERROR_IO, "Cannot write Linux autostart entry");
     return BONGO_CAT_ERROR_IO;
 }
+/* Linux 侧没有内嵌资源(资源随包放在磁盘上), 所以恒定失败, 由调用方走普通目录逻辑。 */
 BongoCatResult bongo_cat_platform_embedded_assets(const char *target, BongoCatError *error) {
     (void)target; (void)error; return BONGO_CAT_ERROR_PLATFORM;
 }

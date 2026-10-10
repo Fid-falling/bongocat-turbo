@@ -1,3 +1,9 @@
+/*
+ * 把"来源包"落成"存储包": Tauri 源转成 Mver(重写清单与贴图), Mver 源原样复制并归一化。
+ * 三种目标布局: 单包根直接落到 target; 全是 Tauri 且多候选时按模式分子目录; 其余情况
+ * (多个包根)保留相对目录结构, 避免把无关的同级目录一起搬走。
+ * 只负责建目录与写文件, 不保证原子性 —— 调用方用临时目录加改名兜底。
+ */
 #include "model_import.h"
 #include "model_import_path.h"
 #include "model_import_mver_copy.h"
@@ -7,6 +13,7 @@
 #include <stdio.h>
 #include <string.h>
 
+/* 按来源格式分派到具体复制实现; installed 由被调方按目标布局改写。 */
 static bool copy_package_files(const BongoCatImportCandidate *candidate,
     const char *target, BongoCatImportCandidate *installed,
     BongoCatError *error) {
@@ -17,6 +24,9 @@ static bool copy_package_files(const BongoCatImportCandidate *candidate,
         error);
 }
 
+/* 前提: candidate、target、installed 非空, target 会被创建。先把候选整体复制给
+   *installed, 再由适配器改写它指向目标里的真实位置; 返回 false 时 *installed 的内容
+   没有意义(可能只改写了一半)。错误消息为空时补一句通用 IO 文案。 */
 bool bongo_cat_import_prepare_package(const BongoCatImportCandidate *candidate,
     const char *target, BongoCatImportCandidate *installed,
     BongoCatError *error) {
@@ -29,6 +39,8 @@ bool bongo_cat_import_prepare_package(const BongoCatImportCandidate *candidate,
     return false;
 }
 
+/* 同一模式有多个 Tauri 变体时用 "gamepad-2" 这类后缀区分, 第一个不加后缀。
+   名字必须稳定: 模型 id 与适配目录名都从这里派生, 改名等于换模型。 */
 static bool tauri_variant_directory(char *output, size_t capacity,
     const char *target, const BongoCatImportDiscovery *discovery,
     size_t index) {
@@ -45,6 +57,8 @@ static bool tauri_variant_directory(char *output, size_t capacity,
         bongo_cat_path_join(output, capacity, target, name);
 }
 
+/* 求所有包根的公共父目录: 从第一个包根的父目录出发, 逐级上溯直到能相对表示每一个包根。
+   它是容器布局的相对基准, 求不出来就放弃容器布局(返回 false)。 */
 static bool common_package_root(const BongoCatImportDiscovery *discovery,
     char root[BONGO_CAT_PATH_CAP]) {
     if (!bongo_cat_import_parent_path(discovery->candidates[0].package_root,
@@ -63,6 +77,8 @@ static bool common_package_root(const BongoCatImportDiscovery *discovery,
     return true;
 }
 
+/* 同一个 package_root 的多个候选只复制一次(按 package_root 去重), 共享同一份包内容;
+   相对路径取相对公共根的部分, 因此 target 下的结构与源目录一一对应。 */
 static bool prepare_container_storage(
     const BongoCatImportDiscovery *discovery, const char *target,
     BongoCatError *error) {
@@ -97,6 +113,8 @@ static bool single_package_root(const BongoCatImportDiscovery *discovery) {
     return true;
 }
 
+/* 布局总决策, 依据是候选的 format 与 package_root 是否相同:
+   全是 Tauri 且多候选 -> 按模式分子目录; 单包根 -> 直接落 target; 否则容器布局。 */
 bool bongo_cat_import_prepare_storage(
     const BongoCatImportDiscovery *discovery, const char *target,
     BongoCatError *error) {
@@ -124,6 +142,9 @@ bool bongo_cat_import_prepare_storage(
     return true;
 }
 
+/* 判断目录是不是"用户自己写的源包": 只要出现运行时占用的标记(见下面的 internal 列表,
+   例如 .bongo-cat-adapter 与 .bongo-cat-builtin)就返回 false。调用方用它跳过已安装与
+   内置模型; 名字读作"未被运行时接管的目录"更贴切。 */
 bool bongo_cat_import_authored_package(const char *directory) {
     char path[BONGO_CAT_PATH_CAP];
     if (!directory || !bongo_cat_path_is_dir(directory)) return false;

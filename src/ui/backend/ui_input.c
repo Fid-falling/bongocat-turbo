@@ -1,5 +1,16 @@
+/*
+ * SDL 事件 -> Nuklear 输入状态。调用时序: 每帧先 input_begin(), 然后 bongo_cat_ui_event()
+ * 消化这一帧累积的 SDL 事件, 最后 input_end() —— 顺序错了 Nuklear 会以为鼠标没动。
+ *
+ * 坐标要除以 layout_scale: Nuklear 里的一切都是逻辑像素, 而 SDL 给的是窗口坐标。
+ * 双击有两条判据 —— SDL 自己的 event->button.clicks, 以及本地记的"上次点击时间 +
+ * 位移" —— 任一满足即算双击。两条都留是因为注入式输入 (自动化测试) 下 clicks 未必
+ * 被填对, 而本地计时只依赖鼠标事件本身。
+ * 失焦时必须 reset: 否则按住鼠标时切窗口, 回来会一直处于"拖拽中"。
+ */
 #include "ui_backend.h"
 
+/* 双击判定: 500ms 内、位移不超过 6 逻辑像素 —— 对齐系统默认的双击间隔 */
 #define DOUBLE_CLICK_NS 500000000ull
 #define DOUBLE_CLICK_RADIUS 6
 

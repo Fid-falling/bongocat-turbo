@@ -1,5 +1,17 @@
+/*
+ * 表单行用的小图标 (18x18 逻辑像素), 全部用线段/圆/三角现场画出来, 不走图片与纹理。
+ *
+ * 为什么不用图标字体或图片: 这些图标要跟随主题色一起变 (包括悬停时的渐变色), 用
+ * 位图就得为每个颜色各准备一份; 而且它们只是十几条线段, 画起来比加载、缓存、释放
+ * 纹理便宜得多, 也没有 BONGO_CAT_UI_VK_TEXTURES 那一套后端的坑。
+ *
+ * 坐标全部是相对 bounds 左上角的偏移, 所以整套图形在一个 18x18 的网格里设计;
+ * line/dot 两个辅助函数负责加上 bounds 的偏移, 新画图标时请沿用它们, 不要直接调
+ * nk_stroke_line 传绝对坐标。
+ */
 #include "preferences_icons_internal.h"
 
+/* 把图标坐标 (0..18) 换算成屏幕坐标的折线; 线宽固定 1.5px */
 static void line(struct nk_command_buffer *canvas, struct nk_rect b,
     float x1, float y1, float x2, float y2, struct nk_color color) {
     nk_stroke_line(canvas, b.x + x1, b.y + y1, b.x + x2, b.y + y2,
@@ -159,6 +171,10 @@ static void shortcut_preferences(struct nk_command_buffer *c, struct nk_rect b,
     line(c, b, 2, 14, 16, 14, color); dot(c, b, 8, 14, 4, color);
 }
 
+/*
+ * hide_fade 用同色但递减透明度的两条短线表示"渐隐" —— 只能改 alpha, 不能换颜色,
+ * 否则在浅色主题下会变成两根突兀的深色线。
+ */
 static void hide_fade(struct nk_command_buffer *c, struct nk_rect b,
     struct nk_color color) {
     nk_stroke_circle(c, nk_rect(b.x + 1, b.y + 3, 12, 12), 1.5f, color);
@@ -178,6 +194,12 @@ static void renderer(struct nk_command_buffer *c, struct nk_rect b,
     nk_stroke_rect(c, nk_rect(b.x + 6, b.y + 6, 11, 11), 2, 1.5f, color);
 }
 
+/*
+ * 行图标总表。下标 = icon - BONGO_CAT_PREF_ICON_MULTIPLE_MODELS, 与枚举顺序**逐项
+ * 对应** —— 这就是 preferences_icons.h 里"新图标只能加在段末"那条约束的落地处:
+ * 在枚举中间插一个值, 这张表的下标就全错位了。
+ * 段级图标不在这个区间内, 于是 index < 0, 直接返回 false 交给另一张表。
+ */
 bool bongo_cat_pref_row_icon_draw(struct nk_command_buffer *canvas,
     struct nk_rect bounds, BongoCatPrefIcon icon, struct nk_color color) {
     typedef void (*Draw)(struct nk_command_buffer *, struct nk_rect,

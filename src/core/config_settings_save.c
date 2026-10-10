@@ -2,8 +2,19 @@
 
 #include <string.h>
 
+/*
+ * settings.json 的写入侧(读取在 config_io.c)。
+ *
+ * 契约: 写出去的文件必须能被 config_io.c 按同一个 schema 原样读回来, 也就是
+ * write_* 与 read_* 的键名/类型/枚举字符串必须一一对齐 —— 改一边就要改另一边,
+ * 而且新增键在老版本读来必须是"可选读"的那种。
+ * 不变量: 先规范化副本 canonical, 不修改调用方的结构; 真正的落盘由
+ * config_file.c 的原子替换完成。
+ */
 #define SETTINGS_FORMAT "bongocat/settings"
 
+/* 每个 write_ 都靠 && 串起来, 只有全部成功才算成功; object 可能是 NULL
+   (上一级 add_obj 失败), 所以第一步就要判空, 免得解引用空指针。 */
 static bool write_model(yyjson_mut_doc *doc, yyjson_mut_val *object,
     const BongoCatModelPreferences *value) {
     return object &&
@@ -90,6 +101,9 @@ static bool write_shortcuts(yyjson_mut_doc *doc, yyjson_mut_val *object,
             value->always_on_top);
 }
 
+/* 这三个数组字段按需写键: shortcutDisabled 只在为真时写, shortcut /
+   displayName 只在非空时写。于是磁盘上的条目保持最小, 也保证读回来时
+   "缺键"正好等于"用默认值"(见 config_fields.c 的可选读约定)。 */
 static bool write_behaviors(yyjson_mut_doc *doc, yyjson_mut_val *root,
     const BongoCatSettings *settings) {
     yyjson_mut_val *array = yyjson_mut_arr(doc);
@@ -140,6 +154,11 @@ static bool write_removed_models(yyjson_mut_doc *doc, yyjson_mut_val *root,
     return true;
 }
 
+/*
+ * extensions 在内存里是"一段 JSON 文本"(见 config_io.c 的 read_extensions),
+ * 这里把它重新解析再拷进新文档。解析失败必须报错: 静默丢掉这段等于抹掉别的
+ * 版本写下的字段。空文本按 "{}" 处理, 让首次运行也能写出合法对象。
+ */
 static yyjson_mut_val *write_extensions(yyjson_mut_doc *target,
     const BongoCatSettings *settings, BongoCatResult *failure,
     BongoCatError *error) {
@@ -181,12 +200,15 @@ static yyjson_mut_val *write_extensions(yyjson_mut_doc *target,
     return copy;
 }
 
+/* 构建期失败都是分配失败, 统一错误信息; 磁盘类错误由 config_write_document 报。 */
 static BongoCatResult build_error(BongoCatError *error) {
     bongo_cat_error_set(error, BONGO_CAT_ERROR_MEMORY,
         "Cannot allocate settings JSON");
     return BONGO_CAT_ERROR_MEMORY;
 }
 
+/* 先 validate 再序列化: 落盘的值必须满足不变量, 但不应该顺手改掉调用方正在
+   用的结构, 所以改的是本地副本 canonical。 */
 BongoCatResult bongo_cat_settings_save(const char *path,
     const BongoCatSettings *settings, BongoCatError *error) {
     if (!path || !settings) return BONGO_CAT_ERROR_ARGUMENT;

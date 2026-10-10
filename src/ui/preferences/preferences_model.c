@@ -1,3 +1,15 @@
+/*
+ * "模型"页 (page 1): 多宠开关 + 模型卡片网格 + 导入卡片 + 附近的模型。
+ *
+ * 本文件的重点在加载动画, 它是"假进度"而不是真进度: 真实加载是同步的, 结束时
+ * 会直接跳完成, 看起来像闪一下。所以模型加载走两段曲线 (见 visual_wait_progress):
+ * 先按 RAMP 快速爬到 80%, 之后极慢地趋近 WAIT_CAP(95%), 加载真结束时再用
+ * COMPLETE 那段把 95% -> 100% 补完。任何一段都不许超过 100%, 也不许出现回退。
+ *
+ * 另一条容易踩的坑 (见 process_model_selection 末尾): 选择模型之后不能在这里
+ * 同步重绘 —— 嵌套渲染会把"点击卡片"那一次点击重放一遍, 于是刚选上的模型立刻
+ * 又被切回去。所以只标脏, 让下一帧正常画。
+ */
 #include "preferences_state.h"
 #include "preferences_model_card.h"
 #include "preferences_model_cover.h"
@@ -10,6 +22,10 @@
 #include <stdio.h>
 #include <string.h>
 
+/*
+ * 卡片高度与加载动画的最小重绘间隔 (30Hz): 加载期间动画不必每帧都画, 这里限流,
+ * 但输入事件仍然照常触发渲染 —— 限的是"定时重绘", 不是交互响应。
+ */
 #define MODEL_CARD_HEIGHT 214
 #define MODEL_LOAD_RENDER_INTERVAL_NS 33333333ull
 
@@ -18,6 +34,10 @@ static const char *tr(BongoCatApp *app, const char *key,
     return bongo_cat_i18n_get(app->i18n, key, fallback);
 }
 
+/*
+ * 两段式等待曲线: 前 RAMP 段线性到 80% (让用户立刻看到反馈), 之后减速逼近
+ * WAIT_CAP。永远不返回 100% —— 100% 只能由"真的加载完"来给, 否则进度条会撒谎。
+ */
 static float visual_wait_progress(uint64_t elapsed) {
     if (elapsed <= BONGO_CAT_MODEL_LOAD_VISUAL_RAMP_NS)
         return .8f * (float)((double)elapsed /
@@ -30,6 +50,10 @@ static float visual_wait_progress(uint64_t elapsed) {
         NK_CLAMP(0.0f, slow, 1.0f);
 }
 
+/*
+ * 开始一段加载动画。completion_ns 清零表示"还没结束", 结束时刻由
+ * model_visual_progress 第一次发现"不再 loading"时补上。
+ */
 void bongo_cat_preferences_model_visual_begin(BongoCatPreferences *value,
     const char *model_id) {
     if (!value || !model_id || !model_id[0]) return;
@@ -41,6 +65,12 @@ void bongo_cat_preferences_model_visual_begin(BongoCatPreferences *value,
         sizeof(value->model_load_visual_id), "%s", model_id);
 }
 
+/*
+ * 加载进度回调 (由加载器在同步加载过程中反复调用)。
+ * 参数 progress 被刻意忽略: 真正的进度不可靠也不好映射到这条曲线上, 界面显示的
+ * 是"已经等了多久"。这里只做两件事: 用时间推进动画, 以及按 30Hz 限流地重绘 ——
+ * 加载本身占着主线程, 不节流会让加载更慢。
+ */
 void bongo_cat_preferences_model_load_progress(BongoCatPreferences *value,
     float progress) {
     if (!value || !value->model_loading) return;
@@ -58,6 +88,13 @@ void bongo_cat_preferences_model_load_progress(BongoCatPreferences *value,
     }
 }
 
+/*
+ * 查询某个模型卡片当前的加载进度 (卡片每帧调一次)。
+ * completion_ns 是"发现加载结束"的那一刻, 不是加载器给的时刻 —— 只有在这里才知道
+ * 加载已经结束, 所以补完动画也从这里起算, 保证 95%->100% 看起来是连续的一小段。
+ * 只有 id 匹配当前正在加载的模型才返回进度, 其它卡片一律 0。
+ * 全部动画结束后把 active 清掉, 这是 needs_frame 停止拉帧的信号之一。
+ */
 float bongo_cat_preferences_model_visual_progress(BongoCatPreferences *value,
     const char *model_id) {
     if (!value || !model_id || !value->model_load_visual_active ||
@@ -85,6 +122,7 @@ float bongo_cat_preferences_model_visual_progress(BongoCatPreferences *value,
     return value->model_load_progress;
 }
 
+/* 加载成功时把进度直接推到 1.0: 已经出结果了就不必再演那段补完动画 */
 static void finish_model_load_progress(BongoCatPreferences *value) {
     if (!value) return;
     if (value->model_load_visual_active) {
@@ -96,6 +134,14 @@ static void finish_model_load_progress(BongoCatPreferences *value) {
     value->render_dirty = true;
 }
 
+/*
+ * 在帧末真正执行"用户选了某个模型"这件事。
+ * 为什么不在点击那一帧做: 卡片点击是在 UI 遍历里发生的, 在那里改状态会让同一帧
+ * 之后的卡片看到不一致的模型列表。所以点击只写 pending_* 标志, 这里统一消费。
+ * 先把 pending 快照到局部变量并清掉标志, 再干活 —— 干活过程中会重绘, 重绘可能又
+ * 触发一次选择流程, 标志不清就会出现递归。
+ * 注意它不重绘 (见函数末尾的英文注释): 只标脏, 由下一帧正常画。
+ */
 void bongo_cat_preferences_process_model_selection(BongoCatPreferences *value) {
     if (!value || !value->model_selection_pending || value->model_loading)
         return;
@@ -133,6 +179,11 @@ void bongo_cat_preferences_process_model_selection(BongoCatPreferences *value) {
        card click that queued this selection and immediately toggle it back. */
 }
 
+/*
+ * 冒烟: 自动选一个非预置模型, 等选择与字体重建都落定后再打开行为设置对话框。
+ * 必须等 font_reload_pending / model_selection_pending / model_loading 全为假 ——
+ * 提前开对话框会撞上字体图集重建, 量出来的布局和真实使用不一致。
+ */
 static void smoke_model_behavior(BongoCatPreferences *value) {
     BongoCatApp *app = value->app;
     if (app->smoke_preference_model_select) {
@@ -154,6 +205,7 @@ static void smoke_model_behavior(BongoCatPreferences *value) {
     }
 }
 
+/* managed=false 是本机模型, true 是"附近的模型"(同局域网/同目录发现的) */
 static size_t model_count(const BongoCatPreferences *value, bool managed) {
     size_t count = 0;
     for (size_t i = 0; i < value->app->models.count; ++i)
@@ -161,6 +213,11 @@ static size_t model_count(const BongoCatPreferences *value, bool managed) {
     return count;
 }
 
+/*
+ * 预置模型的展示顺序 (标准/键盘/手柄), 返回 3 表示"不是预置"或"未知预置"。
+ * 排序是按 order 值分四趟画而不是排序数组: 模型列表是共享数据, 在这里改动顺序会
+ * 影响别处 (托盘菜单、会话恢复), 所以顺序只体现在绘制上。
+ */
 static int preset_model_order(const BongoCatModelEntry *entry) {
     if (!entry || !entry->preset) return 3;
     if (!strcmp(entry->id, "standard")) return 0;
@@ -169,6 +226,10 @@ static int preset_model_order(const BongoCatModelEntry *entry) {
     return 3;
 }
 
+/*
+ * storage_busy 为真时卡片会画成"忙碌/不可操作": 导入或目录刷新期间动模型文件会和
+ * 后台任务抢同一个目录。
+ */
 static void draw_models(BongoCatPreferences *value,
     struct nk_context *context, bool managed, bool storage_busy) {
     for (int order = 0; order <= 3; ++order) {
@@ -182,6 +243,13 @@ static void draw_models(BongoCatPreferences *value,
     }
 }
 
+/*
+ * 页面的组装顺序有依赖: covers_begin 要在任何卡片绘制之前调 (它负责本帧的封面
+ * 缓存预热), covers_prune 必须在所有卡片画完之后调 —— 反了就会把这一帧还要用的
+ * 封面当垃圾回收掉, 表现是封面一闪一闪。
+ * 列数按内容宽度而不是窗口宽度算, 因为侧栏宽度本身也随宽度变化。
+ * 卡片间距是临时改的全局样式, 用完必须还原 (Nuklear 没有样式作用域)。
+ */
 void bongo_cat_preferences_page_model(BongoCatPreferences *value,
     struct nk_context *context) {
     BongoCatApp *app = value->app;

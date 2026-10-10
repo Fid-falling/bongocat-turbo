@@ -1,9 +1,14 @@
+/* 资源目录定位。查找顺序: 程序目录旁边的 assets/ -> (缺资源时) 把内嵌资源解到
+   cache/embedded-assets-<version>/assets -> Debug 构建才回退到开发目录。
+   必须整套关键文件都在才算找到 —— 半套资源目录比"找不到"更难查。 */
 #include "runtime.h"
 #include "bongo_cat/path.h"
 #include "bongo_cat/platform.h"
 
 #include <stdio.h>
 
+/* 最小必需集合: 图标 / UI 符号 / 标准 Live2D 模型与纹理 / 至少一份 locale。
+   判据是"文件存在且非空", 因为打包最常出的错是零字节文件。 */
 static bool required_assets(const char *root) {
     if (!root || !root[0]) return false;
     const char *files[] = {
@@ -21,11 +26,14 @@ static bool required_assets(const char *root) {
     return true;
 }
 
+/* 拼出 root/assets 并确认整套资源在; 任何一步失败都返回 false, 由调用方决定再去哪找。 */
 static bool asset_directory(char *output, size_t capacity, const char *root) {
     return bongo_cat_path_join(output, capacity, root, "assets") &&
         bongo_cat_path_is_dir(output) && required_assets(output);
 }
 
+/* 定位失败时 asset_root 保持空串, 由调用方 (app.c) 报错; 这里只负责填 asset_root 与
+   locale_root 两棵树。 */
 BongoCatResult bongo_cat_app_locate_assets(BongoCatApp *app,
     BongoCatError *error) {
     app->asset_root[0] = '\0'; app->locale_root[0] = '\0';
@@ -42,6 +50,7 @@ BongoCatResult bongo_cat_app_locate_assets(BongoCatApp *app,
             }
         }
     }
+/* 只有 Debug 构建才回退开发目录: Release 包必须自带资源, 否则会静默用到开发者的路径。 */
 #ifndef NDEBUG
     if (!required_assets(app->asset_root) && required_assets(BONGO_CAT_DEV_ASSET_ROOT))
         snprintf(app->asset_root, sizeof(app->asset_root), "%s", BONGO_CAT_DEV_ASSET_ROOT);

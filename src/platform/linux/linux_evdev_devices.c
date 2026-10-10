@@ -17,6 +17,12 @@
 #define EVDEV_DEVICE_DIRECTORY "/dev/input"
 #define EVDEV_SYSFS_CLASS "/sys/class/input"
 
+/*
+ * 设备发现与分类(接收线程, 每 2 秒一次)。
+ *
+ * 分类不靠 ioctl 查询设备状态, 而是读 sysfs 的 capabilities 位图: 有些设备不允许状态
+ * 查询, 而 sysfs 是只读的、总能读到。
+ */
 bool bongo_cat_evdev_node_valid(const char *node) {
     if (!node || strncmp(node, "event", 5) || !node[5] ||
         strlen(node) >= EVDEV_NODE_CAP) return false;
@@ -25,6 +31,8 @@ bool bongo_cat_evdev_node_valid(const char *node) {
     return true;
 }
 
+/* 解析 sysfs 的位图文本(十六进制字, 空格分隔, 最高位字在前)。分块位数必须与内核一致
+   (32 或 64), 所以由调用方传入; 下标要倒着数: words[count - block - 1]。 */
 bool bongo_cat_evdev_mask_bit(const char *text, unsigned word_bits, unsigned code) {
     if (!text || (word_bits != 32 && word_bits != 64)) return false;
     unsigned long long words[KEY_CNT / 32 + 1];
@@ -59,6 +67,9 @@ static bool read_mask(const char *node, const char *name, char text[512]) {
     return ok;
 }
 
+/* 判定设备用途, 顺序有讲究: 先看有没有左键(BTN_LEFT) —— 有就当鼠标/触摸板, 不再当键盘
+   处理(不少鼠标也会上报 KEY_A 之类的多媒体键)。键盘要求同时具备 A/Z/Enter/Space 四个
+   键, 借此排除电源键、遥控器这种只上报一两个键的设备。 */
 static bool classify_device(const char *node, EvdevDevice *device) {
     char keys[512], relative[512];
     if (!read_mask(node, "key", keys)) return false;
@@ -76,6 +87,9 @@ static bool classify_device(const char *node, EvdevDevice *device) {
     return device->keyboard || device->pointer;
 }
 
+/* 汇总: pointer_active 只取决于"是否存在带相对轴的指针设备"(相对位移才是 Wayland 下
+   驱动鼠标跟随所需的)。没有相对设备时顺手清掉累积位移, 免得残留值让猫动一下。
+   设备数量变化时才打一行日志, 否则每 2 秒刷屏。 */
 static void report_devices(LinuxEvdevState *state) {
     bool relative = false;
     for (size_t i = 0; i < state->device_count; ++i)
@@ -88,6 +102,8 @@ static void report_devices(LinuxEvdevState *state) {
         "[runtime] evdev listener: %zu readable input devices", state->device_count);
 }
 
+/* 摘除设备: 先把该设备按着的键全部补发抬起(evdev_release), 再 dereg/close, 最后用
+   "末尾元素填坑"保持数组紧凑。顺序不能反 —— 关掉 fd 之后就没法知道它按了什么。 */
 void bongo_cat_evdev_remove(LinuxEvdevState *state, size_t index) {
     if (index >= state->device_count) return;
     EvdevDevice *device = &state->devices[index];
@@ -100,6 +116,11 @@ void bongo_cat_evdev_remove(LinuxEvdevState *state, size_t index) {
     report_devices(state);
 }
 
+/* 扫描 /dev/input: 已经打开的设备按节点名跳过(节点名就是它的身份, inode 会变)。
+   打开用 O_NONBLOCK | O_CLOEXEC | O_NOFOLLOW: 非阻塞避免读卡住, CLOEXEC 防止 fd 漏给
+   xdg-open 的子进程, NOFOLLOW 防止 /dev/input 里被塞进符号链接。
+   权限不足只警告一次, 并在日志里明确写出"本程序不会修改设备权限" —— 这是刻意的产品
+   决定: 应用不应该偷偷改 /dev 的权限。 */
 void bongo_cat_evdev_scan(LinuxEvdevState *state) {
     DIR *directory = opendir(EVDEV_DEVICE_DIRECTORY);
     if (!directory) return;

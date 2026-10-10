@@ -1,3 +1,7 @@
+/*
+ * 精确探测接口: 回答"这个目录自己是不是某个受支持格式的包根"。
+ * 返回值是三态 int(> 0 命中, 0 不匹配, < 0 命中但损坏), 调用方必须区分 0 与负值, 不能当布尔用。
+ */
 #ifndef BONGO_CAT_MODEL_IMPORT_PROBE_H
 #define BONGO_CAT_MODEL_IMPORT_PROBE_H
 

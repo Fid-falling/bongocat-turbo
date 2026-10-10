@@ -1,3 +1,15 @@
+/*
+ * 设置界面的"外壳"与通用绘制件: 侧边栏、品牌页头、内容页头、关闭按钮, 以及无边框
+ * 窗口的命中测试。
+ *
+ * 图标绘制是从上层注入的 (bongo_cat_ui_set_icons): 图标图集属于应用层, 主题层不该
+ * 反向依赖它, 所以这里只存一个函数指针; 没有注入时退回 ui_catime_icons.c 里手绘的
+ * 简笔图标 (丑但不会让界面缺东西)。
+ *
+ * 本文件最容易出错的地方是"画出来的矩形"和"命中测试用的矩形"必须一致: 下面三个
+ * *_hit() 函数是给窗口拖动/关闭用的, 它们写死了和绘制代码同一套坐标 (8/58/12/14/62...),
+ * 改了绘制参数就必须同步改这里, 否则会出现"点得到但拖不动"或"拖到关闭按钮上"。
+ */
 #include "ui_catime.h"
 #include "ui_backend.h"
 #include "ui_animation.h"
@@ -20,6 +32,9 @@ bool bongo_cat_ui_draw_icon(struct nk_command_buffer *canvas, int icon,
     return true;
 }
 
+/* target_width 多给 1.0f 并夹到 bounds.w: Nuklear 画文字时会按 rect 宽度决定是否
+   换行/裁剪, 浮点宽度恰好等于文字宽度时会在某些字号下把最后一个字切掉。
+   背景色传全透明, 文字颜色由调用方给 (避免每个调用点各写一遍矩形计算)。 */
 static void centered_span(struct nk_command_buffer *canvas,
     struct nk_rect bounds, const char *text, int length,
     const struct nk_user_font *font, struct nk_color color) {
@@ -37,6 +52,11 @@ static void centered(struct nk_command_buffer *canvas, struct nk_rect bounds,
     centered_span(canvas, bounds, text, nk_strlen(text), font, color);
 }
 
+/*
+ * 侧边栏宽度只有两档, 阈值 780 是"窗口再窄就放不下中文标签"的经验值。窄档下标签
+ * 不显示、只留图标和 tooltip, 这个约定在 ui_catime_tabs.c 里按同一个宽度判断
+ * (tile.w < 80 时走图标模式), 两边必须同时改。
+ */
 float bongo_cat_ui_sidebar_width(float window_width) {
     return window_width <= 780.0f ? BONGO_CAT_UI_SIDEBAR_NARROW :
         BONGO_CAT_UI_SIDEBAR_WIDTH;
@@ -47,6 +67,13 @@ bool bongo_cat_ui_native_chrome(void) {
     return false;
 }
 
+/*
+ * 画窗口底板。非原生边框时用两遍绘制 + scissor 造出"整块毛玻璃 + 侧边栏实色":
+ * 先按整窗圆角铺 surface_glass, 再把裁剪框压到侧边栏区域重铺一次 surface —— 这样
+ * 侧边栏右侧是一条干净的直边, 而外层圆角仍然完整。native_frame 时系统自己在画边框,
+ * 圆角必须为 0, 否则 DWM 的方角会和我们的圆角打架。
+ * 侧边栏发光只在浅色主题、开了特效、且不在实时缩放时烘焙 (见 live_resize_fast)。
+ */
 void bongo_cat_ui_shell_draw(struct nk_context *context, float width,
     float height, bool dark, bool native_frame) {
     BongoCatUIPalette p = bongo_cat_ui_palette(dark);
@@ -76,6 +103,14 @@ void bongo_cat_ui_shell_draw(struct nk_context *context, float width,
         p.border_subtle);
 }
 
+/*
+ * 品牌页头 (logo + 标题)。是一个"占位控件": 只申请高度、自己画内容, 不返回任何
+ * 可交互状态, 所以两处 return 都写死 false。
+ * 布局有四种组合 (窄/宽 x 原生边框/无边框) —— native_chrome 时系统标题栏占着顶部,
+ * 所以 logo 的 top 从 8 抬到 34、页头整体也更高, 这就是 top/title_y 两组常数的由来。
+ * 悬停缩放走 EASE_SPRING, 冲过头一点才有"弹一下"的手感; 缩放会同时改 logo 的
+ * y, 保证它是从中心放大而不是向下长。
+ */
 bool bongo_cat_ui_header(struct nk_context *context, const char *title,
     const struct nk_user_font *font, unsigned int logo_texture,
     bool *title_clicked, bool interactive, bool dark, bool native_chrome) {
@@ -123,6 +158,11 @@ bool bongo_cat_ui_header(struct nk_context *context, const char *title,
         nk_input_is_mouse_click_in_rect(&context->input, NK_BUTTON_LEFT, bounds);
     return false;
 }
+/*
+ * 内容页头: 左侧图标 + 标题, 右侧关闭按钮。返回"是否点了关闭"。
+ * native_chrome 时直接跳过关闭按钮 (系统标题栏已经有), 但仍然吃掉同一行的高度,
+ * 否则开启原生边框后整页内容会上移、和页头重叠。
+ */
 bool bongo_cat_ui_content_header(struct nk_context *context,
     const char *title, int icon, bool interactive, bool dark,
     bool native_chrome) {
@@ -170,6 +210,13 @@ bool bongo_cat_ui_close_button(struct nk_context *context,
         NK_BUTTON_LEFT, bounds);
 }
 
+/*
+ * 下面三个命中测试给无边框窗口的鼠标按下处理用 (判定"这一下是拖窗口、还是点关闭")。
+ * 它们是纯几何函数, 不依赖 nk_context, 因为事件到达时 Nuklear 还没开始画这一帧 ——
+ * 也就是说这里的坐标必须和绘制代码逐字对齐, 不能靠"反正下一帧会重算"。
+ * 三者的优先级由调用方保证: 先 close_hit, 再 title_link_hit, 剩下的区域才是拖动
+ * (title_drag_hit 内部也显式排除了关闭按钮, 免得顺序被改坏)。
+ */
 bool bongo_cat_ui_close_hit(float x, float y, float width) {
     return x >= width - 58.0f && x <= width - 12.0f && y >= 14.0f && y <= 62.0f;
 }

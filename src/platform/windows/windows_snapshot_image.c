@@ -2,6 +2,8 @@
 
 #include <SDL3/SDL_opengl.h>
 
+/* custom_destination = 调用方自己指定了目标矩形(拖动预览就是这种); 否则跟随源窗口的
+   实际位置与大小。 */
 void bongo_cat_windows_snapshot_geometry(BongoCatWindowsSnapshot *s,
     const SDL_FRect *rect) {
     if (!s) return;
@@ -9,6 +11,14 @@ void bongo_cat_windows_snapshot_geometry(BongoCatWindowsSnapshot *s,
     if (rect) s->destination = *rect;
 }
 
+/*
+ * 重绘预览。步骤: 算出图像该出现的位置 -> 几何没变且已经画过就直接返回(拖动时这个
+ * 函数会被高频调用, 这一步能省掉大量无谓重绘) -> 把屏幕坐标换算成渲染目标的像素坐标
+ * (渲染目标是整个虚拟桌面, 所以要减 desktop 原点再乘缩放) -> 清成全透明再画 -> 用
+ * SetWindowRgn 把窗口区域收敛到图像范围。
+ * SetWindowRgn 只影响命中测试与绘制区域, 不改变窗口原点 —— 窗口始终钉在桌面左上角,
+ * 于是整段交互里 DWM 看到的都是同一块表面(见下面原有的英文注释)。
+ */
 bool bongo_cat_windows_snapshot_present(BongoCatWindowsSnapshot *s) {
     RECT rect;
     if (!s || !GetWindowRect(s->source_handle, &rect)) return false;
@@ -44,6 +54,14 @@ bool bongo_cat_windows_snapshot_present(BongoCatWindowsSnapshot *s) {
     return true;
 }
 
+/*
+ * 抓取源窗口的前缓冲。glReadPixels 受一堆全局状态影响, 所以先备份并清零
+ * PACK_ALIGNMENT / ROW_LENGTH / SKIP_*, 并临时解绑 PIXEL_PACK_BUFFER(绑着 PBO 时
+ * glReadPixels 会把数据写进 PBO 而不是我们给的指针), 读完逐项还原 —— 这些状态属于
+ * 共享的 GL 上下文, 不还原会影响渲染器后续工作。
+ * 末尾还要检查抓回来的东西是不是空的: 某些驱动拿不到带透明的前缓冲, 这时宁可让整个
+ * 预览失败, 也不能把一只空猫替换到屏幕上(见下面原有的英文注释)。
+ */
 bool bongo_cat_windows_snapshot_capture(BongoCatWindowsSnapshot *s) {
     if (!SDL_GetWindowSizeInPixels(s->source, &s->width, &s->height) ||
         s->width <= 0 || s->height <= 0 ||

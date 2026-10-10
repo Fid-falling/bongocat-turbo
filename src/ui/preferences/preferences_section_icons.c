@@ -1,3 +1,9 @@
+/*
+ * 段落标题用的大图标 (四枚: 窗口/模型/应用/外观)。
+ * 与行图标不同, 这里的图形是按传入矩形的宽高自适应画的 (用 bounds.w/bounds.h 推算
+ * 关键点), 因为段落头给图标的尺寸会随布局变; 行图标则是固定 18x18 网格。
+ * 同样全部是矢量绘制, 理由见 preferences_row_icons.c 的文件头注释。
+ */
 #include "preferences_icons_internal.h"
 
 static void window_icon(struct nk_command_buffer *canvas,
@@ -10,6 +16,10 @@ static void window_icon(struct nk_command_buffer *canvas,
     nk_fill_circle(canvas, nk_rect(bounds.x + 6, bounds.y + 3, 2, 2), color);
 }
 
+/*
+ * model_icon 画的是一张"多面体/低模"轮廓: 8 条棱线拼出上下两个顶点, 正好对应"模型"
+ * 这个语义; 所有顶点都从 bounds 推算, 所以拉宽压扁都不会散架。
+ */
 static void model_icon(struct nk_command_buffer *canvas,
     struct nk_rect bounds, struct nk_color color) {
     float left = bounds.x + 2, right = bounds.x + bounds.w - 2;
@@ -50,6 +60,10 @@ static void appearance_icon(struct nk_command_buffer *canvas,
             x + rays[i][2], y + rays[i][3], 1.5f, color);
 }
 
+/*
+ * 段落图标总表: 用 if/else 链而不是函数指针数组, 因为这几枚图标数量少、且这里要
+ * 显式返回 false 告诉调用方"不是我管的图标"(统一入口靠这个返回值分派到行图标那边)。
+ */
 bool bongo_cat_pref_section_icon_draw(struct nk_command_buffer *canvas,
     struct nk_rect bounds, BongoCatPrefIcon icon,
     struct nk_color color) {

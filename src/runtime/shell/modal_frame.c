@@ -1,5 +1,12 @@
+/* 模态循环里的"一帧": 拖动/托盘/菜单/设置窗口的模态循环会挡住主循环, 但宠物必须继续动,
+ * 这些地方就通过本文件的 tick 回调手动跑一帧 (drain 输入 -> 快照 -> hover -> 步进 live2d
+ * -> 渲染)。dt 由 last_tick_ns 与 app->last_frame_ns 里较新的那个算起, 避免模态循环与主循环
+ * 互相把 dt 吃掉或算重; 单帧 dt 上限 0.25s。 */
 #include "modal_frame.h"
 
+/* 计算本帧 dt 并推进基准: 起点取 state->last_tick_ns 与主循环的 app_frame_ns 中较新者 ——
+ * 两个循环交替运行时不能重复消费同一段时间; now 不大于基准 (时钟未前进或回退) 返回 0。
+ * 会写 state->last_tick_ns, 单帧上限 0.25s (休眠/卡顿后不让动画瞬移)。 */
 static float modal_elapsed(BongoCatModalFrame *state, uint64_t app_frame_ns,
     uint64_t now) {
     uint64_t baseline = state->last_tick_ns;
@@ -16,6 +23,8 @@ void bongo_cat_modal_frame_init(BongoCatModalFrame *state, BongoCatApp *app) {
         .last_tick_ns = SDL_GetTicksNS()};
 }
 
+/* 模态循环每帧调一次 (签名即平台的 BongoCatModalTick): 自己取时钟推进一帧, 无返回值。
+ * 它会把 app->last_frame_ns 推到当前时刻, 主循环恢复后不会把模态期间整段当成一个巨大 dt。 */
 void bongo_cat_modal_frame_tick(void *userdata) {
     BongoCatModalFrame *state = userdata;
     if (!state || !state->app) return;

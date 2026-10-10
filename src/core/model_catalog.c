@@ -13,6 +13,14 @@
 #include <dirent.h>
 #endif
 
+/*
+ * 模型目录的扫描与查找。
+ *
+ * 扫描规则: 逐个看 root 下的子目录, 只有"用户自己放进去的模型"(带内置标记文件)
+ * 或 preset(随程序分发的内置模型)才算数; 目录里找不到 .model3.json 的直接跳过
+ * —— 那不是模型, 可能只是用户随手丢进去的文件夹。
+ * entries 是定长数组, 顺序就是磁盘返回的顺序(平台相关), count 之后没有有效数据。
+ */
 void bongo_cat_models_init(BongoCatModelCatalog *catalog) {
     if (catalog) memset(catalog, 0, sizeof(*catalog));
 }
@@ -24,6 +32,10 @@ bool bongo_cat_model_adapter_metadata_path(const char *directory,
             BONGO_CAT_MODEL_ADAPTER_FILE);
 }
 
+/* 判断模型属于哪个模式(标准 / 键盘 / 手柄), 按可信度从高到低三级回退: 先看模型
+   自己写的 .bongo-cat-mode, 再看目录名, 最后看贴图结构(resources/right-keys/
+   East.png 存在 = 手柄; 只有 right-keys 目录 = 键盘)。三级都判断不出来就当标准
+   模式 —— 猜错只影响默认按键布局, 不会让模型加载失败。 */
 static BongoCatModelMode infer_mode(const char *directory) {
     char path[BONGO_CAT_PATH_CAP], stored[16] = {0};
     bongo_cat_path_join(path, sizeof(path), directory, ".bongo-cat-mode");
@@ -46,12 +58,17 @@ static BongoCatModelMode infer_mode(const char *directory) {
     return bongo_cat_path_is_dir(path) ? BONGO_CAT_MODE_KEYBOARD : BONGO_CAT_MODE_STANDARD;
 }
 
+/* 内置标记文件用来区分"程序自带的模型"和"用户导入的模型": 前者由安装包管理,
+   只有后者才允许删除或改名。 */
 static bool builtin_marker(const char *directory) {
     char marker[BONGO_CAT_PATH_CAP];
     return bongo_cat_path_join(marker, sizeof(marker), directory,
         BONGO_CAT_MODEL_BUILTIN_MARKER) && bongo_cat_path_is_file(marker);
 }
 
+/* 返回 false 只表示"模型太多"或"路径太长"这类硬错误; 目录里没有模型文件属于
+   正常情况, 返回 true 但不添加任何条目。id 直接用目录名 —— 设置里的自定义名称、
+   已删除列表都以它为键, 所以重命名目录等于换了一个模型。 */
 static bool add_model(BongoCatModelCatalog *catalog, const char *directory, bool preset) {
     if (!preset && !builtin_marker(directory)) return true;
     if (catalog->count >= BONGO_CAT_MODEL_CAP) return false;
@@ -122,6 +139,7 @@ static BongoCatResult scan_posix(BongoCatModelCatalog *catalog, const char *root
 }
 #endif
 
+/* 目录不存在不算错误(首次运行时模型目录还没建), 扫描结果为空即可。 */
 BongoCatResult bongo_cat_models_scan(BongoCatModelCatalog *catalog, const char *root, bool preset,
     BongoCatError *error) {
     if (!catalog || !root) return BONGO_CAT_ERROR_ARGUMENT;
@@ -140,6 +158,8 @@ const BongoCatModelEntry *bongo_cat_models_find(const BongoCatModelCatalog *cata
     return NULL;
 }
 
+/* 显示名的回退链: 模型自带的 display_name -> 三个内置模型的固定英文名 -> 目录
+   名。返回值可能指向 entry 内部, 调用方不要释放。 */
 const char *bongo_cat_model_default_name(const BongoCatModelEntry *entry) {
     if (!entry) return "model";
     if (entry->display_name[0]) return entry->display_name;
@@ -149,6 +169,8 @@ const char *bongo_cat_model_default_name(const BongoCatModelEntry *entry) {
     return entry->id;
 }
 
+/* 用户设置的名字优先于模型自带的名字(见 config_model_state.c 里的 modelOverrides)。
+   settings 允许为 NULL, 那表示配置还没加载, 直接退回默认名。 */
 const char *bongo_cat_model_name(const BongoCatSettings *settings,
     const BongoCatModelEntry *entry) {
     if (!entry) return "model";

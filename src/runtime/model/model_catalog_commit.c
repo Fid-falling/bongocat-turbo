@@ -1,3 +1,6 @@
+/* 单个包导入或更新后的收尾：只对 storage_directory 落在该包目录下的条目补跑运行时元数
+ * 据，而不是像 bongo_cat_model_catalog_finish() 那样遍历整张表（条目多时退化成 O(n²)）。
+ * 由后台刷新完成回调在主线程调用；它不增删条目，因此不会让当前选中项失效。 */
 #include "runtime.h"
 #include "model_import.h"
 #include "bongo_cat/path.h"

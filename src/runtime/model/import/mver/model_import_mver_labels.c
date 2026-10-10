@@ -1,3 +1,11 @@
+/*
+ * Mver 配置 (JSON5) 的标签读取器: 按模式对象 (standard / keyboard / gamepad) 从 config 里取出
+ * l2d_expression、l2d_motion、l2d_motion_lockhand、sounds 四个数组, 并把每行旁边的双斜杠注释当作
+ * 行为的显示名。适配器生成阶段 (bongo_cat_import_adapter_metadata) 调用, 早于 add_behaviors 与
+ * add_audio; 只读文本, 不写文件; 行序号 index 是数组下标 (含被跳过的行), 下游靠它和 Live2D
+ * manifest 逐行对齐, 超出 BONGO_CAT_BEHAVIOR_CAP 的标签静默丢弃。
+ * 易错点: Mver 的注释语法不是合法 JSON, 这里刻意不引 JSON 库; 改扫描器时必须保证各分支消费到同一位置。
+ */
 #include "model_import_mver_internal.h"
 #include "bongo_cat/file.h"
 #include "bongo_cat/utf8.h"
@@ -9,6 +17,8 @@
 
 typedef struct TextSpan { const char *begin, *end; } TextSpan;
 
+/* cursor 必须指向引号本身; 返回闭合引号之后的位置, 未闭合则返回 end。反斜杠转义只按吃掉两个
+   字节处理, 不做解码 —— 上层要的是原文边界。 */
 static const char *skip_string(const char *cursor, const char *end) {
     char quote = *cursor++;
     while (cursor < end) {
@@ -18,6 +28,8 @@ static const char *skip_string(const char *cursor, const char *end) {
     return cursor;
 }
 
+/* 跳过空白与两种注释, 返回第一个有意义的字符位置。本文件所有扫描都必须经由它, 否则注释文本
+   会被当成键或值。 */
 static const char *skip_space(const char *cursor, const char *end) {
     for (;;) {
         while (cursor < end && isspace((unsigned char)*cursor)) cursor++;
@@ -34,6 +46,9 @@ static const char *skip_space(const char *cursor, const char *end) {
     }
 }
 
+/* 从 cursor 处跳过一个完整的值: 标量走到逗号、方括号或花括号为止, 字符串交给 skip_string,
+   容器用括号栈配对。嵌套超过栈容量时直接返回 end —— 宁可把剩余文本整体当成一个值, 也不越界
+   写栈。 */
 static const char *skip_value(const char *cursor, const char *end) {
     cursor = skip_space(cursor, end);
     if (cursor >= end) return cursor;
@@ -84,6 +99,8 @@ static bool key_equals(TextSpan key, const char *name) {
     return strlen(name) == length && memcmp(key.begin, name, length) == 0;
 }
 
+/* 在已定位的对象区间里按名字取成员的值区间 (借用 object 内部指针, 生命周期同源文本)。只扫描
+   该对象的第一层, 不递归进嵌套对象; 返回的区间不含键名与冒号。 */
 static bool member(TextSpan object, const char *name, TextSpan *value) {
     const char *cursor = skip_space(object.begin, object.end);
     if (cursor >= object.end || *cursor++ != '{') return false;
@@ -103,6 +120,8 @@ static bool member(TextSpan object, const char *name, TextSpan *value) {
     return false;
 }
 
+/* 在一行绑定里找显示名: 约定是行尾的双斜杠注释, 扫描时先跳过字符串与块注释。命中时把去掉首尾
+   空白后的文本写进 output 并返回 true; 没有注释则返回 false 且不写 output。 */
 static bool line_label(TextSpan row, char *output, size_t capacity) {
     const char *cursor = row.begin;
     while (cursor + 1 < row.end) {
@@ -119,6 +138,8 @@ static bool line_label(TextSpan row, char *output, size_t capacity) {
             while (end > begin && isspace((unsigned char)end[-1])) end--;
             size_t length = (size_t)(end - begin);
             if (!length) return false;
+            /* 容量不足时从尾部回退到整字符边界: 截断点若落在续字节 (高两位为 10) 上, 必须连它的
+               首字节一起丢掉, 否则下游的 UTF-8 校验会失败。 */
             if (length >= capacity) {
                 length = capacity - 1;
                 while (length &&
@@ -130,6 +151,9 @@ static bool line_label(TextSpan row, char *output, size_t capacity) {
     return false;
 }
 
+/* 收集 mode 对象里 field 数组每一行的标签。index 用数组下标而不是成功计数, 这样被跳过 (无注释、
+   编码非法或超容量) 的行不会让下游的 manifest 行号错位; 达到 BONGO_CAT_BEHAVIOR_CAP 之后的行
+   静默丢弃。 */
 static void collect_field(BongoCatMverLabels *labels, TextSpan mode,
     const char *field) {
     TextSpan rows;
@@ -155,6 +179,9 @@ static void collect_field(BongoCatMverLabels *labels, TextSpan mode,
     }
 }
 
+/* 读 path (Mver 的 config 文件, 上限 16 MiB, 允许 UTF-8 BOM) 中名为 mode 的对象并填充 labels。
+   返回 false 表示读文件失败或没有这个模式对象, 此时 labels 已清零, 可当"无标签"安全使用;
+   文件句柄与文本缓冲区都由本函数自行释放。 */
 bool bongo_cat_mver_labels_load(const char *path, const char *mode,
     BongoCatMverLabels *labels) {
     if (!path || !mode || !labels) return false;
@@ -186,6 +213,8 @@ bool bongo_cat_mver_labels_load(const char *path, const char *mode,
     return found;
 }
 
+/* 按字段名与下标查标签, 返回 labels 内部字符串的借用指针 (调用方不得 free, 生命周期同 labels);
+   没有匹配返回 NULL, 调用方据此省略 label 字段。labels 可以为 NULL。 */
 const char *bongo_cat_mver_label(const BongoCatMverLabels *labels,
     const char *field, size_t index) {
     if (!labels || !field) return NULL;

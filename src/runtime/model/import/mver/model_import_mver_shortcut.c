@@ -1,3 +1,11 @@
+/*
+ * Mver 键位矩阵到 BongoCat 快捷方式串的翻译: 输入是配置里的一行 (Windows 虚拟键码数组), 输出形如
+ * Control+Shift+KeyA 或 Gamepad:South, 由适配器生成阶段写进 bindings 的 shortcut 字段。
+ * 契约: 最终由 bongo_cat_shortcut_matches 解析 —— 比较大小写不敏感、修饰键顺序无关, 但修饰键必须与
+ * 按下状态完全一致 (多按一个 Shift 就不命中); output 由调用方提供, 成功时以 0 结尾, 失败时未定义。
+ * 易错点: 键名风格必须和 shortcut.c 的 canonical_key 对齐 (Key 与 Num 前缀、Left 与 Right 后缀、
+ * UpArrow 改名 ArrowUp 等), 改这里要同步改解析侧。
+ */
 #include "model_import_mver_internal.h"
 
 #include <stdio.h>
@@ -11,6 +19,8 @@ static bool append(char *output, size_t capacity, const char *value) {
     return true;
 }
 
+/* 取单个键码的规范名: 优先用共享键名表, 否则写进调用方给的 generated 缓冲区 (16 字节, 返回值可能
+   指向它, 只在本次调用内有效)。修饰键返回 NULL, 交给调用方当修饰位处理。 */
 static const char *shortcut_key(int code, char generated[16]) {
     BongoCatMverKeyNames names = bongo_cat_mver_device_names(code, 0, 1);
     const char *name = names.items[0];
@@ -30,6 +40,9 @@ static const char *shortcut_key(int code, char generated[16]) {
     return name;
 }
 
+/* 键盘组合键: 一行里最多一个非修饰键, 修饰键按 Shift、Control、Alt 三类去重 (重复出现不算错),
+   输出顺序固定为 Control、Shift、Alt、主键, 与配置里的出现顺序无关, 这样同一个组合只有一种写法。
+   出现两个主键、键码不是整数或没有主键都返回 false。 */
 static bool keyboard_chord(yyjson_val *row, char *output, size_t capacity) {
     output[0] = '\0';
     if (!yyjson_is_arr(row)) return false;
@@ -53,6 +66,8 @@ static bool keyboard_chord(yyjson_val *row, char *output, size_t capacity) {
         append(output, capacity, key_name);
 }
 
+/* 手柄组合键: Mver 用单元素数组表示一个按钮 (0 到 15 映射为 South 到 Select), 因此数组长度不等于
+   1 一律失败; 输出带 Gamepad: 前缀, 与键盘绑定区分。 */
 static bool gamepad_chord(yyjson_val *row, char *output, size_t capacity) {
     if (!yyjson_is_arr(row) || yyjson_arr_size(row) != 1) return false;
     yyjson_val *key = yyjson_arr_get_first(row);
@@ -63,6 +78,9 @@ static bool gamepad_chord(yyjson_val *row, char *output, size_t capacity) {
         snprintf(output, capacity, "Gamepad:%s", names.items[0]) > 0;
 }
 
+/* 统一入口: 候选声明了手柄按钮且键码在 0 到 15 之间时按手柄解释, 否则一律按键盘解释 —— 同一个键码
+   在两种模式下含义不同, 判断依据是候选的 gamepad_buttons 而不是模式名。raw 是 yyjson 值的类型
+   擦除指针 (内部头文件不暴露 yyjson)。 */
 bool bongo_cat_mver_chord(const BongoCatImportCandidate *candidate,
     void *raw, char *output, size_t capacity) {
     yyjson_val *row = raw;
@@ -74,6 +92,8 @@ bool bongo_cat_mver_chord(const BongoCatImportCandidate *candidate,
         ? gamepad_chord(row, output, capacity) : keyboard_chord(row, output, capacity);
 }
 
+/* 音效绑定专用: 与视觉绑定不同, 不重排修饰键, 而是按行内顺序用加号连接任意组合, 并允许纯修饰键与
+   鼠标键; 键名可能借自 shortcut_key 的 generated 缓冲区, 返回值只在本次调用内有效。 */
 /* Mver's audio uses Windows keys even when its visual mode uses a gamepad.
    Preserve arbitrary chords, modifier-only keys, and mouse buttons. */
 bool bongo_cat_mver_sound_chord(void *raw, char *output, size_t capacity) {

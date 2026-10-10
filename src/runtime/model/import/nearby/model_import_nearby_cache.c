@@ -1,3 +1,11 @@
+/*
+ * 就近模型的缓存层: 在适配器目录里放一个 .bongo-cat-cache.json 标记, 记下来源路径、来源签名
+ * (bongo_cat_nearby_signature) 与内容指纹, 让重复扫描不必重新指纹化整个模型目录; nearby 扫描在
+ * 检查候选与生成适配器两步调用它, 全程在 model_import_lock 之内。
+ * 契约: 缓存只是加速 —— 标记必须同时匹配来源与签名, 且适配器目录里的模式文件、适配器元数据与
+ * resources 目录都还在, 任何一条不满足都退回真实指纹化。
+ * 易错点: schema 版本变更会让旧标记全部失效, 这是有意的; 更新适配器走 tmp 到 old 的改名切换, 失败时必须退回旧缓存。
+ */
 #include "model_import_nearby_internal.h"
 #include "model_storage.h"
 #include "bongo_cat/json.h"
@@ -10,6 +18,8 @@
 
 #define NEARBY_CACHE_KIND "bongocat/nearby-model-cache"
 
+/* 标记文件的内容。adapter_ready 为假表示这条记录只缓存了指纹 (适配器还没生成), placeholder 为真
+   表示候选是内置模板, 不会出现在模型目录里。 */
 typedef struct NearbyMarker {
     char source[BONGO_CAT_PATH_CAP];
     char signature[65];
@@ -19,6 +29,7 @@ typedef struct NearbyMarker {
     bool valid;
 } NearbyMarker;
 
+/* 只接受 64 位小写十六进制; 大小写或长度的差异都视为脏数据, 直接让标记失效。 */
 static bool digest_valid(const char *value) {
     if (!value || strlen(value) != 64) return false;
     for (size_t i = 0; i < 64; ++i)
@@ -27,6 +38,8 @@ static bool digest_valid(const char *value) {
     return true;
 }
 
+/* 读并校验标记; 任何字段缺失、类型不符、schemaVersion 不符或 kind 不对, valid 都为 false (调用方
+   据此退回真实计算)。返回结构体而非指针, 字符串已拷贝, 不与 json 文档共享内存。 */
 static NearbyMarker read_marker(const char *target) {
     NearbyMarker marker = {0};
     char path[BONGO_CAT_PATH_CAP];
@@ -57,6 +70,8 @@ static NearbyMarker read_marker(const char *target) {
     return marker;
 }
 
+/* 适配器目录能否直接使用: 标记有效且已就绪、非占位、来源一致, 并且磁盘上的模式文件、适配器元数据
+   与 resources 目录都还在 (用户可能手动删掉了其中一个)。 */
 static bool adapter_usable(const char *target, const char *source,
     const NearbyMarker *marker) {
     char mode[BONGO_CAT_PATH_CAP], metadata[BONGO_CAT_PATH_CAP];
@@ -73,6 +88,8 @@ static bool adapter_usable(const char *target, const char *source,
         bongo_cat_path_is_dir(resources);
 }
 
+/* 命中时回填缓存的 identity 与 placeholder 并返回 true; 来源或签名不一致返回 false, 调用方此时
+   必须真做一次 bongo_cat_import_candidate_inspect。只读, 不写标记。 */
 bool bongo_cat_nearby_cached_inspection(const char *target,
     const char *source, const char *signature, char identity[65],
     bool *placeholder) {
@@ -84,6 +101,8 @@ bool bongo_cat_nearby_cached_inspection(const char *target,
     return true;
 }
 
+/* 原子写标记: 建 json 文档后整文件写出; 失败时由调用方清理临时目录。adapter_ready 由调用方显式
+   传入 (记指纹时是 false, 适配器建好后是 true)。 */
 static bool write_marker(const char *target, const char *source,
     const char *signature, const char *identity, BongoCatModelMode mode,
     bool placeholder, bool adapter_ready) {
@@ -109,6 +128,8 @@ static bool write_marker(const char *target, const char *source,
     return ok;
 }
 
+/* 只记指纹, 不生成适配器 (adapter_ready 写 false), 目的是让下次扫描跳过昂贵的目录指纹化; 失败只
+   记警告 —— 缓存写不进去不该让扫描失败。 */
 void bongo_cat_nearby_remember_inspection(const char *target,
     const char *source, const char *signature, const char *identity,
     bool placeholder, BongoCatModelMode mode) {
@@ -120,6 +141,8 @@ void bongo_cat_nearby_remember_inspection(const char *target,
         "Cannot cache nearby model identity: %s", source);
 }
 
+/* 适配器更新失败时的兜底: 旧适配器还在就沿用它并清掉 error, 让模型继续可用; 返回 false 表示连旧
+   缓存都没有, 调用方必须把失败上报。 */
 static bool use_previous_cache(const char *target, const char *source,
     char identity[65], BongoCatError *error) {
     NearbyMarker marker = read_marker(target);
@@ -132,6 +155,10 @@ static bool use_previous_cache(const char *target, const char *source,
     return true;
 }
 
+/* 生成或更新某个候选的适配器。先看现有标记是否已与目标签名和 identity 一致 (一致就直接复用, 不
+   重建), 否则在 .tmp 目录里生成, 再用 .old 换出旧目录后改名激活。
+   *created 只在原本没有适配器目录时置真; adapter 始终写最终目标路径。失败时清掉临时目录、尽力
+   恢复旧适配器, 并退回 use_previous_cache。 */
 bool bongo_cat_nearby_refresh_cache(
     const BongoCatImportCandidate *candidate, const char *cache_root,
     const char *id, const char *source, const char *signature,
@@ -149,6 +176,8 @@ bool bongo_cat_nearby_refresh_cache(
     bongo_cat_model_remove_tree(temporary, NULL);
     if (!bongo_cat_path_is_dir(adapter) && bongo_cat_path_is_dir(backup))
         bongo_cat_path_rename(backup, adapter);
+    /* 上次更新正好在这里被打断会留下 .old 而没有正式目录, 先把它恢复成正式目录再判断要不要重建,
+       免得用户看到模型凭空消失。 */
     if (bongo_cat_path_is_dir(adapter))
         bongo_cat_model_remove_tree(backup, NULL);
     *created = !bongo_cat_path_is_dir(adapter);

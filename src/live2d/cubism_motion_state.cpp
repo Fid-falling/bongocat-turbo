@@ -1,3 +1,11 @@
+/*
+ * Mver 动作 JSON 的曲线解析, 以及"开/关"配对动作的识别。
+ *
+ * Cubism 自己的动作格式由 SDK 解析, 但 Mver 转换过来的动作还额外需要两件事:
+ *  1) 把每条曲线的端点抄下来 —— 动作播完后要把参数恢复成原值, 而 SDK 不会替我们做;
+ *  2) 认出互为反向的一对动作 (开灯/关灯), 让 UI 把它们显示成一个开关而不是两个按钮。
+ * 两个判据都来自同一份 JSON, 所以放在一起解析一次。
+ */
 #include "cubism_model.hpp"
 
 #include <CubismFramework.hpp>
@@ -11,6 +19,8 @@
 
 namespace bongo_cat {
 
+/* Segments 的布局是 [类型, 起点, ...控制点/终点]: 起点在 1 号位, 终点永远在最后一位,
+ * 所以不必先解析中间是什么类型就能取到两端。 */
 static bool curve_endpoints(yyjson_val *segments, float *start, float *end) {
     if (!yyjson_is_arr(segments) || yyjson_arr_size(segments) < 2) return false;
     yyjson_val *first = yyjson_arr_get(segments, 1);
@@ -21,6 +31,9 @@ static bool curve_endpoints(yyjson_val *segments, float *start, float *end) {
     return true;
 }
 
+/* "自包含"判定: 一条曲线如果两端都等于默认值、但中间确实偏离过, 说明这个动作播完自己
+ * 就回到了原状, 不需要我们再恢复; 否则必须靠 motion_states_ 里记下的端点值手动还原。
+ * 中间段的点数按类型推 (贝塞尔 3 个点, 其余 1 个点), 布局对不上就整条曲线放弃, 不要猜。 */
 static bool curve_returns_to_default(yyjson_val *segments, float normal) {
     float start = 0.0f, end = 0.0f;
     if (!curve_endpoints(segments, &start, &end) ||
@@ -52,6 +65,9 @@ static bool curve_has_state_target(const NativeModel::MotionStateCurve &curve) {
     return curve.parameter >= 0 || curve.part >= 0 || curve.model_opacity;
 }
 
+/* 逐条曲线解析。Target 决定恢复到哪一类对象 (参数 / 部件不透明度 / 整模型不透明度),
+ * normal 是该对象当前的"常态"值, 端点值留到动作结束时写回。同时把"这条动作碰过哪些
+ * target:id"累进 motion_signatures_ —— 配对时先用签名做粗筛, 签名不同就不可能是一对。 */
 void NativeModel::load_motion_state(const std::string &key, const char *group,
     int motion_index, const std::vector<unsigned char> &bytes) {
     yyjson_doc *document = yyjson_read(
@@ -105,6 +121,10 @@ void NativeModel::load_motion_state(const std::string &key, const char *group,
     motion_states_[key] = std::move(state);
 }
 
+/* 判定两个动作是不是一对开关: 必须在同一组、曲线条数与 target 一一对应, 且每条曲线
+ * 要么两端完全相同 (这条曲线与开关无关), 要么端点对调 (互为反向)。此外必须恰好有一侧
+ * 停在默认值 —— 停在默认值的那侧就是"关"。所有反向曲线给出的方向还得一致, 否则它们
+ * 只是碰巧相似的两个独立动作, 不能当成开关。 */
 bool motion_toggle_pair(const NativeModel::MotionState &a,
     const NativeModel::MotionState &b, bool *first_enabled) {
     if (!first_enabled || a.group != b.group ||
@@ -168,6 +188,8 @@ static size_t pair_candidates(
     return count;
 }
 
+/* 只在配对唯一时才承认: 正反两个方向都必须恰好只有一个候选。有多个候选说明这组动作里
+ * 存在重复曲线, 硬配会把 UI 的开关连错, 所以宁可放弃配对 —— 它们就显示成两个独立动作。 */
 void NativeModel::pair_motion_states() {
     for (const auto &item : motion_states_) {
         if (motion_toggle_owners_.find(item.first) != motion_toggle_owners_.end())
@@ -186,6 +208,9 @@ void NativeModel::pair_motion_states() {
     }
 }
 
+/* 返回"这次点击真正该播的动作", 并把 UI 勾选态该变成什么写进 *selected。
+ * owner/partner 的规范化保证同一个开关无论从哪一侧点进来都落到同一个 key 上。
+ * 一次性动作只在本次播放期间保持勾选; 开关型动作则改播它的反向动作。 */
 std::string NativeModel::motion_to_play(const std::string &key,
     bool *selected) const {
     auto owner = motion_toggle_owners_.find(key);
@@ -233,6 +258,9 @@ bool NativeModel::restore_motion_defaults(const std::string &key) {
     return true;
 }
 
+/* 写回一个恢复值。参数要同时更新 baseline —— Cubism 的 SaveParameters() 保存的是"动作
+ * 基线", 恢复值必须成为新的基线, 否则下一个动作会从恢复之前的旧值开始插值。
+ * 外部输入覆盖正在生效时, 画面显示覆盖值、但基线照常更新 (两者刻意分离)。 */
 bool NativeModel::apply_motion_curve(const MotionStateCurve &curve,
     float value) {
     if (!_model) return false;

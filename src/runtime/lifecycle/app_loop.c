@@ -1,3 +1,15 @@
+/*
+ * 主循环。一轮的顺序是有意的, 大致四段:
+ *   1. 事件: 更新提示 -> 模型热更新 -> 设置窗口 -> 主窗口 依次有机会消费, 主窗口
+ *      都没消费掉才会因 QUIT 结束循环;
+ *   2. 周期性更新: 滚轮/快照/多宠/随机表情/音频/显示器恢复/运行时流程/输入;
+ *   3. 模型推进: 只有"该出帧"时才 step_live2d (帧预算见 frame_clock.c); 窗口不可见
+ *      或最小化时改为消费一次 idle 内存回收 (memory_policy);
+ *   4. 渲染与收尾: 渲染可能发生两次 (设置窗口会改状态), 最后同步托盘、置前窗口、
+ *      落盘配置。
+ * 不要在这些渲染点之外随手加渲染: app->dirty 的语义与 memory_policy 的"延迟两帧"
+ * 都假设渲染只发生在这些地方。
+ */
 #include "runtime.h"
 #include "bongo_cat/audio.h"
 #include "bongo_cat/log.h"
@@ -9,6 +21,8 @@
 
 #include <SDL3/SDL_opengl.h>
 
+/* 事件分发优先级 = 谁先拿到谁处理: 未消费的事件才轮到主窗口。返回 false 表示主窗口
+   收到 QUIT (或窗口层要求退出), 由上层结束循环。 */
 static void handle_event(BongoCatApp *app, const SDL_Event *event) {
     if (bongo_cat_update_event(app->update, event)) return;
     if (bongo_cat_model_refresh_event(app, event)) return;
@@ -21,6 +35,8 @@ static void handle_event(BongoCatApp *app, const SDL_Event *event) {
     }
 }
 
+/* elapsed 从上一帧算起并夹在 250ms 以内: 拖窗口/系统休眠后时间差可能是几秒, 不夹住
+   模型会瞬移一大步。smoke_freeze_model 让 CI 拿到可复现的画面。 */
 static void update_model(BongoCatApp *app, uint64_t now) {
     float elapsed = (float)((now - app->last_frame_ns) / 1000000000.0);
     if (elapsed > 0.25f) elapsed = 0.25f;
@@ -28,6 +44,9 @@ static void update_model(BongoCatApp *app, uint64_t now) {
     if (!app->smoke_freeze_model) bongo_cat_app_step_live2d(app, elapsed);
 }
 
+/* present=false 是离屏截帧 (模型封面 / 冒烟回读): 照常画一帧但不交换缓冲。返回 false
+   表示这一帧的"目的"没达成 (例如封面回读还没回来), 画面本身可能已经画过了, 调用方
+   据此决定是否下一帧重试 —— 所以它不等于渲染失败。 */
 static bool render(BongoCatApp *app, bool present) {
     if (present && app->window_snapshot) {
         bongo_cat_window_snapshot_present(app);
@@ -47,6 +66,8 @@ static bool render(BongoCatApp *app, bool present) {
         SDL_GetWindowSizeInPixels(app->window, &width, &height);
         return bongo_cat_model_cover_capture(app, width, height);
     }
+/* GL 上下文可能被设置窗口或其他路径抢走/暂时失效: 失败时标脏并在 1s 后重试, 不当成
+   致命错误。Vulkan 路径没有这个问题 (它自己管上下文)。 */
     uint64_t now = SDL_GetTicksNS();
     if (app->render_retry_ns > now) return false;
     if (!SDL_GL_MakeCurrent(app->window, app->gl_context)) {
@@ -111,6 +132,8 @@ static bool render(BongoCatApp *app, bool present) {
     bongo_cat_window_mask_corners(app, width, height);
     bongo_cat_frame_audit(app, width, height);
     bongo_cat_window_capture_pointer_hit(app);
+/* reveal_startup 与 app.c 的 startup_visibility_pending 配对: 只有"第一帧真的端出去
+   了"才清位; 呈现失败要退回隐藏态, 下一轮重来。 */
     /* Keep the native window hidden while diagnostics/readback finish. The
        reveal is intentionally adjacent to the swap so an uninitialised front
        buffer cannot be displayed as a black startup frame. */
@@ -164,6 +187,8 @@ bool bongo_cat_app_capture_pending_model_cover(BongoCatApp *app) {
         bongo_cat_app_selected_motion_count(app),
         bongo_cat_live2d_expression(app->live2d),
         bongo_cat_model_cover_pending_path(app));
+    /* 截帧需要切到主窗口的 GL 上下文; 调用前可能 current 的是别的上下文 (设置窗口),
+       必须在返回前恢复, 否则调用方后续的 GL 调用会打到错误的上下文。 */
     SDL_Window *previous_window = SDL_GL_GetCurrentWindow();
     SDL_GLContext previous_context = SDL_GL_GetCurrentContext();
     bool restore_context = previous_window && previous_context &&
@@ -177,6 +202,8 @@ bool bongo_cat_app_capture_pending_model_cover(BongoCatApp *app) {
     return captured;
 }
 
+/* 第二个实例被拒绝时会把"唤醒"信号留下来, 主实例在循环里取走: 显示窗口并置前。
+   首帧还没出来时只显示、不动 Z 序, 免得把空窗口提到最前面。 */
 static void take_instance_wake(BongoCatApp *app) {
     if (!bongo_cat_platform_single_instance_take_wake()) return;
     bongo_cat_window_set_visible(app, true);
@@ -185,6 +212,7 @@ static void take_instance_wake(BongoCatApp *app) {
     SDL_Log("Existing instance requested window reveal");
 }
 
+/* 更新器装完包要求本进程退出: 只置 running=false, 真正的清理交给统一的 shutdown。 */
 static bool take_update_shutdown(BongoCatApp *app) {
     if (!bongo_cat_platform_single_instance_take_update_shutdown())
         return false;
@@ -235,6 +263,8 @@ void bongo_cat_app_loop(BongoCatApp *app) {
         if (app->session.window.visible && !app->window_minimized && app->dirty)
             render(app, true);
         bongo_cat_preferences_render(app->preferences);
+        /* 渲染两次是刻意的: 设置窗口的渲染与"选模型"处理会改动应用状态并置脏, 第二遍
+           只处理这种刚被改脏的情况 (不脏就不会重画)。 */
         bongo_cat_preferences_process_model_selection(app->preferences);
         if (app->session.window.visible && !app->window_minimized && app->dirty)
             render(app, true);

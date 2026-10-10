@@ -10,6 +10,15 @@
 #include <shobjidl.h>
 #include <stdlib.h>
 
+/*
+ * 文件夹选择对话框: 用现代的 IFileDialog 替换 SDL 的 SHBrowseForFolderW 实现(原因见
+ * windows_dialog.h)。
+ *
+ * 关键约束: SDL 的对话框契约是异步的 —— 回调必须在 SDL 事件线程上被调用, 而 IFileDialog
+ * 是模态的、必须在它自己的线程上跑。所以这里的做法是: 起一条线程跑模态对话框, 回调就
+ * 在那条线程里调用(回调本身是线程安全的, SDL 内部会把结果转投事件队列)。
+ * 参数被打包成堆对象交给线程, 由线程负责释放(见 folder_dialog_thread)。
+ */
 typedef struct BongoCatWindowsFolderDialogArgs {
     SDL_DialogFileCallback callback;
     void *userdata;
@@ -19,6 +28,7 @@ typedef struct BongoCatWindowsFolderDialogArgs {
     Uint64 started_ns;
 } BongoCatWindowsFolderDialogArgs;
 
+/* 取消或失败时按 SDL 的约定回调: files 数组里只有一个 NULL 元素, 表示"用户取消"。 */
 static void notify_cancel(BongoCatWindowsFolderDialogArgs *args) {
     const char *files[] = {NULL};
     args->callback(args->userdata, files, -1);
@@ -44,6 +54,16 @@ static HWND owner_window(SDL_Window *window) {
         SDL_PROP_WINDOW_WIN32_HWND_POINTER, NULL);
 }
 
+/*
+ * 模态对话框本体(跑在工作线程上)。三个容易忽略的细节:
+ *   - FOS_FORCEFILESYSTEM 保证返回真实文件系统路径, 否则可能拿到"网络位置"这类虚拟项,
+ *     根本取不出路径;
+ *   - FOS_NOCHANGEDIR 防止选择过程中进程的当前工作目录被改掉 —— 那会让之后所有相对
+ *     路径解析出错;
+ *   - 记住的上次位置可能已经不存在, SetFolder 失败只是忽略(见下面原有的英文注释),
+ *     由 Windows 用自己的默认位置兜底。
+ * done 标签处保证"回调恰好被调用一次": 任何提前 goto 都会走 notify_cancel。
+ */
 static bool show_folder_dialog(BongoCatWindowsFolderDialogArgs *args) {
     IFileOpenDialog *dialog = NULL;
     IShellItem *default_folder = NULL;
@@ -160,6 +180,8 @@ done:
     return callback_called;
 }
 
+/* 对话框线程入口: 跑完模态循环后记一条耗时日志, 然后释放参数 —— 参数所有权属于这条
+   线程, 所以选完或取消之后主线程不能再碰它。 */
 static int SDLCALL folder_dialog_thread(void *userdata) {
     BongoCatWindowsFolderDialogArgs *args = userdata;
     show_folder_dialog(args);
@@ -171,6 +193,9 @@ static int SDLCALL folder_dialog_thread(void *userdata) {
     return 0;
 }
 
+/* 异步入口: 复制参数 -> 起线程 -> 立刻返回。所有失败路径(分配失败、线程创建失败)都
+   必须以"取消"回调收场, 否则调用方会永远等不到回调。线程是 detach 的, 生命周期由它
+   自己管理。 */
 void bongo_cat_windows_show_open_folder_dialog(
     SDL_DialogFileCallback callback, void *userdata, SDL_Window *window,
     const char *default_location, bool allow_many) {

@@ -6,6 +6,14 @@
 #include <stdlib.h>
 #include <string.h>
 
+/*
+ * GDI+ 的 C 直连绑定: 手动声明用到的几个导出函数, 而不是包含 <gdiplus.h>。
+ *
+ * 为什么不直接 #include <gdiplus.h>: 那是 C++ 头(依赖 Gdiplus 命名空间和模板),
+ * 而这些工具是纯 C 编译的。这里只声明真正调用到的入口, 顺便把 GDI+ 依赖压到最小。
+ * 代价是类型和常量必须自己与官方头文件保持一致(见下面的 enum), 写错没有编译期
+ * 检查, 只能靠运行验证。
+ */
 typedef int GpStatus;
 typedef int PixelFormat;
 typedef struct GpImage GpImage;
@@ -56,6 +64,8 @@ GpStatus WINAPI GdipDrawString(GpGraphics *graphics, const wchar_t *text,
     int length, const GpFont *font, const GpRectF *layout,
     const void *format, const GpBrush *brush);
 
+/* PixelFormat / CompositingMode 这些数值来自 GDI+ 官方头文件, 必须逐位对齐:
+   例如 32BPP_ARGB 的 0x26200A 里还编码了每像素位数等信息。 */
 enum {
     GDIP_OK = 0,
     GDIP_PIXEL_FORMAT_32BPP_ARGB = 0x26200A,
@@ -66,11 +76,19 @@ enum {
     GDIP_UNIT_PIXEL = 2
 };
 
+/* 与 validation_image.c 里的同名函数是各写一份的(两份都只在本文件内使用),
+   改溢出判据时要记得两处都改。 */
 static int image_size_ok(int width, int height) {
     return width > 0 && height > 0 &&
         (size_t)width <= SIZE_MAX / ((size_t)height * 4);
 }
 
+/*
+ * 读任意格式的图(GDI+ 支持 PNG/JPEG/BMP/GIF...)并统一成 32 位 BGRA。
+ * 关键是 SOURCE_COPY 合成模式: 按源像素直接覆盖而不做 alpha 混合, 源图的透明
+ * 区域才能原样保留, 否则会被默认的底色混掉。
+ * 失败时 image 保持清零状态, 所以调用方可以无条件调用 free。
+ */
 int bongo_cat_validation_image_load(const wchar_t *path,
     BongoCatValidationImage *image) {
     const GdiplusStartupInputC startup = {1, NULL, FALSE, FALSE};
@@ -104,6 +122,14 @@ done:
     return image->bgra != NULL;
 }
 
+/*
+ * 把一张截图按 anchor 指定的区域归一化成固定的 800x800 画布: 缩放比例由长边
+ * 决定并留出 margin 边距, anchor 的中心对齐画布中心。这样不同分辨率、不同窗口
+ * 位置的截图才能逐像素比较 —— 验证工具只关心角色本身的差异。
+ * 先清成白底再以 SOURCE_OVER 画上去, 因此带透明的源图会贴在白底上。
+ * 用双三次插值配高质量像素偏移, 是为了让缩放后的抗锯齿行为稳定可复现。
+ * 失败时 output 会被 free 掉, 不会留下半成品指针。
+ */
 int bongo_cat_validation_image_normalize_file(const wchar_t *path,
     BongoCatValidationRect anchor, BongoCatValidationImage *output) {
     const int canvas = 800, margin = 40;
@@ -166,6 +192,8 @@ done:
     return ok;
 }
 
+/* 在图上写一行标注文字(比较图里用来标明这是哪一帧)。字体固定 Segoe UI 20px、
+   纯黑, 只为人眼可读, 不参与任何度量。 */
 int bongo_cat_validation_image_draw_label(BongoCatValidationImage *image,
     const wchar_t *label, float x, float y) {
     const GdiplusStartupInputC startup = {1, NULL, FALSE, FALSE};

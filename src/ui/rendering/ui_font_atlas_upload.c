@@ -2,6 +2,22 @@
 
 #include <SDL3/SDL_opengl.h>
 
+/*
+ * 把烘好的图集 (NK_FONT_ATLAS_ALPHA8, 也就是单通道 8 位) 上传成纹理, 并把
+ * nk_handle_id(id) 交给 Nuklear 当作所有字形纹理的句柄。
+ *
+ * 两条路径的"id"含义不同但用法一致:
+ *  - Vulkan: 先注册进 UI 纹理表, id = 表下标 + 1 (0 是保留的失败值), 之后渲染时
+ *    用 bongo_cat_ui_texture_lookup(id) 反查 BongoCatVkTexture;
+ *  - OpenGL: id 就是 GL 纹理名。
+ * 这就是为什么 ui->font_texture 的类型是 GLuint 却在 Vulkan 下存下标 —— 字段名
+ * 有点误导, 但它始终表示"Nuklear 语义的纹理 id"。
+ *
+ * GL 路径必须设 SWIZZLE: 图集是单通道, 采样出来只有 .r 有值, 而 Nuklear 的
+ * 着色器按 (color * texture) 算, 期望的是"白色 + alpha"。把 R/G/B 常置 1、A 取
+ * RED, 就等价于随手得到一张白色带 alpha 的纹理, 不必在 CPU 侧展开成 RGBA。
+ * 漏掉这一步的表现是: 文字只剩下红分量、变成一片暗红 (因为 G/B 采样出来是 0)。
+ */
 bool bongo_cat_ui_font_upload_atlas(BongoCatUIBackend *ui) {
     int width = 0, height = 0;
     const void *pixels = nk_font_atlas_bake(&ui->atlas, &width, &height,

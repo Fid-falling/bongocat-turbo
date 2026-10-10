@@ -5,6 +5,11 @@
 
 namespace bongo_cat {
 
+/*
+ * 随机挑一个 Idle 动作, 但避开上一次那个 —— 连着播同一个待机动作看起来像卡住了。
+ * 优先级 1 低于用户动作的 2, 所以待机动作不会抢掉正在播的点击动作; ReserveMotion 失败
+ * 说明队列里还有更高优先级的动作没播完, 这一帧就放弃。
+ */
 void NativeModel::start_idle_motion() {
     if (idle_motion_keys_.empty()) return;
     constexpr int priority = 1;

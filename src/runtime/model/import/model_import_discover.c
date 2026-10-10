@@ -1,3 +1,10 @@
+/*
+ * 来源识别的总入口, 按优先级依次尝试: Mver 包(含向上寻找父包) -> Mver 贴图补丁 ->
+ * Tauri 精确探测 -> 容器扫描(递归找包根) -> Tauri 递归扫描(最后兜底)。
+ * 契约: 每次尝试前清零 discovery 并重新填好 source_name(用户选中的目录名会成为可见
+ * 模型名); 返回 true 时 count > 0。与 model_import_probe.h 的分工是"广域识别"对
+ * "精确包根分发"。
+ */
 #include "model_import.h"
 #include "mver/model_import_mver.h"
 #include "tauri/model_import_tauri.h"
@@ -7,6 +14,8 @@
 #include <stdlib.h>
 #include <string.h>
 
+/* 先去掉尾部斜杠再取 basename: 从文件管理器拖进来的路径常带分隔符, 直接取会得到空名字,
+   进而丢掉可见模型名。路径超长时放弃填充而不是截断。 */
 static void seed_source_name(const char *source,
     BongoCatImportDiscovery *discovery) {
     char path[BONGO_CAT_PATH_CAP];
@@ -20,16 +29,21 @@ static void seed_source_name(const char *source,
         sizeof(discovery->source_name), "%s", name);
 }
 
+/* 排序优先级 standard < keyboard < gamepad: receipt.ids[0] 会成为导入后选中的模型,
+   让没有特殊需求的包默认落在标准模式。 */
 static int rank(const BongoCatImportCandidate *candidate) {
     return candidate->mode == BONGO_CAT_MODE_STANDARD ? 0 :
         candidate->mode == BONGO_CAT_MODE_KEYBOARD ? 1 : 2;
 }
 
+/* 同一模式内优先原生 Mver(无需转换), 其次 Tauri, 贴图补丁排最后(它是增量, 需要基包)。 */
 static int format_rank(const BongoCatImportCandidate *candidate) {
     return candidate->format == BONGO_CAT_IMPORT_MVER ? 0 :
         candidate->format == BONGO_CAT_IMPORT_TAURI ? 1 : 2;
 }
 
+/* qsort 比较函数: 前两级相同时用 directory 与 patch_root 全序化, 保证同一输入目录每次
+   都得到相同顺序(去重与家族摘要都依赖顺序稳定)。 */
 static int compare_candidates(const void *left, const void *right) {
     const BongoCatImportCandidate *a = left, *b = right;
     int difference = rank(a) - rank(b);
@@ -44,6 +58,8 @@ typedef struct ContainerDiscovery {
     BongoCatImportDiscovery *output;
 } ContainerDiscovery;
 
+/* 扫描回调: 把子目录发现的候选追加进同一次导入。候选表满时直接报错而不是截断,
+   因为截断会静默少导入几个模型变体。 */
 static BongoCatResult collect_container(void *userdata, const char *source,
     BongoCatImportDiscovery *found, BongoCatError *error) {
     (void)source;
@@ -60,6 +76,9 @@ static BongoCatResult collect_container(void *userdata, const char *source,
     return BONGO_CAT_OK;
 }
 
+/* 失败传播规则: 子适配器返回负值表示"命中但包损坏", 此时不再降级到后面的格式(用户确实
+   选中了一个坏包); 贴图补丁的错误先存起来, 只有后续全部落空时才上报, 否则它可能掩盖
+   真正命中的格式。候选收集完按 compare_candidates 排序后返回。 */
 bool bongo_cat_import_discover(const char *source,
     BongoCatImportDiscovery *discovery, BongoCatError *error) {
     memset(discovery, 0, sizeof(*discovery));

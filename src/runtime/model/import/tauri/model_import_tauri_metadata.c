@@ -1,3 +1,10 @@
+/*
+ * 读源包的标定清单 bongocat.mver.json。只有 schemaVersion == 1 且 kind 是
+ * bongo-cat-mver-source 才采信, 否则整份当不存在并退回 legacy 推断 —— 宁可退回启发式,
+ * 也不采信半截数据。文件缺失或读不动同样静默降级, 不算错误。
+ * 对外契约: 只要参数非空, read_calibration 一定返回 true 并填满 calibration (默认值
+ * 由 calibration_defaults 给出, 与 Mver 侧的 1.1 / 612x352 保持一致)。
+ */
 #include "model_import_tauri_internal.h"
 
 #include "bongo_cat/json.h"
@@ -6,10 +13,13 @@
 #include <string.h>
 #include <yyjson.h>
 
+/* 数值入口统一在这里过滤 NaN/Infinity: 不合法就让上层退回默认值。 */
 static bool finite_number(yyjson_val *value) {
     return yyjson_is_num(value) && isfinite(yyjson_get_num(value));
 }
 
+/* l2d_offset 直接进 Cubism 投影矩阵的 translate (归一化量级, 不是像素); ±100 只是宽松
+ * 的合法区间, 超出它基本可以断定是把像素值写进了比例字段, 宁可不采信。 */
 static bool read_offset(yyjson_val *value, double *x, double *y) {
     if (!yyjson_is_arr(value) || yyjson_arr_size(value) < 2 ||
         !finite_number(yyjson_arr_get(value, 0)) ||
@@ -23,6 +33,8 @@ static bool read_offset(yyjson_val *value, double *x, double *y) {
     return true;
 }
 
+/* window_size 是参考分辨率, 必须是 [64, 8192] 内的整数; 小数一律拒绝, 因为下游把它当
+ * 像素尺寸用, 悄悄取整会改变模型的参考纵横比。 */
 static bool read_window(yyjson_val *value, int *width, int *height) {
     if (!yyjson_is_arr(value) || yyjson_arr_size(value) < 2 ||
         !yyjson_is_num(yyjson_arr_get(value, 0)) ||
@@ -42,6 +54,8 @@ static bool read_window(yyjson_val *value, int *width, int *height) {
     return true;
 }
 
+/* 出厂默认: 1.1 / 612x352 —— 与 Mver 侧的默认值逐字一致 (见 mver_metadata.c 里
+ * number_or 的兜底常量), 改这里会让同一个模型在两条导入路径下显示不同。 */
 void bongo_cat_tauri_calibration_defaults(TauriMverCalibration *calibration) {
     calibration->l2d_correct = 1.1;
     calibration->l2d_offset_x = 0.0;
@@ -52,6 +66,10 @@ void bongo_cat_tauri_calibration_defaults(TauriMverCalibration *calibration) {
     calibration->auto_frame = false;
 }
 
+/* 读标定。语义: 只要参数非空就一定返回 true —— 标定是可选的, 读不到就整体退回 legacy
+ * 推断; 源清单存在但 schemaVersion/kind 不符时同样按“没有标定”处理。candidate->mode
+ * 会用来校验清单里的 mode 字段, 不匹配则整份作废 (防止把别的模式包当本模式转换)。
+ */
 bool bongo_cat_tauri_read_calibration(
     const BongoCatImportCandidate *candidate,
     TauriMverCalibration *calibration) {
@@ -96,6 +114,9 @@ bool bongo_cat_tauri_read_calibration(
         }
         read_offset(yyjson_obj_get(decoration, "l2d_offset"),
             &calibration->l2d_offset_x, &calibration->l2d_offset_y);
+        /* auto_frame 的含义是“至少有一项标定是猜的”: 只有 scale 与 window 都来自源包时,
+         * 才敢关掉自动留边距按作者构图渲染 (legacy 路径已经把它置为 true)。 */
+
         calibration->auto_frame = !(have_scale && have_window);
         yyjson_val *mirror = yyjson_obj_get(decoration,
             "l2d_horizontal_flip");

@@ -1,17 +1,31 @@
+/* 窗口几何换算: 逻辑尺寸、内容尺寸与缩放百分比三者的互相换算, 以及把几何同时写进平台
+ * 窗口与 session.window 的唯一入口。Live2D 模型有超出画布的透明边距 (frame 的
+ * left/top/right/bottom 是相对画布尺寸的比例), 窗口必须比"内容"大一圈, 这里就是两个
+ * 方向的换算处。单位统一是逻辑像素, 不是渲染用的像素尺寸; 缩放是百分比。
+ * 最易改错: scaled_size 的 base_* 必须与 base_scale 配套 (混用会得到漂移的缩放);
+ * 出参只在返回 true 时有效; 尺寸与缩放上限和 window_geometry_self_test 里硬编码的
+ * 期望值 (8192、400x300、384x288) 必须一起改。
+ */
 #include "runtime.h"
 
 #include <math.h>
 #include <stdio.h>
 
+/* 逻辑尺寸与缩放百分比的硬边界: 同时约束用户设置、滚轮动画与拖动缩放。改动这些常量要
+   回头核对 window_geometry_self_test 里的期望值。 */
 #define WINDOW_MIN_DIMENSION 64
 #define WINDOW_MAX_DIMENSION 8192
 #define WINDOW_MIN_SCALE 10.0f
 #define WINDOW_MAX_SCALE 500.0f
 
+/* 尺寸换算用的四舍五入 (int 截断朝零, 只对非负值正确); 屏幕坐标可能为负, 那种场合用
+   window_scale.c 的 round_position。 */
 static int round_dimension(double value) {
     return (int)(value + 0.5);
 }
 
+/* 取模型当前的溢出边距。没有 live2d 或取不到时按全 0 处理, NaN 与负值也归零 —— 这些值
+   会直接乘进窗口尺寸, 一旦是 NaN 就会算出非法窗口。 */
 static BongoCatLive2DFrame model_frame(BongoCatApp *app) {
     BongoCatLive2DFrame frame = {0};
     if (app && app->live2d) bongo_cat_live2d_frame(app->live2d, &frame);
@@ -22,6 +36,9 @@ static BongoCatLive2DFrame model_frame(BongoCatApp *app) {
     return frame;
 }
 
+/* 内容尺寸 -> 窗口逻辑尺寸; left/top 可选, 返回内容左上角在窗口内的偏移 (像素), 用来把
+   内容放回它预留的呼吸空间里。返回 false 表示溢出比例算出了非法值, 或结果超过
+   WINDOW_MAX_DIMENSION —— 此时各出参都不保证有效。 */
 bool bongo_cat_window_frame_size(BongoCatApp *app,
     int content_width, int content_height, int *width, int *height,
     int *left, int *top) {
@@ -43,6 +60,8 @@ bool bongo_cat_window_frame_size(BongoCatApp *app,
     return true;
 }
 
+/* frame_size 的逆运算: 窗口被外部改了尺寸 (用户、窗口管理器、自检) 之后, 用它换回内容
+   尺寸; 结果至少为 1, 免得下游除以 0。 */
 bool bongo_cat_window_content_size(BongoCatApp *app,
     int width, int height, int *content_width, int *content_height) {
     if (width <= 0 || height <= 0 || !content_width || !content_height)
@@ -57,6 +76,10 @@ bool bongo_cat_window_content_size(BongoCatApp *app,
     return true;
 }
 
+/* 缩放百分比换算: base_* 必须与 base_scale 配套 (在 base_scale 下测得的尺寸), 否则缩放会
+   随调用次数漂移。返回的 actual_scale 是夹取后的百分比, 可以不等于 requested_scale, 调用
+   方必须用它回写状态 —— 忽略它就是"拉了 500% 却停在 103%"这类 bug 的来源。上下限同时受
+   WINDOW_MIN/MAX_SCALE 与 WINDOW_MIN/MAX_DIMENSION 约束。 */
 bool bongo_cat_window_scaled_size(int base_width, int base_height, float base_scale,
     float requested_scale, float *actual_scale, int *width, int *height) {
     if (base_width <= 0 || base_height <= 0 || base_scale <= 0.0f ||
@@ -77,6 +100,9 @@ bool bongo_cat_window_scaled_size(int base_width, int base_height, float base_sc
     return true;
 }
 
+/* 唯一同时写平台与 session.window 的几何入口: 平台拒绝就立刻返回且不动 session, 保证
+   "状态 == 真实窗口"。成功后重算内容尺寸, 并把像素尺寸标成待处理 —— 真正的 reshape 由
+   渲染前的 apply_pending_resize 完成, 这里不碰渲染目标。 */
 bool bongo_cat_window_apply_geometry(BongoCatApp *app, int x, int y,
     float scale, int width, int height) {
     if (!app || !app->window || width < WINDOW_MIN_DIMENSION ||
@@ -101,6 +127,9 @@ bool bongo_cat_window_apply_geometry(BongoCatApp *app, int x, int y,
     return true;
 }
 
+/* 右键 + Shift 拖动缩放。Windows 的 Shift 状态取自原生输入线程 (窗口可能没有键盘焦点,
+   SDL 缓存的修饰键会滞后); 首次进入手势时把当前尺寸与缩放记成基准, 之后按累计位移改缩放
+   目标, 方向与滚轮缩放一致 (向右下变大)。 */
 void bongo_cat_window_resize_by_pointer(BongoCatApp *app, const SDL_Event *event) {
     bool shift = bongo_cat_input_shift_down(&app->input);
 #ifndef _WIN32
@@ -130,6 +159,9 @@ void bongo_cat_window_resize_by_pointer(BongoCatApp *app, const SDL_Event *event
         app->resize_scale_target = app->session.window.scale_percent;
 }
 
+/* 端到端自检: 会真的移动/缩放窗口并临时改设置与输入状态, 结束时逐项恢复 (位置、尺寸、
+   设置、透明度、穿透), 所以只能在冒烟入口调用。失败时把各项判据打到 stderr 便于定位;
+   返回值只表示"全部判据通过"。 */
 bool bongo_cat_window_geometry_self_test(BongoCatApp *app) {
     if (!app || !app->window) return false;
     SDL_SyncWindow(app->window);

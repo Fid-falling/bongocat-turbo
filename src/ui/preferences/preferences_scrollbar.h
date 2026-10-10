@@ -5,6 +5,12 @@
 
 #include <stdbool.h>
 
+/*
+ * 自绘滚动条的接口 (不是 Nuklear 的 nk_scrollbar)。
+ * 契约: 调用方持有偏移量并每帧传进来 (本结构体只记拖拽状态, 不存偏移);
+ * 行的可用宽度必须用 scrollbar_content_width 算, 它会预留滚动条的 14px;
+ * draw 返回的 changed 为真时调用方才需要保存新偏移并标脏。
+ */
 typedef struct BongoCatPreferencesScrollbar {
     float grab_y;
     bool dragging;

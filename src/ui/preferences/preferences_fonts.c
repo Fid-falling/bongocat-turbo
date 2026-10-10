@@ -1,3 +1,16 @@
+/*
+ * 字体与字形图集的解析/重建。
+ *
+ * 三条本文件特有的约定:
+ * 1. 一张图集装不下所有语言的字, 所以字形范围 (glyph_ranges) 是**按需累积**的:
+ * fonts_resolve 把 i18n 需要的范围 + 模型/行为名里出现过的字 + 快捷键箭头合并
+ * 成一份表, 交给图集; 导入新模型后要重新解析并重建 (见 model_glyphs 那套 pending);
+ * 2. 重建图集很贵 (要重新栅格化几千个字形), 所以有两个不同的入口:
+ * reload_fonts 用于"内容变了"(改名/导入/换语言), refresh_raster 用于"DPI 变了";
+ * 3. 绘制中途 (ui.frame_building) 绝对不能重建: Nuklear 正握着旧图集的指针。这时
+ * 只置 font_reload_pending, 由 present 在帧末补做, 且额外多等一帧 (defer_once),
+ * 保证这一帧画完的东西用的还是旧图集。
+ */
 #include "preferences_fonts.h"
 
 #include "preferences_model_cover.h"
@@ -11,6 +24,14 @@
 #include <SDL3/SDL.h>
 #include <string.h>
 
+/*
+ * 解析字体与字形范围 (每次重建前都重新解析, 因为系统字体、语言、模型列表都可能变了)。
+ * 正文字体与标题字体各自带"常规 + 回退 + 韩文回退"三档: 一个系统字体覆盖不了中日韩,
+ * 韩文单独拎出来是因为它的字形量大且和 CJK 常常不在同一个字体文件里。
+ * 标题缺失时直接退回正文, 宁可标题和正文同款, 也不要出现空白标题。
+ * 那段"把范围表最后一对改写成 0x2190..0x2193"是为了让快捷键里的方向键箭头一开始就
+ * 在图集里 —— 用户还没录任何快捷键时界面也要能显示默认绑定里的箭头。
+ */
 void bongo_cat_preferences_fonts_resolve(BongoCatPreferences *value,
     BongoCatPreferenceFonts *fonts) {
     memset(fonts, 0, sizeof(*fonts));
@@ -48,6 +69,7 @@ void bongo_cat_preferences_fonts_resolve(BongoCatPreferences *value,
     fonts->ranges = value->glyph_ranges;
 }
 
+/* 真正重建图集; 成功后要通知内存策略"UI 又占住资源了", 否则空闲回收会算错时机 */
 static bool reload(BongoCatPreferences *value,
     const BongoCatPreferenceFonts *fonts, float raster_scale) {
     bool reloaded = bongo_cat_ui_font_atlas_reload(&value->ui, fonts->body,
@@ -58,6 +80,10 @@ static bool reload(BongoCatPreferences *value,
     return reloaded;
 }
 
+/*
+ * 内容驱动的重建 (改名/导入/换语言都会走这里); 返回 true 表示"请求已受理",
+ * 不一定代表这一帧就重建完了 —— 绘制中途会转成 pending 延后。
+ */
 bool bongo_cat_preferences_reload_fonts(BongoCatPreferences *value) {
     if (!value || !value->ui_initialized) return false;
     if (value->ui.frame_building) {
@@ -75,6 +101,13 @@ bool bongo_cat_preferences_reload_fonts(BongoCatPreferences *value) {
     return reloaded;
 }
 
+/*
+ * DPI 驱动的重建 (pending_raster_scale 由 preferences_scale.c 设置)。
+ * 失败时不是放弃而是 1 秒后重试 (raster_retry_ns): 换显示器瞬间 GL 上下文可能暂时
+ * 不可用, 直接放弃会让窗口一直用着低分辨率图集。
+ * 成功后必须连带作废三样东西 —— paint cache (按旧字号缓存了排版)、封面缓存 (按旧
+ * 像素尺寸加载)、UI 素材 (同理) —— 否则界面上会混着两种清晰度的内容。
+ */
 bool bongo_cat_preferences_refresh_raster(BongoCatPreferences *value) {
     if (!value || value->pending_raster_scale <= 0.0f) return true;
     uint64_t now = SDL_GetTicksNS();

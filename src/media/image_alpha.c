@@ -2,6 +2,14 @@
 
 #include <string.h>
 
+/*
+ * 生成 ≤128x128 的 alpha 掩码: 给 CPU 侧判断"这个三角面到底有没有像素"用, 不是给 GPU 采样的
+ * 纹理 (消费方见 cubism_model_bounds.cpp 的 capture_visible_bounds)。
+ *
+ * 取块内**最大值**而不是平均值, 是刻意的保守策略: 只有整块真的全透明才会被判成不可见, 于是
+ * 不会把半透明边缘误剔除。区间用向上取整的整数除法划分, 保证每个源像素恰好归属一个格子。
+ * 命中 255 立刻跳出 —— 再算也不会更大。
+ */
 void bongo_cat_image_make_alpha_mask_progress(const BongoCatImage *image,
     BongoCatImageAlphaMask *mask, BongoCatImageProgress progress,
     void *userdata) {

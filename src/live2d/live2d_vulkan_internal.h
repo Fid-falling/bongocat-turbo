@@ -13,6 +13,14 @@
 #define BONGO_CAT_LIVE2D_VULKAN_SUPERSAMPLE 2
 
 /*
+ * 这是"内部头": 只有 Cubism 的 C++ 实现 include 它 (桥 + 布局转换 + 模型尺寸计算),
+ * 公共 API 一律放 include/bongo_cat/live2d_vulkan.h, 免得纯 C 的运行时被拖进 Vulkan 依赖。
+ * 超采样倍数必须由 bongo_cat_live2d_vulkan_supersample_for() 统一算出: 桥用它决定离屏
+ * 目标尺寸, cubism_model_update.cpp 用它决定 SDK 内部遮罩目标的 SetRenderTargetSize。
+ * 两边各算一次、但必须得到同一个值, 否则遮罩和成品尺寸对不上。
+ */
+
+/*
  * 运行时超采样档位 (设置界面 [性能] 区), 以及按目标尺寸算出的实际倍数:
  *   0 = 自动 (面积超过阈值退回 1x) 1 = 质量 (2x) 2 = 省内存 (1x)
  */

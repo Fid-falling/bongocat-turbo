@@ -14,6 +14,15 @@
  * 两条混合模式:
  *  - 预乘 alpha (叠加层 / 指针): ONE, ONE_MINUS_SRC_ALPHA
  *  - 覆盖率相乘 (圆角遮罩):     ZERO, SRC_ALPHA
+ *
+ * 三条必须同时成立的耦合, 改任何一处都要对着另两处看:
+ *  1. 顶点输入布局 (binding 步长 + attribute 的 location/format/offset) 必须与 SPIR-V
+ *     里 layout(location=...) 的声明一致 —— 不一致不会报错, 只会画出位置/颜色全错的
+ *     几何, 是最难查的一类问题;
+ *  2. 推送常量的字节大小必须等于 vk_internal.h 里 OverlayPush/PointerPush/CornerPush/
+ *     UiPush 的 sizeof, 也必须等于着色器里 std430 块的大小 (少一个字段就是静默错值);
+ *  3. 管线与 vk->render_pass 强绑定, 所以交换链一重建 (格式/渲染通道换了) 就必须整批
+ *     重建, 见 bongo_cat_vk_rebuild_pipelines。
  */
 
 void bongo_cat_vk_destroy_pipelines(BongoCatVk *vk) {
@@ -68,6 +77,12 @@ static VkShaderModule create_module(BongoCatVk *vk, const uint32_t *code,
     return module;
 }
 
+/*
+ * 布局里的推送常量同时给顶点与片元两个阶段 (两边都可能读), 这是刻意的: 拆成两个
+ * range 会让每个着色器各占一段偏移, 而我们的 push 结构体本来就是给两边共用的。
+ * with_texture=false 的布局 (圆角遮罩) 没有任何描述符集 —— 绘制时也不要给它绑,
+ * 绑了属于校验层报错的未定义用法。
+ */
 static VkPipelineLayout create_layout(BongoCatVk *vk, uint32_t push_size,
     bool with_texture) {
     VkPushConstantRange range = {0};
@@ -88,6 +103,18 @@ static VkPipelineLayout create_layout(BongoCatVk *vk, uint32_t push_size,
     return layout;
 }
 
+/*
+ * 组装一条图形管线。几个刻意的取值:
+ *  - cullMode = NONE: 2D 图元的绕序不统一 (三角形扇/带展开后方向可能翻转), 开剔除会
+ *    让部分图元凭空消失;
+ *  - 混合恒开, 连圆角遮罩也不例外 (它靠 ZERO/SRC_ALPHA 把 RGB 与 alpha 一起乘覆盖率,
+ *    与 OpenGL 路径的 blend_func_separate 逐项对应);
+ *  - 动态状态只有 viewport/scissor, 管线里的 viewportCount/scissorCount 只是占位,
+ *    真实矩形每次绘制由 vkCmdSetViewport/vkCmdSetScissor 给 (见 vk_draw.c);
+ *  - 顶点输入用 attribute_count 一个值同时决定 binding 与 attributes 是否存在, 所以
+ *    无顶点输入的管线 (圆角遮罩) 传 0/NULL 即可, 不要只关掉其中一个;
+ *  - 两个 shader module 在返回前统一销毁, 失败路径也走到 (模块只在建管线时需要)。
+ */
 static VkPipeline build_pipeline(BongoCatVk *vk, VkPipelineLayout layout,
     const uint32_t *vertex_code, size_t vertex_bytes, const uint32_t *fragment_code,
     size_t fragment_bytes, VkVertexInputBindingDescription binding,
@@ -187,6 +214,16 @@ static VkPipeline build_pipeline(BongoCatVk *vk, VkPipelineLayout layout,
     return pipeline;
 }
 
+/*
+ * 整批重建。两个早退守卫不是冗余:
+ *  - arenas[0].buffer 为空说明绘制资源还没建 —— 启动顺序里交换链先于 draw_resources
+ *    创建, 交换链那次"重建"回调必须在这里安静地退出, 真正建管线的是 create_draw_resources;
+ *  - render_pass 为空时建管线必然失败 (管线与渲染通道强绑定)。
+ *
+ * 失败处理刻意只打日志 + 拆干净, 不向上返回错误: 调用方是交换链重建路径, 那里没有
+ * 可用的错误通道。代价是失败后所有 vk->*_pipeline 都是 VK_NULL_HANDLE, 因此绘制路径
+ * 必须容忍"管线为空"(跳过这一层) 而不是直接绑定。
+ */
 void bongo_cat_vk_rebuild_pipelines(BongoCatVk *vk) {
     if (!vk || vk->device == VK_NULL_HANDLE) return;
     if (vk->arenas[0].buffer == VK_NULL_HANDLE) return;
@@ -195,6 +232,8 @@ void bongo_cat_vk_rebuild_pipelines(BongoCatVk *vk) {
 
     VkVertexInputBindingDescription overlay_binding = {0};
     overlay_binding.binding = 0;
+    /* 步长必须等于叠加层顶点结构的大小 (vec2 位置 + vec2 UV = 16 字节), 由 vk_draw.c
+       那边的顶点写入决定; 改顶点结构就要同步改这里 */
     overlay_binding.stride = 16;   /* vec2 位置 + vec2 UV */
     overlay_binding.inputRate = VK_VERTEX_INPUT_RATE_VERTEX;
     VkVertexInputAttributeDescription overlay_attributes[2] = {{0}};
@@ -207,6 +246,8 @@ void bongo_cat_vk_rebuild_pipelines(BongoCatVk *vk) {
 
     VkVertexInputBindingDescription pointer_binding = {0};
     pointer_binding.binding = 0;
+    /* 32 字节 = mver 指针层的 PointerVertex (位置 2f + UV 2f + 顶点色 4f, 8 个 float);
+       这个布局在 mver_pointer_overlay_draw.c 里按 8 个 float 平铺着写 */
     pointer_binding.stride = 32;   /* 位置 + UV + 顶点色 */
     pointer_binding.inputRate = VK_VERTEX_INPUT_RATE_VERTEX;
     VkVertexInputAttributeDescription pointer_attributes[3] = {{0}};

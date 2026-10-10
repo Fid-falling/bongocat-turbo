@@ -7,6 +7,18 @@
 #include <string.h>
 #include <yyjson.h>
 
+/*
+ * 界面文案的加载与查表。
+ *
+ * 一个语言文件就是一份嵌套 JSON, key 以 native. / pages. / components. /
+ * composables. 开头。en-US 永远加载并充当 fallback, active 指向当前语言;
+ * 当前语言就是 en-US 时 active 直接复用 fallback 那份文档, 因此 destroy 和
+ * reload 里处处都要判断 active != fallback —— 少了这个判断就会把同一份文档
+ * free 两次。
+ *
+ * 契约: 源码里出现的每个 key 都必须存在于每一种语言的 locale 文件里,
+ * cmake/CheckLocalization.cmake 会在构建时校验(见该脚本)。
+ */
 struct BongoCatI18n {
     char root[BONGO_CAT_PATH_CAP];
     BongoCatLanguage language;
@@ -14,6 +26,8 @@ struct BongoCatI18n {
     yyjson_doc *active;
 };
 
+/* 文件名就是 BongoCatLanguage 对应的语言串(见 config_names.c): 枚举值和
+   磁盘上的文件名是同一个契约的两端, 改一边就要改另一边。 */
 static yyjson_doc *load_locale(const char *root, BongoCatLanguage language,
     BongoCatError *error) {
     char name[32], path[BONGO_CAT_PATH_CAP];
@@ -66,6 +80,8 @@ BongoCatResult bongo_cat_i18n_reload(BongoCatI18n *value, BongoCatLanguage langu
     return BONGO_CAT_OK;
 }
 
+/* 按 '.' 逐级下钻。单级名字超过 63 字节一律当找不到 —— key 都是编译期
+   字面量, 超长只可能是拼错了; 中途遇到非对象也直接返回 NULL。 */
 static yyjson_val *find_value(yyjson_doc *doc, const char *key) {
     yyjson_val *value = doc ? yyjson_doc_get_root(doc) : NULL;
     const char *cursor = key;
@@ -82,6 +98,11 @@ static yyjson_val *find_value(yyjson_doc *doc, const char *key) {
     return value;
 }
 
+/*
+ * 回退链: 当前语言 -> en-US -> 调用方给的 fallback 字符串。任何一级拿到的不
+ * 是字符串(缺键或类型不对)就继续往下退, 所以只要调用方的 fallback 非空, 这个
+ * 函数就不会返回 NULL, 调用方可以直接用返回值。
+ */
 const char *bongo_cat_i18n_get(const BongoCatI18n *value, const char *key,
     const char *fallback) {
     if (!value || !key) return fallback;
@@ -90,6 +111,11 @@ const char *bongo_cat_i18n_get(const BongoCatI18n *value, const char *key,
     return yyjson_is_str(found) ? yyjson_get_str(found) : fallback;
 }
 
+/*
+ * 下面是给字体用的部分: 把语言文件里出现过的所有码点收集起来, 合并成若干
+ * [first, last] 区间交给渲染层, 这样不必为每种语言都加载完整字形表。
+ * 非法序列解码成 0, 会被 add_point 丢掉, 所以坏数据不会污染区间表。
+ */
 static uint32_t decode_utf8(const unsigned char **cursor) {
     const unsigned char *s = *cursor;
     uint32_t value;
@@ -115,6 +141,8 @@ static uint32_t decode_utf8(const unsigned char **cursor) {
     return value;
 }
 
+/* 丢掉 ASCII 可打印区(0x20..0x7E 由 build_ranges 固定加入)、越界码点和重复
+   项; 4096 个码点是这张表的硬预算, 超出的一律不要。 */
 static void add_point(uint32_t *points, size_t *count, uint32_t point) {
     if (point <= 0x7e || point > 0x10ffff || *count >= 4096) return;
     for (size_t i = 0; i < *count; ++i) if (points[i] == point) return;
@@ -139,6 +167,12 @@ static int compare_point(const void *left, const void *right) {
     return a < b ? -1 : a > b;
 }
 
+/*
+ * 把码点排序后合并成 [first, last] 区间数组, 末尾补一个 0 作哨兵。
+ * builtins 里的各语言母语名必须写死在这儿: 它们要显示在语言选择菜单上, 而
+ * 那一刻可能还没有任何语言文件被加载成功。
+ * capacity 不够时只写完整区间就收尾, 返回值包含哨兵那一位。
+ */
 static size_t build_ranges(uint32_t *points, size_t count,
     uint32_t *ranges, size_t capacity) {
     size_t written = 2;
@@ -174,6 +208,8 @@ size_t bongo_cat_i18n_glyph_ranges(const BongoCatI18n *value, uint32_t *ranges,
     return build_ranges(points, count, ranges, capacity);
 }
 
+/* 把所有语言的文件都读一遍取并集, 用于"字体要覆盖全部语言"的场景。
+   某个语言包损坏时直接跳过(错误写进局部变量丢弃), 不因此让整次加载失败。 */
 size_t bongo_cat_i18n_all_glyph_ranges(const BongoCatI18n *value, uint32_t *ranges,
     size_t capacity) {
     if (!value || !ranges || capacity < 3) return 0;

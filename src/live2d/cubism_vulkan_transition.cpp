@@ -17,6 +17,9 @@ bool bongo_cat_live2d_vulkan_transition_sampled(const BongoCatVkNativeInfo *info
     VkDevice device = (VkDevice)info->device;
     VkCommandPool pool = (VkCommandPool)info->command_pool;
     VkQueue queue = (VkQueue)info->queue;
+    /* 单独开一个一次性命令缓冲, 提交后等空闲: SDK 的绘制命令是它自己提交的, 我们在这
+     * 之后才录制帧。阻塞式等待把"SDK 提交"和"我们采样"完全串行, 避免只靠屏障却仍有
+     * 在飞提交的竞态 (桥的 end_frame 里还有一次 vkDeviceWaitIdle 做同样的隔离)。 */
     VkCommandBufferAllocateInfo allocate = {0};
     allocate.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
     allocate.commandPool = pool;
@@ -32,6 +35,9 @@ bool bongo_cat_live2d_vulkan_transition_sampled(const BongoCatVkNativeInfo *info
         vkFreeCommandBuffers(device, pool, 1, &command);
         return false;
     }
+    /* srcAccess/dstAccess 与两个 stage 必须配对: 写发生在颜色附件输出阶段, 读发生在
+     * 片元着色阶段。少写一个, 驱动就可能把它重排成"先采样、后写完"。
+     * 全程只有一个队列族, 所以 queue family 用 IGNORED, 不需要所有权转移。 */
     VkImageMemoryBarrier barrier = {0};
     barrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
     barrier.oldLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;

@@ -1,9 +1,16 @@
+/* "哪些模型显示在桌面上"的选中逻辑 (多桌宠开关背后的语义)。未开启多桌宠时它就是单选模型,
+ * 开启后第一个是主实例、其余各跑一个子进程; 主模型被取消时要提升一个副模型顶上,
+ * 并保留它原本的屏幕位置与透明度。
+ */
 #include "runtime.h"
 #include "bongo_cat/path.h"
 
 #include <stdio.h>
 #include <string.h>
 
+/* 读副模型自己写的 session.json 里的窗口状态 (子进程的 state_root 就是 pets/<hash> 目录);
+ * position_known 为假就不算数 —— 提升为主实例时不能拿一个没意义的默认值当真。
+ */
 static bool load_pet_window(const BongoCatApp *app, const char *model_id,
     BongoCatWindowState *window) {
     char directory[BONGO_CAT_PATH_CAP], path[BONGO_CAT_PATH_CAP];
@@ -19,6 +26,8 @@ static bool load_pet_window(const BongoCatApp *app, const char *model_id,
     return true;
 }
 
+/* 从副桌宠提升为主实例后: 搬回原屏幕位置、同步透明度并清掉 hover 淡出的中间态, 免得新实例继承旧状态。
+ */
 static void adopt_pet_window(BongoCatApp *app,
     const BongoCatWindowState *window) {
     if (!bongo_cat_window_apply_geometry(app, window->x, window->y,
@@ -43,6 +52,10 @@ size_t bongo_cat_app_active_model_count(const BongoCatApp *app) {
         ? 1 + app->session.additional_model_count : app ? 1 : 0;
 }
 
+/* 勾选或取消一个模型。失败经 error 返回: 模型未安装, 或副模型数量已达上限; 未开启多桌宠时
+ * active=true 就是切换当前模型, active=false 无事可做。取消的若是主模型而桌上还有副模型:
+ * 先记下第一个副模型的窗口状态, 把它提升为主实例, 再从副列表里摘掉, 最后搬回原窗口位置。
+ */
 bool bongo_cat_app_set_model_active(BongoCatApp *app, const char *id,
     bool active, BongoCatError *error) {
     if (!app || !id || !bongo_cat_models_find(&app->models, id)) {
@@ -78,6 +91,8 @@ bool bongo_cat_app_set_model_active(BongoCatApp *app, const char *id,
     return true;
 }
 
+/* 关掉多桌宠: 清空副模型列表, 已在跑的子进程交给 update 的 stopping 流程收掉 (副桌宠进程内不触发 update)。
+ */
 void bongo_cat_app_set_multiple_pets(BongoCatApp *app, bool enabled) {
     if (!app) return;
     app->settings.model.multiple_pets = enabled;
@@ -86,6 +101,7 @@ void bongo_cat_app_set_multiple_pets(BongoCatApp *app, bool enabled) {
         bongo_cat_multi_pet_primary_update(app, SDL_GetTicksNS());
 }
 
+/* 每帧清理: 先让会话自校验 (夹 count、去重、丢弃空 id), 再丢掉已经不在模型清单里的副模型。 */
 void bongo_cat_multi_pet_prune_selection(BongoCatApp *app) {
     bongo_cat_session_validate(&app->session);
     for (size_t i = app->session.additional_model_count; i > 0; --i) {

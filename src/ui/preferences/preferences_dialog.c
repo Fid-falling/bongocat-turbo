@@ -1,3 +1,17 @@
+/*
+ * 删除模型的确认框。
+ *
+ * 它是文件级单例 (进程里同时只可能有一个删除确认框), 用 app 指针标明归属:
+ * 冒烟测试会在一个进程里建多个 app 实例, 不区分的话 A 实例的关闭会把 B 实例的
+ * 对话框清掉。所以 clear 只在 app 匹配时才真的清。
+ *
+ * 两个时间戳决定行为:
+ * opened_ns  —— 弹出动画的起点;
+ * closing_ns —— 非 0 表示正在淡出, 淡完 (frame.finished) 才真正清状态。
+ * input_armed 由 overlay_input_ready 维护, 用来吃掉"打开对话框的那一次点击" ——
+ * 少了它, 用户在卡片上点"删除"的同一个 click 会立刻命中确认框里的按钮。
+ * 另外这个文件不画背景遮罩: 遮罩由 preferences_overlay.c 统一负责。
+ */
 #include "preferences_state.h"
 #include "preferences_notice.h"
 #include "preferences_overlay.h"
@@ -54,6 +68,10 @@ bool bongo_cat_preferences_remove_dialog_active(const BongoCatApp *app) {
     return app && remove_dialog.app == app && remove_dialog.model_id[0];
 }
 
+/*
+ * model_name 在这里就查好存下来: 真正删除后目录里已经没有这个模型了, 到那时再想
+ * 弹一条带名字的提示就查不到了。
+ */
 void bongo_cat_preferences_remove_dialog_open(BongoCatApp *app,
     const char *id) {
     if (!app || !id || !id[0]) return;
@@ -68,6 +86,7 @@ void bongo_cat_preferences_remove_dialog_open(BongoCatApp *app,
     if (app->preferences) app->preferences->render_dirty = true;
 }
 
+/* 关闭是幂等的: 已经在淡出就别把 closing_ns 重置, 否则淡出动画永远走不完 */
 void bongo_cat_preferences_remove_dialog_close(BongoCatApp *app) {
     if (!bongo_cat_preferences_remove_dialog_active(app) ||
         remove_dialog.closing_ns) return;
@@ -107,6 +126,7 @@ static bool close_button(struct nk_context *context,
         alpha(p.muted, opacity), alpha(p.accent, opacity), enabled);
 }
 
+/* 删除成功/失败都只弹通知不关窗外的东西; 无论哪条路都要把确认框关掉 */
 static void remove_model(BongoCatApp *app) {
     BongoCatError error = {0};
     if (bongo_cat_app_remove_model(app, remove_dialog.model_id,
@@ -126,6 +146,14 @@ static void remove_model(BongoCatApp *app) {
     bongo_cat_preferences_remove_dialog_close(app);
 }
 
+/*
+ * 画确认框。三件事的顺序不能乱:
+ * 1. cursor_reset: 弹窗盖在页面之上, 底层刚设的悬停光标必须先撤掉, 否则指针
+ * 形状会和实际能点的东西不一致;
+ * 2. frame.finished 时清状态并返回 —— 淡出结束这一帧什么都不画;
+ * 3. 点到面板外 = 取消 (region 是整窗口, 所以点击落在面板之外任何地方都算)。
+ * 末尾按需标脏: 淡出/淡入期间必须持续要帧, 否则动画会停在半路。
+ */
 void bongo_cat_preferences_remove_dialog_draw(BongoCatApp *app,
     struct nk_context *context) {
     if (!bongo_cat_preferences_remove_dialog_active(app)) return;

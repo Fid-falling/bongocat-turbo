@@ -1,3 +1,11 @@
+/*
+ * 更新检查的 Unix 网络实现 (libcurl): 与 update_http.c 是同一个函数的两个平台版本,
+ * 两个文件都参与编译, 靠 _WIN32 互斥。返回码含义与 error 文案风格必须和 Windows 侧
+ * 一致 —— 尤其 "GitHub returned HTTP status N" 会被 update_channel.c 解析来本地化。
+ * 取消是协作式的: 别的线程只置标志, 由 libcurl 的进度回调返回 1 让它自己中止, 因此
+ * bongo_cat_update_destroy() 最坏要等到下一次进度回调 (总时长仍被 15s 总超时兜住)。
+ * 响应体上限与 Windows 侧同为 1 MiB; 成功时 *response 是 malloc 缓冲, 归调用方 free。
+ */
 #include "update_internal.h"
 
 #ifndef _WIN32
@@ -10,6 +18,8 @@
 
 #define UPDATE_RESPONSE_LIMIT (1024u * 1024u)
 
+/* 累积响应体的缓冲: data 始终 NUL 结尾 (初值 malloc(1)); failed 用来把"超限或分配
+ * 失败"与网络错误区分开 —— 两者都会让 write_response 返回 0 中止传输。 */
 typedef struct UpdateResponseBuffer {
     char *data;
     size_t length;
@@ -17,6 +27,7 @@ typedef struct UpdateResponseBuffer {
     bool failed;
 } UpdateResponseBuffer;
 
+/* 粘滞取消标志, 与 Windows 侧同义: 置位后只有下一次检查开始才会清零。 */
 static bool cancelled(BongoCatUpdateService *service) {
     SDL_LockMutex(service->http_mutex);
     bool value = service->http_cancelled;
@@ -24,6 +35,9 @@ static bool cancelled(BongoCatUpdateService *service) {
     return value;
 }
 
+/* CURLOPT_WRITEFUNCTION 回调: 由 libcurl 在工作线程内调用; 返回 count 表示已收下,
+ * 返回 0 会让传输以 CURLE_WRITE_ERROR 中止 (取消之外的异常路径都走这里)。
+ * size * count 先做溢出判断, 上限 1 MiB, 超过则置 failed 并中止。 */
 static size_t write_response(const void *data, size_t size, size_t count,
     void *userdata) {
     UpdateResponseBuffer *buffer = userdata;
@@ -53,6 +67,9 @@ static size_t write_response(const void *data, size_t size, size_t count,
     return count;
 }
 
+/* 取消唯一能生效的地方: 返回 1 让 libcurl 中止并给出 CURLE_ABORTED_BY_CALLBACK。
+ * 不能像 Windows 那样从别的线程去清理句柄 —— libcurl 的 easy handle 不允许跨线程
+ * 操作, 所以这里是协作式取消, 代价是取消有延迟 (见文件头)。 */
 static int transfer_progress(void *userdata, curl_off_t download_total,
     curl_off_t download_now, curl_off_t upload_total, curl_off_t upload_now) {
     (void)download_total;
@@ -62,6 +79,7 @@ static int transfer_progress(void *userdata, curl_off_t download_total,
     return cancelled(userdata) ? 1 : 0;
 }
 
+/* 与 Windows 侧同一套英文短句, 便于两平台日志互相对照; 未列举的码统一兜底。 */
 static const char *curl_error_name(CURLcode code) {
     switch (code) {
     case CURLE_OPERATION_TIMEDOUT: return "network timeout";
@@ -74,12 +92,19 @@ static const char *curl_error_name(CURLcode code) {
     }
 }
 
+/* 前提: service 与其 http_mutex 有效 (本实现会检查 service/error, 与 Windows 侧略有差异)。
+ * 连接超时 5s、总超时 15s; 显式打开 FOLLOWLOCATION 跟随重定向 (Windows 侧没设过重定向
+ * 选项, 两侧策略并未对齐), 只有 CURLE_OK 时状态码才有意义, 所以先判传输错误再判状态码。
+ * 404 给"没有已发布版本", 其余非 200 一律 RESPONSE 错误并把状态码拼进 error。
+ * 所有提前返回都就地 free(buffer.data); 只有 OK 才把这块 malloc 内存交给调用方。 */
 BongoCatUpdateFetchResult bongo_cat_update_http_fetch(
     BongoCatUpdateService *service, char **response, char *error,
     size_t error_capacity) {
     *response = NULL;
     if (!service || !error || !error_capacity)
         return BONGO_CAT_UPDATE_FETCH_MEMORY;
+    /* 每次检查都调一次 curl_global_init; libcurl 允许重复调用, 这里不做引用计数,
+       也始终不调 curl_global_cleanup —— 进程退出时由系统回收。 */
     if (curl_global_init(CURL_GLOBAL_DEFAULT) != CURLE_OK) {
         snprintf(error, error_capacity, "Cannot initialize the network client");
         return BONGO_CAT_UPDATE_FETCH_MEMORY;
@@ -89,6 +114,8 @@ BongoCatUpdateFetchResult bongo_cat_update_http_fetch(
         snprintf(error, error_capacity, "Cannot initialize the network client");
         return BONGO_CAT_UPDATE_FETCH_MEMORY;
     }
+    /* 登记在飞的 CURL*: Unix 侧取消不会去动它 (libcurl 句柄不能跨线程清理),
+       这个字段只是为了和 Windows 实现保持同样的"谁在持有网络资源"语义。 */
     SDL_LockMutex(service->http_mutex);
     bool accepted = !service->http_cancelled;
     if (accepted) service->http_request = curl;
@@ -163,6 +190,8 @@ BongoCatUpdateFetchResult bongo_cat_update_http_fetch(
     return BONGO_CAT_UPDATE_FETCH_OK;
 }
 
+/* 只置粘滞取消位, 不碰句柄 —— 句柄归工作线程所有, 由进度回调把它中止;
+ * 因此调用方必须等 SDL_WaitThread 返回之后才能 free service。 */
 void bongo_cat_update_http_cancel(BongoCatUpdateService *service) {
     if (!service || !service->http_mutex) return;
     SDL_LockMutex(service->http_mutex);

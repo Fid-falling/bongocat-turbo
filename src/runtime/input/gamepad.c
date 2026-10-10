@@ -1,3 +1,12 @@
+/*
+ * 手柄输入入口: 把 SDL 手柄事件翻译成 BongoCatInputEvent, 并维护"哪一只手柄是活动设备"。
+ * SDL 只允许在事件回调里读手柄对象, 所以这里也负责开/关句柄 —— app->active_gamepad 是
+ * 唯一的活动设备 ID (0 = 没有), 非活动设备的句柄必须马上关掉, 否则拔插几次就会泄漏。
+ * 事件名直接沿用 SDL 的按键/轴名字 (South / LeftStickX / LeftTrigger2 ...), 它是外部契约:
+ * core/app_state.c 按字符串匹配成模型参数, 覆盖层的按键图也按这些名字查找, 不能改名。
+ * 轴值在这里归一化成 [-1,1] (负数除以 32768, 正数除以 32767), 到 core 再乘参数区间上限。
+ * 断开连接时系统不会补发"抬起", 所以必须先 bongo_cat_app_reset_gamepad 清状态。
+ */
 #include "runtime.h"
 
 #include <stdio.h>
@@ -47,6 +56,7 @@ const char *bongo_cat_gamepad_button_name(Uint8 button) {
     }
 }
 
+/* 只关掉非活动设备的句柄: 活动设备由 active_gamepad 继续持有, 关了就没法收事件了。 */
 static void close_inactive_gamepads(BongoCatApp *app, const SDL_JoystickID *ids,
     int count) {
     for (int i = 0; ids && i < count; ++i) {
@@ -55,6 +65,8 @@ static void close_inactive_gamepads(BongoCatApp *app, const SDL_JoystickID *ids,
     }
 }
 
+/* 没有活动设备时的选择策略: 取第一台能打开的设备; 一台都没有就保持 0 并清干净旧状态。
+   返回是否选到了设备 (ids 由 SDL_GetGamepads 分配, 本函数负责 SDL_free)。 */
 static bool select_first_gamepad(BongoCatApp *app) {
     int count = 0;
     SDL_JoystickID *ids = SDL_GetGamepads(&count);
@@ -70,14 +82,20 @@ static bool select_first_gamepad(BongoCatApp *app) {
     return selected != 0;
 }
 
+/* 手柄开关的统一入口 (切到手柄模式 / 切回键鼠模式 / 退出时关闭)。enabled 为真时初始化
+   手柄子系统并保证有一台活动设备; 为假时关闭全部句柄、清掉"按住"状态并退出子系统。
+   可重复调用: 子系统已经初始化过时不会再初始化一次。 */
 void bongo_cat_gamepads_set_enabled(BongoCatApp *app, bool enabled) {
     if (!app) return;
     bool initialized = (SDL_WasInit(SDL_INIT_GAMEPAD) & SDL_INIT_GAMEPAD) != 0;
     if (enabled && !initialized) {
+        /* 桌宠通常不是前台窗口, 不开这个提示就拿不到手柄输入。 */
         SDL_SetHint(SDL_HINT_JOYSTICK_ALLOW_BACKGROUND_EVENTS, "1");
         if (!SDL_InitSubSystem(SDL_INIT_GAMEPAD)) {
             SDL_LogWarn(SDL_LOG_CATEGORY_INPUT,
                 "Gamepad initialization failed: %s", SDL_GetError());
+            /* 初始化失败要降级成纯键鼠: 清掉 active_gamepad 与残留的"按住"状态, 否则模型
+               会停在按下姿势, 而系统再也不会有事件来解除它。 */
             app->active_gamepad = 0;
             bongo_cat_app_reset_gamepad(app);
             return;
@@ -96,6 +114,8 @@ void bongo_cat_gamepads_set_enabled(BongoCatApp *app, bool enabled) {
         }
     }
     SDL_free(ids);
+    /* 关闭路径: 先断开活动设备再退出子系统。顺序反过来的话 active_gamepad 会变成指向
+       已释放设备的 ID。 */
     if (!enabled) {
         app->active_gamepad = 0;
         bongo_cat_app_reset_gamepad(app);
@@ -111,6 +131,9 @@ void bongo_cat_gamepads_set_enabled(BongoCatApp *app, bool enabled) {
     }
 }
 
+/* SDL 手柄事件入口。raw 实际类型是 const SDL_Event*, 用 void* 是为了让 runtime.h 不必
+   拖进 SDL 头文件; 调用方 (app_loop 的事件分发) 保证它一定是 SDL_Event。
+   只接受活动设备的事件: 副手柄与手柄键鼠模拟都被丢弃。 */
 void bongo_cat_gamepad_event(BongoCatApp *app, const void *raw) {
     const SDL_Event *event = raw;
     if (event->type == SDL_EVENT_GAMEPAD_ADDED) {
@@ -139,9 +162,11 @@ void bongo_cat_gamepad_event(BongoCatApp *app, const void *raw) {
     if (event->type == SDL_EVENT_GAMEPAD_AXIS_MOTION) {
         source = event->gaxis.which;
         input.kind = BONGO_CAT_INPUT_GAMEPAD_AXIS;
+        /* 负数除以 32768、正数除以 32767: 这样 -32768 与 +32767 都能落到 ±1.0。 */
         input.value = event->gaxis.value < 0
             ? event->gaxis.value / 32768.0f : event->gaxis.value / 32767.0f;
         snprintf(input.name, sizeof(input.name), "%s", bongo_cat_gamepad_axis_name(event->gaxis.axis));
+    /* 按键是 0/1 脉冲、轴是连续量: core 的"按住状态"快照靠这个区分"值回到 0"的轴事件。 */
     } else if (event->type == SDL_EVENT_GAMEPAD_BUTTON_DOWN ||
         event->type == SDL_EVENT_GAMEPAD_BUTTON_UP) {
         source = event->gbutton.which;
@@ -149,9 +174,14 @@ void bongo_cat_gamepad_event(BongoCatApp *app, const void *raw) {
         input.value = event->type == SDL_EVENT_GAMEPAD_BUTTON_DOWN ? 1.0f : 0.0f;
         snprintf(input.name, sizeof(input.name), "%s", bongo_cat_gamepad_button_name(event->gbutton.button));
     } else return;
+    /* SDL 会给所有已打开的设备送事件, 非活动设备的事件在这里丢掉。 */
     if (!app->active_gamepad || source != app->active_gamepad) return;
+    /* 未映射的按键/轴返回 "Unknown*": 放过去会让参数与覆盖层拿到不存在的名字, 直接丢弃。 */
     if (strncmp(input.name, "Unknown", 7) == 0) return;
     input.timestamp_ms = SDL_GetTicks();
+    /* 先过快捷键: 命中后仍要把事件交给 apply_input 推进按键状态, 否则抬起被吞掉会让模型
+       卡在按下姿势。 */
+
     if (input.kind == BONGO_CAT_INPUT_GAMEPAD_BUTTON)
         bongo_cat_app_shortcuts(app, &input);
     bongo_cat_app_apply_input(app, &input);

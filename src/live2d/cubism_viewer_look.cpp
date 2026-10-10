@@ -1,3 +1,11 @@
+/*
+ * 注视跟随: 每帧把鼠标位置推成头/眼的角度参数。
+ *
+ * 用"最大速度 + 最大加速度 + 刹车距离"的阻尼模型而不是直接赋值: 直接赋值会让快速甩鼠标
+ * 变成瞬移, 看起来像抽搐。刹车距离那一项保证减速阶段不会冲过目标再回来 (过冲会抖)。
+ * 只处理模型声明过的参数 (add_parameter 时按 id 查索引, 查不到就整条跳过), 所以同一套
+ * 代码对没有眼球参数的低配模型也安全。
+ */
 #include "cubism_viewer_look.hpp"
 
 #include <CubismFramework.hpp>
@@ -43,6 +51,8 @@ void ViewerLookUpdater::set_target(Csm::csmFloat32 x,
     angle_z_enabled_ = angle_z_enabled;
 }
 
+/* 第一帧只把 initialized_ 置位并返回: 首帧的 delta 可能是整个加载耗时, 直接积分会把
+ * 速度一次性顶到上限, 脸会"弹"一下。 */
 void ViewerLookUpdater::update_target(Csm::csmFloat32 delta_seconds) {
     if (!initialized_) {
         initialized_ = true;
@@ -105,6 +115,8 @@ void ViewerLookUpdater::OnLateUpdate(Csm::CubismModel *model,
         Csm::csmFloat32 bound = current >= 0.0f
             ? model->GetParameterMaximumValue(parameter.index)
             : model->GetParameterMinimumValue(parameter.index);
+/* Z 轴 (歪头) 用 x*y 合成: 鼠标在右上/左下时头往一个方向歪, 左上/右下时往另一个方向歪,
+ * 这样"斜着看"的手感才自然, 而不是单纯跟着水平位置转。 */
         if (parameter.axis == Axis::Z) {
             input = -input_x * input_y;
             gain = 1.0f;

@@ -43,6 +43,8 @@ NativeModel::NativeModel() {
     _motionConsistency = true;
 }
 
+/* 析构顺序是有意的: 先停动作、再删动作对象 (SDK 的队列里可能还持有它们的指针), 然后
+ * 才释放渲染资源, 最后删 setting_ (模型数据引用过它)。 */
 NativeModel::~NativeModel() {
     _motionManager->StopAllMotions();
     _expressionManager->StopAllMotions();
@@ -52,6 +54,8 @@ NativeModel::~NativeModel() {
     delete setting_;
 }
 
+/* 一次性整读, 并且带上限: maximum 用来挡住"被改坏的 model3.json / moc3 声称自己有
+ * 几个 GB"这类情况, 超限一律当读取失败。返回空 vector 表示失败, 调用方按失败处理。 */
 std::vector<unsigned char> NativeModel::read(const std::string &file, size_t maximum) const {
     FILE *stream = bongo_cat_file_open(file.c_str(), "rb");
     if (!stream || std::fseek(stream, 0, SEEK_END) != 0) {
@@ -89,6 +93,9 @@ bool NativeModel::load(const char *directory, const char *setting_file,
         bongo_cat_error_set(error, BONGO_CAT_ERROR_IO, "Cannot read model setting: %s", setting_file);
         return false;
     }
+    /* 有些手工改过的 Mver 清单不是严格 JSON (注释、尾逗号、多一对 "] }"), 解析器会先按
+     * 宽松规则救回来, 并把 normalized 标为真。这种"救回来"的文档必须重新序列化成严格
+     * JSON 再交给 SDK —— SDK 自己的解析器不容忍这些瑕疵。 */
     bool normalized = false;
     yyjson_doc *document = bongo_cat_model_json_parse(
         reinterpret_cast<const char *>(json.data()), json.size(), &normalized);
@@ -139,6 +146,8 @@ bool NativeModel::load_model(BongoCatError *error) {
         bongo_cat_error_set(error, BONGO_CAT_ERROR_CUBISM, "Cubism rejected moc3: %s", name);
         return false;
     }
+    /* 记下模型的出厂参数值, 它同时是"动作基线"的初值: 参数覆盖和动作恢复都需要一个确定
+     * 的参照点, 而这是我们在加载期能直接读到的那一份。 */
     const size_t parameter_count = (size_t)_model->GetParameterCount();
     parameter_override_values_.assign(parameter_count, 0.0f);
     parameter_baseline_values_.resize(parameter_count);
@@ -183,6 +192,8 @@ void NativeModel::load_effects() {
     }
     viewer_look_ = CSM_NEW ViewerLookUpdater(*_model);
     _updateScheduler.AddUpdatableList(viewer_look_);
+    /* 呼吸参数表沿用 SDK 示例的标定值 (幅度/周期/相位), 它决定待机时"呼吸感"的强弱,
+     * 不是随手取的数 —— 要改先和示例比对。 */
     _breath = Csm::CubismBreath::Create();
     if (_breath) {
         Csm::csmVector<Csm::CubismBreath::BreathParameterData> parameters;
@@ -309,6 +320,7 @@ bool NativeModel::load_textures(BongoCatError *error,
             (float)(count > 0 ? count : 1));
     }
     prepare_expression_frame();
+    /* 换贴图必须重建渲染器: 渲染器持有贴图绑定与遮罩缓冲, 不重建就会继续引用旧句柄。 */
     release_renderer();
     if (!create_renderer(error)) {
         release_textures();

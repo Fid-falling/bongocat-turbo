@@ -1,3 +1,19 @@
+/*
+ * 设置窗口的全部运行时状态 + 内部接口声明。
+ *
+ * BongoCatPreferences 是"设置窗口"这个单例的全部家当: 窗口/GL 或 Vulkan 上下文、
+ * UI 后端、纹理、页面与滚动状态、各种动画时间戳、文本编辑会话、拖拽与缩放状态。
+ * 它由 app 持有, 但里面的窗口是**可回收**的: 窗口不显示时 release_idle_window 会把
+ * 窗口、UI 后端、纹理全部销毁, 只留下这个结构体; 下次显示再重建。所以任何"只在窗口
+ * 存在期间有效"的指针 (ui.context / vk / gl_context / 各种 texture) 用之前都必须
+ * 先确认窗口还在。
+ *
+ * 改这个结构体时有两条纪律:
+ * 1. 新增字段如果是"窗口级资源", 要在 release_window 里一起清掉, 否则下次开窗
+ * 会用一个已经销毁的句柄;
+ * 2. 新增字段如果是"跨窗口会话"(比如用户的选择、动画进度), 就不要在
+ * release_window 里清, 那是设计上要保留的。
+ */
 #ifndef BONGO_CAT_PREFERENCES_STATE_H
 #define BONGO_CAT_PREFERENCES_STATE_H
 
@@ -6,6 +22,10 @@
 #include "preferences_text_session.h"
 #include "ui_backend.h"
 
+/*
+ * 模型加载动画的时长参数 (纳秒): 等待段的总时长、快速爬升段、结束补完段, 以及等待段
+ * 的上限 (永远不到 100%)。这四个值配合 preferences_model.c 里的两段曲线使用。
+ */
 #define BONGO_CAT_MODEL_LOAD_VISUAL_DURATION_NS 5000000000ull
 #define BONGO_CAT_MODEL_LOAD_VISUAL_RAMP_NS 3000000000ull
 #define BONGO_CAT_MODEL_LOAD_VISUAL_COMPLETE_NS 160000000ull
@@ -55,6 +75,11 @@ struct BongoCatPreferences {
     bool import_render_active;
     BongoCatImportDialog *import_dialog;
     bool frame_checked;
+    /*
+     * 事件驱动渲染的总开关: 为真才画这一帧, render 一开始就把它清掉, 帧末再按
+     * "还有动画在跑吗"决定要不要重新置真。所有输入/状态变化都必须经过标脏,
+     * 漏标的表现就是"界面卡住不动"。
+     */
     bool render_dirty;
     bool font_reload_pending;
     bool font_reload_defer_once;
@@ -85,8 +110,20 @@ struct BongoCatPreferences {
     uint64_t last_render_ns;
     uint64_t shown_ns;
     float pending_raster_scale;
+    /*
+     * 重建失败后的重试时间 (1s 后); render_retry_ns 则是整帧失败 (上下文/呈现失败) 的
+     * 重试时间, 避免失败时每帧都傻等一次驱动调用。
+     */
     uint64_t raster_retry_ns;
     uint64_t render_retry_ns;
+    /*
+     * 滚动状态机, 下标就是页号 (0..3), 每页各存一份:
+     * current 当前实际偏移 (由指数平滑逼近 target);
+     * target  滚轮/滚动条给出的目标偏移;
+     * ready   该页是否已经读到过 Nuklear 组的真实滚动值 —— 没 ready 之前回写会
+     * 把用户的滚动位置冲掉, 所以首帧只读不写。
+     * 切页时这三者刻意都不重置 (见 page_cache_clear 的注释)。
+     */
     float scroll_current[4];
     float scroll_target[4];
     bool scroll_ready[4];

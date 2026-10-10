@@ -5,6 +5,12 @@
 #include <stdio.h>
 #include <string.h>
 
+/*
+ * session 的默认值与合法性钳制。
+ *
+ * 注意: 这里的 clampf_or / normalize_text 与 config_defaults.c 里的同名函数是
+ * 各自 static 的副本(不共享代码), 改钳制规则或文本规范化策略时两处都要看。
+ */
 static float clampf_or(float value, float low, float high, float fallback) {
     if (!isfinite(value)) return fallback;
     return value < low ? low : value > high ? high : value;
@@ -21,6 +27,8 @@ static bool normalize_text(char *text, size_t capacity) {
     return true;
 }
 
+/* 全新会话的初值, 同时也是读 session.json 时缺字段的默认值。
+   内容尺寸一开始和外框尺寸相同: 只有外框被外部改过时两者才会不同。 */
 void bongo_cat_session_defaults(BongoCatSessionState *session) {
     if (!session) return;
     memset(session, 0, sizeof(*session));
@@ -35,6 +43,8 @@ void bongo_cat_session_defaults(BongoCatSessionState *session) {
     memcpy(session->active_model_id, "standard", sizeof("standard"));
 }
 
+/* 两个 compact_* 与 config_defaults.c 里的同名函数同源: 截断超长字段、丢掉
+   非法或空条目、按内容去重(先出现的胜出), 最后清零尾巴并收敛 count。 */
 static void compact_active_behaviors(BongoCatSessionState *session) {
     size_t count = session->active_behavior_count;
     if (count > BONGO_CAT_BEHAVIOR_BINDING_CAP)
@@ -92,6 +102,12 @@ static void compact_additional_models(BongoCatSessionState *session) {
     session->additional_model_count = output;
 }
 
+/*
+ * session 的收口函数, 读、改、写之前都会被调用, 必须幂等(连续调用结果相同)。
+ * 尺寸下限 64 是渲染侧能接受的最小值, 上限 8192 避免把交换链尺寸撑到驱动
+ * 直接拒绝的地步; content_* 低于下限时回落到外框尺寸而不是钳到 64, 因为
+ * "没有单独设置内容尺寸"本身是正常状态。日期用 YYYYMMDD 整数表示, 越界清零。
+ */
 void bongo_cat_session_validate(BongoCatSessionState *session) {
     if (!session) return;
     session->window.scale_percent = clampf_or(session->window.scale_percent,
@@ -126,6 +142,8 @@ void bongo_cat_session_validate(BongoCatSessionState *session) {
     compact_active_behaviors(session);
 }
 
+/* activeModelId 单独存一份, 但语义上它也算"已加载的模型"之一, 所以判断某个
+   模型是否已加载时必须把两个来源都算上。 */
 bool bongo_cat_session_model_active(const BongoCatSessionState *session,
     const char *model_id) {
     if (!session || !model_id || !model_id[0]) return false;
@@ -138,6 +156,8 @@ bool bongo_cat_session_model_active(const BongoCatSessionState *session,
     return false;
 }
 
+/* 已经是当前模型时返回 true(幂等, 不算失败); 数组满才返回 false, 由调用方
+   决定怎么提示用户。 */
 bool bongo_cat_session_add_model(BongoCatSessionState *session,
     const char *model_id) {
     if (!session || !model_id || !model_id[0] ||
@@ -152,6 +172,8 @@ bool bongo_cat_session_add_model(BongoCatSessionState *session,
     return true;
 }
 
+/* 原地删除: memmove 前移后面的条目并清零点掉的槽位, 维持"前 count 项有效、
+   其余为 0"的不变量, 这样写回文件不会留下空洞。 */
 bool bongo_cat_session_remove_model(BongoCatSessionState *session,
     const char *model_id) {
     if (!session || !model_id) return false;

@@ -25,6 +25,11 @@ bool NativeModel::canvas_size(int *width, int *height) const {
     return true;
 }
 
+/*
+ * 求"可见包络": 遍历所有可见 drawable 的三角形, 借 alpha 掩码判断哪些三角形真的有像素,
+ * 再按面积加权累加, 得出一块包围盒。它决定内容视口和 frame 内边距, 所以必须忽略全透明
+ * 的画布区域 —— 否则窗口会按整张画布开出来, 猫看起来就像没跟着缩放走。
+ */
 NativeModel::ModelBounds NativeModel::capture_visible_bounds() const {
     ModelBounds bounds;
     if (!_model) return bounds;
@@ -49,6 +54,8 @@ NativeModel::ModelBounds NativeModel::capture_visible_bounds() const {
         if (!indices || !uvs || index_count < 3) continue;
         auto &triangle_alpha = triangle_alpha_[(size_t)i];
         const size_t triangle_count = (size_t)index_count / 3;
+        /* alpha 只在三角形数量变化时重算: Cubism 的 UV 与索引是静态的, 动画只动顶点位置,
+         * 而本函数在绘制路径上每帧都会被调用, 每帧重采样掩码纯属浪费。 */
         const bool sample_alpha = triangle_alpha.size() != triangle_count;
         if (sample_alpha) triangle_alpha.assign(triangle_count, 0);
         ModelBounds drawable = {FLT_MAX, FLT_MAX, -FLT_MAX, -FLT_MAX, true};
@@ -88,6 +95,8 @@ NativeModel::ModelBounds NativeModel::capture_visible_bounds() const {
         if (visible_area > drawables[largest].area) largest = drawables.size() - 1;
     }
     if (drawables.empty()) return bounds;
+    /* 以面积最大的 drawable 为锚 (通常是身体或脸), 再按"离锚够不够近"和"自身面积够不够大"
+     * 决定要不要把别的 drawable 并进包络: 远处的粒子/特效不该决定主体的缩放。 */
     const DrawableBounds &anchor = drawables[largest];
     float extent = std::max(anchor.bounds.max_x - anchor.bounds.min_x,
         anchor.bounds.max_y - anchor.bounds.min_y);
@@ -117,6 +126,13 @@ static float frame_margin(float overflow, float padding) {
     return overflow > 0.03f ? (overflow + padding) * 0.5f : 0.0f;
 }
 
+/*
+ * 计算 frame —— 画布四周要额外留多少透明边距 (保存为画布尺寸的比例)。
+ *
+ * 关键是要把**所有表情**都算进包络: 表情能显著改变可见范围 (比如把手臂抬起来), 只按
+ * 当前姿势算边距的话, 用户一换表情就会被窗口边缘裁掉。所以这里对每个表情临时套一遍
+ * 参数、各算一次包络再取并集, 最后还原参数。只在加载模型时付一次这个代价。
+ */
 void NativeModel::prepare_expression_frame() {
     frame_ = BongoCatLive2DFrame{};
     /* Authored Mver calibration keeps its exact frame. Legacy conversions

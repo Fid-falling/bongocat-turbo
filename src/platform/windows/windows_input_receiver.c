@@ -2,8 +2,18 @@
 
 #ifdef _WIN32
 #include <SDL3/SDL_log.h>
+/*
+ * 接收线程的窗口与消息循环。
+ *
+ * 用 message-only 窗口(HWND_MESSAGE)而不是普通窗口: 它不进 Z 序、不显示、不参与
+ * 激活, 却照样能收到 WM_INPUT 与 WM_INPUT_DEVICE_CHANGE —— 这正是 RIDEV_INPUTSINK
+ * 需要的目标窗口。窗口与状态对象的关联放在 GWLP_USERDATA 里: WM_NCCREATE 时写入,
+ * WM_NCDESTROY 时清空。
+ */
 static const wchar_t receiver_class[] = L"BongoCat Raw Input Receiver";
 
+/* 这个窗口过程跑在接收线程上, 因此里面每一件事都必须很快: 解析报文、推事件、
+   必要时唤醒主线程。不要在这里加锁等待或做 I/O。 */
 static LRESULT CALLBACK receiver_proc(HWND window, UINT message,
     WPARAM wparam, LPARAM lparam) {
     WindowsInputState *state = (WindowsInputState *)GetWindowLongPtrW(window,
@@ -26,6 +36,9 @@ static LRESULT CALLBACK receiver_proc(HWND window, UINT message,
             state->read_error = error;
         } else bongo_cat_windows_input_packet(state, &packet, received);
         /* DefWindowProc performs the required foreground WM_INPUT cleanup. */
+    /* 设备增删: 设备表按句柄索引, 所以插入和移除都先把该句柄从表里删掉(插入时
+       等下一个报文再惰性重建), 并清空当前运动缓存 —— 旧设备的位移不能算到新设备
+       头上。 */
     } else if (state && message == WM_INPUT_DEVICE_CHANGE) {
         if (wparam == GIDC_REMOVAL || wparam == GIDC_ARRIVAL) {
             state->diagnostic_device_changes++;
@@ -38,6 +51,8 @@ static LRESULT CALLBACK receiver_proc(HWND window, UINT message,
     return DefWindowProcW(window, message, wparam, lparam);
 }
 
+/* 注册窗口类 + 建 message-only 窗口 + 注册 Raw Input, 三步任一失败都算启动失败。
+   类已存在是可接受的: 同一进程里重建接收器时就会遇到。 */
 bool bongo_cat_windows_input_receiver_create(WindowsInputState *state) {
     HINSTANCE instance = GetModuleHandleW(NULL);
     WNDCLASSW type = {.lpfnWndProc = receiver_proc,
@@ -65,6 +80,9 @@ void bongo_cat_windows_input_receiver_destroy(WindowsInputState *state) {
     }
 }
 
+/* 接收线程的主循环体: 有界地抽取消息(原因见下面原有的英文注释: 每批最多 256 条,
+   免得高回报率鼠标把关闭流程饿死)。返回 false 表示收到 WM_QUIT 或 stop 事件已
+   置位, 调用方应当退出线程。 */
 bool bongo_cat_windows_input_dispatch(WindowsInputState *state) {
     MSG message;
     /* Bound each batch so high-rate mice cannot starve shutdown. */

@@ -1,3 +1,10 @@
+/* 多桌宠的父进程侧: 除主实例外, 每个被勾选的模型都由一个独立子进程显示, 两者用状态目录里的
+ * 文件做 IPC —— 父进程写 control.txt (可见性 + 时间戳 + 穿透) 当心跳, 子进程写
+ * remove.request / pass-through.request / primary.request 提请求。
+ * 子进程读不到足够新的心跳就自杀, 所以父进程必须每 2 s 续写一次 (见 multi_pet_process.c);
+ * 目录名是模型 id 的 FNV-1a 哈希, 父子两侧都靠它对齐, 算法一改两边就对不上。
+ * 本文件同时含子进程侧的读取逻辑 (bongo_cat_multi_pet_update 的另一半分支)。
+ */
 #include "runtime.h"
 #include "bongo_cat/file.h"
 #include "bongo_cat/path.h"
@@ -14,6 +21,9 @@
 #define CONTROL_RETRY_GRACE_NS 5000000000ull
 #define SETTINGS_CHECK_NS 2000000000ull
 
+/* 读 control.txt 的三种结果: OK 采纳本帧; RETRY 是暂时性问题 (文件还没写出来、格式不对),
+ * 由调用方在宽限期内继续重试; END 表示父进程已经不在了或状态非法, 子进程应当退出。
+ */
 typedef enum ControlReadResult {
     CONTROL_READ_OK, CONTROL_READ_RETRY, CONTROL_READ_END
 } ControlReadResult;
@@ -23,6 +33,9 @@ typedef struct ControlState {
     bool pass_through;
 } ControlState;
 
+/* FNV-1a 64 位哈希, 只为把模型 id 变成稳定的目录名: 父子两个进程必须算出同一个值,
+ * 所以算法与下面的 %016llx 格式都不能单方面改。
+ */
 static uint64_t model_hash(const char *model_id) {
     uint64_t hash = 1469598103934665603ull;
     for (const unsigned char *p = (const unsigned char *)model_id; p && *p; ++p) {
@@ -32,6 +45,9 @@ static uint64_t model_hash(const char *model_id) {
     return hash;
 }
 
+/* 生成 <root>/pets/<hash>。子进程的 state_root 就是它, 父进程从 primary_state_root
+ * 拼出同一路径, 用来找子进程写下的请求文件。
+ */
 bool bongo_cat_multi_pet_state_directory(char *target, size_t capacity,
     const char *root, const char *model_id) {
     char pets[BONGO_CAT_PATH_CAP], name[24];
@@ -50,6 +66,9 @@ static bool primary_remove_request_path(char *target, size_t capacity,
         bongo_cat_path_join(target, capacity, directory, REMOVE_REQUEST_FILE);
 }
 
+/* 父进程取走"移除这个副桌宠"请求: 文件真的删掉才算消费成功, 删不掉就报错返回 false,
+ * 免得留下它让下次启动重复移除。
+ */
 bool bongo_cat_multi_pet_take_remove_request(BongoCatApp *app,
     const char *model_id) {
     char path[BONGO_CAT_PATH_CAP];
@@ -62,6 +81,7 @@ bool bongo_cat_multi_pet_take_remove_request(BongoCatApp *app,
     return false;
 }
 
+/* 启动新子进程之前清理上一次留下的移除请求, 否则新进程一启动就会被摘掉。 */
 void bongo_cat_multi_pet_clear_remove_request(BongoCatApp *app,
     const char *model_id) {
     char path[BONGO_CAT_PATH_CAP];
@@ -69,6 +89,7 @@ void bongo_cat_multi_pet_clear_remove_request(BongoCatApp *app,
         bongo_cat_path_is_file(path)) bongo_cat_file_remove(path);
 }
 
+/* 当前进程是否由 --secondary-pet=<非空 id> 启动; 前缀自带等号, 空值不算命中。 */
 bool bongo_cat_multi_pet_secondary_argument(int argc, char **argv) {
     static const char prefix[] = "--secondary-pet=";
     for (int i = 1; i < argc; ++i)
@@ -77,6 +98,9 @@ bool bongo_cat_multi_pet_secondary_argument(int argc, char **argv) {
     return false;
 }
 
+/* 子进程侧: 往自己的 state_root 写 remove.request, 请求父进程把它从会话里摘掉。
+ * 先写 .tmp 再原子替换, 父进程不会读到半截文件。
+ */
 bool bongo_cat_multi_pet_request_remove(BongoCatApp *app) {
     char path[BONGO_CAT_PATH_CAP], temporary[BONGO_CAT_PATH_CAP];
     int length;
@@ -98,6 +122,10 @@ bool bongo_cat_multi_pet_request_remove(BongoCatApp *app) {
     return true;
 }
 
+/* 读父进程的心跳, 格式为 "<visible|hidden> <unix 秒> <pass_through>" 三个字段。
+ * 时间戳用来判断父进程是否还活着 —— 过期或来自未来都当成父进程已死, 返回 END 让子进程退出;
+ * 文件暂时不存在或格式坏掉则是 RETRY, 由调用方的宽限期兜底。
+ */
 static ControlReadResult read_control(BongoCatApp *app,
     ControlState *control, const char **retry_reason) {
     char path[BONGO_CAT_PATH_CAP], content[64] = {0};
@@ -144,6 +172,10 @@ static ControlReadResult read_control(BongoCatApp *app,
     return CONTROL_READ_OK;
 }
 
+/* 子进程跟随主实例的设置: 每 2 s 重读共享的 settings.json。pass_through 是例外,
+ * 它以 control.txt 为准 (那才是父进程的实时状态), 否则会被滞后的设置文件盖回去。
+ * 窗口段变化要重新应用置顶、命中测试与穿透同步。
+ */
 static void reload_secondary_settings(BongoCatApp *app) {
     BongoCatSettings settings = app->settings;
     BongoCatError error = {0};
@@ -173,6 +205,9 @@ static void reload_secondary_settings(BongoCatApp *app) {
     }
 }
 
+/* 子进程的循环钩子: 每 100 ms 检查一次心跳, 每 2 s 重读设置。
+ * 第一次失败只记下起点, 连续失败超过 5 s 宽限才退出 —— 主进程被强杀时子进程不会变成孤儿。
+ */
 static void update_secondary(BongoCatApp *app, uint64_t now) {
     if (!app->secondary_control_check_ns ||
         now >= app->secondary_control_check_ns) {
@@ -216,6 +251,9 @@ static void update_secondary(BongoCatApp *app, uint64_t now) {
     }
 }
 
+/* 唯一的调度入口: now 由主循环传入 (SDL_GetTicksNS), 保证同一帧内所有判定用同一时间基准。
+ * 子进程分支只做心跳与设置同步, 父进程分支才跑完整的多桌宠状态机。
+ */
 void bongo_cat_multi_pet_update(BongoCatApp *app, uint64_t now) {
     if (!app) return;
     if (app->secondary_pet) update_secondary(app, now);

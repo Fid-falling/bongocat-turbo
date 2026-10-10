@@ -1,8 +1,25 @@
+/*
+ * 轮盘的渲染后端: 一条极简的 2D 管线 (位置/UV/颜色 三个属性), GL 与 Vulkan 两条腿。
+ * 场景层 (dial_scene) 只产出顶点和批次, 本文件负责把它们提交出去 —— 所以 GL 与 Vulkan
+ * 的差异全部收敛在这里, 上面的几何/动画代码完全后端无关。
+ *
+ * 顶点格式是 DialVertex (x,y,u,v,rgba), 由 dial_triangle/dial_quad 组装; 提交时按
+ * 纹理分组成 DialBatch (连续区间), 一次 buffer_data 上传 + 每批一个 draw call。
+ * 没有索引缓冲: 扇形本身就是三角形列表, 用索引反而更麻烦。
+ *
+ * Vulkan 分支只能用小写 gl/VAO/program 之外的接口: 菜单窗口在 Vulkan 模式下**没有**
+ * GL 上下文, 任何 GL 调用 (包括加载函数) 都会失败 —— 那句
+ * "Radial menu GL loader: Missing OpenGL function" 就是这么来的。
+ */
 #include "dial_internal.h"
 #include "bongo_cat/vk_backend.h"
 #include <stddef.h>
 #include <stdlib.h>
 
+/*
+ * 顶点着色器: 只做投影变换 (正交投影由 CPU 算好传入), 不做任何模型变换 ——
+ * 变换已经在几何阶段烘进顶点的 xy 里了 (见 dial_transform)。
+ */
 static const char *vertex_shader =
     "#version 330 core\n"
     "layout(location=0) in vec2 Position; layout(location=1) in vec2 UV;"
@@ -14,6 +31,14 @@ static const char *fragment_shader =
     "in vec2 uv; in vec4 color; uniform sampler2D Texture; out vec4 pixel;"
     "void main(){pixel=color*texture(Texture,uv);}";
 
+/*
+ * 一次性初始化: 后端资源 + 字体图集 + 根项扇形几何。
+ * 两处刻意的安排:
+ *   - 根项扇形在这里就建好 (它们的角度只取决于 d->count), 每帧不再重算; 建完立刻检查
+ *     triangle_count, 三角化失败就直接报错退出 —— 少了这个检查, 后面会画出一个看不见
+ *     的菜单, 排查起来毫无线索;
+ *   - 结尾的 glGetError 只在 GL 下做: Vulkan 没有对应的全局错误状态。
+ */
 bool dial_paint_init(Dial *d) {
     DialPaint *p = &d->paint;
     BongoCatError error = {0};
@@ -62,6 +87,14 @@ bool dial_paint_init(Dial *d) {
     return status == GL_NO_ERROR || SDL_SetError("Radial menu GL initialization error: 0x%x",(unsigned)status);
 }
 
+/*
+ * 一帧: 清空顶点/批次 -> 让 dial_scene 填 -> 提交。
+ * p->alpha 有一个 0.15 的下限 (见英文注释): 完全透明的第一帧在部分平台的原生透明窗口
+ * 上收不到指针命中, 菜单会"点不到"。所以开头这 180ms 里菜单至少是 15% 不透明的。
+ * p->failed 表示几何超预算 (顶点或批次写满), 这是必须报出来的错误而不是静默丢内容。
+ * GL 下投影矩阵把逻辑坐标 (0..width, 0..height) 映到 NDC, y 轴翻转 (屏幕坐标朝下);
+ * 混合用分离式 blend_func, 因为 alpha 通道也要按同样规则累加 (否则透明窗口边缘会发黑)。
+ */
 bool dial_paint_frame(Dial *d) {
     DialPaint *p = &d->paint;
     p->count = 0; p->batch_count = 0;
@@ -120,6 +153,12 @@ bool dial_paint_frame(Dial *d) {
  * 现在只登记/查找/注销句柄, 真正在绘制里使用要等 dial_paint 的 Vulkan 分支落地。
  */
 int dial_vk_texture_register(Dial *d, struct BongoCatVkTexture *texture) {
+/*
+ * 用法约定: register 拿到 id, 批与封面里只存 id, 绘制时用 lookup 换成后端句柄,
+ * 销毁时用 release 归还槽位。
+ * id 绝不能跨后端使用, 也不能在 release 之后继续用; 表只有 8 格, 满了 register
+ * 返回 0 (= 无纹理), 调用方必须能接受 0。
+ */
     if (!d || !texture) return 0;
     for (int i = 0; i < 8; ++i) {
         if (d->paint.vk_textures[i]) continue;
@@ -143,6 +182,14 @@ void dial_vk_texture_release(Dial *d, unsigned int id) {
 
 void dial_paint_free(Dial *d) {
     DialPaint *p = &d->paint;
+/*
+ * 释放全部渲染资源。两条路差别很大:
+ *   - Vulkan: 纹理对象交给后端销毁 (这里的 id 不是 GL 纹理名, 调 glDeleteTextures 是
+ *     无效的), 且 VAO/VBO/Program 本来就是 0;
+ *   - GL: 逐个 glDeleteTextures, 再删 VBO/VAO/Program (顺序无所谓, 但都必须在上下文
+ *     还当前时做)。
+ * 两条路都要清字体图集与 ranges, 并 free 顶点数组 —— 那些是 CPU 内存, 与后端无关。
+ */
     if (d->vk) {
         /*
          * Vulkan 菜单: 纹理句柄表里的对象由后端销毁 (glDeleteTextures 在这里是

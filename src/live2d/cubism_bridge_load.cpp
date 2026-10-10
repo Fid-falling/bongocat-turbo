@@ -22,9 +22,15 @@ static void retire_previous(BongoCatLive2D *runtime,
     }
     BongoCatRetiredModel *slot = &runtime->retired[runtime->retired_count++];
     slot->model = previous;
+    /* 3 帧: 双缓冲/三缓冲的交换链最多还有两帧在飞, 多留一帧作余量。 */
     slot->frames_remaining = 3;
 }
 
+/*
+ * 加载顺序即"先建好新的, 再退休旧的": 新模型完全就绪 (动作/贴图/渲染器都建好) 之前,
+ * 旧模型一直活着当前模型 —— 于是加载失败时画面保持原样, 用户只会看到一条错误日志,
+ * 而不是一只消失的猫。任何一步失败都就地 delete 新模型并返回, runtime->model 不动。
+ */
 extern "C" BongoCatResult bongo_cat_live2d_load(BongoCatLive2D *runtime,
     const char *directory, const char *setting, bool preset,
     const BongoCatLive2DRenderOptions *render_options,

@@ -8,6 +8,8 @@ static HWND native_window(SDL_Window *window) {
         SDL_PROP_WINDOW_WIN32_HWND_POINTER, NULL);
 }
 
+/* 销毁顺序: 先恢复源窗口(不透明度 + DWM 合成), 再隐藏并解绑预览窗口, 最后释放资源。
+   恢复放在最前面 —— 中途失败时至少源窗口还能被看见, 不会两只猫一起消失。 */
 void bongo_cat_windows_snapshot_destroy(BongoCatWindowsSnapshot *s) {
     if (!s) return;
     if (s->suppressed) {
@@ -25,6 +27,14 @@ void bongo_cat_windows_snapshot_destroy(BongoCatWindowsSnapshot *s) {
     SDL_free(s);
 }
 
+/*
+ * 创建预览: 量出整个虚拟桌面 -> 抓源窗口当前画面 -> 建一个覆盖整个桌面、带
+ * WS_EX_TOOLWINDOW | NOACTIVATE 的透明预览窗口 -> 用 D3D11 渲染器把抓到的图当纹理贴
+ * 上去 -> 绑定输入转发 -> 最后才把源窗口改成全透明。
+ * 预览窗口固定为桌面大小(原因见下面原有的英文注释: DWM 只看到图像变化, 不会看到一连
+ * 串原生窗口移动/改尺寸), 位置变化靠重绘纹理的目标矩形实现。
+ * 纹理是预乘 alpha, 所以用 BLENDMODE_NONE 直接替换像素, 而不是再混合一次。
+ */
 BongoCatWindowsSnapshot *bongo_cat_windows_snapshot_create(SDL_Window *source,
     float opacity) {
     BongoCatWindowsSnapshot *s = SDL_calloc(1, sizeof(*s));

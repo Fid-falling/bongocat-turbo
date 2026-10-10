@@ -10,6 +10,16 @@
 #include "cubism_viewer_desktop_capture.h"
 #include "windows_tool.h"
 
+/*
+ * 桌面采集验证工具: 找到 Cubism viewer 的窗口, 用模拟鼠标/键盘把它摆成指定
+ * 姿势, 然后在拖动过程的关键时刻抓图落盘, 同时写一份 trace.csv 记录每一帧是
+ * "请求第几毫秒"时拿到的。
+ *
+ * 这是给人工或脚本比对用的复现工具, 不是产品代码: 里面的界面坐标
+ * (100,194 / 313,659 ...)都是在 1280x720 窗口下量出来的固定位置, viewer 改版
+ * 就要重新标定。采集走 DXGI 桌面复制, 所以窗口必须真的显示在屏幕上 —— 最小化
+ * 或被完全遮挡都会改变采集结果。
+ */
 typedef struct WindowSearch { DWORD process; HWND window; } WindowSearch;
 
 typedef struct Sample {
@@ -19,6 +29,8 @@ typedef struct Sample {
     double requested;
 } Sample;
 
+/* 全程使用 QPC(高精度性能计数器), 单位是计数而不是毫秒; 换算一律走
+   milliseconds(), 不要手写除法, 免得漏掉频率。 */
 static LARGE_INTEGER timer_frequency;
 
 static LONGLONG ticks(void) {
@@ -31,6 +43,8 @@ static double milliseconds(LONGLONG value) {
     return value * 1000.0 / timer_frequency.QuadPart;
 }
 
+/* 认定的目标窗口: 属于指定进程、可见、并且没有 owner(借此排除工具窗口和
+   弹窗)。回调返回 FALSE 会立刻停止枚举, 所以拿到的是第一个匹配项。 */
 static BOOL CALLBACK find_window(HWND window, LPARAM data) {
     WindowSearch *search = (WindowSearch *)data;
     DWORD process = 0;
@@ -74,6 +88,9 @@ static int key(WORD code) {
     Sleep(80); return 1;
 }
 
+/* 把 viewer 摆成可采集状态: 还原 + 置顶 + 1280x720 + 前台, 然后按坐标点界面
+   选表情。中间的 Sleep 是在等 viewer 重绘和窗口动画结束 —— 对方是外部程序,
+   没有可等待的事件, 只能用固定延时。 */
 static int prepare_viewer(HWND window, int expression) {
     ShowWindow(window, SW_RESTORE);
     SetWindowPos(window, HWND_TOPMOST, 0, 0, 1280, 720, SWP_SHOWWINDOW);
@@ -109,6 +126,9 @@ static wchar_t *sample_path(const wchar_t *directory, const char *name,
     return result;
 }
 
+/* 写 32 位 BMP: biHeight 取负值表示自上而下的行序, 正好与采集到的像素顺序
+   一致, 否则图像会上下翻转。文件头是手工拼的, 所以必须用 #pragma pack(1)
+   保证结构里没有填充字节。 */
 static int save_bitmap(const wchar_t *path, const Frame *frame,
     int width, int height) {
     BitmapFileHeader file = {0x4D42, 0, 0, 0, 0};
@@ -133,6 +153,9 @@ static void sample_name(char *name, size_t capacity, const char *phase, int fram
     snprintf(name, capacity, "%s-%03d", phase, frame);
 }
 
+/* 参数: output-directory viewer-pid [left top width height press-x press-y
+   target-x target-y settle-ms expression]。采集时刻是固定的 14 张: idle 1 张,
+   按住后 1 张, 沿轨迹 6 个时刻(第 1/2/4/8/15/30 帧), 回程 6 个时刻。 */
 int wmain(int argc, wchar_t **argv) {
     static const int frame_numbers[] = {1, 2, 4, 8, 15, 30};
     DesktopCapture capture;
@@ -149,10 +172,15 @@ int wmain(int argc, wchar_t **argv) {
         fwprintf(stderr, L"usage: output-directory viewer-pid [capture arguments]\n");
         return 2;
     }
+    /* 必须声明 per-monitor DPI 感知: 否则系统会缩放坐标, 模拟点击和屏幕坐标
+       都会对不上, 抓到的区域也跟着错位。 */
     SetProcessDpiAwarenessContext(DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2);
     QueryPerformanceFrequency(&timer_frequency);
     if (!bongo_cat_tool_ensure_directory(argv[1])) goto done;
     process = (DWORD)_wtoi(argv[2]);
+    /* 默认的采集区域与点击坐标都是 1280x720 viewer 下猫身所在地的实测标定值:
+       left/top 是采集区左上角, width/height 是采集区大小, press/target 是拖动
+       的起点和终点。 */
     left = argc > 3 ? _wtoi(argv[3]) : 247;
     top = argc > 4 ? _wtoi(argv[4]) : 82;
     width = argc > 5 ? _wtoi(argv[5]) : 1022;

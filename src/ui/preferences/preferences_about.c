@@ -1,3 +1,20 @@
+/*
+ * "关于 / 支持开发者"页 (page 3): 实验版声明 + logo + 作者 + 网页链接 + 致谢,
+ * 以及下面两张推广卡片 (Catime / vlaina)。
+ *
+ * 这一页的排版全是手算坐标: 每个块先用 nk_layout_row_dynamic + nk_widget 领一块矩形,
+ * 然后在矩形里用 nk_draw_* / nk_fill_rect 直接画 —— 因为卡片、圆形光晕、渐变色块
+ * 这些效果不是标准控件能表达的。改坐标时要连着看整条链 (hero 里 y 方向是 0/190/
+ * 226/254/300 依次排下来的), 单独挪一个就会叠在一起。
+ *
+ * 三条这里特有的约定:
+ * - 实验版声明必须是这一页的第一行: 它是产品定位说明, 要第一眼可见;
+ * - logo 不再套一层卡片 (素材本身就是完整品牌标识), 免得和侧栏的 logo 观感不一致;
+ * - 两张推广卡片的图片来自 support assets (关于页专有), 离开这一页时会被
+ * page_cache_clear 释放掉, 所以本页绘制时必须假设它们可能为 0 (image_contain 会跳过)。
+ * 所有动画 id 都带各自的 key (support-logo-hover / project-hover-<name>), 否则多个
+ * 元素的悬停动画会互相带。
+ */
 #include "preferences_state.h"
 #include "preferences_about_community.h"
 #include "preferences_about_footer.h"
@@ -34,6 +51,11 @@ static void centered(struct nk_command_buffer *canvas, struct nk_rect bounds,
     const char *value, const struct nk_user_font *font, struct nk_color color) {
     centered_span(canvas, bounds, value, nk_strlen(value), font, color);
 }
+/*
+ * 按空格折成两行再居中。选的是"让较长的那行尽量短"的断点, 所以两行宽度最接近。
+ * 一个空格都没有 (比如中文长句) 就退回单行居中并允许溢出 —— 这一页的文本都是
+ * 短句/长句混排, 为了它上完整的断行算法不值得。
+ */
 static void centered_wrapped(struct nk_command_buffer *canvas,
     struct nk_rect bounds, const char *value,
     const struct nk_user_font *font, struct nk_color color) {
@@ -68,6 +90,10 @@ static void open_url(const char *url) {
     if (!SDL_OpenURL(url)) SDL_LogWarn(SDL_LOG_CATEGORY_APPLICATION,
         "Cannot open URL: %s", SDL_GetError());
 }
+/*
+ * 等比缩放到能放进 bounds 并居中 (contain): 两张推广图的长宽比不同, 不能用同一套
+ * 固定尺寸; 纹理 id 为 0 时(素材没加载出来)直接不画, 不画占位是为了不喧宾夺主。
+ */
 static void image_contain(struct nk_command_buffer *canvas, unsigned int texture,
     int image_width, int image_height, struct nk_rect bounds) {
     if (!texture || image_width < 1 || image_height < 1) return;
@@ -78,6 +104,10 @@ static void image_contain(struct nk_command_buffer *canvas, unsigned int texture
     struct nk_image image = nk_image_id((int)texture);
     nk_draw_image(canvas, target, &image, nk_rgb(255, 255, 255));
 }
+/*
+ * 悬停时按 spring 缓动抬起 4% 并上移 5px; 命中区和绘制区分开 —— 绘制区被抬高了,
+ * 但点击判定仍然用原来的 bounds, 否则鼠标在边缘会闪。
+ */
 static void support_logo(BongoCatPreferences *value,
     struct nk_context *context,
     struct nk_command_buffer *canvas, struct nk_rect bounds,
@@ -124,6 +154,10 @@ static void star_button(BongoCatPreferences *value,
     if (hit(context, bounds))
         open_url("https://github.com/vladelaina/BongoCat");
 }
+/*
+ * 作者名做成链接: 前面 "by " 是普通文字, 只有作者名那块参与命中与动画, 所以
+ * x 坐标是由三段的文字宽度累加算出来的 (标题宽度随语言变化)。
+ */
 static void hero_title(BongoCatPreferences *value, struct nk_context *context,
     struct nk_command_buffer *canvas, struct nk_rect bounds,
     BongoCatUIPalette p) {
@@ -202,6 +236,11 @@ void bongo_cat_preferences_about_hero(BongoCatPreferences *value,
     bongo_cat_preferences_about_footer(value, context, canvas,
         nk_rect(bounds.x, bounds.y + 300, bounds.w, 34), p);
 }
+/*
+ * 一张推广卡片: 图标 + 底部名字, 整体可点。
+ * pink 决定用粉色还是强调色 (两张卡片刻意区分开), 并顺带切换图标的绘制内缩 ——
+ * 粉色那张的图自带留白, 非粉色那张需要手动内缩一点才不至于贴边。
+ */
 static void project(BongoCatPreferences *value, struct nk_context *context,
     struct nk_command_buffer *canvas, struct nk_rect bounds, unsigned int texture,
     int image_width, int image_height, const char *name, const char *url,

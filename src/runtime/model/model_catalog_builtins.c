@@ -1,3 +1,7 @@
+/* 把程序自带的模型（assets/models 下的 standard、keyboard、gamepad）落地到可写的
+ * models_root，并写入 .bongo-cat-builtin 标记文件。时序上由扫描线程在目录扫描之前调用，
+ * 且必须持有导入锁；标记文件是 core/model_catalog.c 判定 preset 的唯一依据，丢了它内置
+ * 模型会退化成用户模型，从而允许被删除或改名。 */
 #include "model_storage.h"
 #include "bongo_cat/file.h"
 #include "bongo_cat/path.h"
@@ -5,6 +9,8 @@
 #include <stdio.h>
 #include <string.h>
 
+/* 幂等：标记已存在就直接返回成功（目录可能来自旧版本或用户手工放置），不校验目录内容；
+ * 任何一步 IO 失败都会写入 error 并返回 false。 */
 static bool mark_builtin(const char *directory, BongoCatError *error) {
     char path[BONGO_CAT_PATH_CAP];
     if (!bongo_cat_path_join(path, sizeof(path), directory,
@@ -18,6 +24,8 @@ static bool mark_builtin(const char *directory, BongoCatError *error) {
     return ok;
 }
 
+/* 启动扫描专用，需由调用方持有导入锁（会复制整棵目录）。目标目录已存在时跳过复制但仍补
+ * 写标记 —— 升级后的旧内置模型就是靠这一步被认领；内置资源缺失立即中止并返回 IO。 */
 BongoCatResult bongo_cat_model_install_builtins(const char *asset_root,
     const char *models_root, BongoCatError *error) {
     static const char *const names[] = {"standard", "keyboard", "gamepad"};

@@ -1,3 +1,8 @@
+/*
+ * 设置窗口的图形上下文: Vulkan 走共享设备, OpenGL 走"能共享就共享"。
+ * 本文件里的所有失败路径都必须把主窗口的上下文设回当前 —— 设置窗口建上下文的
+ * 过程会抢占 "current", 忘了还回去, 主窗口(宠物)下一帧就画不出来或画到错窗口上。
+ */
 #include "preferences_gl.h"
 #include "preferences_state.h"
 #include "bongo_cat/render.h"
@@ -5,6 +10,10 @@
 #include <SDL3/SDL_opengl.h>
 #include <stdio.h>
 
+/*
+ * 统一失败出口: 打一条带三个窗口/上下文指针的日志 (这类问题只能靠指针区分是哪个
+ * 窗口出事), 把当前上下文还给主窗口, 再把错误串塞回 SDL 供上层记录。
+ */
 static bool fail(BongoCatPreferences *value, const char *message) {
     char detail[256];
     snprintf(detail, sizeof(detail), "%s",
@@ -75,6 +84,14 @@ bool bongo_cat_preferences_gl_create(BongoCatPreferences *value) {
     SDL_GL_SetAttribute(SDL_GL_ALPHA_SIZE, 8);
     if (share && !SDL_GL_SetAttribute(SDL_GL_SHARE_WITH_CURRENT_CONTEXT, 1))
         return fail(value, SDL_GetError());
+    /*
+     * SDL_GL_*Attribute 是全局状态, 不是"这次创建"的参数:
+     * - 共享属性会让 SDL_GL_CreateContext 去和"当前上下文"共享, 设完必须立刻
+     * 复位, 否则之后任何地方新建的上下文都会莫名其妙地去共享同一个对象;
+     * - 复位失败说明进程已经处在不可控状态, 这时宁可销毁刚建好的上下文也不
+     * 继续 —— 留着它等于把一个会传染的全局状态带进后续所有创建流程。
+     * 错误串要提前拷出来: SDL_SetError 的内容会被后续 SDL 调用覆盖。
+     */
     SDL_GLContext context = SDL_GL_CreateContext(value->window);
     char creation_error[256] = {0};
     if (!context) snprintf(creation_error, sizeof(creation_error), "%s",
@@ -110,6 +127,12 @@ bool bongo_cat_preferences_gl_create(BongoCatPreferences *value) {
     return true;
 }
 
+/*
+ * 释放顺序: 先销毁设置窗口自己的 Vulkan 上下文 (共享设备时它只是交换链, 不会动
+ * 主窗口的设备), 再处理 GL 上下文。销毁 GL 上下文之前必须先把它从 current 上摘
+ * 下来, 否则驱动里会留下一个指向已销毁上下文的活动槽位。
+ * 全程不回问 GL 驱动除非确实拥有 GL 上下文 (见下面的保护)。
+ */
 void bongo_cat_preferences_gl_destroy(BongoCatPreferences *value) {
     if (!value) return;
     if (value->vk) {

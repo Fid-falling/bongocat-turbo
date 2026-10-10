@@ -9,6 +9,9 @@
 #include <malloc.h>
 #endif
 
+/* 三个平台的实现其实是同一件事: 把已经还给分配器、但还没还给操作系统的内存退回
+   去。放在平台层是因为这些都是 OS 特有的原语(堆收缩 / 工作集裁剪 / malloc_trim),
+   core 层没有对应的跨平台抽象。 */
 void bongo_cat_platform_trim_memory(void) {
 #ifdef _WIN32
     /* Release allocator slack, then let Windows keep only actively touched

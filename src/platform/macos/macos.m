@@ -11,11 +11,25 @@
 #include <sys/file.h>
 #include <unistd.h>
 
+/*
+ * macOS 平台层的装配点。
+ *
+ * 与 Linux 版结构相似(单实例用锁文件 + flock), 但"把已有实例叫到前台"走的是分布式通知
+ * (com.bongocat.desktop.show): macOS 上跨进程不能像 X11 那样直接操作别人的窗口。
+ * macOS 专属的窗口语义有几点:
+ *   - 激活策略设为 Accessory: 程序不出现在 Dock 里, 但仍然可以有窗口和状态栏图标 —— 这是
+ *     桌宠应有的形态;
+ *   - sharingType = ReadOnly: 允许录屏/截图抓到窗口, 否则默认会被系统排除在采集之外;
+ *   - 点击穿透必须同时告诉 SDL(窗口形状)与 NSWindow(ignoresMouseEvents), 原因见下面那段
+ *     长注释。
+ */
 static int instance_lock = -1;
 static BongoCatPlatform *active_platform;
 static NSObject *instance_observer;
 static bool instance_show_pending;
 
+/* 模态循环里驱动单帧回调的小目标对象: NSTimer 需要一个 target 来接收 tick, 而我们手里
+   只有 C 函数指针, 所以用一个轻量 Objective-C 对象把两者接起来。 */
 @interface BongoCatModalTarget : NSObject { BongoCatModalTick callback_; void *userdata_; }
 - (id)initWithCallback:(BongoCatModalTick)callback userdata:(void *)userdata;
 - (void)tick:(NSTimer *)timer;
@@ -34,11 +48,16 @@ static NSWindow *native_window(BongoCatPlatform *platform) {
         SDL_PROP_WINDOW_COCOA_WINDOW_POINTER, NULL);
 }
 
+/* 采集相关的窗口属性: 激活策略 Accessory(不进 Dock)、sharingType 允许被采集。
+   这里不涉及"只在采集软件里显示" —— macOS 需要虚拟显示器之类的额外机制, 见下面
+   capture_only_supported 处的注释。 */
 static void configure_capture_window(NSWindow *window) {
     [NSApp setActivationPolicy:NSApplicationActivationPolicyAccessory];
     [window setSharingType:NSWindowSharingReadOnly];
 }
 
+/* 第二个实例请求"显示我"时调用。若平台还没初始化(active_platform 为空)就先记一个待处理
+   标志, 等 init 结尾补一次 —— 通知可能比窗口创建更早到达。 */
 static void show_instance(void) {
     if (!active_platform) { instance_show_pending = true; return; }
     NSWindow *window = native_window(active_platform); configure_capture_window(window);
@@ -47,6 +66,8 @@ static void show_instance(void) {
     instance_show_pending = false;
 }
 
+/* 分布式通知的接收者。回调可能在任意线程到达, 而 AppKit 的操作必须在主线程, 所以先切回
+   主线程再处理。 */
 @interface BongoCatInstanceObserver : NSObject
 - (void)showWindow:(NSNotification *)notification;
 @end
@@ -61,6 +82,8 @@ static void show_instance(void) {
 }
 @end
 
+/* 只注册一次即可。suspensionBehavior 用 DeliverImmediately: 程序可能正处于非活跃状态,
+   默认策略会把通知挂起, 那样"再点一次图标"就没反应了。 */
 static void observe_instance(void) {
     if (instance_observer) return;
     instance_observer = [[BongoCatInstanceObserver alloc] init];
@@ -68,6 +91,9 @@ static void observe_instance(void) {
         selector:@selector(showWindow:) name:@"com.bongocat.desktop.show" object:nil
         suspensionBehavior:NSNotificationSuspensionBehaviorDeliverImmediately];
 }
+/* 初始化: 预留一个 SDL 用户事件给输入线程唤醒(拿不到就直接失败, 否则输入线程无法安全
+   退出), 设好采集窗口属性, 再启动输入采集 —— 输入失败只记警告, 没有全局输入时程序仍然
+   能跑。 */
 BongoCatResult bongo_cat_platform_init(BongoCatPlatform *platform, SDL_Window *window,
     BongoCatInputState *input, BongoCatError *error) {
     memset(platform, 0, sizeof(*platform));
@@ -88,10 +114,16 @@ BongoCatResult bongo_cat_platform_init(BongoCatPlatform *platform, SDL_Window *w
     if (instance_show_pending) show_instance();
     return BONGO_CAT_OK;
 }
+/* 关闭: 停掉输入线程并清空 active_platform —— 此后 show_instance 会走"待处理"分支, 而
+   不是去访问已经失效的窗口。 */
 void bongo_cat_platform_shutdown(BongoCatPlatform *platform) {
     bongo_cat_macos_input_stop(platform);
     if (active_platform == platform) active_platform = NULL;
 }
+/* 点击穿透必须同时告诉两边: SDL(窗口形状)与 NSWindow(ignoresMouseEvents)。为什么两边都
+   要说, 见下面原有的英文注释 —— 简单说: SDL 会在鼠标移动时按形状重新写
+   ignoresMouseEvents, 只设 NSWindow 会被它覆盖回去。
+   这里用一个 1x1 的表面充当"全透明 / 全不透明"的形状: SDL 要的是表面, 不是一个布尔标志。 */
 /* SDL rewrites NSWindow.ignoresMouseEvents from the window shape whenever a mouse move reaches the
    window, and derives "ignore the mouse" from a transparent shape pixel. Telling SDL the same state
    through that shape keeps the two from disagreeing, which would otherwise hand the pet back to the
@@ -113,6 +145,8 @@ static void apply_click_through_shape(BongoCatPlatform *platform, bool enabled) 
     SDL_DestroySurface(shape);
 }
 
+/* 与 Linux 一样只有整窗穿透(没有逐像素判断), 所以 forced 与 pointer_transparent 在这里
+   合并处理。 */
 void bongo_cat_platform_set_click_through(BongoCatPlatform *platform,
     bool forced, bool pointer_transparent) {
     if (!platform || !platform->window) return;
@@ -140,6 +174,8 @@ bool bongo_cat_platform_frame_alpha(const BongoCatPlatform *platform,
     (void)platform; (void)width; (void)height; (void)x; (void)y; (void)alpha;
     return false;
 }
+/* 显示 / 隐藏。重新显示时要重设一遍采集属性: 窗口重新上屏后系统可能把 sharingType 之类
+   的属性恢复成默认值。 */
 void bongo_cat_platform_set_visible(BongoCatPlatform *platform, bool visible) {
     if (!platform || !platform->window) return;
     visible ? SDL_ShowWindow(platform->window) : SDL_HideWindow(platform->window); if (visible) configure_capture_window(native_window(platform));
@@ -176,6 +212,7 @@ void bongo_cat_platform_relative_pointer_reset(BongoCatPlatform *platform) {
 void bongo_cat_platform_relative_pointer_release(BongoCatPlatform *platform) {
     (void)platform;
 }
+/* 置顶靠窗口层级: NSFloatingWindowLevel 会浮在普通窗口之上, 取消时回到 Normal 层级。 */
 void bongo_cat_platform_set_always_on_top(BongoCatPlatform *platform, bool enabled) {
     [native_window(platform) setLevel:enabled ? NSFloatingWindowLevel : NSNormalWindowLevel];
 }
@@ -203,6 +240,8 @@ bool bongo_cat_platform_set_geometry(BongoCatPlatform *platform,
         SDL_SetWindowPosition(platform->window, x, y);
     return true;
 }
+/* 拖动: performWindowDragWithEvent 是 macOS 自带的窗口拖动, 它同样会进入模态循环, 所以
+   和托盘菜单一样要临时挂一个 60Hz 定时器让猫继续出帧(拖动前后各补一次回调)。 */
 void bongo_cat_platform_begin_drag(BongoCatPlatform *platform,
     BongoCatModalTick modal_tick, void *userdata) {
     NSWindow *window = native_window(platform);
@@ -218,6 +257,8 @@ void bongo_cat_platform_begin_drag(BongoCatPlatform *platform,
     if (modal_tick) modal_tick(userdata);
     [target release];
 }
+/* 逐像素命中是否可用取决于输入监控授权: 没有授权就拿不到全局鼠标位置, 也就无法按像素
+   判断鼠标是否落在猫身上。 */
 bool bongo_cat_platform_dynamic_hit_supported(void) {
     return bongo_cat_macos_input_supported();
 }
@@ -239,6 +280,8 @@ bool bongo_cat_platform_open_directory(const char *path) {
     }
 }
 
+/* 单实例: 锁文件 + flock(与 Linux 相同的理由 —— 进程退出时由内核自动释放)。拿不到锁就发
+   一条分布式通知请已有实例显示自己, 然后返回 false。 */
 bool bongo_cat_platform_single_instance_begin(void) {
     char path[96]; snprintf(path, sizeof(path),
         "/tmp/" BONGO_CAT_SLUG "-%lu.lock",
@@ -261,6 +304,7 @@ void bongo_cat_platform_single_instance_end(void) {
         [instance_observer release]; instance_observer = nil;
     }
 }
+/* macOS 侧没有内嵌资源(资源在 app bundle 里), 恒定失败, 由调用方走普通目录逻辑。 */
 BongoCatResult bongo_cat_platform_embedded_assets(const char *target, BongoCatError *error) {
     (void)target; (void)error; return BONGO_CAT_ERROR_PLATFORM;
 }

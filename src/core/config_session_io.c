@@ -4,6 +4,16 @@
 #include <stdio.h>
 #include <string.h>
 
+/*
+ * session.json 的读写。session 是"可以丢"的临时状态: 上次退出时的窗口位置/
+ * 尺寸/缩放/不透明度、当前模型、以及已启用的模型动作。
+ *
+ * 与 settings.json 的分工: 这里读失败不必打扰用户, 缺字段就沿用调用方传入的
+ * 默认值; 但写入依然走 config_file.c 的原子替换, 免得留下半个文件。
+ *
+ * 不变量: 与 config_io.c 相同 —— 先读进副本 loaded, 全部通过才赋值; 保存时也
+ * 先规范化副本, 不修改调用方传进来的结构。
+ */
 #define SESSION_FORMAT "bongocat/session"
 #define type_error(error, field, expected) bongo_cat_config_type_error( \
     "Session", error, field, expected)
@@ -15,6 +25,8 @@
     "Session", object, key, target, error)
 #define read_bool(object, key, target, error) bongo_cat_config_read_bool( \
     "Session", object, key, target, error)
+/* 这里的 read_int 保留 required 开关: 窗口位置和尺寸要么整组存在、要么整组
+   不存在, 只存一半坐标没有意义, 所以那几个字段按必读处理(见下面的 load)。 */
 #define read_int(object, key, target, required, error) \
     bongo_cat_config_read_int( \
         "Session", object, key, target, required, error)
@@ -27,6 +39,8 @@
     bongo_cat_config_copy_text( \
         "Session", target, capacity, value, length, field, error)
 
+/* 键不存在时保留调用方原有的 active_model_id(可能是空串); 但键一旦存在就
+   必须是长度合法的非空字符串 —— 空串算损坏, 不能当成"还没选模型"。 */
 static bool read_active_model(yyjson_val *root,
     BongoCatSessionState *session, BongoCatError *error) {
     yyjson_val *value;
@@ -98,6 +112,11 @@ static bool read_additional_models(yyjson_val *array,
     return true;
 }
 
+/*
+ * 读 session.json。position 是可选的整组: 只有 x/y 都读成功才置 position_known,
+ * 否则窗口位置交回平台层决定。size 里 width/height 必读, contentWidth/
+ * contentHeight 可选 —— 老版本只存外框尺寸, 这时内容尺寸回落到外框尺寸。
+ */
 BongoCatResult bongo_cat_session_load(const char *path,
     BongoCatSessionState *session, BongoCatError *error) {
     if (!path || !session) return BONGO_CAT_ERROR_ARGUMENT;
@@ -163,12 +182,16 @@ BongoCatResult bongo_cat_session_load(const char *path,
     return BONGO_CAT_OK;
 }
 
+/* 保存路径上的失败基本都是 yyjson 分配失败(文档只在内存里构建), 所以统一用
+   同一个错误信息。 */
 static BongoCatResult build_error(BongoCatError *error) {
     bongo_cat_error_set(error, BONGO_CAT_ERROR_MEMORY,
         "Cannot allocate session JSON");
     return BONGO_CAT_ERROR_MEMORY;
 }
 
+/* 两个 write_* 都是"先把数组挂到对象上再逐项填"的写法: yyjson 里数组必须先
+   成为文档的一部分才能继续添加元素; 失败返回 false, 由调用方统一回收文档。 */
 static bool write_active_behaviors(yyjson_mut_doc *doc,
     yyjson_mut_val *root, const BongoCatSessionState *session) {
     yyjson_mut_val *array = yyjson_mut_arr(doc);
@@ -198,6 +221,10 @@ static bool write_additional_models(yyjson_mut_doc *doc,
     return true;
 }
 
+/*
+ * 保存前先对本地副本 canonical 调用 validate: 落盘的值必须满足不变量, 但不应该
+ * "顺手"改掉调用方正在用的结构。
+ */
 BongoCatResult bongo_cat_session_save(const char *path,
     const BongoCatSessionState *session, BongoCatError *error) {
     if (!path || !session) return BONGO_CAT_ERROR_ARGUMENT;

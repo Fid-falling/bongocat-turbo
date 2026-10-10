@@ -1,3 +1,9 @@
+/*
+ * 绘制原语的对外接口。所有 paint_* 都是"能缓存就缓存, 缓存不了就退化"的语义:
+ * 拿不到 backend / 窗口尺寸时不画 (或退成 nk_fill_rect 的近似), 但绝不返回错误码,
+ * 因为调用方是绘制代码, 没有地方处理失败。
+ * 前置条件: 本帧已经调用过 bongo_cat_ui_paint_begin_frame()。
+ */
 #ifndef BONGO_CAT_UI_PAINT_H
 #define BONGO_CAT_UI_PAINT_H
 

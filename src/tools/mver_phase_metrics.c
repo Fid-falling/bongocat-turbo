@@ -11,6 +11,18 @@
 #include <string.h>
 #include <wchar.h>
 
+/*
+ * 相位(时间偏移)分析工具: 给定 Mver 猫和原生猫的抽帧序列, 找出让两段动画最
+ * 对齐的帧偏移量, 输出 JSON 供上层脚本挑参数。
+ *
+ * 四个区域固定是: 整幅 / 脸 / 头发 / 手(见 in_region)。只看全图会被大面积静止
+ * 的底色淹没, 所以必须分区看 —— 相位差在不同部位的表现并不一样。
+ *
+ * 两级搜索: 先用 spatial_stride=3 粗扫 [-max_lag, +max_lag] 的所有偏移, 取运动
+ * 相似度最高的前 7 个(再补一个 0)用 stride=1 精算。粗扫只看运动相关性而不看
+ * 颜色相似度, 因为颜色相似度对相位几乎不敏感。
+ * 输出是 JSON 数组, 字段名是外部脚本读取的契约(见 print_candidate), 不能改。
+ */
 enum { REGION_COUNT = 4 };
 
 typedef struct Score {
@@ -32,6 +44,8 @@ typedef struct Candidate {
     double motion[REGION_COUNT];
 } Candidate;
 
+/* 区域用归一化比例定义, 因而与分辨率无关; 这些阈值是照着猫的构图量出来的,
+   换模型要重新标定。region 0 表示整幅, 直接返回 1。 */
 static int in_region(int region, int x, int y, int width, int height) {
     double nx = x / (double)width, ny = y / (double)height;
     if (region == 0) return 1;
@@ -40,6 +54,9 @@ static int in_region(int region, int x, int y, int width, int height) {
     return nx >= .16 && nx <= .58 && ny >= .58 && ny <= .92;
 }
 
+/* 逐像素累计颜色差(三通道绝对值之和), 同时记录参与统计的样本数 —— 相似度要
+   除以样本数, 而各区域的样本数不同, 不能直接比总和。两边都接近黑(<= 4)的
+   像素直接跳过: 那是背景, 加进去只会稀释差异。 */
 static void add_pair(Score *score, const Frame *first, const Frame *second,
     int spatial_stride) {
     int gx, gy, region;
@@ -64,6 +81,9 @@ static void add_pair(Score *score, const Frame *first, const Frame *second,
     }
 }
 
+/* 运动相似度用"相邻帧差分向量"的余弦相关: 比较两段动画在每个像素上的变化
+   方向是否一致, 因此对整体亮度/配色差异不敏感, 而这正是判断相位所需要的。
+   两份差分都为 0 的像素没有方向可言, 跳过; 归一化用 sqrt(f·f * s·s)。 */
 static void add_motion_pair(MotionScore *score, const Frame *first_previous,
     const Frame *first, const Frame *second_previous, const Frame *second,
     int spatial_stride) {
@@ -88,11 +108,13 @@ static void add_motion_pair(MotionScore *score, const Frame *first_previous,
     }
 }
 
+/* 换算成百分比: 每个通道最多差 255, 三通道累计的上限是 samples*3*255。 */
 static double similarity(const Score *score, int region) {
     return score->samples[region] == 0 ? 0.0 : 100.0 * (1.0 -
         score->absolute[region] / (score->samples[region] * 3.0 * 255.0));
 }
 
+/* 相关系数 [-1,1] 线性映射到 [0,100], 便于和颜色相似度放在一起看。 */
 static double motion_similarity(const MotionScore *score, int region) {
     double denominator = sqrt(score->first_squared[region] *
         score->second_squared[region]);
@@ -103,6 +125,12 @@ static double motion_similarity(const MotionScore *score, int region) {
     return 50.0 * (correlation + 1.0);
 }
 
+/*
+ * 算某个偏移量下两段序列的相似度。offset 为正表示原生序列比 Mver 晚 offset 帧:
+ * Mver 从 0 开始、原生从 offset 开始, 重叠长度取两者较小值; offset 为负时反过来
+ * (mver_start = -offset)。
+ * 颜色比较隔帧取样(+= 2)以省时间; 运动比较必须逐帧(+= 1), 否则差分没有意义。
+ */
 static Candidate measure(const Frame *mver, size_t mver_count,
     const Frame *native, size_t native_count, int offset,
     int interval_milliseconds, int spatial_stride) {
@@ -131,6 +159,7 @@ static Candidate measure(const Frame *mver, size_t mver_count,
     return candidate;
 }
 
+/* 按整幅运动相似度降序; 相同时按偏移升序, 让输出顺序稳定、结果可复现。 */
 static int compare_candidates(const void *left, const void *right) {
     const Candidate *a = (const Candidate *)left, *b = (const Candidate *)right;
     if (a->motion[0] < b->motion[0]) return 1;
@@ -138,6 +167,8 @@ static int compare_candidates(const void *left, const void *right) {
     return a->offset < b->offset ? -1 : a->offset > b->offset;
 }
 
+/* 手工拼 JSON(不引第三方库); %.17g 是为了让 double 能往返可逆。字段名是外部
+   脚本读取的契约, 不能改。 */
 static void print_candidate(const Candidate *candidate, int comma) {
     printf("  {\"NativeOffsetFrames\":%d,\"NativeOffsetSeconds\":%.17g,"
         "\"OverlapFrames\":%d,\"FullSimilarity\":%.17g,"
@@ -151,6 +182,8 @@ static void print_candidate(const Candidate *candidate, int comma) {
         candidate->motion[2], candidate->motion[3], comma ? "," : "");
 }
 
+/* 参数: MVER_DIR NATIVE_DIR [max-lag-frames=30] [minimum-overlap-frames=2]
+   [interval-ms=17]。interval-ms 只用于把帧偏移换算成秒, 默认 17ms 约等于 60fps。 */
 int wmain(int argc, wchar_t **argv) {
     PathList mver_paths = {0}, native_paths = {0};
     Frame *mver = NULL, *native = NULL;
@@ -164,11 +197,15 @@ int wmain(int argc, wchar_t **argv) {
             L"[interval-ms]\n");
         return 2;
     }
+    /* 强制 C 数字格式: printf 输出的浮点必须用 '.' 作小数点, 否则在某些系统区域
+       设置下会写成 ',' , 生成的 JSON 直接失效。 */
     setlocale(LC_NUMERIC, "C");
     max_lag = argc > 3 ? _wtoi(argv[3]) : 30;
     minimum_overlap = argc > 4 ? _wtoi(argv[4]) : 2;
     interval_ms = argc > 5 ? _wtoi(argv[5]) : 17;
     if (max_lag < 0 || minimum_overlap < 2) return 2;
+    /* 图像解码走 WIC/GDI+, 需要先初始化 COM; 用 MULTITHREADED 是因为这些工具
+       不跑消息循环。 */
     if (FAILED(CoInitializeEx(NULL, COINIT_MULTITHREADED))) return 1;
     if (!phase_collect_paths(argv[1], &mver_paths) ||
         !phase_collect_paths(argv[2], &native_paths) ||

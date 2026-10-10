@@ -1,9 +1,18 @@
+/*
+ * 把归一化结果写成 Mver 规范包的 config.json —— 全流程里唯一产出该文件的地方。
+ * 前提: img/<mode>/ 下的图片已经按矩阵行号排好 (见 model_import_tauri_input.c)。
+ * 契约: 安装完成后整个目录会被重新扫描一次, 所以 mode 段的形态必须能通过 Mver 的
+ * 发现判据 —— l2d 为真、手型是数组、手柄模式带 input_mode=1。
+ * 这里写出去的 mode 整数与 BongoCatModelMode 的顺序不一致, 是另一个易错点。
+ */
 #include "model_import_tauri_internal.h"
 
 #include "bongo_cat/json.h"
 
 #include <yyjson.h>
 
+/* 一个手型 = 一组按键行, 每行是该位置的键码数组 (行序即图片编号)。
+ * left/right 允许 count == 0, 此时写出的是空数组。 */
 static bool add_matrix(yyjson_mut_doc *document, yyjson_mut_val *mode,
     const char *name, const TauriKeyFiles *files) {
     yyjson_mut_val *matrix = yyjson_mut_obj_add_arr(document, mode, name);
@@ -16,6 +25,8 @@ static bool add_matrix(yyjson_mut_doc *document, yyjson_mut_val *mode,
     return true;
 }
 
+/* 先构建 doc 再落盘: ok 短路链保证中途失败不会写出半截文件, 失败统一报 IO 错误。
+ * 只写配置, 不搬任何资源; path 的父目录必须已经存在。 */
 bool bongo_cat_tauri_write_config(const char *path, BongoCatModelMode mode,
     const TauriKeyFiles *left, const TauriKeyFiles *right,
     const TauriMverCalibration *calibration, BongoCatError *error) {
@@ -44,6 +55,8 @@ bool bongo_cat_tauri_write_config(const char *path, BongoCatModelMode mode,
             calibration->mirror) &&
         yyjson_mut_obj_add_bool(document, decoration, "l2d_auto_frame",
             calibration->auto_frame) &&
+        /* 这里写的是 Mver 的模式编号 1/2/3, 不是枚举值 0/1/2 —— 与 BongoCatModelMode
+         * 的顺序差一位, 改动前先确认下游怎么读它 (旧版独立精灵模式是 98)。 */
         yyjson_mut_obj_add_int(document, root, "mode",
             mode == BONGO_CAT_MODE_STANDARD ? 1 :
             mode == BONGO_CAT_MODE_KEYBOARD ? 2 : 3) &&
@@ -56,6 +69,9 @@ bool bongo_cat_tauri_write_config(const char *path, BongoCatModelMode mode,
         ok = add_matrix(document, mode_object, "lefthand", left) &&
             add_matrix(document, mode_object, "righthand", right) &&
             yyjson_mut_obj_add_arr(document, mode_object, "keyboard");
+    /* input_mode=1 是手柄键码的开关: 重新扫描已安装包时 Mver 侧只认这个键 (缺失或写 0
+     * 就会把 0..15 当成键盘键码), 所以它只在手柄模式下写, 而且不能省。 */
+
     if (ok && mode == BONGO_CAT_MODE_GAMEPAD)
         ok = yyjson_mut_obj_add_int(document, mode_object, "input_mode", 1);
     if (ok) ok = yyjson_mut_obj_add_arr(document, mode_object, "face") &&

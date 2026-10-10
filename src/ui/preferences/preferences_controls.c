@@ -1,3 +1,15 @@
+/*
+ * 设置页上三类数值/开关控件的底层实现: 步进器 (stepper)、滑杆 (slider)、以及给它们
+ * 用的按住连发与拖拽状态。
+ *
+ * 两个状态是**跨帧、按 context 归属**的静态变量 (repeat_state / slider_drag_state):
+ * 它们记录"用户正按着谁"。之所以必须跨帧, 是因为拖拽过程中指针会离开控件范围,
+ * 只在单帧内判断的话拖到一半就断了。每个都带 context 指针, 是为了多实例
+ * (冒烟测试里一个进程多个 app) 之间不串台, context 不同就视为另一个控件。
+ *
+ * 另一条硬性约定: 谁消费了滚轮就把它清零 (scroll_delta.y = 0)。Nuklear 的滚轮
+ * 增量是全局的, 不清零的话同一个滚轮事件会被后面的控件/页面滚动再吃一次。
+ */
 #include "preferences_controls.h"
 #include "preferences_number_edit.h"
 #include "ui_animation.h"
@@ -36,6 +48,10 @@ static void slider_drag_stop(struct nk_context *context) {
     memset(&slider_drag_state, 0, sizeof(slider_drag_state));
 }
 
+/*
+ * 开始拖拽时抓一次鼠标 (SDLCaptureMouse): 指针滑出窗口后仍然能收到移动, 否则
+ * 用户拖到窗口外就"卡住"了。抓取可能失败 (平台限制), 失败也不影响继续拖窗内部分。
+ */
 static bool slider_drag_begin(struct nk_context *context, const char *id,
     struct nk_rect hit) {
     bool active = slider_drag_active(context, id);
@@ -62,6 +78,12 @@ static void centered(struct nk_command_buffer *canvas, struct nk_rect bounds,
         nk_rgba(0, 0, 0, 0), color);
 }
 
+/*
+ * 按住连发: 第一次点击立刻返回方向, 按住不放则先等 360ms 再以 60ms 的间隔重复。
+ * 那个 360ms 是"防误触 + 手感"的折中, 太短会让想点一下的用户多点好几下。
+ * 只在指针仍停在同一个按钮上时才连发 (移开就停), 并且一旦松开左键就把状态清空 ——
+ * 否则下次点到别处会被当成还在连发。
+ */
 static int repeat_direction(struct nk_context *context, const char *id,
     struct nk_rect minus, struct nk_rect plus) {
     bool down = nk_input_is_mouse_down(&context->input, NK_BUTTON_LEFT);
@@ -91,6 +113,11 @@ static int repeat_direction(struct nk_context *context, const char *id,
     return repeat_state.direction;
 }
 
+/*
+ * "还有控件没结束交互吗" —— 供事件驱动渲染决定要不要继续要帧。
+ * 这里同时兼职做清理: 左键已经松开时顺手把连发状态清掉。之所以把清理放在这个
+ * 每帧都会调的函数里, 是因为用户可能在窗口外松手, 那一刻收不到本窗口的事件。
+ */
 bool bongo_cat_pref_controls_animating(struct nk_context *context) {
     bool down = nk_input_is_mouse_down(&context->input, NK_BUTTON_LEFT);
     if (!down && repeat_state.context == context)
@@ -100,6 +127,10 @@ bool bongo_cat_pref_controls_animating(struct nk_context *context) {
         slider_drag_state.context == context;
 }
 
+/*
+ * 关窗/失焦时统一复位: 不重置的话下次开窗会带着"还按着某个控件"的陈旧状态,
+ * 表现为刚打开就自己连发/自己拖动。
+ */
 void bongo_cat_pref_controls_reset(struct nk_context *context) {
     bongo_cat_pref_number_edit_reset(context);
     if (repeat_state.context == context)
@@ -107,6 +138,16 @@ void bongo_cat_pref_controls_reset(struct nk_context *context) {
     slider_drag_stop(context);
 }
 
+/*
+ * 步进器: [ - ] [ 数值 ] [ + ] 三个区, 双击数值恢复默认, 悬停时滚轮也能加减。
+ * effect_margin 是给命中区外扩的 2px: 按钮的圆角和阴影向外溢出, 不外扩的话紧贴
+ * 边缘点不动。
+ * 数值框在编辑态下交给 number_edit 自己画 (它要处理光标与选区), 非编辑态才由这里
+ * 居中画文本 —— 两处都画会重影。
+ * 双击恢复默认那一下要顺手把数字编辑会话重置并 unfocus: 否则输入框里还留着旧草稿,
+ * 下次点进去会看到和当前值不一致的文字。
+ * 返回的 changed 是"值真的变了", 调用方据此决定要不要落盘/重绘窗口。
+ */
 static double stepper(struct nk_context *context, const char *id,
     double minimum, double value, double maximum, double step,
     double default_value, bool integer, bool *changed) {
@@ -188,6 +229,10 @@ static double stepper(struct nk_context *context, const char *id,
     return value;
 }
 
+/*
+ * 浮点包装: 只有"步进结果和原值不同"才算 changed, 免得因为 double/float 舍入
+ * 差异每次都报变化, 引发无意义的重绘与落盘。
+ */
 bool bongo_cat_pref_control_float(struct nk_context *context, const char *id,
     float minimum, float *value, float maximum, float step,
     float default_value) {
@@ -208,6 +253,13 @@ bool bongo_cat_pref_control_int(struct nk_context *context, const char *id,
     return changed;
 }
 
+/*
+ * 滑杆: 轨道 + 拇指 + 右侧百分比方框。
+ * 拖动时的值由指针位置按比例算出, 再按 step 取整 (roundf) —— 不取整的话滑杆会
+ * 产生 47.2381 这种值, 存进配置很难看。
+ * 松手那一帧用 clicked_pos 而不是当前 pos: 用户拖到窗口外松手时, 最后的位置可能
+ * 已经在窗口外, 用 clicked_pos 能保证落点是按下时那个点, 不会突然跳到 0 或 100。
+ */
 bool bongo_cat_pref_control_slider(struct nk_context *context, const char *id,
     float minimum, float *value, float maximum, float step,
     float default_value) {

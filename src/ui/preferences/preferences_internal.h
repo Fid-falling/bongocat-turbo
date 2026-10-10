@@ -1,3 +1,12 @@
+/*
+ * 设置窗口内部的跨文件接口 (只在 src/ui/preferences/ 内部使用)。
+ * 按用途分成几组: 页面绘制 (page_settings / page_model / page_shortcuts / page_about)、
+ * 两个"会话型"子状态 (文本重命名、快捷键录制)、导入通路, 以及缓存目录那一行。
+ *
+ * 有一条容易忽略的契约: 这里所有 *_event 函数返回 true 都表示"事件已被消费",
+ * 调用方 (preferences.c 的 event 分发) 必须立刻停止往下传 —— 尤其是异步对话框的
+ * dialog_event, 它必须跑在"按窗口 ID 过滤"之前, 否则没有窗口 ID 的用户事件会被丢掉。
+ */
 #ifndef BONGO_CAT_PREFERENCES_INTERNAL_H
 #define BONGO_CAT_PREFERENCES_INTERNAL_H
 

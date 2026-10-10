@@ -11,6 +11,9 @@
 #include <string.h>
 #include <windows.h>
 
+/* 命名对象的句柄与其名字(默认值见下面, 可被测试环境变量改写)。这是进程级单例状态:
+   只有 initialize_identity 会改名字, 其它函数一律通过 *._name() 取值, 于是"必须先
+   初始化再使用"这条顺序要求集中在一个地方。 */
 static HANDLE instance_mutex;
 static HANDLE instance_wake_event;
 static HANDLE instance_update_shutdown_event;
@@ -26,6 +29,8 @@ static wchar_t instance_stopped_name[128] = L"Local\\BongoCat.InstanceStopped";
 static wchar_t instance_info_name[128] = L"Local\\BongoCat.InstanceInfo";
 static bool identity_ready;
 
+/* 测试用的实例标识只允许字母数字与 -_ 且不超过 32 字符: 它会被拼进内核对象名字,
+   带反斜杠的名字会跑进别的命名空间(或者直接失败), 所以必须白名单过滤。 */
 static bool safe_identity(const char *value) {
     if (!value || !value[0] || strlen(value) > 32) return false;
     for (const unsigned char *cursor = (const unsigned char *)value; *cursor; ++cursor)
@@ -74,6 +79,14 @@ const wchar_t *bongo_cat_windows_instance_info_name(void) {
     initialize_identity(); return instance_info_name;
 }
 
+/*
+ * 创建(或打开)全部命名对象。三个事件的语义不同, 不能互换:
+ *   - wake: 自动重置, 只表示"有人敲了一下门";
+ *   - update-shutdown: 自动重置, 只表示"请退出";
+ *   - stopped: 手动重置, 是"我已经退出"的持久状态 —— 新实例必须在它置位后才敢接管,
+ *     所以它绝不能是自动重置。
+ * 共享内存里写 magic(用于识别结构已被初始化)、可执行文件路径与版本号。
+ */
 static void create_instance_events(void) {
     if (!instance_wake_event)
         instance_wake_event = CreateEventW(NULL, FALSE, FALSE, instance_wake_name);
@@ -101,6 +114,12 @@ static void create_instance_events(void) {
     }
 }
 
+/*
+ * 通知已经运行的实例"又有人启动了一次": 先试事件(最快), 事件打不开就退化成按标题
+ * 找到窗口并直接激活它。
+ * 重试 30 次 × 100ms: 旧实例可能还在启动过程中, 窗口和事件都没建好; 这时立刻放弃会
+ * 让用户点了图标却什么都没发生。
+ */
 static void wake_existing_instance(void) {
     for (int attempt = 0; attempt < 30; ++attempt) {
         HANDLE wake = OpenEventW(EVENT_MODIFY_STATE, FALSE, instance_wake_name);
@@ -119,6 +138,14 @@ static void wake_existing_instance(void) {
     }
 }
 
+/*
+ * 单实例裁决。返回 true = 本进程继续运行(自己拿到了互斥体, 或者被测试环境变量放行);
+ * 返回 false = 已经有实例在跑, 调用方应当退出。
+ * 流程: 建互斥体 -> 已存在就先试"更新交棒"(让旧实例为更新让位) -> 等它真正退出后
+ * 重新拿互斥体 -> 还是拿不到就只把旧实例唤到前台, 然后返回 false。
+ * 这里每一步都要关掉再重新 CreateMutexW: 互斥体是"持有"语义, 旧实例退出后必须重新
+ * 创建才能取得所有权。
+ */
 bool bongo_cat_platform_single_instance_begin(void) {
     initialize_identity();
     if (SDL_getenv_unsafe("BONGO_CAT_ALLOW_TEST_INSTANCES")) return true;
@@ -149,11 +176,20 @@ bool bongo_cat_platform_single_instance_begin(void) {
     return false;
 }
 
+/* 非阻塞地取一次唤醒信号: 主循环每轮调用, 返回 true 就把窗口显示出来。 */
 bool bongo_cat_platform_single_instance_take_wake(void) {
     return instance_wake_event &&
         WaitForSingleObject(instance_wake_event, 0) == WAIT_OBJECT_0;
 }
 
+/*
+ * 更新流程里"新进程"的入口: 命令行带 --shutdown-for-update 时, 负责把旧实例请出去并
+ * 等它关完。
+ * 三条通知同时发: 事件(给正常运行的实例)、WM_CLOSE(给卡在消息循环里的窗口), 最后等
+ * stopped 事件最多 15 秒 —— 即使超时也照样返回 true, 因为更新已经进入下一步, 卡在
+ * 这里没有意义。
+ * 返回 true 表示"本进程只负责关掉旧实例, 关完就该退出"。
+ */
 bool bongo_cat_platform_update_shutdown_argument(int argc, char **argv) {
     bool requested = false;
     for (int i = 1; i < argc; ++i)
@@ -177,11 +213,15 @@ bool bongo_cat_platform_update_shutdown_argument(int argc, char **argv) {
     return true;
 }
 
+/* 非阻塞地检查"是否有更新流程要求我退出": 主循环每轮调用, 返回 true 就应当优雅退出。 */
 bool bongo_cat_platform_single_instance_take_update_shutdown(void) {
     return instance_update_shutdown_event &&
         WaitForSingleObject(instance_update_shutdown_event, 0) == WAIT_OBJECT_0;
 }
 
+/* 退出清理。顺序很重要: 先置 stopped(让正在等待的新实例知道可以接管了), 再逐个关闭
+   句柄。即使某个句柄本来就是 NULL 也要走到最后 —— 单实例资源泄漏会让下次启动被误判
+   成"已有实例在运行"。 */
 void bongo_cat_platform_single_instance_end(void) {
     if (instance_stopped_event) SetEvent(instance_stopped_event);
     if (instance_update_shutdown_event)
@@ -199,6 +239,12 @@ void bongo_cat_platform_single_instance_end(void) {
     instance_mutex = NULL;
 }
 
+/*
+ * 开机自启: 在用户的"启动"文件夹里放 / 删一个快捷方式(而不是写 Run 注册表项)。
+ * 为什么用快捷方式: 更新后程序路径可能变化, 而且用户能在"启动"文件夹里看得见、自己
+ * 管理; 快捷方式带 --autostart 参数, 程序据此知道这次是开机自启而不是用户双击。
+ * 关闭时 ERROR_FILE_NOT_FOUND 也算成功 —— 目标状态(没有快捷方式)已经达成。
+ */
 BongoCatResult bongo_cat_platform_set_autostart(bool enabled,
     BongoCatError *error) {
     PWSTR startup = NULL;
@@ -234,6 +280,8 @@ BongoCatResult bongo_cat_platform_set_autostart(bool enabled,
     wchar_t *separator = wcsrchr(working_directory, L'\\');
     if (separator) *separator = L'\0';
 
+    /* IShellLink 需要 COM。RPC_E_CHANGED_MODE 表示本线程已经用别的套间模式初始化过,
+       这时仍然可以创建对象, 但不该由我们 CoUninitialize。 */
     HRESULT initialized = CoInitializeEx(NULL, COINIT_APARTMENTTHREADED);
     if (FAILED(initialized) && initialized != RPC_E_CHANGED_MODE) result = initialized;
     else {

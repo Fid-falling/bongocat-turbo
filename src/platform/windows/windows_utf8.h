@@ -6,6 +6,14 @@
 #include <stddef.h>
 #include <wchar.h>
 
+/*
+ * UTF-8 <-> UTF-16 转换, Windows 平台层所有字符串进出的唯一通道。
+ *
+ * 契约: bongo_cat_windows_wide 返回新分配的宽字符串, 由调用方 free, 失败返回 NULL;
+ * bongo_cat_windows_utf8 写进调用方的缓冲区, 空间不够就返回 false(绝不截断)。
+ * 两者都带 MB_ERR_INVALID_CHARS / WC_ERR_INVALID_CHARS: 非法编码直接失败, 而不是被
+ * 悄悄替换成 '?', 否则路径会指向另一个文件。
+ */
 wchar_t *bongo_cat_windows_wide(const char *text);
 bool bongo_cat_windows_utf8(const wchar_t *text, char *output, size_t capacity);
 #endif

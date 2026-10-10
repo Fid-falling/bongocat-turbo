@@ -1,3 +1,5 @@
+/* 模型导入的全局锁接口（实现见 model_import_lock.c）：懒创建，lock 与 unlock 必须成对且不可
+ * 重入；..._shutdown 由 lifecycle 关闭阶段调用，那时必须已经没有使用者。 */
 #ifndef BONGO_CAT_MODEL_IMPORT_LOCK_H
 #define BONGO_CAT_MODEL_IMPORT_LOCK_H
 

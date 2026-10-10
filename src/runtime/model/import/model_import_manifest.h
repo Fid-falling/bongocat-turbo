@@ -1,3 +1,7 @@
+/*
+ * Live2D 清单校验的对外接口: 严格版(导入用)与文档版(调用方已经解析好 JSON 时复用)。
+ * 两者都只读文件; 失败除了写 BongoCatError 之外不产生任何副作用。
+ */
 #ifndef BONGO_CAT_MODEL_IMPORT_MANIFEST_H
 #define BONGO_CAT_MODEL_IMPORT_MANIFEST_H
 

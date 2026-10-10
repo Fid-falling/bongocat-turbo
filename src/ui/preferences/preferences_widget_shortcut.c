@@ -1,3 +1,16 @@
+/*
+ * 快捷键表单行 (标题 + 快捷键显示框 + 可选的清除小叉)。
+ *
+ * 返回值是三态约定, 调用方必须按它分派:
+ * -1 清除绑定;  0 无操作;  1 开始录制。
+ * 这个三态是本文件与调用方之间最容易搞错的契约 —— 返回 0 和返回 1 都是"非负",
+ * 用 if (result) 判断会把"清除"当成"开始录制"。
+ *
+ * 录制中那条呼吸光圈是无限循环动画, 所以必须每帧重绘 (present 里靠
+ * shortcut_recording 拉帧), 停帧会让光圈卡住。
+ * 宽度是按当前显示文字的实测宽度算并夹在 180..260 之间的: 太窄会截断组合键, 太宽
+ * 会把标题列挤没。
+ */
 #include "preferences_widgets.h"
 #include "bongo_cat/shortcut.h"
 #include "preferences_widgets_internal.h"
@@ -96,6 +109,7 @@ int bongo_cat_pref_edit(struct nk_context *context, const char *id,
         clear_bounds, p, 1.0f, can_clear);
     if (hover) bongo_cat_ui_cursor_hover_rect(context, bounds,
         BONGO_CAT_UI_CURSOR_POINTER);
+    /* clicked 特意排除 clear 命中: 小叉压在框的右下角, 不排除的话点清除会同时触发录制 */
     bool clicked = !clear && nk_input_is_mouse_click_in_rect(&context->input,
         NK_BUTTON_LEFT, bounds) != 0;
     nk_layout_row_end(context);

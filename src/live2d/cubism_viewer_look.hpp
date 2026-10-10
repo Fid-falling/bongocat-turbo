@@ -5,6 +5,15 @@
 
 namespace bongo_cat {
 
+/*
+ * 注视跟随的更新器。
+ *
+ * 它挂在 SDK 的更新调度器上 (CubismUpdateOrder_Look 顺序), 每帧由 SDK 回调, 不需要外部
+ * 驱动, 也不会和物理/呼吸/眨眼的顺序打架 —— 顺序由 SDK 统一决定。
+ *
+ * 阻尼模型的状态 (face_/velocity_) 必须留在这里而不是参数上: 参数只是每帧的输出, 真正的
+ * "惯性"得由我们自己维护, 否则鼠标一停头也会立刻停住。
+ */
 class ViewerLookUpdater final : public Csm::ICubismUpdater {
 public:
     explicit ViewerLookUpdater(Csm::CubismModel &model);

@@ -1,3 +1,5 @@
+/* 模型存储的底层文件操作（实现见 model_storage.c）：递归删除、清理导入残留、递归复制、安
+ * 装内置模型。除只读调用外都需要在 bongo_cat_import_storage_lock() 保护下使用。 */
 #ifndef BONGO_CAT_MODEL_STORAGE_H
 #define BONGO_CAT_MODEL_STORAGE_H
 

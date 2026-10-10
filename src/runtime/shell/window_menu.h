@@ -1,8 +1,14 @@
+/* 主窗口右键径向菜单的内部接口 (仅 shell 内部使用): 菜单的标签、勾选态、实时预览与
+ * "选中之后做什么"分散在 actions/preview/behavior 三个实现文件里, 这里只声明契约。
+ * 菜单本体由系统侧 (Windows 原生菜单 / dial 窗口) 绘制并返回 BongoCatMenuAction; 预览与
+ * restore 是主窗口被回调进去执行的, 发生在平台菜单的模态循环期间, 那段时间主循环停摆。 */
 #ifndef BONGO_CAT_WINDOW_MENU_INTERNAL_H
 #define BONGO_CAT_WINDOW_MENU_INTERNAL_H
 
 #include "modal_frame.h"
 
+/* 预览事务的会话状态: init 记下菜单打开瞬间的缩放/不透明度/表情, last 是最近一次请求
+ * 试穿的动作, applied 才是已经真正落定的动作 —— restore 靠它区分"保留"与"回滚"。 */
 typedef struct BongoCatWindowMenuPreview {
     BongoCatApp *app;
     float scale, opacity;

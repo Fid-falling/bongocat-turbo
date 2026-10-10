@@ -1,3 +1,14 @@
+/*
+ * 行为重命名 (行左半部分的名字)。
+ *
+ * 名字存的地方不是行为表而是 settings.behavior_shortcuts 里的 label 字段 —— 行为表
+ * 是每次启动从模型里枚举出来的, 改它下次启动就没了; 绑定记录才是持久的。所以
+ * "恢复默认"的写法是: 当新名字恰好等于原始名时, 存成空字符串 (空 = 用原始名),
+ * 而不是把名字原样存一份。见 rename_finish 里的 label 计算。
+ *
+ * 改名会引入新字形, 所以结束时要重建字体图集 (reload_fonts) —— 不重建的话用户
+ * 刚打进去的汉字会显示成方块。
+ */
 #include "preferences_state.h"
 #include "preferences_text_edit.h"
 
@@ -5,6 +16,10 @@
 #include <stdio.h>
 #include <string.h>
 
+/*
+ * 与 preferences_behavior_row.c 里的同名函数是一份重复实现: 两边都按需惰性创建绑定
+ * 记录, 所以逻辑必须保持一致 (改动时两处一起改)。
+ */
 static BongoCatBehaviorShortcut *binding_for(BongoCatSettings *config,
     const char *id) {
     for (size_t i = 0; i < config->behavior_shortcut_count; ++i)
@@ -24,6 +39,11 @@ static const char *display_label(const BongoCatBehaviorEntry *entry,
     return binding && binding->label[0] ? binding->label : entry->label;
 }
 
+/*
+ * 结束改名。save=false 是 ESC/取消, 这时什么都不写。
+ * 只有在"新名字真的和旧的不一样"时才重建字体图集 —— 每次回车都重建一次图集
+ * 会让对话框明显卡一下。
+ */
 void bongo_cat_preferences_behavior_rename_finish(
     BongoCatPreferences *value, bool save) {
     if (!value || !bongo_cat_preferences_text_session_active(
@@ -53,6 +73,10 @@ void bongo_cat_preferences_behavior_rename_finish(
     value->render_dirty = true;
 }
 
+/*
+ * 开始改名。先 cancel 掉快捷键录制: 两个会话都要独占键盘, 同时开着会互相抢文字输入
+ * (rename 吃 TEXT_INPUT, 录制吃 KEY_DOWN, 用户会看到两处同时在变)。
+ */
 void bongo_cat_preferences_behavior_rename_begin(BongoCatPreferences *value,
     const BongoCatBehaviorEntry *entry, BongoCatBehaviorShortcut *binding,
     struct nk_rect bounds) {
@@ -64,6 +88,7 @@ void bongo_cat_preferences_behavior_rename_begin(BongoCatPreferences *value,
     value->render_dirty = true;
 }
 
+/* 文本编辑会话的事件入口; 这里只把 result 翻译成"结束并保存/放弃"和"要重画" */
 bool bongo_cat_preferences_behavior_rename_event(
     BongoCatPreferences *value, const SDL_Event *event) {
     if (!value) return false;

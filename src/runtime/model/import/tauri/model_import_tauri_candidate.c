@@ -1,9 +1,21 @@
+/*
+ * 候选构造: 把一个已发现的 Tauri 目录变成 BongoCatImportCandidate。
+ * 这里确定后续转换依赖的字段: directory (含 model3.json 的目录)、setting (清单文件名)、
+ * assets (预览图与按键图的资源根, 可能上溯到父目录)、package_root (包根, 先按模型目录
+ * 填, 精确发现时会再改写成用户选中的目录)。
+ * 模式判定分两级: 先看 resources/right-keys 里出现的键名判手柄/键盘, 判不出来再退回
+ * 目录名关键字 (含中文“键盘/手柄/标准”); 两级都失败时按 standard 处理。
+ * 最容易改错的是 assets 的上溯规则, 它会改变后面所有找图的搜索根。
+ */
 #include "model_import_tauri_internal.h"
 
 #include <SDL3/SDL.h>
 #include <stdio.h>
 #include <string.h>
 
+/* 目录名匹配用“裸字节子串查找”, 不经过 locale 也不做正规化: 导出器会给目录加前后缀,
+ * 所以只能按子串判; 中文关键字直接以 UTF-8 字节序列比对 (见下面的 utf8_contains),
+ * 因为 Tauri 中文包的目录名就是“键盘 / 手柄 / 标准”这三个词。 */
 static bool ascii_contains_ci(const char *value, const char *needle) {
     if (!value || !needle || !needle[0]) return false;
     size_t length = strlen(needle);
@@ -24,6 +36,8 @@ static bool utf8_contains(const char *value, const unsigned char *needle,
     return false;
 }
 
+/* 目录名的模式启发式。按路径段逐层扫描, 越深的段越优先 (后写覆盖先写), 但 basename
+ * 一旦命中关键字就直接返回 —— basename 比任何中间目录都权威, 因为用户看到的是它。 */
 static BongoCatModelMode import_mode(const char *path) {
     const char *cursor = path;
     BongoCatModelMode mode = BONGO_CAT_MODE_STANDARD;
@@ -56,6 +70,8 @@ static BongoCatModelMode import_mode(const char *path) {
     return mode;
 }
 
+/* 下面三个探测函数回答“这一层有没有能当预览/背景用的资源”: 任意一个候选名命中就算有。
+ * has_preview_assets 连 resources/ 目录也算命中, 另外两个只认文件。 */
 static bool has_preview_assets(const char *directory) {
     const char *names[] = {"resources", "cover.png", "cat.png", "bg.png",
         "mousebg.png", "tabletbg.png"};
@@ -96,6 +112,9 @@ typedef struct TauriRightKeys {
     bool gamepad;
 } TauriRightKeys;
 
+/* 设计上假定只有手柄包会在 right-keys 里出现这 16 个键名 (与 model_import_tauri_keys.c 的手柄表、
+ * Mver 侧的 bongo_cat_mver_gamepad_names 同名同序)。名字必须恰好等于表项加 .png,
+ * 因为键盘包的图都叫 KeyA.png 这类名字, 不会误撞。 */
 static bool gamepad_key_name(const char *name) {
     static const char *const names[] = {
         "South", "East", "West", "North", "LeftTrigger", "RightTrigger",
@@ -120,6 +139,9 @@ static BongoCatPathVisit inspect_right_key(void *userdata,
     return BONGO_CAT_PATH_CONTINUE;
 }
 
+/* 用 right-keys 目录判定模式: 目录里的键名决定这包是手柄还是键盘。目录不存在或枚举
+ * 失败都返回 false (调用方一律退回目录名启发式, 不需要区分这两种情况); 目录存在但
+ * 为空时按键盘处理。 */
 static bool tauri_resource_mode(const char *directory, const char *assets,
     BongoCatModelMode *mode, bool *gamepad_buttons) {
     const char *roots[] = {directory, assets};
@@ -149,6 +171,12 @@ static bool tauri_resource_mode(const char *directory, const char *assets,
     *gamepad_buttons = keys.gamepad;
     return true;
 }
+
+/* 把一个 Tauri 目录登记成候选。返回值 true 只表示“这个目录不用再报了”, 不代表新增:
+ * 同一目录 + 同一清单 = 重复 (静默忽略); 同一目录 + 不同清单 = 歧义, 置
+ * discovery->ambiguous 并返回 false; 容量用尽时也返回 false, 但会走另一条错误文案。
+ * assets 默认等于 directory, 只有本层缺封面/背景、父目录有预览资源时才上溯父目录 ——
+ * Tauri 导出器常把预览图放在包根、模型放在子目录。 */
 
 bool bongo_cat_import_tauri_add_candidate(BongoCatImportDiscovery *discovery,
     const char *directory, const char *setting) {

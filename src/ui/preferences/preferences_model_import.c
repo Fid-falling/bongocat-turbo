@@ -1,3 +1,15 @@
+/*
+ * 导入结束后的用户可见结果 (由 complete_job 在工作线程结束后于主线程调用)。
+ *
+ * 这个函数是"导入"这条链路的唯一出口: 提示文字、失败清单、冒烟退出码、重绘都在这里
+ * 定稿, 上面的 worker 只管干活不碰 UI。
+ * 两条特殊约定:
+ * - 失败清单只列前 N 个, 剩下的用 "and N more" 概括 —— 一次拖进 200 个包时
+ * 全列出来会把通知撑爆;
+ * - app->smoke 下不弹通知, 而是把失败转成 exit_code=1, 让 CI 能判定。
+ * 末尾主动 render 一次: 导入是在事件流之外结束的, 不主动画这一帧, 结果提示要等到
+ * 用户下一次操作才出现。
+ */
 #include "preferences_state.h"
 #include "preferences_notice.h"
 #include "model_import.h"
@@ -12,6 +24,10 @@ static const char *tr(BongoCatApp *app, const char *key,
     return bongo_cat_i18n_get(app->i18n, key, fallback);
 }
 
+/*
+ * 把结果码翻成人话。CUBISM 那一档单独列出, 因为它是"装上了但显示不出来" ——
+ * 和"没装上"是完全不同的两件事, 提示必须说清楚。
+ */
 static const char *import_failure_message(BongoCatApp *app,
     BongoCatResult result) {
     switch (result) {
@@ -53,6 +69,12 @@ void bongo_cat_preferences_import_complete(BongoCatApp *app,
         snprintf(failure_list + used, sizeof(failure_list) - used,
             "%s%s", i ? ", " : "", failed_names[i]);
     }
+    /*
+     * failed_count 是"失败总数", failed_names 是"记得住名字的那部分", 两者可能不等。
+     * listed_count 记录真正列出来的条数, 只用来算 "and N more" 里的 N;
+     * 一条名字都没有但确实有失败时, 补一个 "unknown source" 占位, 否则提示会变成
+     * "失败 3 个, 失败的模型: " 这种半截话。
+     */
     size_t listed_count = shown_names;
     if (!failure_list[0]) {
         snprintf(failure_list, sizeof(failure_list), "%s",
@@ -64,6 +86,10 @@ void bongo_cat_preferences_import_complete(BongoCatApp *app,
         snprintf(more_failures, sizeof(more_failures), tr(app,
             "pages.preference.model.hints.importMoreFailures",
             " and %zu more"), failed_count - listed_count);
+    /*
+     * 三种措辞分开: 装上了新包 / 只有同名已存在的包 / 部分失败。
+     * error 的 code 优先于结果码, 因为它带着更具体的失败原因。
+     */
     const char *message = installed_count ? tr(app,
             "pages.preference.model.hints.importSuccess", "Model imported")
         : tr(app, "pages.preference.model.hints.importExists",

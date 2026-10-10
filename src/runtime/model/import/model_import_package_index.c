@@ -1,3 +1,8 @@
+/*
+ * 会话内的"已安装包索引": 建会话时扫描 models_root 建立, 每次安装成功后再追加。
+ * 用途是内容级去重 —— 摘要与模式集合都对得上的包视为同一个包, 不再重复落盘。
+ * 索引是快照, 只在持有存储锁的导入流程内读写, 非线程安全。
+ */
 #include "model_import_session_internal.h"
 #include "bongo_cat/path.h"
 
@@ -5,6 +10,7 @@
 #include <stdlib.h>
 #include <string.h>
 
+/* 一个已安装包在索引里的紧凑表示: 包 id 加它全部变体的 (模式, 内容摘要) 集合。 */
 typedef struct IndexedPackage {
     char id[BONGO_CAT_ID_CAP];
     char digests[BONGO_CAT_IMPORT_CANDIDATE_CAP][65];
@@ -20,6 +26,9 @@ struct BongoCatImportPackageIndex {
 
 /* Build once for a batch; successful atomic installs extend this snapshot. */
 
+/* 判断"已知条目"能否覆盖 discovery 的全部候选: 用 used[] 保证模式与摘要一对一(同一条目
+   不能匹配两次); discovery->count 大于已知变体数时直接不匹配。matches[i] 只在返回 true
+   时有意义, 是 discovery 第 i 个候选对应的变体下标。 */
 static bool match_package(const IndexedPackage *known,
     const BongoCatImportDiscovery *discovery,
     const BongoCatPackageMetadata *metadata,
@@ -43,6 +52,8 @@ static bool match_package(const IndexedPackage *known,
     return true;
 }
 
+/* 容量按"变体总数"计(BONGO_CAT_MODEL_CAP 是模型总数上限), 溢出时报 FORMAT 并且不改动
+   索引; 已提交目录的回滚由调用方负责。 */
 bool bongo_cat_import_package_index_add(BongoCatImportPackageIndex *index,
     const char *id, const BongoCatImportDiscovery *discovery,
     const BongoCatPackageMetadata *metadata, BongoCatError *error) {
@@ -66,6 +77,8 @@ bool bongo_cat_import_package_index_add(BongoCatImportPackageIndex *index,
     return true;
 }
 
+/* 找到能覆盖全部候选的包就返回 true, 并通过 ids/count 给出该包各变体的 id(用变体下标
+   还原 "~N" 后缀); 返回 false 表示"没装过", 此时 count 已被清零。 */
 bool bongo_cat_import_package_index_find(
     const BongoCatImportPackageIndex *index,
     const BongoCatImportDiscovery *discovery,
@@ -91,6 +104,7 @@ bool bongo_cat_import_package_index_find(
     return false;
 }
 
+/* 供调用方在复制之前预判容量, 避免"复制完才发现放不下"。 */
 bool bongo_cat_import_package_index_has_capacity(
     const BongoCatImportPackageIndex *index, size_t model_count) {
     return index && index->count < BONGO_CAT_MODEL_CAP &&
@@ -104,6 +118,8 @@ typedef struct IndexBuild {
     bool failed;
 } IndexBuild;
 
+/* 目录枚举回调: 跳过隐藏项与带运行时标记的目录; 单个坏包(识别或摘要失败)只跳过,
+   不中断整个索引 —— 只有内存不足或索引写入失败才返回 FAILURE 终止建索引。 */
 static BongoCatPathVisit index_package(void *userdata,
     const char *dirname, const char *name) {
     IndexBuild *build = userdata;
@@ -139,6 +155,7 @@ static BongoCatPathVisit index_package(void *userdata,
     return BONGO_CAT_PATH_FAILURE;
 }
 
+/* 失败返回 NULL 并释放半成品索引; 只有枚举失败或回调显式失败才报错(单个坏包会被跳过)。 */
 BongoCatImportPackageIndex *bongo_cat_import_package_index_create(
     const char *root, BongoCatImportDigestCache *digests,
     BongoCatError *error) {

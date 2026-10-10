@@ -1,3 +1,11 @@
+/*
+ * Mver 图片补丁的发现器: 补丁只替换 img 下的按键与手势图片, 不含 Live2D 本体, 所以必须先在磁盘上
+ * 找到归属的完整模型包, 再把补丁叠加到那个包的候选上 (patch_root、overrides 与 format 都被改写成
+ * 补丁形态)。
+ * 位置: 由精确包根探测与 nearby 扫描调用; 返回值沿用发现器约定 —— 大于 0 命中, 0 表示"不是补丁,
+ * 请继续试别的格式", 负值表示错误。
+ * 易错点: overrides 指向补丁里的模式目录, 模型本体仍从基准包读取, 两者混用会让补丁覆盖掉本体。
+ */
 #include "model_import.h"
 #include "model_import_mver.h"
 #include "../model_import_path.h"
@@ -20,6 +28,8 @@ static bool child_file(const char *root, const char *first, const char *second) 
         bongo_cat_path_is_file(path);
 }
 
+/* 判定目录是不是 Mver 的 img 根: standard 模式要有 hand/0.png, gamepad 模式要有左右手各一张图片,
+   满足其一即可。 */
 static bool patch_shape(const char *root) {
     char mode[BONGO_CAT_PATH_CAP];
     if (bongo_cat_path_join(mode, sizeof(mode), root, "standard") &&
@@ -29,6 +39,9 @@ static bool patch_shape(const char *root) {
         child_file(mode, "righthand", "0.png");
 }
 
+/* 递归 enumerator: 找出目录树里所有形如 img 的补丁根, 只记住第一个路径, 其余仅用于计数 (多于
+   一个时调用方报补丁含多个模型根)。最多向下 3 层, 跳过点号开头的隐藏目录; 出错时返回 FAILURE
+   让枚举整体中止。 */
 static BongoCatPathVisit find_image_root(void *userdata,
     const char *dirname, const char *name) {
     PatchSearch *search = userdata;
@@ -58,6 +71,9 @@ static bool full_package(const char *path) {
         patch_shape(image);
 }
 
+/* 从 source 起向上最多 6 层, 在每一层的同级目录里找名为 model_name 的完整模型包。返回命中个数
+   (0 表示没找到), base 只写第一个命中; 调用方据此区分唯一基准与多个候选, 后者必须报错而不是
+   随便挑一个。 */
 static int find_base(const char *source, const char *model_name,
     char *base, size_t capacity) {
     char current[BONGO_CAT_PATH_CAP];
@@ -77,6 +93,9 @@ static int find_base(const char *source, const char *model_name,
     return matches;
 }
 
+/* 把补丁的图片目录叠加到唯一找到的基准包上: 先用基准包做常规 Mver 发现, 再逐个候选改写
+   overrides、patch_root 与 format。返回发现器的值 (1 成功、0 未命中、-1 错误); discovery 由调用
+   方提供并就地修改。 */
 static int finish_patch(const char *source, const char *image_root,
     BongoCatImportDiscovery *discovery, BongoCatError *error) {
     char model_root[BONGO_CAT_PATH_CAP], base[BONGO_CAT_PATH_CAP];
@@ -107,6 +126,8 @@ static int finish_patch(const char *source, const char *image_root,
     return 1;
 }
 
+/* 只认两种情况: source 本身就是 img 补丁目录, 或 source 下的 img 是补丁目录。返回 0 表示不是
+   补丁 (调用方可以继续探测其它格式), 不要求 source 存在。 */
 int bongo_cat_import_mver_patch_discover_exact(const char *source,
     BongoCatImportDiscovery *discovery, BongoCatError *error) {
     char root[BONGO_CAT_PATH_CAP], image[BONGO_CAT_PATH_CAP];
@@ -120,6 +141,8 @@ int bongo_cat_import_mver_patch_discover_exact(const char *source,
     return finish_patch(source, image, discovery, error);
 }
 
+/* 先做精确判定; 否则受限地扫描子树找唯一的 img 补丁根。枚举失败与没有补丁一样返回 0 (错误被
+   吞掉, 好让上层继续尝试别的适配器), 找到多个补丁根则返回错误 -1。 */
 int bongo_cat_import_mver_patch_discover(const char *source,
     BongoCatImportDiscovery *discovery, BongoCatError *error) {
     int exact = bongo_cat_import_mver_patch_discover_exact(source,

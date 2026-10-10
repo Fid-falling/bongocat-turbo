@@ -1,9 +1,17 @@
+/*
+ * Mver 音效素材转换: 按 sounds 下标找 assets/sounds/<下标>.wav|ogg|flac, 复制到 target/resources/sounds/,
+ * 并追加一条 kind=sound 绑定 (绑定里的声音名取自源文件名)。时序: 由 bongo_cat_import_adapter_metadata 在
+ * add_behaviors 之后调用; 只往调用方的 items 数组追加条目, 文档与 items 的所有权仍归调用方 (与特效生成同一约定)。
+ * 契约: 缺音频文件的行静默跳过 (音效是可选素材), 但键位解析失败是硬错误。
+ */
 #include "model_import_mver_internal.h"
 #include "bongo_cat/path.h"
 
 #include <stdio.h>
 #include <yyjson.h>
 
+/* 按下标探测三种扩展名 (wav 优先): 命中就写绝对源路径与写进绑定的相对路径 resources/sounds/<下标>.<扩展名>;
+ * 三个都没有则返回 false, 此时两个输出缓冲区内容未定义。 */
 static bool sound_source(const BongoCatImportCandidate *candidate, size_t index,
     char *source, size_t capacity, char *relative, size_t relative_capacity) {
     static const char *extensions[] = {"wav", "ogg", "flac"};
@@ -19,6 +27,8 @@ static bool sound_source(const BongoCatImportCandidate *candidate, size_t index,
     return false;
 }
 
+/* 触发条件刻意只看"存在且不是空数组": 这条绑定不带快捷键 (见下), 行内容没有可写的位置, 强行解析只会把
+ * 占位写法 (字符串或数字) 变成硬错误。 */
 static bool add_sound_clear(yyjson_mut_doc *output, yyjson_mut_val *items,
     yyjson_val *config) {
     yyjson_val *decoration = yyjson_obj_get(config, "decoration");
@@ -29,6 +39,9 @@ static bool add_sound_clear(yyjson_mut_doc *output, yyjson_mut_val *items,
     return item && yyjson_mut_obj_add_str(output, item, "kind", "sound-clear");
 }
 
+/* 音效绑定生成入口: rows 为 null 表示该模式没有音效 (宽松处理, 与素材步一致), 非数组才算错误。副作用: 建
+ * target/resources/sounds 目录并复制音频, 往 items 追加 kind=sound 条目 (overlap 取配置的 decoration.soundKeep,
+ * 缺失时按 true 处理), 只在确实写出音效后追加一条 sound-clear; 下标是配置下标, 缺文件的行不改变其它行编号。 */
 bool bongo_cat_mver_add_audio(void *raw_output, void *raw_items,
     void *raw_config, void *raw_rows,
     const BongoCatImportCandidate *candidate, const BongoCatMverLabels *labels,

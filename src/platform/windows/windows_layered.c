@@ -8,6 +8,20 @@
 #include <stb_image_resize2.h>
 #include <stdlib.h>
 #include <windows.h>
+/*
+ * 分层窗口呈现器: 用代理窗口把 GL 画面按像素透明地贴到桌面上。
+ *
+ * 为什么需要代理窗口: SDL 的 OpenGL 窗口自带一个 DC, 而 UpdateLayeredWindow 必须由
+ * 拥有窗口的线程用内存 DC 提交, 直接在 GL 窗口上做会把 GL 的呈现路径顶掉。所以做法
+ * 是: 把真实(源)窗口压成全透明(SetLayeredWindowAttributes alpha=0), 再用一个
+ * WS_EX_LAYERED 的代理窗口把抓到的帧显示出来。
+ *
+ * 整条链路是"预乘 alpha": glReadPixels 取回 BGRA, 缩放用 STBIR_BGRA_PM(告诉重采样
+ * 器数据已预乘), UpdateLayeredWindow 用 ULW_ALPHA(要求预乘)—— 三者必须一致, 任何
+ * 一环改成直通 alpha, 透明边缘就会出现黑边或亮边。
+ *
+ * 只有强制点击穿透时才启用这套路径(原因见 windows_pointer.c), 平时走 SDL 直接呈现。
+ */
 static const wchar_t proxy_class[] = L"BongoCat.LayeredPresenter";
 static const wchar_t proxy_property[] = L"BongoCat.LayeredProxy";
 /* SDL's OpenGL window owns a DC, so a separate layered window presents frames. */
@@ -25,6 +39,8 @@ void *bongo_cat_windows_layered_create(void) {
     return NULL;
 }
 
+/* 删除 DIB 之前必须先 SelectObject 换回原位图 —— 还选在 DC 里的位图不能删。
+   同时清掉 pixels/width/height, 让 resize_bitmap 下次必定重建。 */
 static void release_bitmap(BongoCatWindowsLayered *value) {
     if (!value || !value->bitmap) return;
     SelectObject(value->memory_dc, value->original_bitmap);
@@ -34,6 +50,9 @@ static void release_bitmap(BongoCatWindowsLayered *value) {
     value->pixels = NULL;
     value->width = value->height = 0;
 }
+/* 把源窗口恢复成普通窗口: 去掉 WS_EX_LAYERED / WS_EX_TRANSPARENT 与全透明属性,
+   并用 SWP_FRAMECHANGED 让系统重新计算非客户区。恢复后必须重设一次 SDL 的窗口
+   不透明度(分层属性会把它盖掉), 并修复 DWM 的透明合成。 */
 static void restore_source(BongoCatPlatform *platform) {
     BongoCatWindowsLayered *value = platform ? platform->presenter : NULL;
     HWND source = native_window(platform);
@@ -61,6 +80,8 @@ void bongo_cat_windows_layered_destroy(BongoCatPlatform *platform) {
     free(value);
     platform->presenter = NULL;
 }
+/* 代理窗口类只注册一次; 已经存在就直接复用。窗口过程用 DefWindowProcW: 代理窗口
+   不接收输入(TRANSPARENT + NOACTIVATE), 不需要自己的消息处理。 */
 static bool register_proxy_class(void) {
     WNDCLASSEXW existing = {.cbSize = sizeof(existing)};
     HINSTANCE instance = GetModuleHandleW(NULL);
@@ -73,6 +94,10 @@ static bool register_proxy_class(void) {
     type.lpszClassName = proxy_class;
     return RegisterClassExW(&type) != 0;
 }
+/* 按需创建代理窗口: 以源窗口为 owner(层级与任务栏归属跟着源窗口), 并继承标题和
+   大小图标(否则任务栏上会是个无名窗口)。样式固定 TOOLWINDOW | NOACTIVATE |
+   TRANSPARENT | LAYERED: 不抢焦点、不接收鼠标。句柄同时写进源窗口的属性, 方便
+   其它模块(windows_pointer.c 抬窗口、诊断)按窗口找到它。 */
 static bool ensure_proxy(BongoCatPlatform *platform) {
     BongoCatWindowsLayered *value = platform ? platform->presenter : NULL;
     HWND source = native_window(platform);
@@ -96,6 +121,10 @@ static bool ensure_proxy(BongoCatPlatform *platform) {
     bongo_cat_windows_capture_log(value->proxy, "layered-proxy-created");
     return true;
 }
+/* 把内存 DC 里的整帧提交给 DWM。destination 用源窗口的屏幕位置, 所以窗口每次移动
+   后都要重新提交; blend 里的 SourceConstantAlpha 就是整窗不透明度, 提交成功后记进
+   applied_alpha, 好让 set_opacity 跳过"值没变"的重复提交。
+   失败细节交给 SDL_SetError, 上层只看到 false 加一条错误信息。 */
 bool bongo_cat_windows_layered_update_proxy(BongoCatPlatform *platform,
     BongoCatWindowsLayered *value) {
     HWND source_window = native_window(platform);
@@ -121,6 +150,9 @@ bool bongo_cat_windows_layered_update_proxy(BongoCatPlatform *platform,
     return true;
 }
 
+/* 把源窗口压成全透明(alpha=0), 桌面上就只剩代理窗口的画面。
+   LWA_ALPHA 失败时必须先把样式改回去再返回 false —— 半途而废会让窗口既不是普通
+   窗口也不透明, 用户会直接看到一块黑。 */
 static bool make_source_transparent(BongoCatPlatform *platform) {
     BongoCatWindowsLayered *value = platform ? platform->presenter : NULL;
     HWND source = native_window(platform);
@@ -140,6 +172,9 @@ static bool make_source_transparent(BongoCatPlatform *platform) {
     return true;
 }
 
+/* 切换呈现路径。这个函数会被反复调用, 所以只在模式真的变化时才动窗口(mode_logged
+   与 active 一起做记忆); 打开时先隐藏代理窗口(等第一帧成功后再显示), 关闭时直接
+   恢复源窗口。 */
 void bongo_cat_windows_layered_set_click_through(
     BongoCatPlatform *platform, bool enabled) {
     BongoCatWindowsLayered *value = platform ? platform->presenter : NULL;
@@ -171,10 +206,13 @@ void bongo_cat_windows_layered_set_always_on_top(
         0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE);
 }
 
+/* 其它模块只能通过这个入口拿到代理窗口(句柄就存在源窗口的属性里)。 */
 HWND bongo_cat_windows_layered_proxy(HWND source) {
     return source ? (HWND)GetPropW(source, proxy_property) : NULL;
 }
 
+/* 尺寸没变就复用现有 DIB。biHeight 用正值 = 自下而上的行序, 与 glReadPixels 的
+   输出方向一致, 因此拷进去之后不需要翻转。 */
 static bool resize_bitmap(BongoCatWindowsLayered *value, int width, int height) {
     if (value->bitmap && value->width == width && value->height == height) return true;
     release_bitmap(value);
@@ -200,6 +238,13 @@ static bool resize_bitmap(BongoCatWindowsLayered *value, int width, int height) 
     return true;
 }
 
+/*
+ * 抓取 GL 前缓冲。渲染尺寸与窗口尺寸相同时直接读进 pixels; 不同时(高 DPI 缩放、
+ * supersample)先读进 readback 再缩放 —— readback_valid 就是"这一帧走了缩放路径"
+ * 的标记, 逐像素 alpha 查询要靠它决定读哪块内存。
+ * 缩放必须按预乘 alpha 处理(见文件头的不变量): 按预乘值插值, 透明边缘才不会出现
+ * 深色或亮色描边。
+ */
 static bool read_frame(BongoCatWindowsLayered *value, int width, int height,
     int display_width, int display_height) {
     value->source_width = width; value->source_height = height;
@@ -223,6 +268,13 @@ static bool read_frame(BongoCatWindowsLayered *value, int width, int height,
         STBIR_BGRA_PM) != NULL;
 }
 
+/*
+ * 呈现入口(平台层的 present)。没有启用代理模式时就是普通的 SDL_GL_SwapWindow。
+ * 启用时: 源窗口不可见或被最小化就直接返回 false —— 此时拿不到画面, 也不该让代理
+ * 窗口显示一帧旧内容(隐藏状态没有可暴露的帧, 由启动路径先显示窗口再重试)。
+ * 任何一步失败都会清掉 has_frame, 避免 set_opacity 误以为"已经提交过同 alpha 的
+ * 帧"而跳过重提交。
+ */
 bool bongo_cat_platform_present(BongoCatPlatform *platform, int width, int height) {
     if (!platform || !platform->window) return false;
     BongoCatWindowsLayered *value = platform->presenter;

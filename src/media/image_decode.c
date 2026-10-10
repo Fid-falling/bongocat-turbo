@@ -1,3 +1,12 @@
+/*
+ * 图像解码: 两条路径。
+ *
+ *  - stb_image: 可移植, 任何平台都能用, 永远是兜底;
+ *  - Windows Imaging Component: 只在 _WIN32 下编。用它有两个不可替代的理由: ①可以在解码
+ *    阶段就缩小 (IWICBitmapScaler), 于是 8192px 的图集永远不会在内存里整个展开; ②尊重
+ *    图片内嵌的色彩配置。
+ * 走哪条由调用方 (image.c) 决定; 这里的 *_responsive 变体只是"带进度回调"的同一件事。
+ */
 #include "image_internal.h"
 
 #include "bongo_cat/file.h"
@@ -38,6 +47,9 @@ typedef struct PixelDecodeJob {
     BongoCatResult result;
 } PixelDecodeJob;
 
+/* 线程约定 (两条解码路径都适用): worker 只产 CPU 像素, Cubism/OpenGL 一律留在调用线程 ——
+ * GL 上下文是线程亲和的, 在工作线程里碰它就是未定义行为。任务结构体分配在调用方的栈上,
+ * 且返回前一定 join, 所以既不需要堆分配, 也不会出现悬垂指针。 */
 static int SDLCALL decode_pixels_worker(void *userdata) {
     /* Workers only produce CPU pixels; Cubism and OpenGL remain on the caller. */
     PixelDecodeJob *job = userdata;
@@ -46,6 +58,8 @@ static int SDLCALL decode_pixels_worker(void *userdata) {
     return (int)job->result;
 }
 
+/* 轮询等 2ms 只是为了让进度条动起来 (解码本身没有细粒度回调), 它不是同步原语;
+ * 真正的等待是下面的 SDL_WaitThread。 */
 static void wait_for_decode(SDL_Thread *worker,
     BongoCatImageProgress progress, void *userdata) {
     while (SDL_GetThreadState(worker) == SDL_THREAD_ALIVE) {
@@ -71,6 +85,7 @@ BongoCatResult bongo_cat_image_decode_pixels_responsive(const char *path,
 }
 
 #ifdef _WIN32
+/* 尺寸未知 (文件头读不出来) 时也返回 true: 宁可走更稳的 WIC 路径, 也不要赌 stb 能处理。 */
 bool bongo_cat_image_needs_wic_scaling(const char *path, int limit) {
     int width = 0, height = 0;
     bool known = bongo_cat_image_info(path, &width, &height);
@@ -93,6 +108,9 @@ static bool decode_wic(const char *path, BongoCatImage *image,
     UINT max_width, UINT max_height, BongoCatImageProgress progress,
     void *userdata) {
     memset(image, 0, sizeof(*image));
+    /* CoInitializeEx 可能与进程里已有的单元模型冲突 (RPC_E_CHANGED_MODE): 那说明 COM 已经被
+     * 别人初始化过, 我们照样能用, 但**不能**再 CoUninitialize —— 所以只有自己初始化成功
+     * 时才在末尾收尾。 */
     HRESULT initialized = CoInitializeEx(NULL, COINIT_MULTITHREADED);
     bool uninitialize = initialized == S_OK || initialized == S_FALSE;
     if (FAILED(initialized) && initialized != RPC_E_CHANGED_MODE) return false;
@@ -158,6 +176,8 @@ static bool decode_wic(const char *path, BongoCatImage *image,
         ? stride * target_height : 0;
     unsigned char *pixels = bytes <= UINT_MAX ? malloc(bytes) : NULL;
     if (SUCCEEDED(result) && pixels) {
+        /* 按 256 行分块拷贝: 既能上报进度, 也把"一次向解码器要多少像素"限制住, 让超大图的
+         * 峰值内存可控。 */
         for (UINT y = 0; y < target_height && SUCCEEDED(result); y += 256) {
             UINT rows = SDL_min(256u, target_height - y);
             WICRect rect = {0, (INT)y, (INT)target_width, (INT)rows};

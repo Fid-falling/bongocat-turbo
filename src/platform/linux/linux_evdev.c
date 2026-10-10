@@ -6,15 +6,33 @@
 #include <sys/epoll.h>
 #include <unistd.h>
 
+/*
+ * evdev 输入后端: 直接读 /dev/input/event* 的内核事件流。
+ *
+ * 为什么需要: Wayland 合成器不会把别的应用的按键转发给 X11 客户端, 所以 XInput2 在
+ * Wayland 下看不到全局按键(见 linux_internal.h)。
+ * 代价: 需要能读 /dev/input/*(通常要加入 input 组), 因此属于实验性路径 —— 默认只在
+ * Wayland 下、且显式设置 BONGOCAT_ENABLE_EVDEV=1 时才启用。默认关闭是因为没权限时
+ * 会刷一堆失败日志, 而用户往往不知道该怎么授权。
+ */
 bool bongo_cat_linux_evdev_requested(const char *option, bool wayland) {
     return wayland && option && strcmp(option, "1") == 0;
 }
 
+/* 从平台状态里取 evdev 子状态; 没选这个后端时返回 NULL, 于是所有对外函数都可以安全
+   调用而不必各自判空。 */
 static LinuxEvdevState *evdev_state(const BongoCatPlatform *platform) {
     const LinuxPlatformState *native = platform ? platform->native : NULL;
     return native ? native->evdev : NULL;
 }
 
+/*
+ * 接收线程主体: epoll 同时等所有设备 fd, 超时用来做两件事 —— 定期重扫设备
+ * (EVDEV_SCAN_INTERVAL_NS, 处理热插拔, 不依赖 inotify)和检查退出标志。
+ * EPOLLHUP / EPOLLERR 或读失败都当作设备消失, 从表里摘掉; 设备表是紧凑数组, 摘除会
+ * 移动后面的元素, 所以每轮都要按 fd 重新查一遍下标。
+ * 退出时先清空设备再复位 running, 保证 stop 的等待者看到的是完全停下来的状态。
+ */
 static int SDLCALL evdev_thread(void *userdata) {
     LinuxEvdevState *state = userdata;
     bongo_cat_evdev_scan(state);
@@ -48,6 +66,9 @@ static int SDLCALL evdev_thread(void *userdata) {
     return 0;
 }
 
+/* 启动: 三个前提(选中了 evdev、平台状态存在、输入队列存在)。已经启动过就直接返回 true
+   (幂等)。epoll 用 CLOEXEC —— 我们后面会用 fork/exec 打开目录, 不能让这些 fd 漏给
+   子进程。reported_count 初始化为 SIZE_MAX, 让第一次扫描一定会打印"发现了几个设备"。 */
 bool bongo_cat_linux_evdev_start(BongoCatPlatform *platform, BongoCatError *error) {
     LinuxPlatformState *native = platform ? platform->native : NULL;
     if (!native || !native->evdev_selected || !platform->input) return false;
@@ -76,6 +97,8 @@ failed:
     return false;
 }
 
+/* 停止: 先清 running 标志再等线程退出(线程自己会清理设备表), 然后才释放 epoll / mutex /
+   内存, 最后清空平台的 evdev 指针。顺序反了会让线程访问已释放的状态。 */
 void bongo_cat_linux_evdev_stop(BongoCatPlatform *platform) {
     LinuxEvdevState *state = evdev_state(platform);
     if (!state) return;
@@ -92,6 +115,8 @@ bool bongo_cat_linux_evdev_pointer_active(const BongoCatPlatform *platform) {
     return state && atomic_load(&state->pointer_active);
 }
 
+/* 取走累积的相对位移(取走即清零)。返回值表示"这一次是否真的有位移" —— 返回 false 时
+   dx/dy 已经被写成 0, 调用方可以无条件使用它们。 */
 bool bongo_cat_linux_evdev_relative_pointer(BongoCatPlatform *platform,
     double *dx, double *dy) {
     LinuxEvdevState *state = evdev_state(platform);

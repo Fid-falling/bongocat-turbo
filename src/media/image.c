@@ -1,3 +1,11 @@
+/*
+ * OpenGL 侧的图像上传与合成。
+ *
+ * 这里所有返回纹理名的接口都要求调用线程当前有可用的 GL 上下文; Vulkan 后端不适用 (它走
+ * vk_backend 的纹理接口)。而纯 CPU 的 load/fit/composite 两条路径都能用 —— 这个分层见
+ * include/bongo_cat/image.h 的说明。
+ * 模块内部三层: 解码 (image_decode.c) -> CPU 处理 (alpha/mipmap/resize) -> 上传 (本文件)。
+ */
 #include "bongo_cat/gl_api.h"
 #include "bongo_cat/image.h"
 #include "image_internal.h"
@@ -21,6 +29,8 @@ BongoCatResult bongo_cat_image_load(const char *path, BongoCatImage *image, Bong
     }
     return BONGO_CAT_OK;
 }
+/* pixels_stbi 记住该用哪个分配器: stb 有自己的分配器, 和 free() 不能混用 —— 混了会在部分
+ * 平台上直接崩 (不是同一个 CRT 堆)。 */
 void bongo_cat_image_free(BongoCatImage *image) {
     if (!image) return;
     if (image->surface) SDL_DestroySurface(image->surface);
@@ -52,6 +62,8 @@ static unsigned int upload(const BongoCatImage *image, GLuint texture,
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+        /* 模型图集是 1024px 级别、实际只画几百像素, 缩小倍率很大: 没有 mip 链会闪, 斜视时还会
+         * 出摩尔纹。各向异性上限取 8 是收益与开销的折中 (再高对 2D 图集没有明显收益)。 */
         if (model_texture && SDL_GL_ExtensionSupported(
             "GL_EXT_texture_filter_anisotropic")) {
             GLfloat maximum = 1.0f;
@@ -61,6 +73,8 @@ static unsigned int upload(const BongoCatImage *image, GLuint texture,
                     SDL_min(maximum, 8.0f));
         }
     }
+    /* 行本身是紧打包的 RGBA (宽度*4 天然 4 字节对齐), 设 1 只是为了不受外部遗留状态影响;
+     * 结束时恢复成 4, 免得把状态泄漏给同进程里的其它上传者。 */
     glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
     if (created && model_texture) {
         if (!bongo_cat_image_upload_mipmaps(image)) {
@@ -101,6 +115,8 @@ void bongo_cat_image_release_texture(unsigned int texture) {
     glDeleteTextures(1, &name);
 }
 
+/* Windows 上先用 WIC 直接解到目标尺寸 (省掉一次全尺寸解码), 失败再退回 stb + SDL_ScaleSurface。
+ * 只有确实超限时才缩放; 缩不出来时原样返回, 这不算失败。 */
 BongoCatResult bongo_cat_image_fit(const char *path, int max_width,
     int max_height, BongoCatImage *out, BongoCatError *error) {
     if (!path || !out) return BONGO_CAT_ERROR_ARGUMENT;
@@ -169,6 +185,12 @@ static void report_stage_progress(void *userdata, float progress) {
         stage->progress(stage->userdata, stage->start + stage->span * progress);
 }
 
+/*
+ * 模型贴图上传 (GL 路径)。
+ *
+ * 进度区间刻意写死, 而不是按实际走了哪条分支去算: 解码可能从 WIC 退回 stb, 上传也可能因
+ * GL_OUT_OF_MEMORY 缩小重试, 各分支耗时不同但区间固定 —— 进度条才不会来回跳。
+ */
 unsigned int bongo_cat_image_texture_model(const char *path, bool direct_decode,
     int *width, int *height, BongoCatImageAlphaMask *alpha,
     BongoCatImageProgress progress, void *userdata, BongoCatError *error) {
@@ -258,6 +280,9 @@ unsigned int bongo_cat_image_texture_model(const char *path, bool direct_decode,
     return texture;
 }
 
+/* 把掌心那块"脚印"抹掉的椭圆, 中心和半径是**针对内置猫图手工标定的归一化值**: 换一张底图
+ * 必须重新标定, 否则擦出来的形状对不上爪子。只把 alpha 非零的像素刷成白色 (而不是设成
+ * 透明), 所以抹掉的是"图案"而不是"那块区域"。 */
 static void erase_paw(BongoCatImage *image, bool left) {
     float cx = left ? .700f : .275f, cy = left ? .515f : .397f;
     float rx = left ? .080f : .070f, ry = left ? .170f : .160f;
@@ -270,6 +295,9 @@ static void erase_paw(BongoCatImage *image, bool left) {
     }
 }
 
+/* source-over 混合, 且要求两层尺寸完全一致: 尺寸不符就整层放弃并返回 false —— 宁可不出图,
+ * 也不要把错位的图层糊上去。公式按"未预乘像素 + 直通 alpha"写, 中间乘 255 放大是为了避免
+ * 整数除法提前截断。 */
 static bool blend_file(BongoCatImage *base, const char *path, BongoCatError *error) {
     if (!path || !path[0]) return true;
     BongoCatImage layer;

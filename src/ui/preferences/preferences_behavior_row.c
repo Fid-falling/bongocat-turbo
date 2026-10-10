@@ -1,3 +1,14 @@
+/*
+ * 行为设置对话框里的一行: 左名(可重命名) + 中快捷键录制 + 右试听/停止。
+ *
+ * 与 bongo_cat_preferences_behavior_dialog.c 的契约: 行只负责画和响应, 行高固定
+ * 56 像素 (对话框用 "行数 x 56" 算面板高度和滚动量), 改成别的值两边都要改。
+ *
+ * 重命名的状态存在 value->behavior_rename 这个会话里, 靠 session->id 与 entry->id
+ * 比对判断"这一行是不是正在被改名" —— 所以同一时间只可能有一行在编辑。
+ * 编辑中还每帧回写 session->bounds: 对话框是可滚动的, 行会移动, 不跟着更新的话
+ * 光标和点击范围会留在旧位置。
+ */
 #include "preferences_state.h"
 #include "bongo_cat/audio.h"
 #include "bongo_cat/shortcut.h"
@@ -28,6 +39,12 @@ static bool hit(struct nk_context *context, struct nk_rect bounds, bool enabled)
         nk_input_is_mouse_click_in_rect(&context->input, NK_BUTTON_LEFT, bounds);
 }
 
+/*
+ * 取(或按需创建)某个行为对应的快捷键绑定记录。
+ * 惰性创建: 行为是启动时批量枚举的, 用户可能一辈子都不给某个行为设快捷键, 预先
+ * 全建出来既占配置空间又会让配置文件里塞满空条目。
+ * 表满返回 NULL, 调用方据此把这一行的快捷键编辑器整个跳过。
+ */
 static BongoCatBehaviorShortcut *binding_for(BongoCatSettings *config,
     const char *id) {
     for (size_t i = 0; i < config->behavior_shortcut_count; ++i)
@@ -41,6 +58,10 @@ static BongoCatBehaviorShortcut *binding_for(BongoCatSettings *config,
     return binding;
 }
 
+/*
+ * 显示名优先级: 用户改过的名字 > "停止所有声音"这种特殊语义 > 模型里的原始名。
+ * 特殊条目必须在改名之前判定, 否则它会被显示成一个模型内部名 (用户看不懂)。
+ */
 static const char *display_label(BongoCatPreferences *value, const BongoCatBehaviorEntry *entry,
     const BongoCatBehaviorShortcut *binding) {
     if (binding && binding->label[0])
@@ -50,6 +71,13 @@ static const char *display_label(BongoCatPreferences *value, const BongoCatBehav
     return entry->label;
 }
 
+/*
+ * 快捷键编辑器 (行中间那块)。
+ * 录制中要持续标脏: 呼吸光晕是时间驱动的, 不主动要帧它就不会继续动。
+ * "清除"按钮只在真的录了东西时出现 (按钮占掉右侧 25px, 文本宽度要相应让位),
+ * 清掉后同时把 shortcut_disabled 置真 —— 只清字符串不置禁用位, 会被当成"用空
+ * 快捷键启用", 下帧又被恢复成默认值。
+ */
 static bool shortcut_editor(BongoCatPreferences *value,
     struct nk_context *context, struct nk_command_buffer *canvas,
     struct nk_rect bounds, const char *id, BongoCatBehaviorShortcut *shortcut,
@@ -99,6 +127,11 @@ static bool shortcut_editor(BongoCatPreferences *value,
     return hit(context, bounds, enabled);
 }
 
+/*
+ * 画名字区域, 并处理"点一下开始改名"。
+ * 重命名会话是按 id 认领的, 只有 id 相同的那一行才进编辑态并画光标; 其它行照常
+ * 显示标签。选中态 (select_all) 下不画光标 —— 此时整段被高亮, 再画一根竖线反而怪。
+ */
 static void draw_name(BongoCatPreferences *value, struct nk_context *context,
     struct nk_command_buffer *canvas, struct nk_rect bounds,
     BongoCatBehaviorEntry *entry, BongoCatBehaviorShortcut *binding,
@@ -140,6 +173,20 @@ static void draw_name(BongoCatPreferences *value, struct nk_context *context,
     }
 }
 
+/*
+ * 一行的布局是从右往左定的: 先钉住最右边的播放键, 再往左排快捷键框, 剩下的才是
+ * 名字区 —— 名字可以被压缩, 但那两个控件不能。
+ * 播放键是"试听/停止"二态: 同一个声音正在播就停, 否则执行这个行为。
+ * 快捷键框的 id 要带 entry->id 前缀 (behavior-xxx), 它是动画与录制会话的键, 用
+ * 固定名字会让所有行共用一次录制。
+ */
+/*
+ * 一行的布局是从右往左定的: 先钉住最右边的播放键, 再往左排快捷键框, 剩下的才是
+ * 名字区 —— 名字可以被压缩, 但那两个控件不能。
+ * 播放键是"试听/停止"二态: 同一个声音正在播就停, 否则执行这个行为。
+ * 快捷键框的 id 要带 entry->id 前缀 (behavior-xxx), 它是动画与录制会话的键, 用
+ * 固定名字会让所有行共用一次录制。
+ */
 void bongo_cat_preferences_behavior_row_draw(BongoCatPreferences *value,
     struct nk_context *context, struct nk_command_buffer *canvas,
     struct nk_rect row, BongoCatBehaviorEntry *entry, BongoCatUIPalette p,

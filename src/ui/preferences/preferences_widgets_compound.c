@@ -1,3 +1,10 @@
+/*
+ * 复合控件: "开关 + 可选数值输入"排在一行 (例如"随机表情" + 间隔秒数)。
+ * 关键点是列数随开关状态变: 关掉时是 2 列 (标题 + 开关), 打开时是 3 列
+ * (标题 + 数值 + 开关) —— 数值框不是"禁用"而是整个不占位, 这样关掉时开关会靠到
+ * 右边, 视觉上不会有空洞。
+ * 两处 changed 用 || 合并: 用户可能在同一帧里既拖了数值又点了开关, 漏一个就会丢改动。
+ */
 #include "preferences_widgets.h"
 #include "preferences_widgets_internal.h"
 #include "preferences_controls.h"

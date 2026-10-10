@@ -1,3 +1,13 @@
+/*
+ * model3.json 的预校验层。
+ *
+ * 模型是用户可下载、可导入的数据, 而 SDK 的 CubismModelSettingJson 会无条件相信里面的
+ * 路径和数组长度: 一条 "../../../x" 就能让加载器读到模型目录之外, 一个声明了上万条动作
+ * 的数组就能把内存吃光。所以在把 JSON 交给 SDK 之前先在这里过一遍 —— 宁可判成"格式
+ * 错误", 也不要让坏数据进到 SDK 里变成越界读。
+ *
+ * 这里只做结构与上限检查, 不检查文件是否真的存在: 缺文件由各加载路径自己报错。
+ */
 #include "cubism_model.hpp"
 
 #include <cstring>
@@ -6,6 +16,8 @@
 namespace bongo_cat {
 namespace {
 
+/* 路径安全: 只接受相对路径, 任何一段 ".." 都不允许。同时拒绝绝对路径、盘符 (冒号)
+ * 与 UNC 前缀, 这样模型包无法指向自己目录之外的任何东西。 */
 bool safe_path_value(yyjson_val *value) {
     const char *path = yyjson_is_str(value) ? yyjson_get_str(value) : nullptr;
     if (!path || !path[0] || path[0] == '/' || path[0] == '\\' ||
@@ -22,6 +34,8 @@ bool safe_path_value(yyjson_val *value) {
     return true;
 }
 
+/* 可选字段的语义: 字段不存在、或是空字符串都算合法 (SDK 用空串表示"没有这个文件"),
+ * 但只要非空就必须是安全的相对路径。 */
 bool optional_path(yyjson_val *object, const char *key) {
     yyjson_val *value = yyjson_obj_get(object, key);
     return !value || (yyjson_is_str(value) && !yyjson_get_str(value)[0]) ||
@@ -33,6 +47,8 @@ bool optional_number(yyjson_val *object, const char *key) {
     return !value || yyjson_is_num(value);
 }
 
+/* 下面这些上限不是按"正常模型有多大"定的, 而是按"坏数据最多能让我们分配多少"定的;
+ * 真实模型离这些数字很远 (内置图集最多几十张)。 */
 bool valid_textures(yyjson_val *value) {
     if (!yyjson_is_arr(value) || yyjson_arr_size(value) == 0 ||
         yyjson_arr_size(value) > 256) return false;
@@ -131,6 +147,8 @@ bool validate_model_setting_json(const std::vector<unsigned char> &json,
         reinterpret_cast<char *>(const_cast<unsigned char *>(json.data())),
         json.size(), 0, nullptr, &parse_error);
     yyjson_val *root = document ? yyjson_doc_get_root(document) : nullptr;
+    /* 只接受 Version 3: 更低版本缺 Offscreen/BlendShape 之类的字段, SDK 要到运行时才会
+     * 以空指针的形式炸掉, 不如在这里一次判死, 错误信息也更清楚。 */
     bool valid = yyjson_is_obj(root) && yyjson_is_int(yyjson_obj_get(root, "Version")) &&
         yyjson_get_int(yyjson_obj_get(root, "Version")) == 3 &&
         valid_references(yyjson_obj_get(root, "FileReferences")) &&

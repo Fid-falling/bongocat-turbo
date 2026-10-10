@@ -1,3 +1,15 @@
+/*
+ * "快捷键"页 (page 2) 的录制逻辑。
+ *
+ * 录制期间有一个必须守住的约定: 录快捷键时键盘事件会被设置窗口"吃掉", 绝不能
+ * 让它们再流到全局快捷键处理里去 —— 否则用户想录 Ctrl+B, 按下去的一瞬间就先触发
+ * 了绑定在 Ctrl+B 上的动作。为此有两条防线:
+ * - 录制中 (shortcut_recording) 的事件在本文件里被消费掉;
+ * - 录完再屏蔽 250ms (shortcut_suppress_until_ns), 因为按键松开那一刻的
+ * KEY_UP 还会到达, 不留这一段就会"刚设好就触发一次"。
+ * 字符串格式是项目约定的写法 (Control+Shift+A 这种), 与 bongo_cat_settings_shortcut_*
+ * 共用, 不要在这里自创格式。
+ */
 #include "preferences_state.h"
 #include "preferences_notice.h"
 #include "preferences_widgets.h"
@@ -19,6 +31,14 @@ bool bongo_cat_preferences_shortcut_active(const BongoCatPreferences *value,
         strcmp(value->shortcut_id, id) == 0;
 }
 
+/*
+ * 结束录制并清空录制态。
+ * 那段"遍历所有绑定, 把指向同一块缓冲的项重新判断启用与否"是有原因的: 多个
+ * 行为可以指向同一个 shortcut 缓冲区, 一旦被清空, 原来靠它启用的绑定必须同步
+ * 改成禁用, 否则会留下一个"绑定为空却仍算启用"的条目。
+ * 最后重置 shortcut_state / sound_shortcut_state: 录制期间攒下的按键状态不清掉,
+ * 解禁之后会立刻补触发一次。
+ */
 static void finish(BongoCatPreferences *value) {
     if (value->shortcut_target && strcmp(value->shortcut_target, value->shortcut_original))
         for (size_t i = 0; i < value->app->settings.behavior_shortcut_count; ++i) {
@@ -38,6 +58,7 @@ static void finish(BongoCatPreferences *value) {
     value->render_dirty = true;
 }
 
+/* 放弃本次录制: 先把缓冲区恢复成进入录制时的原文, 再走统一的收尾 */
 void bongo_cat_preferences_shortcut_cancel(BongoCatPreferences *value) {
     if (!value || !value->shortcut_recording) return;
     if (value->shortcut_target && value->shortcut_capacity > 0)
@@ -46,6 +67,12 @@ void bongo_cat_preferences_shortcut_cancel(BongoCatPreferences *value) {
     finish(value);
 }
 
+/*
+ * 开始录制。target/capacity 是"用户设置里那块固定大小的字符数组", 录制期间一直
+ * 拿着这个裸指针写 —— 所以同一时间只允许一个录制会话 (先 cancel 掉上一个),
+ * 且页面重排/换页前必须收尾, 否则指针会悬空。
+ * shortcut_original 是取消时的还原依据。
+ */
 void bongo_cat_preferences_shortcut_begin(BongoCatPreferences *value,
     const char *id, char *target, int capacity) {
     if (!value || !id || !target || capacity < 1) return;
@@ -63,6 +90,7 @@ void bongo_cat_preferences_shortcut_begin(BongoCatPreferences *value,
     value->render_dirty = true;
 }
 
+/* 修饰键只用来拼前缀, 单独按下不算一个完整快捷键, 所以既不结束也不记录 */
 static bool modifier_key(SDL_Keycode key) {
     return key == SDLK_LCTRL || key == SDLK_RCTRL ||
         key == SDLK_LSHIFT || key == SDLK_RSHIFT ||
@@ -70,6 +98,12 @@ static bool modifier_key(SDL_Keycode key) {
         key == SDLK_LGUI || key == SDLK_RGUI;
 }
 
+/*
+ * SDL 把导航键和数字键盘键排在 F12 和 F13 之间, 所以不能按区间猜名字, 只能逐个列。
+ * 名字必须和 bongo_cat_settings_shortcut_* 解析用的字符串完全一致 —— 这里返回的
+ * 每个 token 都是"会被写进配置、也会被重新解析"的持久格式, 改名字等于改配置格式。
+ * 认不出来返回 NULL: 调用方会整个忽略这次按键 (而不是写进去一个看不懂的名字)。
+ */
 static const char *primary_name(SDL_Keycode key, char output[24]) {
     if (key >= SDLK_A && key <= SDLK_Z) {
         output[0] = (char)('A' + key - SDLK_A); output[1] = '\0'; return output;
@@ -111,12 +145,20 @@ static const char *primary_name(SDL_Keycode key, char output[24]) {
     }
 }
 
+/* 拼接格式固定为 "Control+Shift+Key": 顺序固定, 判重和解析都依赖它 */
 static void append(char *output, size_t capacity, const char *token) {
     size_t length = strlen(output);
     if (length >= capacity) return;
     snprintf(output + length, capacity - length, "%s%s", length ? "+" : "", token);
 }
 
+/*
+ * 一次按键的录制。
+ * 这里用"松开主键才算录完"的语义: 按下时先写进缓冲区让用户看到预览, 松开才收尾,
+ * 这样组合键来得及在按下期间按全。
+ * 冲突检测失败要恢复原值再弹提示 —— 不能把冲突的键留在缓冲区里。
+ * 返回值恒为 true 表示事件已被消费: 录制期间的按键绝不能漏给全局快捷键。
+ */
 static bool capture_key(BongoCatPreferences *value,
     const SDL_KeyboardEvent *event) {
     if (event->repeat) return true;
@@ -157,6 +199,10 @@ static bool capture_key(BongoCatPreferences *value,
     return true;
 }
 
+/*
+ * 录制中丢焦点 (用户切走了) 视为放弃, 但返回 false: 这不是"本模块处理掉了事件",
+ * 窗口层还要继续走它自己的失焦清理 (复位输入、松开捕获等)。
+ */
 bool bongo_cat_preferences_shortcut_event(BongoCatPreferences *value,
     const SDL_Event *event) {
     if (!value || !event || !value->shortcut_recording) return false;
@@ -168,12 +214,20 @@ bool bongo_cat_preferences_shortcut_event(BongoCatPreferences *value,
     return false;
 }
 
+/*
+ * 全局快捷键此刻该不该被屏蔽。除了录制中, 还要覆盖录制结束后那一小段抑制窗口 ——
+ * 按键的 KEY_UP 来得比收尾晚, 不留这 250ms, 用户刚绑好的快捷键会立刻触发一次。
+ */
 bool bongo_cat_preferences_shortcuts_blocked(
     const BongoCatPreferences *value) {
     return value && (value->shortcut_recording ||
         SDL_GetTicksNS() < value->shortcut_suppress_until_ns);
 }
 
+/*
+ * 一行快捷键: pref_edit 的返回码约定是 <0 清除, >0 开始录制, 0 无操作;
+ * 注意 capacity 用的是 sizeof(数组) 而不是长度, begin 里按字节上限写入。
+ */
 static void shortcut_row(BongoCatPreferences *value, struct nk_context *context,
     const char *id, const char *label_key, const char *label_fallback,
     char *target, int capacity, BongoCatPrefIcon icon) {
@@ -191,6 +245,7 @@ static void shortcut_row(BongoCatPreferences *value, struct nk_context *context,
     }
 }
 
+/* 这一页的行很少, 直接展开写; 顺序与行为面板/托盘菜单里的顺序保持一致, 方便对照 */
 void bongo_cat_preferences_page_shortcuts(BongoCatPreferences *value,
     struct nk_context *context) {
     BongoCatShortcutPreferences *keys = &value->app->settings.shortcuts;

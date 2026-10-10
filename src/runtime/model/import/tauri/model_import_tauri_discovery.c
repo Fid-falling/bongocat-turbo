@@ -1,3 +1,12 @@
+/*
+ * Tauri 源包的两条发现路径: exact 只看用户选中目录的直接子项 (选中即包根),
+ * recursive 递归下钻 (选中的是装着多个包的容器目录)。
+ * 两者都往调用方的 discovery 里追加候选, 并共用一条排除规则: 已经属于 Mver 包的
+ * model3.json 不再当 Tauri 源 —— 否则同一个模型会以 Tauri 源的身份被再导入一次
+ * (Mver 包里本来就放着 Live2D 模型和它的静态兜底模板)。
+ * 返回值 1/0/负值 = 命中/未命中/出错, 与其它格式适配器一致; ambiguous 一旦置位,
+ * 出错文案就换成“一个目录里有多份清单”, 候选构造失败的原因只能靠它区分。
+ */
 #include "model_import_tauri_internal.h"
 #include "../model_import_manifest.h"
 
@@ -5,6 +14,8 @@
 #include <stdio.h>
 #include <string.h>
 
+/* Mver 规范包的输入图指纹: img/<mode>/<hand|lefthand|righthand>/0.png 存在即算。
+ * 标准模式用 hand, 另两种模式是左右手两组 (与 Mver 侧的判据逐字一致)。 */
 static bool mver_input_assets(const char *directory) {
     char path[BONGO_CAT_PATH_CAP], group[BONGO_CAT_PATH_CAP];
     static const char *const groups[] = {"hand", "lefthand", "righthand"};
@@ -15,6 +26,7 @@ static bool mver_input_assets(const char *directory) {
     return false;
 }
 
+/* 模式目录的判据: 名字必须是 standard/keyboard/gamepad 之一, 父目录叫 img, 且带输入图。 */
 static bool mver_mode_directory(const char *directory) {
     const char *name = bongo_cat_path_name(directory);
     if (!name || (SDL_strcasecmp(name, "standard") != 0 &&
@@ -27,6 +39,8 @@ static bool mver_mode_directory(const char *directory) {
         mver_input_assets(directory);
 }
 
+/* 这份 model3.json 是不是已经躺在某个 Mver 包里? 从它所在目录向上最多探 4 层
+ * (与 Mver 的 find_package 同深度), 命中就说明它是包的组成部分, 不是 Tauri 源。 */
 static bool inside_mver_model(const char *directory) {
     char current[BONGO_CAT_PATH_CAP];
     int written = snprintf(current, sizeof(current), "%s",
@@ -42,6 +56,8 @@ static bool inside_mver_model(const char *directory) {
     return false;
 }
 
+/* 枚举回调: 只认 .model3.json 文件, 且清单与它引用的资源都要通过校验才登记候选;
+ * 返回 FAILURE 会让整次枚举失败 (调用方据此报错)。 */
 static BongoCatPathVisit discover_model(void *userdata,
     const char *dirname, const char *name) {
     BongoCatImportDiscovery *discovery = userdata;
@@ -58,6 +74,8 @@ static BongoCatPathVisit discover_model(void *userdata,
     return BONGO_CAT_PATH_CONTINUE;
 }
 
+/* 递归下钻: 跳过隐藏项 (以 . 开头, 含 macOS 的 ._ 资源叉), 深度上限 8; 计数借
+ * discovery->depth 传递, 因此枚举中途返回也是平衡的。 */
 static BongoCatPathVisit discover_recursive_item(void *userdata,
     const char *dirname, const char *name) {
     BongoCatImportDiscovery *discovery = userdata;
@@ -75,6 +93,9 @@ static BongoCatPathVisit discover_recursive_item(void *userdata,
     return ok ? BONGO_CAT_PATH_CONTINUE : BONGO_CAT_PATH_FAILURE;
 }
 
+/* 精确发现: 只看直接子项, 所以选中的目录就是包根 —— 成功时把这一批候选的
+ * package_root 统一改写成 source。返回 -1 表示枚举失败 (也可能只是清单歧义),
+ * 只有 1 才代表真有候选, 0 不算失败。 */
 int bongo_cat_import_tauri_discover_exact(const char *source,
     BongoCatImportDiscovery *discovery, BongoCatError *error) {
     if (!source || !discovery || !bongo_cat_path_is_dir(source)) return 0;
@@ -93,6 +114,9 @@ int bongo_cat_import_tauri_discover_exact(const char *source,
             sizeof(discovery->candidates[i].package_root), "%s", source);
     return discovery->count > before ? 1 : 0;
 }
+
+/* 递归发现: 候选可能来自互不相干的子包, 所以每个候选保留自己的 package_root, 不在
+ * 这里改写。返回语义与 exact 相同: 1 = 命中, 0 = 没找到, -1 = 扫描出错。 */
 
 int bongo_cat_import_tauri_discover_recursive(const char *source,
     BongoCatImportDiscovery *discovery, BongoCatError *error) {

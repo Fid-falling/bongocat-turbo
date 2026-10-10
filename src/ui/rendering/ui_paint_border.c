@@ -1,3 +1,12 @@
+/*
+ * 虚线圆角矩形的 CPU 光栅器 (虚线边框是唯一没法用 SDF 一次性算完的形状,
+ * 所以单独放一个文件, 由 ui_paint.c 的 dashed_rounded 烘焙成纹理后缓存)。
+ *
+ * 核心是把每个采样点映射成两个数: distance = 到边框中心线的距离 (决定描边宽度),
+ * along = 沿周长走的弧长 (决定这一处是"实线段"还是"空隙")。周长必须首尾相接且
+ * 单调, 否则虚线会在圆角处跳变 —— 下面 corner() 把 -pi/2 起的角度统一折算成
+ * [start, start+2pi), 再各自加上该角在周长上的起始偏移, 就是为了这个不变量。
+ */
 #include "ui_paint_border.h"
 
 #include <math.h>
@@ -7,6 +16,9 @@ static float clamp01(float value) {
     return NK_CLAMP(0.0f, value, 1.0f);
 }
 
+/* 圆角上的采样: 把极角归一化到 [start, start+2pi) 再乘半径, 换算成"从该角起点算起
+   的弧长"。base 是该角在整条周长上的起始偏移 —— 位移必须单调递增, 虚线相位才连贯。
+   到中心线的距离用 |实际半径 - r|, 于是描边内外两侧对称。 */
 static void corner(float x, float y, float cx, float cy, float radius,
     float base, float start, float *distance, float *along) {
     float angle = atan2f(y - cy, x - cx);

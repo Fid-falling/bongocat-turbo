@@ -1,3 +1,12 @@
+/*
+ * 缩放的三个来源, 别混用:
+ *  - layout_scale: 逻辑缩放, 决定"一个 UI 单位等于几个窗口坐标", 输入坐标要除它;
+ *  - raster_scale: 光栅缩放, 决定字体/图形按几倍像素烘焙;
+ *  - 二者之比的另一半来自窗口的像素密度, 所以 query_window_scale 用
+ *    display_scale / pixel_density 反推 layout_scale: 像素密度已经体现在窗口的
+ *    物理尺寸里, 不除掉就等于把缩放算了两遍, 界面会整体偏大一圈。
+ * BONGO_CAT_TEST_UI_SCALE 是给自动化测试固定缩放用的, 同时覆盖上面两者。
+ */
 #include "ui_backend.h"
 
 #include <math.h>

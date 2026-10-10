@@ -1,3 +1,10 @@
+/*
+ * Tauri → Mver 的转换编排。调用顺序本身就是契约: 建目录树并整树拷贝模型文件, 生成
+ * 按键图与矩阵, 读标定, 最后写 config.json 与预览/运行时图层。
+ * copy_preview 必须早于 copy_runtime_images —— 后者拿 mousebg.png 当兜底图源。
+ * target 是安装流程给的一次性暂存目录, 失败时由调用方整目录删除; 成功后整个目录会被
+ * 重新扫描, 因此产物必须能通过 Mver 的发现判据 (img/<mode>/ + config.json)。
+ */
 #include "model_import_tauri_internal.h"
 #include "bongo_cat/path.h"
 
@@ -9,6 +16,8 @@ typedef struct TauriConversionWorkspace {
     TauriKeyFiles right;
 } TauriConversionWorkspace;
 
+/* 建出 Mver 的目录骨架 target/img/<mode>/cat_model, 并通过 mode_root/model_root 返回
+ * 两个根路径; 输出缓冲的容量由调用方保证, 失败时内容未定义。 */
 static bool create_target_tree(const char *target, BongoCatModelMode mode,
     char *mode_root, size_t mode_capacity, char *model_root,
     size_t model_capacity) {
@@ -21,6 +30,12 @@ static bool create_target_tree(const char *target, BongoCatModelMode mode,
             "cat_model") && bongo_cat_path_create_directory(mode_root) &&
         bongo_cat_path_create_directory(model_root);
 }
+
+/* 转换入口。前提: candidate 是 Tauri 格式且 target 可写 (调用方负责清理)。
+ * 返回 true 时 installed 被完整填成 BONGO_CAT_IMPORT_MVER 的形态 (config、directory、
+ * assets、package_root 全部指向新包, overrides 与 patch_root 清空); 返回 false 时
+ * 本函数不碰 installed, 但 target 下可能留下半成品, 由调用方连目录一起删。
+ */
 
 bool bongo_cat_import_tauri_convert_to_mver(
     const BongoCatImportCandidate *candidate, const char *target,

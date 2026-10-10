@@ -1,3 +1,15 @@
+/*
+ * 存储目录解析, 六棵树: config / data / models / cache / state / logs。
+ *
+ * 来源优先级:
+ *   1. --storage-root= : 六棵树全部挂在它下面 (CI、绿色版、多实例测试);
+ *   2. 平台默认: Windows 打包运行用包内存储, 否则 %LOCALAPPDATA%\BongoCat;
+ *      macOS 用 ~/Library/{Application Support,Caches,Logs}; Linux 走 XDG_*;
+ *   3. 全部失败就返回 false —— 没有降级方案, 因为配置/日志/模型都必须落盘。
+ * 副宠进程会把 state_root 换成按模型 id 命名的子目录 (multi_pet), 免得两个进程抢
+ * 同一份 session.json。
+ * 每个目录都用"真的写一个探针文件"来判定可写, 而不是看权限位。
+ */
 #include "storage_paths.h"
 #include "runtime.h"
 
@@ -19,6 +31,7 @@ static bool child_path(char *target, size_t capacity, const char *root,
         bongo_cat_path_join(target, capacity, root, child);
 }
 
+/* 探针文件判可写: 只读挂载、被安全软件拦住的目录在 Windows 上权限位看着都是正常的。 */
 static bool writable_directory(const char *root) {
     char probe[BONGO_CAT_PATH_CAP];
     if (!root || !root[0] || !bongo_cat_path_create_directory(root) ||
@@ -31,6 +44,7 @@ static bool writable_directory(const char *root) {
     return written;
 }
 
+/* 六棵树的路径必须全部拼成功才算解析成功; 任何一棵失败都返回 false, 不做部分降级。 */
 static bool roots_under(BongoCatApp *app, const char *root) {
     return child_path(app->config_root, sizeof(app->config_root),
             root, "config") &&
@@ -107,6 +121,8 @@ static bool platform_roots(BongoCatApp *app) {
 }
 #endif
 
+/* 失败时把 settings_path/session_path 清空: 调用方据此判断"配置不可用", 而空路径会让
+   config_store 直接跳过读写, 而不是往相对路径里写出一份野生配置。 */
 bool bongo_cat_storage_paths_prepare(BongoCatApp *app,
     BongoCatError *error) {
     if (!app) return false;
@@ -168,6 +184,8 @@ static void ensure_cache_shaders(BongoCatApp *app) {
     }
 }
 
+/* 只有显式配置了缓存目录才会重设。换目录失败要回退到默认目录并填 error, 但这里不决定
+   是否致命 —— 调用方 (app.c) 只在命令行给了 --cache-root= 时才当失败处理。 */
 bool bongo_cat_storage_paths_apply_cache(BongoCatApp *app,
     BongoCatError *error) {
     if (!app) return true;

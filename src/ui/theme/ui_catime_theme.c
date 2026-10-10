@@ -1,3 +1,13 @@
+/*
+ * 调色板与 Nuklear 样式。两件事在这里汇合:
+ *  - 颜色: 亮/暗两套写死的常量 (设计稿值), 另外 Windows 高对比度模式下整体让位给
+ *    系统颜色 —— 无障碍优先级高于品牌色, 所以 high_contrast() 命中时直接返回,
+ *    连 effects 都关掉 (发光/alpha 在高对比度下会削弱可读性);
+ *  - 几何: 圆角/内边距/边框宽度集中在 geometry(), 与界面里各处硬编码的圆角要大致
+ *    贴合, 否则按钮和它外面的卡片会看起来不同族。
+ * 注意 apply_theme 末尾会把 dark 记回 backend: 之后 bongo_cat_ui_dark() 就能从
+ * context 反查主题, 不必让每个绘制函数都多收一个 dark 参数。
+ */
 #include "ui_catime.h"
 #include "ui_backend.h"
 
@@ -99,6 +109,9 @@ static void geometry(struct nk_style *style) {
     style->scrollh = style->scrollv;
 }
 
+/* 把 Nuklear 的颜色表一次填满。注意 table 是未初始化的栈数组: NK_COLOR_COUNT 里
+   每一个槽都必须被赋值, 漏一个就会把栈上的垃圾当成颜色用 (表现为随机闪烁的色块),
+   所以新增枚举时要同步补上。 */
 void bongo_cat_ui_apply_theme(struct nk_context *context, bool dark) {
     struct nk_color table[NK_COLOR_COUNT];
     BongoCatUIPalette p = bongo_cat_ui_palette(dark);

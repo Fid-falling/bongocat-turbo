@@ -5,6 +5,13 @@
 #include <string.h>
 #include <windows.h>
 
+/*
+ * 顺带把 '/' 统一成 '\\': 调用方(尤其是 core 的路径拼接)可能产生正斜杠, 而很多
+ * Windows API 只认反斜杠。
+ * 超过 240 字符的长路径要加 \\?\ 前缀才能突破 MAX_PATH: 盘符路径加 \\?\, UNC 路径
+ * 必须写成 \\?\UNC\server\share(所以先去掉了原来的两个反斜杠, 再加 8 字符前缀)。
+ * 阈值取 240 而不是 260, 是给调用方后续拼接留余量。
+ */
 wchar_t *bongo_cat_windows_wide(const char *text) {
     int length = text ? MultiByteToWideChar(CP_UTF8, MB_ERR_INVALID_CHARS,
         text, -1, NULL, 0) : 0;
@@ -28,6 +35,7 @@ wchar_t *bongo_cat_windows_wide(const char *text) {
     free(wide); return extended;
 }
 
+/* 先问需要多少字节再转换, 因此容量不够时直接失败, 不会写出半截字符串。 */
 bool bongo_cat_windows_utf8(const wchar_t *text, char *output, size_t capacity) {
     if (!text || !output || !capacity) return false;
     int required = WideCharToMultiByte(CP_UTF8, WC_ERR_INVALID_CHARS,

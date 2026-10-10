@@ -6,6 +6,11 @@
 #include <stdio.h>
 #include <string.h>
 
+/*
+ * 默认值与合法性钳制的唯一来源。配置可能来自手改或旧版本, 所以读进来之后
+ * 一律要过一遍 bongo_cat_settings_validate; 之后渲染/输入侧就可以直接相信
+ * 结构里的数值都在允许范围内, 不必到处再判一次。
+ */
 static float clampf_or(float value, float low, float high, float fallback) {
     if (!isfinite(value)) return fallback;
     return value < low ? low : value > high ? high : value;
@@ -20,6 +25,8 @@ static bool shortcut_equal(const char *left, const char *right) {
     return *left == *right;
 }
 
+/* 定长文本字段的收尾: 保证 NUL 结尾、把尾部残留字节清零(否则写回文件时会
+   带出上一次的垃圾), 非法 UTF-8 直接清空整段而不是留下半个字符。 */
 static bool normalize_text(char *text, size_t capacity) {
     text[capacity - 1] = '\0';
     if (!bongo_cat_utf8_valid(text)) {
@@ -31,6 +38,11 @@ static bool normalize_text(char *text, size_t capacity) {
     return true;
 }
 
+/*
+ * 快捷键冲突检查: 全局命令(显示/隐藏、打开设置、镜像、穿透、置顶)之间必须
+ * 互斥; 模型动作绑定的键彼此可以重复, 但与全局命令冲突时以全局为准。
+ * exclude 用于"正在改的就是这一项"时忽略它自己。大小写不敏感。
+ */
 bool bongo_cat_settings_shortcut_conflicts(const BongoCatSettings *config,
     const char *shortcut, const char *exclude) {
     if (!config || !shortcut || !shortcut[0]) return false;
@@ -53,6 +65,11 @@ bool bongo_cat_settings_shortcut_conflicts(const BongoCatSettings *config,
     return false;
 }
 
+/*
+ * 冲突的解决方式是"后者让位": 重复的全局键被清空, 模型动作里与全局键相同的
+ * 绑定也被清空。这里只做清理不提示, 由 UI 负责告诉用户。
+ * 两两比较是按数组顺序做的, 所以最终保留的是先出现的那一项。
+ */
 static void validate_shortcuts(BongoCatSettings *config) {
     char *global[] = {config->shortcuts.toggle_pet_visibility,
         config->shortcuts.visible_preferences, config->shortcuts.mirror,
@@ -72,6 +89,12 @@ static void validate_shortcuts(BongoCatSettings *config) {
     }
 }
 
+/*
+ * 三个 compact_* 做的是同一件事: 把可能被外部改坏的定长数组就地整理成规范
+ * 形态 —— 截断超长字段、丢弃非法或空条目、按 id 去重(后出现的字段覆盖先出现
+ * 的)、最后清零剩余槽位并把 count 收敛到真实条目数。
+ * 不变量: 前 count 项一定有效, 其余槽位一定是 0。写回文件前必须经过它。
+ */
 static void compact_behavior_overrides(BongoCatSettings *config) {
     size_t input_count = config->behavior_shortcut_count;
     if (input_count > BONGO_CAT_BEHAVIOR_BINDING_CAP)
@@ -189,6 +212,9 @@ static void compact_removed_models(BongoCatSettings *config) {
     config->removed_model_count = output_count;
 }
 
+/* 全新配置的初值: 首次运行、没有配置文件时由调用方用它铺底。
+   由于读取是可选读(缺键保留原值), 这里给出的初值同时就是那些键的默认值,
+   改动它会直接改变老配置的行为。 */
 void bongo_cat_settings_defaults(BongoCatSettings *config) {
     if (!config) return;
     memset(config, 0, sizeof(*config));
@@ -210,6 +236,12 @@ void bongo_cat_settings_defaults(BongoCatSettings *config) {
     memcpy(config->extensions_json, "{}", sizeof("{}"));
 }
 
+/*
+ * 幂等的收口函数: 读配置、改配置、写配置之前都会被调用。它只做钳制与整理,
+ * 不改变语义, 所以调用多少次结果都一样, 调用方不需要判断"是否已经校验过"。
+ * 末尾再跑一次 compact_behavior_overrides, 是因为 validate_shortcuts 可能
+ * 刚把某些 shortcut 清空, 清空之后又会多出空条目。
+ */
 void bongo_cat_settings_validate(BongoCatSettings *config) {
     if (!config) return;
     int max_fps = config->model.max_fps;

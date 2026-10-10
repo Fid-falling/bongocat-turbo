@@ -13,6 +13,9 @@ static bool removal_warning_emitted;
 static bool style_warning_emitted;
 #define BONGO_CAT_CAPTURE_REFRESH_TIMER ((UINT_PTR)0xBC51)
 
+/* 用窗口属性(capture_property)标记"这个窗口被登记为采集源": 后面的样式事务、
+   任务栏刷新、以及窗口过程里的消息分发都以它为准, 于是没登记过的窗口(设置窗口等)
+   不会被误改样式。 */
 static bool has_property(HWND window, const wchar_t *name) {
     return window && name && GetPropW(window, name) != NULL;
 }
@@ -21,6 +24,9 @@ bool bongo_cat_windows_capture_is_configured(HWND window) {
     return has_property(window, capture_property);
 }
 
+/* GetWindowLongPtr 返回 0 既可能是"样式本来就是 0"也可能是"调用失败", 必须配合
+   SetLastError(ERROR_SUCCESS) + GetLastError 才能区分; SetWindowLongPtr 同理(它返回
+   旧值, 成功时旧值也可能为 0)。这两个包装函数把这条容易写错的规则固定下来。 */
 static bool read_extended_style(HWND window, LONG_PTR *style) {
     SetLastError(ERROR_SUCCESS);
     LONG_PTR value = GetWindowLongPtrW(window, GWL_EXSTYLE);
@@ -37,6 +43,8 @@ static bool write_extended_style(HWND window, LONG_PTR style, DWORD *error) {
     return previous || result == ERROR_SUCCESS;
 }
 
+/* 两条自定义消息都只注册一次并缓存: TaskbarCreated 是资源管理器重启时广播的系统
+   消息(名字必须完全一致才收得到), 另一条是我们自己用来异步安排任务栏刷新的。 */
 static void register_messages(void) {
     if (!taskbar_created_message)
         taskbar_created_message = RegisterWindowMessageW(L"TaskbarCreated");
@@ -45,6 +53,9 @@ static void register_messages(void) {
             L"BongoCat.CaptureWindow.RefreshTaskbar");
 }
 
+/* 用 ITaskbarList::DeleteTab 把窗口从任务栏和 Alt+Tab 列表里摘掉。
+   CoInitializeEx 返回 RPC_E_CHANGED_MODE 是可接受的: 说明本线程已经用别的套间模式
+   初始化过 COM, 仍然可以创建对象, 但不该由我们 CoUninitialize。 */
 static HRESULT remove_taskbar_tab(HWND window) {
     HRESULT initialized = CoInitializeEx(NULL, COINIT_APARTMENTTHREADED);
     if (FAILED(initialized) && initialized != RPC_E_CHANGED_MODE)
@@ -59,6 +70,9 @@ static HRESULT remove_taskbar_tab(HWND window) {
     return result;
 }
 
+/* 只有 video 日志级别为 debug 时才收集这些信息(每次都要查 DWM 和窗口属性, 不便宜)。
+   输出包含 cloaked(是否被 DWM 隐藏)、display affinity(是否禁止截屏)、样式与 owner
+   —— 排查"OBS 抓不到"时这几个字段最关键。 */
 void bongo_cat_windows_capture_log(HWND window, const char *stage) {
     if (!window || !IsWindow(window)) return;
     if (SDL_GetLogPriority(SDL_LOG_CATEGORY_VIDEO) > SDL_LOG_PRIORITY_DEBUG) return;
@@ -96,6 +110,8 @@ static void refresh_taskbar(HWND window) {
     }
 }
 
+/* 立刻投递一次自定义消息, 同时起一个 250ms 的一次性定时器兜底: 资源管理器重启期间
+   消息可能投不进去, 定时器保证最终还会再试一次。 */
 static void schedule_refresh(HWND window) {
     register_messages();
     if (!window) return;
@@ -104,6 +120,15 @@ static void schedule_refresh(HWND window) {
     SetTimer(window, BONGO_CAT_CAPTURE_REFRESH_TIMER, 250, NULL);
 }
 
+/*
+ * 把窗口配置成可被 OBS 发现: 先打上标记, 再去掉 WS_EX_TOOLWINDOW。
+ * 去掉样式时窗口会被隐藏再显示(原因见下面原有的英文注释: 不引入 APPWINDOW, 也尽量
+ * 避免普通 SDL 窗口的隐藏/显示切换), 因为这个改动会重建 DWM 重定向表面。
+ * 结尾检查两个会让窗口采集彻底不可用的样式位(TOOLWINDOW / NOREDIRECTIONBITMAP), 用
+ * 返回值表示"是否配置成功"; 失败只警告一次, 不反复刷日志。
+ * 这个函数是幂等的, 会被反复调用(见 windows_pointer.c), 所以"样式没变"的路径上也
+ * 要执行透明修复与任务栏刷新。
+ */
 bool bongo_cat_windows_capture_configure(HWND window) {
     if (!window || !IsWindow(window)) return false;
     register_messages();
@@ -163,6 +188,9 @@ bool bongo_cat_windows_capture_configure(HWND window) {
     return ready;
 }
 
+/* 采集相关消息的分发。返回 true 表示消息已被吃掉, 调用方不要再交给原窗口过程。
+   顺序有讲究: 透明消息优先(它对 WM_ERASEBKGND 之类有硬性要求), 然后才是我们自己的
+   两条刷新消息与 TaskbarCreated 广播; TaskbarCreated 只对登记过的窗口返回 true。 */
 bool bongo_cat_windows_capture_handle_message(
     HWND window, UINT message, WPARAM wparam) {
     register_messages();

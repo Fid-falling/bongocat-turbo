@@ -1,3 +1,15 @@
+/*
+ * 系统字体探测: 只负责"找到能用的字体文件路径", 不负责加载 (加载在
+ * ui_font_atlas_sources.c)。
+ *
+ * 两个约定:
+ *  - 成功时把路径写进调用方的 path 缓冲并返回同一个指针, 失败返回 NULL (调用方
+ *    据此回退到 Nuklear 内置字体)。返回的指针不指向静态存储, 别跨调用保存。
+ *  - multilingual 表示界面需要 CJK: 为 true 时优先挑含中文字形的字体, 但最终仍会
+ *    退到拉丁字体 —— 宁可显示英文也不能没有字。
+ * 每个平台各写一套候选表, 不共用: Windows 走 %WINDIR%\Fonts, macOS 走绝对路径,
+ * Linux 的发行版布局差异太大, 只能把常见路径都列上。
+ */
 #include "ui_font.h"
 #include "bongo_cat/file.h"
 #include "bongo_cat/path.h"

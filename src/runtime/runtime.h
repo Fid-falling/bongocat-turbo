@@ -1,3 +1,16 @@
+/*
+ * runtime 模块的私有 API 清单 (对外只有 bongo_cat/app.h 那一套)。这里只有声明, 实现按
+ * 职责分在 lifecycle / shell / model / input / diagnostics / update 下。
+ * 建议阅读顺序: app_entry.c (进程入口) -> app.c (装配顺序与各 startup stage) ->
+ * app_loop.c (主循环的四个阶段) -> config_store.c 与 memory_policy.c (两条跨模块策略)。
+ * 调用时序上的硬约束 (改这些声明之前先看实现):
+ *   - bongo_cat_startup_prepare 必须最先调用: 它解析参数并算出存储路径, 之后才能
+ *     config_store_load (要读路径); "configuration-ready" 之后才允许依赖设置值;
+ *   - 窗口与平台相关的调用都要求 window-ready 之后 (platform_init 依赖 SDL_Window);
+ *   - 诊断/自测入口 (*_audit_run / *_self_test) 只在 --ci-* 参数下才真的有动作;
+ *   - shutdown 侧的 *_destroy 全部容忍 NULL, 因为启动失败时对象是半初始化的。
+ * 这个头被 runtime 内部大量 .c 包含: 只加声明, 不要在这里放实现或全局变量。
+ */
 #ifndef BONGO_CAT_RUNTIME_INTERNAL_H
 #define BONGO_CAT_RUNTIME_INTERNAL_H
 
@@ -7,6 +20,7 @@
 #include "window_snapshot.h"
 #include <SDL3/SDL.h>
 
+/* --- 生命周期与窗口: 装配、主循环、模型目录扫描与热更新 --- */
 BongoCatResult bongo_cat_window_create(BongoCatApp *app, BongoCatError *error);
 bool bongo_cat_app_initialize(BongoCatApp *app, int argc,
     char **argv, BongoCatError *error);
@@ -36,6 +50,7 @@ void bongo_cat_app_shutdown(BongoCatApp *app, const char *stage,
     int exit_code);
 void bongo_cat_startup_failure(BongoCatApp *app, const BongoCatError *error);
 void bongo_cat_startup_ci_failure(BongoCatApp *app, const BongoCatError *error);
+/* --- 窗口: 应用设置、事件、几何/缩放、拖拽与命中 --- */
 void bongo_cat_window_destroy(BongoCatApp *app);
 void bongo_cat_window_apply(BongoCatApp *app);
 /* 应用"只在录屏软件里显示"设置 (Windows: DWM 隐藏窗口, 桌面不显示但可采集) */
@@ -93,6 +108,7 @@ void bongo_cat_window_drag_motion(BongoCatApp *app,
     const SDL_MouseMotionEvent *event);
 void bongo_cat_window_drag_end(BongoCatApp *app);
 void bongo_cat_window_resize_by_pointer(BongoCatApp *app, const SDL_Event *event);
+/* --- 输入: 手柄、鼠标映射与跟踪、快捷键、悬停淡出 --- */
 const char *bongo_cat_gamepad_axis_name(Uint8 axis);
 const char *bongo_cat_gamepad_button_name(Uint8 button);
 void bongo_cat_gamepads_set_enabled(BongoCatApp *app, bool enabled);
@@ -115,6 +131,7 @@ void bongo_cat_window_menu_action(BongoCatApp *app, BongoCatMenuAction action);
 bool bongo_cat_window_menu_self_test(BongoCatApp *app);
 bool bongo_cat_window_geometry_self_test(BongoCatApp *app);
 void bongo_cat_window_show_context_menu(BongoCatApp *app);
+/* --- 诊断与冒烟: 只在 --ci-* 下真的有动作, 实现见 diagnostics/ --- */
 void bongo_cat_live2d_audit_run(BongoCatApp *app);
 bool bongo_cat_live2d_visual_audit_run(BongoCatApp *app);
 bool bongo_cat_live2d_viewer_audit_run(BongoCatApp *app);
@@ -127,6 +144,7 @@ void bongo_cat_window_mask_corners(BongoCatApp *app, int width, int height);
 void bongo_cat_window_destroy_corner_mask(void);
 void bongo_cat_app_render_now(BongoCatApp *app);
 bool bongo_cat_app_capture_pending_model_cover(BongoCatApp *app);
+/* --- 运行时策略: 流程脚本、系统语言、配置落盘、多宠协同 --- */
 void bongo_cat_runtime_flow_update(BongoCatApp *app, uint64_t now);
 void bongo_cat_random_expression_update(BongoCatApp *app, uint64_t now);
 void bongo_cat_random_expression_reset(BongoCatApp *app);

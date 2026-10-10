@@ -1,3 +1,15 @@
+/*
+ * 行为设置对话框 (动作 / 表情 / 声音), 从模型卡片上的那个笑脸图标打开。
+ *
+ * 结构是三段式: 标题 -> 分段控件 -> 可滚动行列表。
+ * 两条设计约束:
+ * 1. 分段是否显示由"当前模型真的有没有这一类数据"决定 (tab_available 每次绘制
+ * 现算, 不缓存) —— 换个模型, 动作集合就变了, 缓存会显示出一个空标签页;
+ * 2. 行列表是虚拟化的 (只画落在视口里的行), 但滚动偏移是按 tab 分别保存的
+ * (behavior_scroll[3]), 所以来回切标签页各自的滚动位置都还在。
+ * 关闭走的是"先进入淡出 (closing_ns), 淡完 (frame.finished) 才真正清状态",
+ * 这段时间里输入一律禁用; input_armed 用来吃掉"打开它的那一次点击"。
+ */
 #include "preferences_state.h"
 #include "preferences_overlay.h"
 #include "ui_animation.h"
@@ -34,6 +46,10 @@ static bool hit(struct nk_context *context, struct nk_rect bounds, bool enabled)
     return enabled && nk_input_is_mouse_hovering_rect(&context->input, bounds) &&
         nk_input_is_mouse_click_in_rect(&context->input, NK_BUTTON_LEFT, bounds);
 }
+/*
+ * 某个条目属不属于某个 tab。动作那一档要额外问 live2d 这个 motion 当前可不可见:
+ * 行为表是启动时枚举出来的全集, 换模型后会有一批失效项, 不筛掉就会列出点了没反应的行。
+ */
 static bool matches(const BongoCatPreferences *value,
     const BongoCatBehaviorEntry *entry, int tab) {
     if (tab == 0) return entry->kind == BONGO_CAT_BEHAVIOR_MOTION &&
@@ -43,6 +59,7 @@ static bool matches(const BongoCatPreferences *value,
     return entry->kind == BONGO_CAT_BEHAVIOR_SOUND && (entry->sound[0] || entry->sound_clear);
 }
 
+/* 声音那一档要求 sound[0] 非空: sound_clear 类型的条目本身没有文件名, 列出来也没得改 */
 static bool tab_available(const BongoCatPreferences *value, int tab) {
     for (size_t i = 0; i < value->app->behaviors.count; ++i) {
         const BongoCatBehaviorEntry *entry = &value->app->behaviors.entries[i];
@@ -51,6 +68,7 @@ static bool tab_available(const BongoCatPreferences *value, int tab) {
     return false;
 }
 
+/* 当前 tab 的行数。面板高度是用它算出来的, 所以必须在画面板之前就能拿到 (见 draw) */
 static size_t row_count(const BongoCatPreferences *value) {
     if (!tab_available(value, value->behavior_tab)) return 0;
     size_t count = 0;
@@ -78,6 +96,10 @@ void bongo_cat_preferences_behavior_dialog_open(
     value->render_dirty = true;
 }
 
+/*
+ * 关闭是幂等的 (已在淡出就不重置时间戳); 顺手收掉重命名与快捷键录制这两个会话 ——
+ * 它们持有的目标指针属于卡片/页面, 面板关掉之后再留着会写到看不见的地方。
+ */
 void bongo_cat_preferences_behavior_dialog_close(
     BongoCatPreferences *value) {
     if (!value || !value->behavior_dialog || value->behavior_dialog_closing_ns)
@@ -100,6 +122,12 @@ static bool draw_header(BongoCatPreferences *value, struct nk_context *context,
         alpha(p.muted, opacity), alpha(p.accent, opacity), enabled);
 }
 
+/*
+ * 分段控件。只画"有数据"的段, 所以每段宽度是按可用段数均分的 —— 用一个固定的
+ * 三分之一宽, 只显示两段时右边会空出一条。
+ * 切段时要做三件收尾: 重置滚动条 (新列表的高度完全不同)、记下过渡起点、取消正在
+ * 进行的快捷键录制 (录到一半切走, 目标行已经不在屏幕上了)。
+ */
 static void draw_segments(BongoCatPreferences *value,
     struct nk_context *context, struct nk_command_buffer *canvas,
     struct nk_rect panel, BongoCatUIPalette p, float opacity, bool enabled) {
@@ -145,6 +173,16 @@ static void draw_segments(BongoCatPreferences *value,
     }
 }
 
+/*
+ * 行列表。几处容易出错的地方:
+ * - 滚动条画在视口右侧, 行的可用宽度要相应让位 (scrollbar_content_width), 否则
+ * 行的右边缘会被滚动条压住;
+ * - 只画与视口相交的行, 但 shown 的计数必须对"所有匹配行"递增, 不能只对画出来的
+ * 递增, 否则滚动位置会随可见行数漂移;
+ * - scissor 用完必须恢复成整个内容区, 忘了恢复会让后面画的东西全被裁掉;
+ * - behavior_scroll 的下标是当前 tab, 保存的是"用户停下的偏移", 每帧读回来喂给
+ * 滚动条, 变化时再写回并标脏 —— 这就是它跨帧记住位置的方式。
+ */
 static void draw_rows(BongoCatPreferences *value, struct nk_context *context,
     struct nk_command_buffer *canvas, struct nk_rect panel,
     BongoCatUIPalette p, float opacity, bool enabled, size_t count) {
@@ -195,6 +233,14 @@ static void draw_rows(BongoCatPreferences *value, struct nk_context *context,
         "No items"), value->ui.caption_font, alpha(p.muted, content_opacity));
 }
 
+/*
+ * 面板整体绘制。
+ * 进入前先做一次"当前 tab 已失效就换一个"的兜底: 用户可能在面板开着的时候换了
+ * 模型, 原来的 tab 变成空的了。
+ * 高度由行数算出并夹在窗口内, 所以行多的时候面板更高, 但不会超出窗口。
+ * frame.finished 表示淡出播完, 这时才真正把 behavior_dialog 置假 —— 注意不能提前
+ * 置假, 否则面板会在还没淡完时突然消失。
+ */
 void bongo_cat_preferences_behavior_dialog_draw(
     BongoCatPreferences *value, struct nk_context *context) {
     if (!bongo_cat_preferences_behavior_dialog_active(value)) return;

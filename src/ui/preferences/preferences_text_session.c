@@ -1,3 +1,17 @@
+/*
+ * 文本编辑会话: 把"哪个输入框正在编辑"这件事变成一个可跨帧存活的会话对象, 并负责把
+ * SDL 事件翻译成编辑动作。
+ *
+ * 调用时序 (三个入口, 缺一不可):
+ * begin    —— 用户点进输入框时建立会话 (记住目标缓冲的 id 与初始文本);
+ * event    —— 每个 SDL 事件都喂进来, 返回 handled/finish/save 三个意图;
+ * reset    —— finish 之后 (或关窗/取消时) 收尾清空。
+ * 会话是"按 id 认领"的: 同一时间只有一个输入框处于编辑态, 这是单行编辑的简化点,
+ * 也意味着**不能有两个输入框同时进入编辑**。
+ *
+ * 焦点丢失 (WINDOW_FOCUS_LOST) 被当成"回车保存": 用户切到别的窗口时, 不应该丢掉
+ * 已经输入的内容。
+ */
 #include "preferences_text_session.h"
 
 #include "preferences_text_edit.h"
@@ -11,6 +25,8 @@ static float measure(const void *userdata, const char *text, size_t length) {
     return font->width(font->userdata, font->height, text, (int)length);
 }
 
+/* 只有选中态才有"整段复制/剪切"的语义; 未选中时按下 Ctrl+C/X 不动剪贴板,
+ * 但 Ctrl+V 始终可用 */
 static void clipboard_event(BongoCatPreferencesTextSession *session,
     SDL_Keycode key) {
     if (key == SDLK_V) {
@@ -26,11 +42,14 @@ static void clipboard_event(BongoCatPreferencesTextSession *session,
             &session->select_all);
 }
 
+/* 会话是否活着: 靠 id 非空判断, 所以 reset 必须把 id 清成空串 (memset 全零即可) */
 bool bongo_cat_preferences_text_session_active(
     const BongoCatPreferencesTextSession *session) {
     return session && session->id[0];
 }
 
+/* 进入编辑: 光标停在末尾而不是全选 —— 重命名时用户多半想接着改, 全选会一打字就
+ * 把原名冲掉 */
 void bongo_cat_preferences_text_session_begin(
     BongoCatPreferencesTextSession *session, const char *id,
     const char *text, struct nk_rect bounds) {
@@ -47,6 +66,15 @@ void bongo_cat_preferences_text_session_reset(
     if (session) memset(session, 0, sizeof(*session));
 }
 
+/*
+ * 事件入口。返回的三个意图要分清:
+ * handled  本事件已被本会话消费, 不要再给别的控件;
+ * finish   编辑结束 (回车/ESC/点空白/丢焦点), save 表示"要保存"还是"放弃";
+ * save     只有 finish 为真时才有意义。
+ * 鼠标点击落在输入框外要按布局缩放换算坐标 (事件是物理像素, bounds 是逻辑像素),
+ * 不换算的话高 DPI 下点空白处无法结束编辑。
+ * 编辑期间 KEY_DOWN/KEY_UP 一律标记为 handled, 否则方向键会同时被页面滚动吃掉。
+ */
 BongoCatPreferencesTextSessionEvent bongo_cat_preferences_text_session_event(
     BongoCatPreferencesTextSession *session, const SDL_Event *event,
     float layout_scale, const struct nk_user_font *font, float text_inset) {

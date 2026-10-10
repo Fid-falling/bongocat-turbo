@@ -1,3 +1,13 @@
+/*
+ * 没有 Cubism SDK 时的替代实现 (诊断构建)。
+ *
+ * 它的目的不是"还能跑 Live2D", 而是让整个程序在没有 SDK 的情况下依然能编译、链接并启动
+ * 到主界面, 从而区分"是渲染的问题"还是"是模型/SDK 的问题"。
+ *
+ * 因此约定是: 查询类一律返回 false/空, 但凡"返回 false 会让上层把某个功能面整个关掉"的
+ * 查询, 要返回中性值 —— 见末尾 shaders_available 与 motion_visible 的说明。另外这里所有
+ * 函数都必须与真实的 C 接口签名逐字一致, 否则链接期才发现对不上。
+ */
 #include "bongo_cat/live2d_vulkan.h"
 #include "bongo_cat/model.h"
 #include "model_import_manifest.h"
@@ -7,6 +17,8 @@
 #include <SDL3/SDL_log.h>
 #include <stdlib.h>
 
+/* 桩运行时只保留"加载过没有"和最近一次的画布尺寸: 前者让 ready() 的语义与真实实现一致,
+ * 后者让视口查询返回一个合法的 (虽然没用) 矩形, 而不是 0 尺寸把上层布局算崩。 */
 struct BongoCatLive2D {
     int width;
     int height;
@@ -146,6 +158,8 @@ bool bongo_cat_live2d_motion_persistent(const BongoCatLive2D *value,
     const char *group, int index) {
     (void)value; (void)group; (void)index; return false;
 }
+/* 唯一返回 true 的动作查询: 返回 false 会被上层理解成"这条动作是配对隐藏项", 于是把它从
+ * 动作列表里摘掉 —— 诊断构建下用户会以为动作丢了。 */
 bool bongo_cat_live2d_motion_visible(const BongoCatLive2D *value,
     const char *group, int index) {
     (void)value; (void)group; (void)index; return true;

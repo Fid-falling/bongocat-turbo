@@ -1,3 +1,13 @@
+/*
+ * 主题/渲染器/帧率这一组"分段选择器" (capsule) 与它外面的表单壳。
+ *
+ * form_begin / form_end 是成对的作用域: 把全局的 Nuklear 窗口样式临时改成"无底色、
+ * 无边框、13/11 内边距"来画一行表单, 画完还原。之所以要清掉底色, 是因为行本身画在
+ * 页面背景上, 再叠一层窗口底色会脏。
+ * 三个特效区都是手绘的 (电脑/太阳/月亮), 不走图标图集: 它们要跟随选中动画改颜色,
+ * 而图集是按固定贴图着色画的, 做不到"图标底色随滑块一起渐变"。
+ * 动画 id 全都带 id 参数前缀 —— 同一个窗口里有多个分段控件, 不区分会互相带动画。
+ */
 #include "preferences_theme.h"
 #include "preferences_widgets_internal.h"
 #include "ui_animation.h"
@@ -18,6 +28,11 @@ typedef struct ThemeFormStyle {
     float border;
 } ThemeFormStyle;
 
+/*
+ * 进入一行表单。返回 true 表示组已开好, 调用方结束时必须配 form_end;
+ * 返回 false 表示这一行被滚动裁剪掉了 —— 此时组没开成, 但样式已经复原 (见中间那段),
+ * 所以调用方直接返回即可, 不要再调 form_end。
+ */
 static bool form_begin(struct nk_context *context, const char *id,
     ThemeFormStyle *saved) {
     saved->background = context->style.window.fixed_background;
@@ -45,6 +60,7 @@ static bool form_begin(struct nk_context *context, const char *id,
     return false;
 }
 
+/* 收尾: 先让行图标状态复位再关组, 顺序反了会让图标残留到下一行 */
 static void form_end(struct nk_context *context, const ThemeFormStyle *saved) {
     bongo_cat_pref_row_icon_clear(context);
     nk_group_end(context);
@@ -78,6 +94,10 @@ static void draw_sun(struct nk_command_buffer *canvas,
             x + rays[i][2], y + rays[i][3], 1.7f, color);
 }
 
+/*
+ * 月亮是用"画一个圆, 再用背景色盖掉一个偏移的圆"抠出来的: 这样不用贝塞尔也能得到
+ * 干净的月牙, 所以必须把背景色传进来 —— 换主题背景色变了, 传错了月牙就是花的。
+ */
 static void draw_moon(struct nk_command_buffer *canvas,
     struct nk_rect bounds, struct nk_color color,
     struct nk_color background) {
@@ -96,6 +116,18 @@ static void draw_icon(struct nk_command_buffer *canvas, int icon,
     else draw_moon(canvas, bounds, color, background);
 }
 
+/*
+ * 分段选择器 (胶囊控件)。icons 为真时画图标, 否则画文字。
+ * 三个动画层次的配合要看清:
+ * position       选中段的浮点位置 (0..count-1), 用补间值而不是整数下标, 滑动条
+ * 才能平滑移动;
+ * outer_hover    整个控件的悬停描边;
+ * theme-hover-id-i 每一段自己的悬停底色。
+ * active_weight 是"离选中位置多远"的权重, 用它把图标/文字颜色推向白色并放大 1px,
+ * 这样滑块移动过程中途经的段会有一次淡淡的提亮, 而不是硬切。
+ * disabled 段 (比如不可用的 Vulkan) 连悬停高亮都不给 —— 只禁用点击但保留高亮,
+ * 会让人以为点得动。
+ */
 static int capsule(struct nk_context *context, const char *id,
     const char *const *labels, int count, bool icons, int selected,
     float width, int disabled) {
@@ -175,6 +207,11 @@ static int capsule(struct nk_context *context, const char *id,
     return selected;
 }
 
+/*
+ * 一行"左标签 + 右分段控件"。左右宽度是算出来的 (右列至少 control_width + 20),
+ * 左列有 220px 下限: 窗口窄到一定程度时宁可让标签占满左边, 也不要把分段控件压扁
+ * 到点不准。
+ */
 static int choice_row(struct nk_context *context, const char *id,
     const char *title, const char *const *labels, int count, bool icons,
     int selected, float control_width, int disabled) {
@@ -193,11 +230,16 @@ static int choice_row(struct nk_context *context, const char *id,
     return selected;
 }
 
+/* disabled 传 -1 表示没有禁用段 */
 int bongo_cat_pref_theme(struct nk_context *context, const char *id,
     const char *title, const char *const *labels, int selected) {
     return choice_row(context, id, title, labels, 3, true, selected, 156.0f, -1);
 }
 
+/*
+ * Vulkan 不可用的机器上把 Vulkan 段画成禁用; 越界的 renderer 值一律退回 Auto,
+ * 免得旧配置里存了一个现在已经不存在的序号导致三个段全都不选中。
+ */
 int bongo_cat_pref_renderer(struct nk_context *context, const char *id,
     const char *title, int renderer, bool vulkan_selectable) {
     static const char *labels[] = {"Auto", "OpenGL", "Vulkan"};
@@ -207,6 +249,10 @@ int bongo_cat_pref_renderer(struct nk_context *context, const char *id,
         vulkan_selectable ? -1 : (int)BONGO_CAT_RENDERER_VULKAN);
 }
 
+/*
+ * 界面上的三段是 30 / 60(默认) / 无限, 而存储用的是"实际帧率上限"数值, 所以
+ * 进出都要做一次映射; fps 既不是 30 也不是默认值时就当成"无限"。
+ */
 int bongo_cat_pref_fps(struct nk_context *context, const char *id,
     const char *title, int fps, const char *unlimited_label) {
     /* 比主题行宽: "Unlimited" 比图标占地方, 沿用 156px 三段会挤到一起 */

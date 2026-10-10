@@ -1,3 +1,9 @@
+/*
+ * 图标绘制的统一入口: 先试"段落级图标", 再试"行级图标"。
+ * 这样分派的好处是调用方只需要一个 BongoCatPrefIcon 值, 不必知道某个图标属于哪张表;
+ * 两张表之间用枚举值的区间划分 (见 preferences_icons_internal.h 的说明), 所以任何
+ * 越界的 icon 都会在两边各自被拒绝, 不会画错图。
+ */
 #include "preferences_icons.h"
 #include "preferences_icons_internal.h"
 

@@ -1,3 +1,9 @@
+/*
+ * 异常退出的事后取证。runtime-state.txt 只存"最后到达的阶段 + 时间戳", 每次先写 .tmp
+ * 再原子替换 —— 被杀/断电不会留下半行内容。
+ * 正常退出先删文件; 删不掉 (只读目录 / 被占用) 才写一个 clean-shutdown 作为退路。
+ * 于是"文件还在且不是 clean-shutdown"就等于上次没有正常退出, 下一次启动会 WARN。
+ */
 #include "runtime.h"
 #include "runtime_state.h"
 #include "bongo_cat/file.h"
@@ -18,6 +24,8 @@ static bool temporary_path(BongoCatApp *app, char *path, size_t capacity) {
             "runtime-state.tmp");
 }
 
+/* 时间戳格式固定 (带 UTC 偏移), 日志与 CI 都按这个格式 grep; 取不到系统时间时退化成
+   epoch 秒, 保证总能写出一行。 */
 void bongo_cat_runtime_timestamp(char *target, size_t capacity) {
     if (!target || !capacity) return;
     SDL_Time ticks = 0;
@@ -40,6 +48,8 @@ void bongo_cat_runtime_timestamp(char *target, size_t capacity) {
     target[capacity - 1] = '\0';
 }
 
+/* 读上次的状态: 顺手修复"只剩 .tmp"的残留 (上次恰好死在替换之前), 并把换行统一成
+   空格, 免得日志被撕裂。 */
 void bongo_cat_runtime_state_previous(BongoCatApp *app, char *state,
     size_t capacity) {
     if (!state || !capacity) return;
@@ -60,6 +70,7 @@ void bongo_cat_runtime_state_previous(BongoCatApp *app, char *state,
         if (state[i] == '\r' || state[i] == '\n') state[i] = ' ';
 }
 
+/* 内容里绝不放换行: 状态是一行文本, 多出来的换行会让下次读取的解析错位。 */
 static bool write_state(BongoCatApp *app, const char *stage,
     const char *timestamp) {
     char path[BONGO_CAT_PATH_CAP], temporary[BONGO_CAT_PATH_CAP];
@@ -84,6 +95,8 @@ void bongo_cat_runtime_stage(BongoCatApp *app, const char *stage) {
     write_state(app, stage, timestamp);
 }
 
+/* 正常关闭: 删掉状态文件; 删不掉就写 clean-shutdown 兜底, 至少不让下次启动误报"上次
+   异常退出"。 */
 void bongo_cat_runtime_state_clean(BongoCatApp *app, const char *timestamp) {
     char path[BONGO_CAT_PATH_CAP], temporary[BONGO_CAT_PATH_CAP];
     if (temporary_path(app, temporary, sizeof(temporary)))

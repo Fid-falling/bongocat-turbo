@@ -5,6 +5,14 @@
 
 #include "nuklear_config.h"
 
+/*
+ * 设置页用到的全部图标 (全部是代码画的矢量图形, 没有图片文件)。
+ * 枚举值分成两段: 前面几个 SECTION_* 是段落标题用的大图标, 从
+ * BONGO_CAT_PREF_ICON_MULTIPLE_MODELS 起是表单行用的小图标。分段依据是枚举顺序,
+ * 两边的绘制函数按区间判断归属 —— 所以**新增图标必须加在所属段的末尾**, 插到中间
+ * 会让后面所有图标的含义整体错位。
+ * BONGO_CAT_PREF_ICON_COUNT 必须始终是最后一个。
+ */
 typedef enum BongoCatPrefIcon {
     BONGO_CAT_PREF_ICON_SECTION_WINDOW,
     BONGO_CAT_PREF_ICON_SECTION_MODEL,

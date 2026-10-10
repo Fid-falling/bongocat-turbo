@@ -14,6 +14,7 @@ static unsigned char *next_level(const unsigned char *source,
     if (!target) return NULL;
     for (int y = 0; y < *height; ++y) for (int x = 0; x < *width; ++x) {
         int sx = x * 2, sy = y * 2;
+        /* 奇数尺寸时右/下边界要 clamp 回最后一行/列, 否则降采样会越界读。 */
         int sx1 = SDL_min(sx + 1, source_width - 1);
         int sy1 = SDL_min(sy + 1, source_height - 1);
         const unsigned char *samples[] = {
@@ -40,12 +41,21 @@ static unsigned char *next_level(const unsigned char *source,
     return target;
 }
 
+/*
+ * 手工建 mip 链并逐级上传 (只给模型贴图用)。
+ *
+ * 关键不变量: 源像素已经是预乘 RGBA, 所以四像素**等权**平均才对 —— 若再按 alpha 加权,
+ * 半透明边缘会每降一级就更暗 (见 next_level 里的说明)。
+ * 失败时返回 false, 但只保证不抛错、不泄漏, 不负责收尾: 调用方 (image.c 的 upload) 会清掉
+ * GL 错误、把过滤退回 GL_LINEAR 并重新上传 level 0。
+ */
 bool bongo_cat_image_upload_mipmaps(const BongoCatImage *image) {
     if (!image || !image->pixels || image->width < 1 || image->height < 1)
         return false;
     glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8, image->width, image->height,
         0, GL_RGBA, GL_UNSIGNED_BYTE, image->pixels);
     if (glGetError() != GL_NO_ERROR) return false;
+    /* owned 指向"上一级的分配": 每上传完一级就可以把上上级释放掉, 所以峰值只有两级大小。 */
     const unsigned char *source = image->pixels;
     unsigned char *owned = NULL;
     int source_width = image->width, source_height = image->height, level = 1;

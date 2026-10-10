@@ -1,9 +1,17 @@
+/* 菜单行为的自测 (smoke): 由 bongo_cat_window_menu_self_test 串进启动自检, 失败会记日志并
+ * 汇成 CI 致命错误 (见 lifecycle/app.c), 不是"仅供参考"的检查。
+ * 这些用例直接在真实 app 上跑, 会改 live2d 的选中动作/表情与窗口状态, 所以每个子用例都必须
+ * 先备份、结束前还原 —— 还原范围和顺序是这里最容易出错的地方。
+ * 另外: 断言用的是"独立复现"的序号换算与标签拼接, 有意不调用产品代码里的私有实现,
+ * 否则产品实现错了测试也会跟着错。 */
 #include "window_menu.h"
 #include "bongo_cat/shortcut.h"
 
 #include <stdio.h>
 #include <string.h>
 
+/* 与 window_menu_behavior.c 的 nth_behavior 保持同样的过滤条件, 但刻意分开实现:
+ * 计数走独立复现, 产品代码改了过滤规则时这里应该失败, 而不是跟着一起错。 */
 static const BongoCatBehaviorEntry *test_nth_behavior(BongoCatApp *app,
     BongoCatBehaviorKind kind, size_t position) {
     if (!app) return NULL;
@@ -30,6 +38,9 @@ static const char *test_behavior_shortcut(const BongoCatApp *app,
     return NULL;
 }
 
+/* 表情用例: labels 导出的表情条数要与可见表情一致; 选中后 current_expression 指向正确
+ * 下标; 预览-取消必须回到原表情, 预览-确认必须保留新表情 (见 preview_applied)。
+ * 开头先清空表情以便验证"没有选中"的哨兵, 结束前必须把原表情写回, 否则污染后续用例。 */
 static bool expression_self_test(BongoCatApp *app) {
     size_t count = 0;
     while (test_nth_behavior(app, BONGO_CAT_BEHAVIOR_EXPRESSION, count)) count++;
@@ -96,11 +107,16 @@ static bool expression_self_test(BongoCatApp *app) {
     return restored && passed;
 }
 
+/* 用固定步长 (0.25s) 推进 live2d 而不是等真实时钟, 动作生命周期才可复现;
+ * 调用方自己决定步数, 所以下面的等待都是相对时间的循环。 */
 static void advance_motion(BongoCatApp *app, unsigned steps) {
     for (unsigned i = 0; i < steps; ++i)
         bongo_cat_app_step_live2d(app, 0.25f);
 }
 
+/* 动作生命周期不变量: 常驻动作 (persistent) 不会被时间推进清掉; 一次性动作播完会自己
+ * 取消勾选, 而且不会顺带清掉常驻动作。模型缺少某一类时跳过对应断言。
+ * 末尾尽量把常驻动作重新拉起来, 让退出时状态接近进入时。 */
 static bool motion_lifecycle_self_test(BongoCatApp *app) {
     const BongoCatBehaviorEntry *persistent = NULL, *one_shot = NULL;
     for (size_t i = 0; i < app->behaviors.count; ++i) {
@@ -153,6 +169,11 @@ static bool motion_lifecycle_self_test(BongoCatApp *app) {
     return passed;
 }
 
+/* 行为自测入口 (smoke 流程调用): 依次验证动作菜单的勾选态与标签、预览期间勾选态稳定、
+ * 预览取消要回到原动作、确认要保留、两个动作可以并存、配对项联动关掉 (只有配对时才要求),
+ * 然后跑动作生命周期与表情两组子用例。会在真实 app 上改 live2d 状态, 各子用例自己负责
+ * 还原; 模型里没有动作/表情时跳过对应部分 (跳过算通过)。返回 false 会让整轮 smoke 自检失败
+ * (见 lifecycle/app.c 的 smoke_menu 分支), 所以每个子结果都要汇进 passed。 */
 bool bongo_cat_window_behavior_self_test(BongoCatApp *app) {
     if (!app) return false;
     bool passed = true;
@@ -176,6 +197,7 @@ bool bongo_cat_window_behavior_self_test(BongoCatApp *app) {
             bongo_cat_shortcut_format(first_shortcut, shortcut_label, sizeof(shortcut_label));
             passed = strstr(motions[0], shortcut_label) != NULL && passed;
         }
+        /* hover 预览期间勾选态不能变: 预览是"试穿", 只有确认才写回会话。 */
         memcpy(before, checked, motion_count * sizeof(before[0]));
         size_t preview_position = test_nth_behavior(app,
             BONGO_CAT_BEHAVIOR_MOTION, 1) ? 1 : 0;
@@ -222,6 +244,8 @@ bool bongo_cat_window_behavior_self_test(BongoCatApp *app) {
                 candidate->group, candidate->index);
             independent = independent || (first_selected && candidate_selected);
         }
+        /* 只有 CAT_motion_lock 这个名字的模型承诺多个动作可以同时选中, 其它模型不一定,
+         * 所以只在此时断言 independent。 */
         if (motion_count > 2 && strcmp(first->group, "CAT_motion_lock") == 0)
             passed = independent && passed;
         passed = bongo_cat_window_behavior_action(app,

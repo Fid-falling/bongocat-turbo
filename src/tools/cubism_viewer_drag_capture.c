@@ -11,6 +11,16 @@
 #include <string.h>
 #include <wchar.h>
 
+/*
+ * 拖动采集工具: 用模拟鼠标在 Cubism viewer 里真拖一次猫, 在指定时刻用 GDI
+ * BitBlt 抓屏并存成 PNG, 同时写 trace.csv 记录每张图的请求时刻与抓取起止时刻。
+ *
+ * 与 cubism_viewer_desktop_capture.c 的分工: 那个用 DXGI 桌面复制, 能拿到真实的
+ * 呈现时间戳, 适合分析呈现延迟; 这个用 BitBlt, 简单且无额外依赖, 适合比对画面
+ * 本身 —— 代价是只有"我们开始/结束抓取的时刻", 没有真正的呈现时间。
+ * 采样时刻固定为拖动与回程各自的 16.7/33.3/66.7/133.3/250/500ms, 再加 idle 与
+ * 刚按下共 14 张。这份时刻表与原生实现的对照实验共用, 不能只改一边。
+ */
 enum { FRAME_COUNT = 14 };
 
 typedef struct WindowSearch { DWORD process; HWND window; } WindowSearch;
@@ -42,6 +52,8 @@ static HWND process_window(DWORD process) {
     return search.window;
 }
 
+/* 用 QPC 计时并换算成毫秒; frequency 在 wmain 里初始化一次。所有时间都相对
+   origin(触发拖动的那一刻), 所以 trace 里的毫秒值就是"拖动开始后多久"。 */
 static double now_milliseconds(void) {
     LARGE_INTEGER value;
     QueryPerformanceCounter(&value);
@@ -59,6 +71,8 @@ static void key(BYTE code) {
     Sleep(80);
 }
 
+/* 按界面坐标点开表情菜单选第 index 项(每行 29 像素)。这些坐标是 1280x720
+   viewer 下的实测标定值, viewer 改版就要重新量。 */
 static void select_expression(int index) {
     SetCursorPos(100, 194); click(); Sleep(150); key(VK_RIGHT); Sleep(150);
     SetCursorPos(120, 222 + index * 29); click(); Sleep(1000);
@@ -77,6 +91,14 @@ static wchar_t *output_path(const wchar_t *directory, const wchar_t *name,
     return path;
 }
 
+/*
+ * 抓一块屏幕区域。用 CreateDIBSection 直接拿到可读的像素缓冲(而不是先 BitBlt 到
+ * 兼容位图再 GetDIBits), 少一次拷贝; biHeight 取负表示自上而下的行序, 与后续
+ * 图像处理保持一致。
+ * GDI 的 32 位 DIB 不保证 alpha 有效, 所以最后统一填成 255 —— 下游工具正是靠
+ * 这一点判断"这张图没有透明信息, 请改用背景色判前景"。
+ * begin/end 夹住 BitBlt 本身, trace 里的 capture_mid_ms 就是两者中点。
+ */
 static int capture_image(int left, int top, int width, int height,
     double origin, Frame *frame) {
     BITMAPINFO bitmap = {0};
@@ -114,6 +136,8 @@ done:
     return copied && frame->image.bgra != NULL;
 }
 
+/* 忙等到指定时刻: 剩余超过 2ms 时 Sleep(1) 让出 CPU, 否则用 YieldProcessor
+   空转 —— 最后这几百微秒的精度直接决定采样时刻的准确性, Sleep 的粒度不够。 */
 static void wait_until(double origin, double milliseconds) {
     for (;;) {
         double remaining = milliseconds - (now_milliseconds() - origin);
@@ -123,6 +147,9 @@ static void wait_until(double origin, double milliseconds) {
     }
 }
 
+/* 存图并写 trace.csv。drag_x/drag_y 把点击位置换算成 Live2D 的拖拽参数
+   ([-1,1], Y 轴翻转), 必须与核心里的 bongo_cat_mouse_drag_coordinates 用同一套
+   公式, 两边不一致会让对照实验得出错误结论。 */
 static int save_frames(Frame *frames, int count, const wchar_t *directory,
     int press_x, int press_y, int target_x, int target_y,
     int left, int top, int width, int height) {
@@ -153,6 +180,8 @@ static int save_frames(Frame *frames, int count, const wchar_t *directory,
     return ok;
 }
 
+/* 参数: output-directory viewer-pid [left top width height press-x press-y
+   target-x target-y press-settle-ms expression-index]。 */
 int wmain(int argc, wchar_t **argv) {
     static const wchar_t *track_names[] = {L"track-001", L"track-002",
         L"track-004", L"track-008", L"track-015", L"track-030"};
@@ -218,6 +247,8 @@ int wmain(int argc, wchar_t **argv) {
     result = 0;
 done:
     mouse_event(MOUSEEVENTF_LEFTUP, 0, 0, 0, 0);
+    /* 成功路径上图像已经由 save_frames 释放过, 所以这里只在失败时补一次释放;
+       而无论成败都要松开左键 —— 否则工具异常退出会把用户的鼠标卡在按下状态。 */
     if (result) for (index = 0; index < count; ++index)
         bongo_cat_validation_image_free(&frames[index].image);
     CoUninitialize();

@@ -1,3 +1,11 @@
+/*
+ * Mver 的"这是不是内置模型"策略: 用清单里 Moc 与 Textures 的内容指纹 (而不是整个目录的聚合指纹)
+ * 比对内置 runtime 模型的已知档位; 图片补丁则先剥掉覆盖层, 再对底层包做同样的判断。判定为内置
+ * 模板的候选不会作为用户模型出现在目录里 (由 candidate_placeholder 调用)。
+ * 契约: 三个导出函数都不修改 candidate; 指纹是 65 字节的十六进制 sha256, 由调用方的
+ * BongoCatImportDigestCache 加速。
+ * 易错点: profiles 是硬编码指纹, 内置模型一变就必须重新生成, 否则新内置模型会以用户模型变体的身份冒出来。
+ */
 #include "model_import_mver_policy.h"
 #include "model_import_mver_manifest.h"
 #include "bongo_cat/file.h"
@@ -14,6 +22,9 @@ typedef struct StockLive2DProfile {
     size_t texture_count;
 } StockLive2DProfile;
 
+/* 把补丁候选还原成底层完整包再取指纹: 复制候选, 强制 format 为 MVER 并清空 patch_root 与
+   overrides, 算出来的才是模型本体的 identity, 用于判断补丁是不是只在改内置模板。candidate 不是
+   补丁时直接返回 false。 */
 bool bongo_cat_import_patch_base_inspect(
     const BongoCatImportCandidate *candidate, char output[65],
     bool *placeholder, BongoCatError *error) {
@@ -26,6 +37,8 @@ bool bongo_cat_import_patch_base_inspect(
     return bongo_cat_import_candidate_inspect(&base, output, placeholder, error);
 }
 
+/* discovery 里是否已经存在这个补丁所依附的完整 Mver 候选 (模式、目录与清单文件全同)。调用方据此
+   跳过补丁候选让完整包胜出, 避免同一个模型列两次; 下标越界返回 false。 */
 bool bongo_cat_import_patch_has_full_base(
     const BongoCatImportDiscovery *discovery, size_t candidate_index) {
     if (!discovery || candidate_index >= discovery->count) return false;
@@ -42,6 +55,8 @@ bool bongo_cat_import_patch_has_full_base(
     return false;
 }
 
+/* 校验清单里的相对引用: 拒绝空串、以斜杠开头的路径、含冒号的盘符或流名, 以及任何一个只由两个点
+   组成的路径分量。这是拼接清单内容时的目录穿越防线, 放宽它会允许模型读走包外的文件。 */
 static bool safe_model_reference(const char *value) {
     if (!value || !value[0] || value[0] == '/' || value[0] == '\\' ||
         strchr(value, ':')) return false;
@@ -56,6 +71,7 @@ static bool safe_model_reference(const char *value) {
     return true;
 }
 
+/* 拼路径并取缓存指纹; 引用非法或文件不存在都返回 false (不是错误), 由调用方定夺。 */
 static bool reference_digest(const char *root, const char *relative,
     BongoCatImportDigestCache *cache, char digest[65]) {
     char path[BONGO_CAT_PATH_CAP];
@@ -66,6 +82,8 @@ static bool reference_digest(const char *root, const char *relative,
         bongo_cat_import_digest_file_cached(cache, path, size, modified, digest);
 }
 
+/* 档位比对: 模式必须相同, Textures 的个数必须与档位一致 (多一张少一张都算不同), 然后逐个比对
+   Moc 与每张贴图的指纹。 */
 static bool profile_matches(const StockLive2DProfile *profile,
     const BongoCatImportCandidate *candidate, yyjson_val *refs,
     BongoCatImportDigestCache *cache) {
@@ -85,6 +103,8 @@ static bool profile_matches(const StockLive2DProfile *profile,
     return true;
 }
 
+/* 判断候选是否就是内置 runtime 模型 (占位模板): 读它的清单, 拿 FileReferences 逐个与 profiles
+   比对。返回 true 表示不该把它当用户模型; 读不到清单返回 false, 按普通模型处理。 */
 bool bongo_cat_import_mver_stock_model(
     const BongoCatImportCandidate *candidate,
     BongoCatImportDigestCache *cache) {
@@ -119,6 +139,8 @@ bool bongo_cat_import_mver_stock_model(
              "bf32b89f328160ac8bd7cd4e527646eedfae98294506c597f381001ae6a83eb4",
              "93c3213355e4743b38e8dd2e14a24693f2d24f10dc8b51c4ca986a749ee24682"}, 3}
     };
+    /* 同一模式出现多个档位是不同发行版的内置贴图组合, 顺序无关; 新增或更新内置模型时把新的 Moc
+       与 Textures 指纹追加到这里。 */
     char manifest[BONGO_CAT_PATH_CAP];
     if (!bongo_cat_path_join(manifest, sizeof(manifest), candidate->directory,
             candidate->setting)) return false;

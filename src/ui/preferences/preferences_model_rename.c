@@ -1,3 +1,15 @@
+/*
+ * 模型卡片上的名字 (点一下可以改名)。
+ *
+ * 与 preferences_behavior_rename.c 是同一套做法的姊妹实现, 但保存目标不同: 这里写
+ * 的是 settings 里该模型的自定义 label (通过 bongo_cat_settings_set_model_label),
+ * 原始名仍在模型目录里。把名字改回默认值时存空串, 表示"没有自定义名"。
+ *
+ * 本文件唯一特殊的地方是"字形还没准备好"的占位处理 (name_pending): 目录刷新或导入
+ * 之后, 新名字里的字可能还没进字体图集, 直接画就是一堆方块。这时改成显示 "..." 或
+ * "导入中", 等图集重建好 (font_reload_pending 落下) 再显示真名。
+ * 占位期间禁止进入改名 (clicked && !name_pending): 否则用户会把占位符当成名字改掉。
+ */
 #include "preferences_state.h"
 #include "preferences_model_glyphs.h"
 #include "preferences_text_edit.h"
@@ -48,9 +60,14 @@ bool bongo_cat_preferences_model_name_draw(BongoCatPreferences *value,
         bongo_cat_preferences_model_rename_begin(value, entry, bounds);
     if (hover || renaming) bongo_cat_ui_cursor_hover_rect(context, bounds,
         BONGO_CAT_UI_CURSOR_TEXT);
+/*
+ * 名字区域每帧都要重画光标, 所以返回"这一帧名字区是否处于活跃状态",
+ * 供卡片层判断要不要把悬停光标切成 I 形、以及要不要把点击让给文本编辑。
+ */
     return renaming || hover;
 }
 
+/* 结束改名: 与行为改名同样只在名字真的变了时才重建字体图集; 取消 (save=false) 不写任何东西 */
 void bongo_cat_preferences_model_rename_finish(
     BongoCatPreferences *value, bool save) {
     if (!value || !bongo_cat_preferences_text_session_active(
@@ -72,6 +89,7 @@ void bongo_cat_preferences_model_rename_finish(
     value->render_dirty = true;
 }
 
+/* 开始改名: 先取消快捷键录制, 两者都要独占键盘 */
 void bongo_cat_preferences_model_rename_begin(BongoCatPreferences *value,
     const BongoCatModelEntry *entry, struct nk_rect bounds) {
     if (!value || !entry) return;
@@ -82,6 +100,7 @@ void bongo_cat_preferences_model_rename_begin(BongoCatPreferences *value,
     value->render_dirty = true;
 }
 
+/* 文本编辑事件入口; 返回 handled 表示事件已被消费, 不要再传给其他控件 */
 bool bongo_cat_preferences_model_rename_event(
     BongoCatPreferences *value, const SDL_Event *event) {
     if (!value) return false;

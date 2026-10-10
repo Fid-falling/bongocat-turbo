@@ -1,3 +1,9 @@
+/* "构图是否稳定"的视觉审计: 每个用例都自己清屏画一帧, 读回像素与 BongoCatLive2DVisualState, 往
+ * state_root/live2d-visual-audit.csv 追加一行 (fit_scale 与平移、可见包围盒、边缘 alpha、fitted /
+ * visible / mver_projection 以及通过位)。核心不变量是: 切表达式、拖动、镜像、改画布尺寸都不应改变
+ * fit_scale —— 构图由投影决定, 内容只改参数。边缘像素只进 CSV 不做断言, Vulkan 下记 ~0u 表示"没取到"
+ * (需要独立的离屏渲染路径)。结束时恢复拖拽、镜像与画布并置 app->dirty。
+ */
 #include "runtime.h"
 #include "bongo_cat/render.h"
 #include "bongo_cat/file.h"
@@ -8,21 +14,33 @@
 #include <stdio.h>
 #include <stdlib.h>
 
+/* 只推进模型时间, 不渲染也不交换缓冲 —— 与 live2d_viewer_audit.c 里的同名函数行为不同, 这边只有在
+ * record() 里才真正画一帧。
+ */
 static void advance(BongoCatApp *app, int frames) {
     for (int i = 0; i < frames; ++i)
         bongo_cat_live2d_update(app->live2d, 1.0f / 60.0f);
 }
 
+/* 1e-4 的容差对应"浮点重算出的同一构图": fit_scale 由窗口尺寸与画布尺寸决定, 内容变化不该动它,
+ * 所以可以按近似相等判定。
+ */
 static bool close_scale(float left, float right) {
     return fabsf(left - right) <= 0.0001f;
 }
 
+/* 可见包围盒是否落在 [-1,1] 标准画布内, 允许 8% 溢出 (投影与标定本身有取整误差); visible_min/max 是
+ * 投影到 NDC 之后的范围, 不是像素坐标。
+ */
 static bool inside(const BongoCatLive2DVisualState *state) {
     return state && state->visible_min_x >= -1.08f &&
         state->visible_min_y >= -1.08f && state->visible_max_x <= 1.08f &&
         state->visible_max_y <= 1.08f;
 }
 
+/* 读四条 1 像素宽的边并统计 alpha>8 的像素数, 用来发现"模型被裁到只剩边缘"这类构图错误。Vulkan 下没有
+ * 可读的 GL 缓冲, 返回 ~0u (CSV 里是 4294967295); 它只进 CSV 不参与通过判定, 所以哨兵值不会污染结果。
+ */
 static unsigned edge_pixels(int width, int height) {
     /* 该审计靠"自己清屏 + 画一帧"再读像素, Vulkan 需要先有离屏渲染路径 */
     if (bongo_cat_renderer_active() == BONGO_CAT_RENDERER_VULKAN) return ~0u;
@@ -44,6 +62,9 @@ static unsigned edge_pixels(int width, int height) {
     return visible;
 }
 
+/* 自绘一帧、采集状态、追加一行 CSV, 返回这一行是否通过; 调用方必须用 && 累积。contained=false 用于表达式
+ * 与动作这类可能故意超出画布的用例, 此时跳过包围盒检查。另外它不恢复 GL 状态 (viewport、scissor 等)。
+ */
 static bool record(FILE *file, BongoCatApp *app, const char *name,
     bool contained, BongoCatLive2DVisualState *state) {
     int width = 0, height = 0;
@@ -74,6 +95,9 @@ static bool record(FILE *file, BongoCatApp *app, const char *name,
     return passed;
 }
 
+/* 表达式矩阵: 进入、稳定、两个指针方向、镜像、画布 50% 与 200% 各记一行; 断言 fit_scale 全程不变, 且稳定态
+ * 的 fit_scale 为 1、无平移 (表达式不应重新构图)。width/height 用于把缩放实验改回原尺寸。
+ */
 static bool expression_matrix(FILE *file, BongoCatApp *app, int expression,
     int width, int height) {
     bool passed = true;
@@ -126,6 +150,9 @@ static bool contains_index(const int *indexes, size_t count, int value) {
     return false;
 }
 
+/* 从 behaviors 表里挑出指定种类、去重后的索引; 容量不足就截断 (调用方给 BONGO_CAT_BEHAVIOR_CAP),
+ * 返回实际个数。contains_index 是它用的线性去重助手。
+ */
 static size_t behavior_indexes(const BongoCatApp *app, BongoCatBehaviorKind kind,
     int *indexes, size_t capacity) {
     size_t count = 0;
@@ -138,6 +165,9 @@ static size_t behavior_indexes(const BongoCatApp *app, BongoCatBehaviorKind kind
     return count;
 }
 
+/* 同一个动作连播两次并比较进入帧: 第一次播放留下的缩放或位移残留会让第二次的 fit_scale 不同, 这是"动作
+ * 污染构图"的典型表现。mver=true 时额外要求 fitted 为假且 fit_scale 为 1 —— MVER 投影必须保持作者构图。
+ */
 static bool motion_replay_matrix(FILE *file, BongoCatApp *app,
     const BongoCatBehaviorEntry *entry, bool mver) {
     BongoCatLive2DVisualState active = {0}, stable = {0}, replayed = {0};
@@ -162,6 +192,10 @@ static bool motion_replay_matrix(FILE *file, BongoCatApp *app,
     return passed;
 }
 
+/* 入口: 需要 app/live2d/window, CSV 写在 state_root 下; baseline 的 mver_projection 决定后续判定口径
+ * (MVER 走动作重放, 普通投影走 inside 包围盒检查), 所以这个字段必须在最前面采到。结束时恢复拖拽、
+ * 镜像与画布并置 app->dirty; 返回值就是整轮是否通过, false 会被上层记成失败。
+ */
 bool bongo_cat_live2d_visual_audit_run(BongoCatApp *app) {
     if (!app || !app->live2d || !app->window) return false;
     char path[BONGO_CAT_PATH_CAP];
@@ -190,6 +224,9 @@ bool bongo_cat_live2d_visual_audit_run(BongoCatApp *app) {
             close_scale(baseline.fit_scale, current.fit_scale) &&
             !current.fitted && passed;
     }
+/* 模型没提供任何表达式时退回 0/1/2 三个内置索引, 保证审计至少覆盖一次表达式切换;
+ * 真实模型都从 behaviors 表拿索引, 这条只是兜底。
+ */
     int expression_indexes[BONGO_CAT_BEHAVIOR_CAP];
     size_t expression_count = behavior_indexes(app, BONGO_CAT_BEHAVIOR_EXPRESSION,
         expression_indexes, BONGO_CAT_BEHAVIOR_CAP);
@@ -208,6 +245,9 @@ bool bongo_cat_live2d_visual_audit_run(BongoCatApp *app) {
         passed = record(file, app, label, !baseline.mver_projection, &current) &&
             close_scale(current.fit_scale, 1.0f) && !current.fitted && passed;
     }
+    /* 只有 MVER 投影才跑带 _lock 的动作重放: 这些动作自带固有位移, 普通自适应投影下 fit_scale
+     * 本来就会变, 断言没有意义。
+     */
     if (baseline.mver_projection) {
         for (size_t i = 0; i < app->behaviors.count; ++i) {
             const BongoCatBehaviorEntry *entry = &app->behaviors.entries[i];

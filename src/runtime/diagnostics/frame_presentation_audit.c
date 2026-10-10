@@ -1,3 +1,10 @@
+/* "首帧到底呈现了什么"的对照审计: 切换缓冲前先对整帧像素做一次指纹 (prepare), 平台真正 present
+ * 之后再回读 GL 前/后台缓冲, 用指纹是否相同判断用户看到的是哪一块。它只跑一次 (presented 置位
+ * 后不再重跑), 且只由 app_loop.c 的 OpenGL 路径调用 —— render() 在 Vulkan 会分叉到 vk_render_main
+ * 并提前返回, 那边只会看到 prepare 的日志。Windows 上如果存在 layered 代理窗口, 可见输出其实是
+ * 代理而不是 GL 表面, 此时跳过前台缓冲回读, 改为抓取源窗口与代理的截图诊断信息。
+ * 契约: prepare 必须在 swap 之前调用, 传进来的像素是借用指针, 本文件不持有。
+ */
 #include "runtime.h"
 #include "bongo_cat/render.h"
 
@@ -25,6 +32,10 @@
 #define GL_SAMPLES 0x80A9
 #endif
 
+/* 模块内单例, 生命周期只有"首帧": prepare 覆盖式写入, presented 审计读完置位 presented, 没有任何
+ * 重置入口 —— 冒烟只需要一次结论, 多帧重跑反而会拿最后一帧覆盖掉证据。rendered_hash 是 prepare
+ * 那一刻的整帧指纹, 也是后面与前/后台缓冲比对的唯一依据。
+ */
 typedef struct PresentationAudit {
     bool prepared;
     bool presented;
@@ -36,6 +47,9 @@ typedef struct PresentationAudit {
 
 static PresentationAudit audit;
 
+/* 64 位字节哈希 (FNV 的偏移基数与乘子), 用途只是"两次读回是否同一幅图", 不承担安全性; 用整帧哈希
+ * 而不是抽样, 是因为任何一个字节的差异都会改变结果, 哈希相同基本可以认定是同一份像素。
+ */
 static uint64_t pixel_hash(const unsigned char *pixels, size_t bytes) {
     uint64_t hash = UINT64_C(1469598103934665603);
     for (size_t index = 0; index < bytes; ++index) {
@@ -45,6 +59,10 @@ static uint64_t pixel_hash(const unsigned char *pixels, size_t bytes) {
     return hash;
 }
 
+/* 一次性打印 GL 的目标状态: draw/read buffer、绑定的 FBO、位深、MSAA, 以及 SDL 的 double-buffer、
+ * 加速视觉、保留后台缓冲属性。排查"画了却看不到"时先看这里是不是画到了非默认 FBO 或读错了缓冲;
+ * 函数开头会清空 GL 错误队列, 输出的 before/after 只用于日志。
+ */
 static void log_gl_presentation_state(BongoCatApp *app) {
     GLint draw_buffer = 0, read_buffer = 0;
     GLint draw_framebuffer = 0, read_framebuffer = 0;
@@ -85,6 +103,9 @@ static void log_gl_presentation_state(BongoCatApp *app) {
         (unsigned long long)flags, before, after);
 }
 
+/* 记录呈现前的整帧指纹并打印一次 GL 状态; 只由首帧审计调用, 不是每帧钩子。尺寸不合法或乘法溢出
+ * 时直接忽略本次调用, 此时后面的 presented 审计会因为 !prepared 而自动跳过。
+ */
 void bongo_cat_frame_presentation_prepare(BongoCatApp *app,
     const unsigned char *pixels, int width, int height, bool visible) {
     if (!app || !pixels || width < 1 || height < 1) return;
@@ -99,6 +120,10 @@ void bongo_cat_frame_presentation_prepare(BongoCatApp *app,
     log_gl_presentation_state(app);
 }
 
+/* 读回指定的前/后台缓冲并统计可见像素, 会临时把 GL_READ_BUFFER 切到目标缓冲再恢复原值 (恢复失败
+ * 只记日志)。Vulkan 下没有可读的 GL 缓冲, 直接打印跳过。valid 只表示这次 glReadPixels 没报错 ——
+ * 按 GL 规范, 交换之后后台缓冲的内容本来就是未定义的, matches_pre_swap 才算有意义的结论。
+ */
 static void log_post_present_buffer(const char *name, GLenum buffer) {
     if (bongo_cat_renderer_active() == BONGO_CAT_RENDERER_VULKAN) {
         /* Vulkan 没有可回读的 GL 前/后台缓冲, 这项对比无法进行 */
@@ -143,6 +168,10 @@ static void log_post_present_buffer(const char *name, GLenum buffer) {
     free(pixels);
 }
 
+/* present 成功后由主循环调用一次; 非冒烟、没 prepare 过、已经审计过都会直接返回, 所以首帧呈现失败
+ * 不会自动重试。Windows 下还会记录源窗口与 layered 代理各自的可见性, 并抓取两边的截图诊断,
+ * 用来区分"GL 没画出来"和"合成/采集路径没拿到"。
+ */
 void bongo_cat_frame_presented_audit(BongoCatApp *app) {
     if (!app || !app->smoke || audit.presented || !audit.prepared) return;
     audit.presented = true;
@@ -153,6 +182,9 @@ void bongo_cat_frame_presented_audit(BongoCatApp *app) {
         bongo_cat_obs_background_color_name(
             app->settings.window.obs_background_color));
 #ifdef _WIN32
+    /* HWND 是从 SDL 窗口属性借出的句柄, 生命周期由 SDL 管理, 这里只读不持有; 拿不到说明窗口不是
+     * Win32 实现, 后面的抓取诊断全部跳过。
+     */
     HWND source = app->window ? (HWND)SDL_GetPointerProperty(
         SDL_GetWindowProperties(app->window),
         SDL_PROP_WINDOW_WIN32_HWND_POINTER, NULL) : NULL;
@@ -165,6 +197,9 @@ void bongo_cat_frame_presented_audit(BongoCatApp *app) {
     bool proxy_visible = proxy && IsWindow(proxy) && IsWindowVisible(proxy);
     SDL_Log("Windows presented path: source=%p proxy=%p proxy_visible=%d",
         (void *)source, (void *)proxy, proxy_visible);
+    /* 只有代理不可见时 GL 表面才是用户看到的输出, 这时回读前/后台缓冲才有意义;
+     * 代理可见就说明真正的画面在代理里, 再读 GL 只会得出误导性的结论。
+     */
     if (!proxy_visible) {
         log_post_present_buffer("front", GL_FRONT);
         log_post_present_buffer("back", GL_BACK);

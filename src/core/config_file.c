@@ -14,6 +14,13 @@
 #include <unistd.h>
 #endif
 
+/*
+ * 配置文件的读写底座(config_io.c 与 config_session_io.c 共用)。
+ *
+ * 为什么不用 yyjson_obj_get: 内置接口遇到重复键时返回第一个匹配项, 而这里的
+ * 规则是"重复键 = 配置损坏"(谁也不知道该信哪个值), 只有手工遍历才能发现重复
+ * 并通过 duplicate 上报。
+ */
 static yyjson_val *unique_member(yyjson_val *object, const char *name,
     bool *duplicate) {
     yyjson_val *found = NULL;
@@ -30,6 +37,11 @@ static yyjson_val *unique_member(yyjson_val *object, const char *name,
     return found;
 }
 
+/*
+ * 认领并校验配置文件的外壳: 大小在 1 字节 ~ BONGO_CAT_CONFIG_FILE_CAP 之间、
+ * 根必须是对象、format 必须完全等于调用方给的名字、schemaVersion 必须等于
+ * 调用方认的版本。任何一条不满足都按格式损坏处理, 绝不"猜着往下读"。
+ */
 BongoCatResult bongo_cat_config_read_document(const char *path,
     const char *format, int schema, yyjson_doc **document,
     BongoCatError *error) {
@@ -97,6 +109,10 @@ BongoCatResult bongo_cat_config_read_document(const char *path,
     return BONGO_CAT_OK;
 }
 
+/*
+ * 落盘: 对临时文件做一次 fsync 再原子替换。少了这一步, 掉电/崩溃后可能留下
+ * 一个长度为 0 或内容被截断的配置文件。
+ */
 static bool sync_file(const char *path) {
 #ifdef _WIN32
     wchar_t *wide = bongo_cat_windows_wide(path);
@@ -117,6 +133,8 @@ static bool sync_file(const char *path) {
 }
 
 #ifndef _WIN32
+/* POSIX 上的"替换"是 rename 改目录项, 目录项本身也要 fsync 才算真正落盘;
+   Windows 的 MoveFileEx 已经保证这点, 所以这个函数只在非 Windows 编译。 */
 static bool sync_parent(const char *path) {
     char directory[BONGO_CAT_PATH_CAP];
     int length = snprintf(directory, sizeof(directory), "%s", path);
@@ -133,6 +151,11 @@ static bool sync_parent(const char *path) {
 }
 #endif
 
+/*
+ * 原子写: 先写 <path>.tmp, fsync 之后再替换正式文件。中间任何一步失败都会删掉
+ * 临时文件并返回错误, 因此正式的配置文件要么是旧的完整内容, 要么是新的完整
+ * 内容 —— 不会出现"写了一半"的中间态。
+ */
 BongoCatResult bongo_cat_config_write_document(const char *path,
     yyjson_mut_doc *document, const char *description, BongoCatError *error) {
     char temporary[BONGO_CAT_PATH_CAP + 8];

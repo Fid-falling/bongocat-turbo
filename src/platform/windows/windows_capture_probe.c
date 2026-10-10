@@ -10,6 +10,15 @@
 #define PW_RENDERFULLCONTENT 0x00000002
 #endif
 
+/*
+ * 老式截屏路径的诊断探针: 依次用 BitBlt / BitBlt+CAPTUREBLT / PrintWindow(仅客户区)
+ * / PrintWindow+全内容 抓同一个窗口, 统计"有多少像素真的被写过、有多少不是黑的"。
+ *
+ * 为什么需要它: 用户报告"OBS 抓不到猫"时, 究竟是窗口本身截不到, 还是采集软件选了
+ * 别的路径, 光看代码判断不了。这个探针把结论落成日志, 并明确写出它的局限 —— 它只能
+ * 证明这些 API 拿得到内容, 不能证明第三方采集软件一定走这条路径。
+ * 画布先填成固定标记色(0x5a/0xa5/0x3c/0xc7), 用来识别"API 报告成功却一个像素都没写"。
+ */
 typedef struct CaptureSurface {
     HDC dc;
     HBITMAP bitmap;
@@ -27,6 +36,9 @@ typedef struct CaptureObservation {
     unsigned long long hash;
 } CaptureObservation;
 
+/* 建一块 32 位、自上而下行的 DIB(与 GDI 抓屏的行序一致)。三处防御: 尺寸上限 8192
+   (过大尺寸的 DIB 常常分配失败还会拖慢系统)、乘法溢出检查、以及 SelectObject 失败
+   (返回 HGDI_ERROR)时也要清理干净。 */
 static bool capture_surface_create(CaptureSurface *surface,
     int width, int height) {
     if (!surface || width < 1 || height < 1 || width > 8192 || height > 8192)
@@ -65,6 +77,7 @@ static bool capture_surface_create(CaptureSurface *surface,
     return true;
 }
 
+/* 必须先把原位图选回 DC 再删, 否则删不掉还选在 DC 里的位图。 */
 static void capture_surface_destroy(CaptureSurface *surface) {
     if (!surface) return;
     if (surface->dc && surface->previous)
@@ -83,6 +96,8 @@ static void capture_surface_prepare(CaptureSurface *surface) {
     }
 }
 
+/* 统计时把"标记色"的像素算作未被写入(unchanged), 所以 written = 总数 - 未写入。
+   除黑白之外还统计四种抠像键色: 这些颜色出现与否能反映窗口用的是哪种透明实现。 */
 static CaptureObservation log_capture_pixels(const char *stage,
     const char *method, const CaptureSurface *surface,
     bool called, DWORD error) {
@@ -139,6 +154,8 @@ static CaptureObservation log_capture_pixels(const char *stage,
     return observation;
 }
 
+/* BitBlt 之前先 SetLastError 清零, 之后只在失败时读 GetLastError —— 否则会读到上一次
+   操作留下的陈旧错误码。GdiFlush 保证像素确实写进内存之后再做统计。 */
 static CaptureObservation probe_bitblt(HDC source, DWORD source_error,
     CaptureSurface *surface, const char *stage, const char *method,
     DWORD operation) {
@@ -162,6 +179,10 @@ static CaptureObservation probe_print_window(HWND window,
     return log_capture_pixels(stage, method, surface, called, error);
 }
 
+/* 入口: 先用 DwmFlush 同步一次合成(否则可能截到半帧), 再跑四种方法, 最后把"四种里
+   有几种调用成功、几种写出了非黑像素"汇总成一条诊断。全军覆没、报告成功却写不出
+   像素、写出来全是黑, 这三种情况各给一条警告; 结论里也写明了它的局限(见最后那条
+   日志: 不能据此断定第三方采集软件用的是这条路径)。 */
 bool bongo_cat_windows_diagnostics_probe_capture(
     HWND window, const char *stage) {
     if (!window || !IsWindow(window)) return false;

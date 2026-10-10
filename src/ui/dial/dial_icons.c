@@ -1,3 +1,15 @@
+/*
+ * 菜单图标: 14 个图标, 全部是描边矢量 (没有位图/图标字体)。
+ *
+ * 数据是三张互相索引的常量表, 关系必须一起看:
+ *   points     所有图标的轮廓点, 按顺序拼在一起 (约 700 个点);
+ *   contours   每条子轮廓 (一笔连续折线) 在 points 里的起点与点数;
+ *   icons      每个图标由哪几条子轮廓组成 (icons[i] 指向 contours 的一段)。
+ * 所以"改一个图标"实际是在三张表里定位, 而不是改一段代码。点坐标是 24x24 网格里的值,
+ * 画的时候按 (p - 12) * size / 24 缩放并平移到目标中心 —— 12 是网格中心。
+ * dial_icon 里的 transformed[512] 是栈上定长缓冲, 所以单条子轮廓超过 512 点会被跳过
+ * (当前的 170 点上限留了充足余量)。
+ */
 /* Static vector contours transcribed from the supplied index.html. */
 #include "dial_internal.h"
 typedef struct IconContour { unsigned short offset, count; } IconContour;
@@ -180,6 +192,7 @@ static const DialPoint points[] = {
     {14.0000f, 3.0000f}, {14.3827f, 3.0761f}, {14.7071f, 3.2929f}, {14.9239f, 3.6173f},
     {15.0000f, 4.0000f}, {15.0000f, 8.0000f},
 };
+/* 子轮廓表: {在 points 里的起点, 点数}。顺序就是绘制顺序, 后画的压在前面之上 */
 static const IconContour contours[] = {
     {0, 170}, {170, 49}, {219, 21}, {240, 23}, {263, 40}, {303, 2},
     {305, 5}, {310, 2}, {312, 2}, {314, 2}, {316, 2}, {318, 18},
@@ -189,10 +202,20 @@ static const IconContour contours[] = {
     {677, 2}, {679, 2}, {681, 2}, {683, 5}, {688, 2}, {690, 2},
     {692, 2}, {694, 12},
 };
+/*
+ * 图标表: 下标就是 DialItem.icon, 与 dial_items.c 里填的 icon 值一一对应 ——
+ * 往中间插一个图标会让后面所有图标的含义整体错位, 只能在末尾追加。
+ */
 static const IconContour icons[] = {
     {0, 2}, {2, 4}, {6, 4}, {10, 3}, {13, 4}, {17, 2}, {19, 1}, {20, 4}, {24, 3}, {27, 1}, {28, 3}, {31, 2}, {33, 2}, {35, 3}
 };
 
+/*
+ * 画一个图标。所有子轮廓都用 dial_stroke(smooth=true) 描边而不是填充: 图标的观感就是
+ * 线稿, 而且描边宽度会跟着 size 一起缩放 (1.95/24), 所以放大缩小都不会变成一团。
+ * 越界的 icon 直接返回 (dial_items 里 icon 值可能因为平台差异而不同), 调用方不必自己
+ * 判断范围。
+ */
 void dial_icon(Dial *d, int icon, float x, float y, float size, uint32_t color) {
     if (icon < 0 || icon >= (int)(sizeof(icons) / sizeof(icons[0]))) return;
     IconContour range = icons[icon];

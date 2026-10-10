@@ -1,3 +1,20 @@
+/*
+ * 轮盘 (径向菜单) 的内部定义。
+ *
+ * 全局设计要点, 改这里之前先读:
+ *   1. 轮盘**不是**接入主循环的一套 UI, 而是一个自带模态循环的独立窗口
+ *      (bongo_cat_platform_context_menu 里的 while)。所以它自己 pump 事件、自己
+ *      控帧率 (16ms 预算)、退出时自己收拾全部资源;
+ *   2. 它共享宠物窗口的 Vulkan 设备 (只建自己的交换链)。第二条设备在装了 RTSS /
+ *      OBS 注入钩子的机器上第一帧呈现就崩 —— 与设置窗口同一个坑, 见 dial_window.c
+ *      create() 里的注释;
+ *   3. 纹理句柄是后端无关的: GL 下是 GL 纹理名, Vulkan 下是下面 dial_vk_texture_*
+ *      那张表的 id (id = 下标 + 1, 0 表示无)。任何要交给后端的纹理都必须先经
+ *      dial_vk_texture_lookup 换一次, 不能把 id 直接当句柄用;
+ *   4. 所有几何都先算成 DialPath (扇形折线), 再经 dial_triangle 送进一条统一的顶点
+ *      流, 由 DialPaint 按批次一次提交 —— 菜单里所有东西 (扇形、文字、图标、封面)
+ *      共用同一条管线, 没有第二个 draw call 路径。
+ */
 #ifndef BONGO_CAT_DIAL_INTERNAL_H
 #define BONGO_CAT_DIAL_INTERNAL_H
 #include "bongo_cat/platform.h"
@@ -5,6 +22,12 @@
 #include "nuklear_config.h"
 #include <SDL3/SDL.h>
 #include <math.h>
+/*
+ * 几何/动画常量。DIAL_PAGE 是子项分页上限, DIAL_ROOTS 是根项上限;
+ * 两个 REVEAL_* 配合使用: 每一项比前一项晚 22ms 开始、各自用 360ms 展开 (级联效果);
+ * _POINTS/SEGMENTS/RINGS 是各类折线/圆环的离散段数, 它们同时决定固定数组的大小,
+ * 调大就会同时增加内存与顶点数。
+ */
 #define DIAL_PI 3.14159265358979323846f
 #define DIAL_PAGE 16
 #define DIAL_ROOTS 12
@@ -28,6 +51,10 @@ typedef struct DialItem {
     bool checked;
     size_t children;
 } DialItem;
+/*
+ * 顶点/批次都是预分配的 (没有动态增长): 菜单的规模有上界, 预分配换来了绘制期间
+ * 零分配, 也就不会有分配失败路径。
+ */
 typedef struct DialVertex { float x, y, u, v; uint8_t r, g, b, a; } DialVertex;
 /* 纹理句柄与后端无关: GL 下是 GL 纹理名, Vulkan 下是界面纹理表的 id */
 typedef struct DialBatch { unsigned int texture; int first, count; } DialBatch;
@@ -35,6 +62,11 @@ typedef struct DialCover { unsigned int texture; float width, height; bool attem
 typedef struct DialPaint {
     BongoCatGL gl;
     GLuint program, vao, vbo, white, font_texture;
+    /*
+     * Vulkan 菜单窗口的纹理句柄表: 批/封面里存的是 id, 画的时候要换成
+     * bongo_cat_vk_draw_triangles 需要的纹理指针。id = 下标 + 1。
+     * 与设置窗口里 BongoCatUIBackend.vk_textures[] 同一套做法。
+     */
     /*
      * Vulkan 菜单窗口的纹理句柄表: 批/封面里存的是 id, 画的时候要换成
      * bongo_cat_vk_draw_triangles 需要的纹理指针。id = 下标 + 1。
@@ -58,9 +90,25 @@ typedef struct DialPaint {
     bool center_ready;
     bool failed;
 } DialPaint;
+/*
+ * 轮盘的全部状态。生命周期只有一个: bongo_cat_platform_context_menu 里 calloc 出来,
+ * 循环结束后 free —— 没有"重建窗口"这条路, 每次开菜单都是全新一份。
+ *
+ * previous_window/previous_context 记录"打开菜单之前谁的 GL 上下文是当前的": 预览
+ * 回调要把画面画到宠物窗口上, 所以调它之前必须先把上下文切回去, 之后还要切回来。
+ * Vulkan 下这两个字段没有意义 (不切上下文), 相关代码都要用 if (!d->vk) 保护。
+ *
+ * dirty 是这套渲染的开关: 任何会改变画面的东西 (动画步进、输入、封面加载完成) 都要
+ * 把它置真; 模态循环只在 dirty 时真正画一帧。漏标的表现就是菜单卡住不动。
+ */
 typedef struct Dial {
     SDL_Window *window, *owner;
     SDL_GLContext context, previous_context;
+    /*
+     * 菜单窗口自己的 Vulkan 上下文 (renderer=vulkan 时非空, 否则为 NULL 走 GL)。
+     * 用前置声明避免这个头文件依赖 vk_backend.h。
+     * 施工图: docs/vulkan-dial-port-recipe.md
+     */
     /*
      * 菜单窗口自己的 Vulkan 上下文 (renderer=vulkan 时非空, 否则为 NULL 走 GL)。
      * 用前置声明避免这个头文件依赖 vk_backend.h。
@@ -79,10 +127,20 @@ typedef struct Dial {
     float scale, opening, lift[DIAL_ROOTS], raster_scale;
     uint64_t opened_at, changed_at, animation_at;
     SDL_Event events[128];
+    /*
+     * 本帧从 SDL 队列里"截"下来的自有事件 (见 dial_window.c 的 collect_event):
+     * 先攒起来再处理, 是为了在事件回调里不重入模态循环的状态机。
+     */
     int event_count;
     DialPaint paint;
     DialCover covers[BONGO_CAT_MODEL_CAP];
 } Dial;
+/*
+ * 内部接口清单, 按调用顺序大致排列: 建表(items) -> 几何(hit/child_paths/sector) ->
+ * 渲染(paint_ 系列: scene/quad/stroke/icon/text) -> 封面 -> 事件 -> 预览回调。
+ * 其中 dial_transform 修改的是"绘制用的"zoom/offset (不改布局), dial_hit 则完全在
+ * 逻辑坐标里判定 —— 两者必须用同一套布局公式, 改一边就要改另一边。
+ */
 void dial_items(Dial *d);
 int dial_child_count(const Dial *d);
 float dial_child_angle(const Dial *d, int index);

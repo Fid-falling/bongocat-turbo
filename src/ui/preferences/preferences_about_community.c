@@ -1,3 +1,14 @@
+/*
+ * "社区"区块: Discord / QQ 群两张卡片 + 请喝咖啡按钮。
+ *
+ * 这一块和 about.c 里那两张推广卡片的分工: 这里的图是"图标"(走图标图集, 按 id 画),
+ * 那里的图是"位图素材"(走纹理)。所以这里不需要图片文件, 换主题也不会变形。
+ *
+ * 一处必须小心的地方: 社区链接的显示文字里带有语言相关的标签, 而文字宽度是按标签
+ * 现算的 —— 任何新增/改名的标签都会影响 glyph 图集的范围 (见
+ * bongo_cat_preferences_about_localized_link 上的英文注释)。所以这里不能硬编码
+ * 中文/日文等标签, 必须走 tr()。
+ */
 #include "preferences_about_community.h"
 #include "preferences_state.h"
 #include "ui_animation.h"
@@ -60,6 +71,11 @@ static void open_url(const char *url) {
 }
 
 /* Localized labels feed the font atlas and must not be hardcoded here. */
+/*
+ * 一行"标签 + 链接"的文字链接 (网站/作者这类), 整行可点。
+ * animation_id 由调用方给: 同一页上有多个链接, 必须各自有一个补间 key, 否则
+ * 一处悬停会让所有链接一起变色。
+ */
 void bongo_cat_preferences_about_localized_link(BongoCatPreferences *value,
     struct nk_context *context, struct nk_command_buffer *canvas,
     struct nk_rect bounds, const char *key, const char *fallback,
@@ -80,6 +96,12 @@ void bongo_cat_preferences_about_localized_link(BongoCatPreferences *value,
     if (hit(context, link)) open_url(url);
 }
 
+/*
+ * 一张社区卡片。brand 是各平台自己的品牌色 (Discord 蓝 / QQ 用主题强调色),
+ * 卡片底色是"玻璃底混一点品牌色" —— 悬停时混入比例从 5.5% 提到 10%, 这个幅度是
+ * 调出来的: 再高会盖掉文字对比度。
+ * 右侧的小箭头是用两条线段拼的, 不是图标: 图标图集里没有这个形状。
+ */
 static void community_link(BongoCatPreferences *value,
     struct nk_context *context, struct nk_command_buffer *canvas,
     struct nk_rect bounds, int index, BongoCatUIPalette p) {
@@ -117,6 +139,7 @@ static void community_link(BongoCatPreferences *value,
     if (hit(context, bounds)) open_url(urls[index]);
 }
 
+/* "请喝咖啡"胶囊按钮: 宽度按标签宽度 + 图标占位算出来, 所以换语言不会挤在一起 */
 static void coffee(BongoCatPreferences *value, struct nk_context *context,
     struct nk_command_buffer *canvas, struct nk_rect bounds,
     BongoCatUIPalette p) {
@@ -141,6 +164,12 @@ static void coffee(BongoCatPreferences *value, struct nk_context *context,
     if (hit(context, pill)) open_url("https://bongocat.pet/support");
 }
 
+/*
+ * "更多应用"标题 + 说明句, 其中开发者名字单独做成链接。
+ * 技巧在"把一句话按名字切成三段分别画": 因为整句要居中, 而只有中间那段是链接。
+ * 用 strstr 找名字而不是拼字符串, 是为了让翻译可以自由调整语序 —— 找不到名字时
+ * 退化成整句普通文字 (prefix 取全句长度, 链接段长度 0), 不会错位。
+ */
 void bongo_cat_preferences_about_projects_heading(
     BongoCatPreferences *value, struct nk_context *context,
     struct nk_rect bounds) {
@@ -180,6 +209,7 @@ void bongo_cat_preferences_about_projects_heading(
         open_url("https://vladelaina.com");
 }
 
+/* 社区区块整体布局; 两张卡片横向并排, 中间留 18px 间隙 (280 + 18 = 298 的步进) */
 void bongo_cat_preferences_about_community(
     BongoCatPreferences *value, struct nk_context *context) {
     struct nk_rect bounds;

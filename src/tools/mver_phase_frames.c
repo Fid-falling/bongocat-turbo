@@ -8,6 +8,8 @@
 #include <stdlib.h>
 #include <string.h>
 
+/* 只用 '\\' 拼接: 这些工具只在 Windows 上构建, 参数也都是自己传的, 不需要
+   兼容另一种分隔符。 */
 static wchar_t *join_path(const wchar_t *directory, const wchar_t *name) {
     size_t a = wcslen(directory), b = wcslen(name);
     wchar_t *result = (wchar_t *)malloc((a + b + 2) * sizeof(*result));
@@ -35,6 +37,8 @@ static int compare_paths(const void *left, const void *right) {
     return wcscmp(*(const wchar_t *const *)left, *(const wchar_t *const *)right);
 }
 
+/* 把 *.png 和 *.bmp 分两轮收齐之后再统一按文件名排序 —— 排序必须在两轮之后
+   做, 否则帧序会按扩展名分组, 相位比对就失去意义了。目录为空返回 0。 */
 int phase_collect_paths(const wchar_t *directory, PathList *list) {
     static const wchar_t *patterns[] = {L"*.png", L"*.bmp"};
     size_t pattern_index;
@@ -61,6 +65,8 @@ int phase_collect_paths(const wchar_t *directory, PathList *list) {
     return list->count != 0;
 }
 
+/* 按 PIXEL_STEP 抽样成网格并转成紧凑的 BGR(丢掉 alpha), 后续比对只看颜色。
+   抽样坐标必须钳到 width-1 / height-1: 尺寸不是 4 的整数倍时最后一格会越界。 */
 static int load_frame(const wchar_t *path, Frame *frame) {
     BongoCatValidationImage image = {0};
     int gx, gy;
@@ -90,6 +96,8 @@ void phase_free_frames(Frame *frames, size_t count) {
     free(frames);
 }
 
+/* 一次性把所有帧读进内存, 并要求所有帧尺寸一致(不一致说明这一组根本不是同一个
+   模型的抽帧, 直接整体失败), 这样后面比较时就不必逐帧判尺寸。 */
 Frame *phase_load_frames(const PathList *paths) {
     Frame *frames = (Frame *)calloc(paths->count, sizeof(*frames));
     size_t index;

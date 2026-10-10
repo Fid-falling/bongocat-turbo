@@ -25,6 +25,9 @@ static size_t mask_combination_count(Csm::csmInt32 object_count,
     return combinations.size();
 }
 
+/* 一张遮罩纹理最多容纳 ClippingMaskMaxCountOnDefault 个裁剪上下文, 超出就按
+ * MultiRenderTexture 那一档再开缓冲。组合数在 mask_combination_count() 里已经按
+ * "排序去重后的 ID 集合"算过 (且把隐藏对象也算进去), 所以这里只做除法就够了。 */
 static Csm::csmInt32 mask_buffer_count(size_t count) {
     if (count <= (size_t)Csm::Rendering::ClippingMaskMaxCountOnDefault) return 1;
     const size_t capacity = Csm::Rendering::ClippingMaskMaxCountOnMultiRenderTexture;
@@ -48,6 +51,8 @@ void NativeModel::bind_textures() {
     for (size_t i = 0; i < textures_.size(); ++i)
         if (textures_[i])
             renderer->BindTexture((Csm::csmInt32)i, textures_[i]);
+    /* 贴图在 image.c 的 upload() 里已经就地预乘, 这里只是把这一事实告诉 SDK 渲染器,
+     * 让它按预乘混合; Vulkan 分支不需要这一步 —— 它的管线本来就按预乘混合。 */
     renderer->IsPremultipliedAlpha(true);
 }
 
@@ -74,6 +79,8 @@ void NativeModel::release_renderer() {
 #ifdef CSM_TARGET_MAC_GL
     core_buffers_.release();
 #endif
+    /* 把尺寸与遮罩记账全部清零: 下一次 create_renderer() 会重新探测纹理上限、重算预算
+     * 与网格划分。留着旧值会让"换模型/换后端"复用上一套遮罩假设。 */
     renderer_width_ = 0;
     renderer_height_ = 0;
     mask_texture_limit_ = 0;
@@ -87,6 +94,10 @@ void NativeModel::release_render_resources() {
     release_renderer();
 }
 
+/*
+ * 只有 OpenGL 路径会用到: Vulkan 分支的遮罩缓冲尺寸在 create_renderer() 里一次性设好
+ * (见那里的说明)。这里的记忆值让每帧调用退化成一次比较, 真正的重建发生在窗口尺寸变化时。
+ */
 void NativeModel::update_mask_buffers() {
     if (width_ == mask_last_width_ && height_ == mask_last_height_) return;
     auto *renderer = GetRenderer<Csm::Rendering::CubismRenderer_OpenGLES2>();
@@ -245,6 +256,8 @@ bool NativeModel::create_renderer(BongoCatError *error) {
         mask_texture_limit_ = std::min(4096, (int)texture_limit);
         const size_t per_buffer = (std::max(drawable_combinations,
             offscreen_combinations) + (size_t)buffer_count - 1) / (size_t)buffer_count;
+        /* 遮罩图集把多个裁剪区域按网格排进一张纹理, 每张缓冲要装下的裁剪组合数决定
+         * 网格分几格: 格子太少时 SDK 会自动多开缓冲, 组合很少时开大格反而浪费。 */
         mask_layout_divisions_ = per_buffer <= 4 ? 1 : (per_buffer <= 16 ? 2 : 3);
         const uint64_t total_buffers = (uint64_t)buffer_count *
             ((drawable_combinations > 0 ? 1u : 0u) +

@@ -1,3 +1,9 @@
+/*
+ * 按键图文件名 → 键码。Tauri 用文件名编码按键, 这里翻译成本项目内部使用的 Windows
+ * 虚拟键码 (键盘) 或手柄按钮序号 (0..15); 认不出来一律返回 -1, 由调用方跳过。
+ * 匹配顺序即优先级: 纯数字 → KeyX/NumX → F1..F12 → 键盘名字表 → 手柄表。
+ * 表只允许追加, 不允许改动已有条目的码值 —— 它们会被写进已安装模型的 config.json。
+ */
 #include "model_import_tauri_internal.h"
 
 #include <SDL3/SDL.h>
@@ -5,6 +11,8 @@
 #include <stdlib.h>
 #include <string.h>
 
+/* 只接受 .png (大小写不敏感); 文件名先复制到栈上再截断扩展名, 不碰调用方的缓冲。
+ * 返回 -1 表示不认识, 它与合法的 0 号手柄按钮不同, 调用方必须用 < 0 判断。 */
 int bongo_cat_tauri_key_code(const char *filename) {
     char name[BONGO_CAT_ID_CAP];
     snprintf(name, sizeof(name), "%s", filename ? filename : "");
@@ -24,6 +32,8 @@ int bongo_cat_tauri_key_code(const char *filename) {
         if (end != name + 1 && !*end && value >= 1 && value <= 12)
             return 111 + (int)value;
     }
+    /* 键盘名字表: 码值是 Windows 虚拟键码。同一物理键的多种拼写 (Backspace/BackSpace、
+     * LeftArrow 等导出器差异) 要各自列一行; 查表用大小写不敏感比较。 */
     static const struct { const char *name; int code; } map[] = {
         {"Backspace", 8}, {"BackSpace", 8}, {"Tab", 9}, {"Return", 13},
         {"Pause", 19}, {"CapsLock", 20}, {"Escape", 27}, {"Space", 32},
@@ -47,6 +57,9 @@ int bongo_cat_tauri_key_code(const char *filename) {
     };
     for (size_t i = 0; i < sizeof(map) / sizeof(map[0]); ++i)
         if (SDL_strcasecmp(name, map[i].name) == 0) return map[i].code;
+    /* 手柄表: 下标即按钮序号, 顺序必须与 Mver 侧的 bongo_cat_mver_gamepad_names 以及
+     * candidate.c 的 right-keys 名字表完全一致, 三处任何一处改动都会让手柄错键。 */
+
     static const struct { const char *name; int code; } gamepad[] = {
         {"South", 0}, {"East", 1}, {"West", 2}, {"North", 3},
         {"LeftTrigger", 4}, {"RightTrigger", 5}, {"LeftTrigger2", 6},

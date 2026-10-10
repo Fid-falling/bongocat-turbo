@@ -4,6 +4,11 @@
 #include "nuklear_config.h"
 #include <stdbool.h>
 
+/*
+ * 时序全部用 SDL_GetTicksNS() 的绝对时间, 不用帧计数 —— 掉帧时补间应当"跳过"
+ * 而不是"变慢", 否则卡顿会被动画放大成拖影。
+ * duration_ms <= 0 视为立即到位。
+ */
 typedef enum BongoCatUIEasing {
     BONGO_CAT_UI_EASE_LINEAR,
     BONGO_CAT_UI_EASE_OUT_CUBIC,

@@ -4,6 +4,14 @@
 #ifdef _WIN32
 #include <windows.h>
 
+/*
+ * 更新交棒: "新进程请旧进程让位"。
+ *
+ * 只有在新进程版本不低于旧进程、并且旧进程确实是同一个可执行文件时才动手 —— 否则
+ * 用户可能只是想把便携版和安装版一起打开, 那时不该把已经在跑的那个关掉。
+ * 版本与路径都来自共享内存(见 windows_startup.c); 只要旧实例没写出共享内存就一律
+ * 放弃: 宁可多开一个, 也不能误杀。
+ */
 static bool request_shutdown(HWND existing) {
     HANDLE stopped = OpenEventW(SYNCHRONIZE, FALSE,
         bongo_cat_windows_instance_stopped_name());
@@ -22,6 +30,9 @@ static bool request_shutdown(HWND existing) {
     return result == WAIT_OBJECT_0;
 }
 
+/* 先看有没有旧实例, 再读它的共享内存信息, 然后按"是不是同一个 exe + 版本谁更新"
+   决定是否请求它退出。三个事件里 wake 用不上, 这里只用到 update-shutdown 与
+   stopped。 */
 bool bongo_cat_windows_update_handoff(void) {
     HWND existing = FindWindowW(NULL, bongo_cat_windows_instance_title());
     HANDLE mapping = existing ? OpenFileMappingW(FILE_MAP_READ, FALSE,

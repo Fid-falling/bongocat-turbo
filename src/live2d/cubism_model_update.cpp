@@ -33,6 +33,8 @@ void NativeModel::resize(int width, int height) {
      * 注意桥的离屏目标就是 2 倍分辨率 (见 live2d_vulkan_internal.h 的
      * BONGO_CAT_LIVE2D_VULKAN_SUPERSAMPLE), 合成时再线性缩小回窗口。
      */
+    /* 倍数必须取自和桥同一个函数 bongo_cat_live2d_vulkan_supersample_for(): 桥用它定
+     * 离屏目标, 这里用它定 SDK 的模型/遮罩目标, 两处一旦不一致遮罩就会和成品错位。 */
 #ifdef BONGO_CAT_HAS_VULKAN
     if (bongo_cat_cubism_renderer_uses_vulkan()) {
         SetRenderTargetSize(
@@ -45,6 +47,11 @@ void NativeModel::resize(int width, int height) {
     renderer_height_ = height_;
 }
 
+/*
+ * reshape 与 resize 的分工: reshape 只更新画布尺寸并重算内容视口, resize 还会把新尺寸
+ * 推给 SDK 的重绘目标。加载期用 reshape (那时渲染器和贴图都还不存在, 推给 SDK 没意义),
+ * 之后每次窗口变化走 resize。
+ */
 void NativeModel::reshape(int width, int height) {
     if (width > 0 && height > 0) {
         width_ = width;
@@ -53,6 +60,8 @@ void NativeModel::reshape(int width, int height) {
     }
 }
 
+/* 用一份浮点快照做脏检查: 参数/部件数量可能变 (换模型), 所以先比数组尺寸再比数值。
+ * 1e-5 的容差是留给 SDK 插值噪声的余量, 太小会让静止的猫每帧都被判成"变了"。 */
 template<typename Getter>
 static bool changed(std::vector<float> &snapshot, int count, Getter value) {
     bool result = snapshot.size() != (size_t)count;
@@ -65,6 +74,11 @@ static bool changed(std::vector<float> &snapshot, int count, Getter value) {
     return result;
 }
 
+/*
+ * 返回值是"这一帧有没有可见变化"的脏标记, 上层据此决定要不要重绘 (静止的猫不必每帧
+ * 重画)。delta 上限 0.25s 是为了让窗口拖动/系统卡顿后的补帧不会一步跳过大段动画 ——
+ * 宁可慢放也不要抽搐。
+ */
 bool NativeModel::update(float delta_seconds) {
     if (!_model || delta_seconds <= 0.0f) return false;
     if (delta_seconds > 0.25f) delta_seconds = 0.25f;
@@ -102,6 +116,8 @@ void NativeModel::build_projection(Csm::CubismMatrix44 &projection,
             render_options_.projection_scale,
             render_options_.projection_scale * aspect);
         projection.Translate(render_options_.offset_x, render_options_.offset_y);
+    /* 非 Mver 路径: 按窗口长宽比决定在哪个轴上贴合。竖窗口时把画布宽度按 2.0 处理,
+     * 让模型在窄窗口里也不会被横向拉扁。 */
     } else if (_model->GetCanvasWidth() > 1.0f && width < height) {
         _modelMatrix->SetWidth(2.0f);
         projection.Scale(mirror_ ? -1.0f : 1.0f,

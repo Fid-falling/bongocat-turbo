@@ -1,3 +1,12 @@
+/*
+ * 验证工具的图像 I/O 与基础图像处理(WIC 负责编解码; 读取与绘制在
+ * validation_gdiplus.c 里)。这里只提供上游工具真正需要的几件事: 存图、释放、
+ * 只保留最大前景连通块、求前景包围盒。
+ *
+ * 颜色约定: 32 位 BGRA, 每行紧密排列。所有"前景"判定都准备了两套: 图带 alpha
+ * 时用 alpha, 否则与采样到的背景色比对 —— 带透明通道和纯色背景两种截图都要能
+ * 处理。
+ */
 #define COBJMACROS
 #define WIN32_LEAN_AND_MEAN
 #include <windows.h>
@@ -12,11 +21,16 @@ static void release_unknown(IUnknown *value) {
     if (value) IUnknown_Release(value);
 }
 
+/* 尺寸校验同时挡住两种坑: 非正的尺寸, 以及 width*height*4 会溢出 size_t 的
+   畸形图。 */
 static int image_size_ok(int width, int height) {
     return width > 0 && height > 0 &&
         (size_t)width <= SIZE_MAX / ((size_t)height * 4);
 }
 
+/* 用 WIC 编码: png 为真存 PNG(保留 alpha), 否则存 BMP。逐级创建 COM 对象,
+   任何一步失败都跳到同一个 done 统一释放; result 只有走到最后一次 Commit 成功
+   才为真 —— "编码器建好了"并不等于文件写成功了。 */
 int bongo_cat_validation_image_save(const wchar_t *path,
     const BongoCatValidationImage *image, int png) {
     IWICImagingFactory *factory = NULL;
@@ -74,10 +88,21 @@ void bongo_cat_validation_image_free(BongoCatValidationImage *image) {
     memset(image, 0, sizeof(*image));
 }
 
+/* "接近白/灰"的像素不算前景: 237 这个阈值是为了滤掉截图里的浅灰底和抗锯齿
+   边缘, 让连通块尽量贴合真正的角色轮廓。 */
 static int foreground_pixel(const unsigned char *pixel) {
     return min(pixel[0], min(pixel[1], pixel[2])) < 237;
 }
 
+/*
+ * 只保留面积最大的前景连通块, 其余前景涂成白色(而不是透明): 后续存成 BMP 时
+ * 白色更容易被人眼和脚本区分出来。
+ * 两处特别处理:
+ *   - 落在最大连通块包围盒之外、或"青色占比超过一成"的块会被抹掉 —— 青色是验证
+ *     场景里的标记色(见下面 32/220/220 那组判断), 一定不是角色本体;
+ *   - 连通性用 4 邻域并显式排除左右换行处, 否则 x=0 会和上一行行尾被错误连通。
+ * 洪水填充用数组队列而不是递归, 大图也不会爆栈。
+ */
 int bongo_cat_validation_image_keep_largest(BongoCatValidationImage *image) {
     size_t size, index;
     int *labels = NULL, *queue = NULL, *counts = NULL, *cyan = NULL;
@@ -139,6 +164,12 @@ fail:
     return 0;
 }
 
+/*
+ * 求前景包围盒, 只算面积最大的那个连通块。背景色取图像上部 1/20 高度处水平
+ * 中线上的一个像素 —— 那里通常是纯背景; 同时稀疏采样判断整幅图有没有 alpha,
+ * 有 alpha 就改用 alpha 阈值判前景(与 keep_largest 保持同一套策略)。
+ * 返回 false 表示图里找不到前景。
+ */
 int bongo_cat_validation_image_bounds(const BongoCatValidationImage *image,
     BongoCatValidationRect *bounds) {
     size_t size, index;

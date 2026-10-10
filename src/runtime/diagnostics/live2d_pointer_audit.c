@@ -1,5 +1,9 @@
+/* 指针审计: 把鼠标依次放到显示器四角附近, 每处推 90 帧 (1.5s) 让参数收敛, 再把 ParamAngleX/Y 与
+ * ParamMouseX/Y 采进全局 bongo_cat_pointer_audit 供断言读取, 并记录相邻帧 ParamAngleX 的最大跳变。
+ */
 #include "live2d_pointer_audit.h"
 
+/* 全局单例: 断言写在 live2d_audit.c, 结果靠这个模块级符号传递; 只有 reverse 审计会重置它并把 ran 置真。 */
 BongoCatPointerAudit bongo_cat_pointer_audit;
 
 static bool value(BongoCatApp *app, const char *id, float *output) {
@@ -9,6 +13,9 @@ static bool value(BongoCatApp *app, const char *id, float *output) {
     return true;
 }
 
+/* 取窗口中心点所在的那块显示器 (不是主显示器), 输出显示器边界与窗口中心坐标。用窗口中心而不是鼠标位置
+ * 选显示器, 是因为多屏下窗口可能横跨两块屏; 任一步失败都返回 false, 调用方据此判"环境不具备审计条件"。
+ */
 static bool test_center(BongoCatApp *app, SDL_Rect *bounds,
     double *center_x, double *center_y) {
     int window_x, window_y, width, height;
@@ -23,6 +30,9 @@ static bool test_center(BongoCatApp *app, SDL_Rect *bounds,
         bounds->w > 0 && bounds->h > 0;
 }
 
+/* mirror 直接写进 settings.model.mouse_mirror 且不恢复 (场景本身就是"带镜像跑一次"), 落点固定在
+ * 窗口中心右上方 40% 处; 真正的方向判定在 live2d_audit.c 的 mouse-move 分支里。
+ */
 bool bongo_cat_live2d_pointer_audit_run(BongoCatApp *app, bool mirror) {
     SDL_Rect bounds;
     double center_x, center_y;
@@ -36,6 +46,10 @@ bool bongo_cat_live2d_pointer_audit_run(BongoCatApp *app, bool mirror) {
     return true;
 }
 
+/* 四角顺序 tl/tr/bl/br 与断言里的下标一一对应, 改顺序会让 mouse-reverse 的断言全反。期望: 左右两侧
+ * 给出符号相反的 ParamAngleX (左负右正), 上下两侧给出符号相反的 ParamAngleY (上正下负)。
+ * maximum_step 记录相邻帧的最大跳变 (每帧变化量, 不是总位移), 上限由 POINTER_VISIBLE_STEP_LIMIT 判定。
+ */
 bool bongo_cat_live2d_pointer_reverse_audit_run(BongoCatApp *app) {
     SDL_Rect bounds;
     double center_x, center_y;
@@ -71,6 +85,7 @@ bool bongo_cat_live2d_pointer_reverse_audit_run(BongoCatApp *app) {
             &bongo_cat_pointer_audit.mouse_x[corner]);
         bool mouse_y = value(app, "ParamMouseY",
             &bongo_cat_pointer_audit.mouse_y[corner]);
+        /* 四个角必须一致地"有/没有" ParamMouseX 与 ParamMouseY: 模型不该只在某些姿态下才有这组参数。 */
         if (corner == 0)
             bongo_cat_pointer_audit.has_mouse = mouse_x && mouse_y;
         else if (bongo_cat_pointer_audit.has_mouse != (mouse_x && mouse_y))

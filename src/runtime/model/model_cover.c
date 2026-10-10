@@ -1,3 +1,11 @@
+/* 模型封面 (设置窗口里每张卡片上的预览图) 的抓取与落盘。
+ * 触发链: 模型提交后排程 (model_files.c), 主循环在下一帧走离屏渲染 (present=false) 时收尾,
+ * 把这一帧的像素写成 <adapter_directory>/resources/cover.png。两条渲染后端各自回读 ——
+ * OpenGL 走 glReadPixels, Vulkan 走整帧回读 (有一帧以上延迟, 没就绪就返回失败让上层退避重试)。
+ * 契约: 队列里只有属于 app->loaded_model 的任务会被抓取; 写出成功或主动放弃都要摘链 (finish),
+ * 失败则保持挂起, 由 bongo_cat_model_cover_defer 安排下一次。
+ * 最容易改错的两处: 两条后端的行序相反 (见 read_cover_pixels), 且 Vulkan 的样本是一次性取走的。
+ */
 #include "model_cover.h"
 
 #include "preferences_model_cover.h"
@@ -17,6 +25,10 @@ typedef struct CoverWriter {
     bool ok;
 } CoverWriter;
 
+/* 切换到另一个模型之前, 为即将离开的模型安排一次封面刷新。
+ * 必须在 app->loaded_model 仍指向旧模型时调用 —— 队列按 loaded_model 匹配任务。
+ * 这里只排程并尝试立刻抓一帧; 抓不到就交给主循环的退避重试, 只留一条日志。
+ */
 void bongo_cat_model_cover_capture_before_switch(BongoCatApp *app) {
     if (!app || !app->loaded_model[0]) return;
     const BongoCatModelEntry *entry = bongo_cat_models_find(&app->models,
@@ -29,6 +41,7 @@ void bongo_cat_model_cover_capture_before_switch(BongoCatApp *app) {
             entry->id);
 }
 
+/* stb_image_write 的写出回调: 任何一次短写只记下失败, 由调用方在 fclose 之后统一判定。 */
 static void cover_write(void *context, void *data, int size) {
     CoverWriter *writer = context;
     if (writer->ok && fwrite(data, 1, (size_t)size, writer->file) !=
@@ -36,6 +49,9 @@ static void cover_write(void *context, void *data, int size) {
         writer->ok = false;
 }
 
+/* glReadPixels 的第 0 行是图像底部, 而 PNG 第 0 行是顶部, 所以 GL 路径要整体翻行。
+ * Vulkan 回读已经是自上而下, 不要在这里重复翻转。
+ */
 static void flip_cover_pixels(unsigned char *pixels, int height, size_t pitch) {
     for (int y = 0; y < height / 2; ++y) {
         unsigned char *top = pixels + (size_t)y * pitch;
@@ -48,6 +64,9 @@ static void flip_cover_pixels(unsigned char *pixels, int height, size_t pitch) {
     }
 }
 
+/* 取一帧 RGBA 像素。返回 malloc 的缓冲, 由调用方 free; 失败返回 NULL。
+ * 副作用: Vulkan 分支会一次性取走 (take) 整帧样本, 之后再取要等下一次回读。
+ */
 static unsigned char *read_cover_pixels(const char *path, int width,
     int height, size_t pitch, size_t bytes) {
     /*
@@ -98,6 +117,9 @@ static unsigned char *read_cover_pixels(const char *path, int width,
     return pixels;
 }
 
+/* 先写临时文件, 再原子替换到目标路径: 失败时删掉临时文件并返回 false, 目标文件保持旧内容。
+ * durable=false —— 封面是可再生的缓存, 不值得为它做落盘同步。
+ */
 static bool write_cover_png(const char *temporary, const char *path,
     const unsigned char *pixels, int width, int height, size_t pitch) {
     FILE *file = bongo_cat_file_open(temporary, "wb");
@@ -118,6 +140,10 @@ static bool write_cover_png(const char *temporary, const char *path,
     return false;
 }
 
+/* 抓取并写出当前模型的封面。返回值是"这次任务是否算处理完", 而不是"是否成功":
+ * true = 已写出, 或因尺寸超出 4096 上限而主动放弃 (两者都会摘链); false = 这次没成,
+ * 任务仍挂起, 调用方应当 defer 退避后再来。成功时会顺带让设置窗口重载这张封面。
+ */
 bool bongo_cat_model_cover_capture(BongoCatApp *app, int width, int height) {
     if (!app || !bongo_cat_model_cover_pending(app)) return false;
     uint64_t started_ns = SDL_GetTicksNS();
@@ -142,6 +168,7 @@ bool bongo_cat_model_cover_capture(BongoCatApp *app, int width, int height) {
             "Model cover refresh skipped due to size overflow: %s", path);
         return false;
     }
+    /* 主/副桌宠是两个进程, 都可能刷新同一张封面: 临时名带实例后缀, 避免互相看到半截文件。 */
     char temporary[BONGO_CAT_PATH_CAP];
     int temporary_length = snprintf(temporary, sizeof(temporary), "%s.tmp.%s",
         path, app->secondary_pet ? "secondary" : "primary");

@@ -14,6 +14,9 @@ namespace bongo_cat {
  *
  * 默认 OpenGL: 即使 Vulkan 后端还没接通, 行为也和以前完全一样。
  */
+/* 只在这个开关"打开之后才创建渲染器"的前提下成立: 已经建好的渲染器不会因为切开关而换
+ * 后端。调用点在窗口创建期 (remember), 那时还没有模型, 所以实际不会出现混合状态;
+ * 测试里若要在同一个进程内切换, 必须先释放所有模型。 */
 void bongo_cat_cubism_renderer_use_vulkan(bool enabled);
 bool bongo_cat_cubism_renderer_uses_vulkan();
 

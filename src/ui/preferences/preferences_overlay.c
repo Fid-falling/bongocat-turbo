@@ -1,9 +1,22 @@
+/*
+ * 模态弹层 (删除确认框 / 行为设置对话框) 的公共部分: 遮罩、面板几何、开关动画、输入
+ * 武装。
+ *
+ * 两个时间戳分工明确: opened_ns 驱动淡入, closing_ns 非 0 表示正在淡出; 两者都在
+ * frame() 里换算成 visibility/close_amount, 并给出 finished (淡出结束) —— 调用方
+ * 看到 finished 才能真的销毁弹层状态, 提前销毁会让动画戛然而止。
+ *
+ * input_ready 是"吃掉打开弹层那一次点击"的机制: 打开弹层的点击本身还没结束 (左键
+ * 还按着), 如果立刻允许输入, 同一个点击会马上命中弹层上的按钮。所以要先等左键抬起,
+ * 之后 armed 置真并一直保持。
+ */
 #include "preferences_overlay.h"
 #include "ui_animation.h"
 #include "ui_paint.h"
 
 #include <SDL3/SDL.h>
 
+/* 打开 200ms / 关闭 180ms: 关闭比打开略快, 手感上更像"立刻响应" */
 enum { OVERLAY_OPEN_MS = 200, OVERLAY_CLOSE_MS = 180 };
 
 bool bongo_cat_preferences_overlay_input_ready(struct nk_context *context,
@@ -22,6 +35,11 @@ struct nk_color bongo_cat_preferences_overlay_alpha(
     return color;
 }
 
+/*
+ * 算面板矩形与可见度。关闭时面板会缩 1.5% 并下移 6px —— 这是"收进背景"的视觉暗示,
+ * 让弹层消失看起来是有方向的, 而不是原地闪没。
+ * closing_ns 优先于 opened_ns: 一个弹层可能在淡入还没结束时就被关掉。
+ */
 BongoCatOverlayFrame bongo_cat_preferences_overlay_frame(
     struct nk_rect region, float width, float height, uint64_t opened_ns,
     uint64_t closing_ns) {
@@ -51,6 +69,13 @@ BongoCatOverlayFrame bongo_cat_preferences_overlay_frame(
     return frame;
 }
 
+/*
+ * 画遮罩层 (面板本体由各自的调用方画, 因为面板内容不一样)。
+ * 遮罩颜色按主题区分: 暗色主题用深色薄雾, 亮色主题用白色薄雾 —— 亮色主题下用深色
+ * 遮罩会显得很脏。
+ * 注意这里只是把 scissor 压到整窗口区域, 面板的阴影要靠外扩才能画出来, 所以调用方
+ * 必须在面板画完之后自己恢复 scissor。
+ */
 void bongo_cat_preferences_overlay_draw(struct nk_context *context,
     struct nk_rect region, const BongoCatOverlayFrame *frame,
     BongoCatUIPalette palette) {

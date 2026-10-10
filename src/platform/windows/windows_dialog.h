@@ -12,6 +12,8 @@
  * dialog. Keep the same asynchronous callback contract here, but use the
  * modern IFileDialog implementation instead.
  */
+/* 回调契约与 SDL_ShowOpenFolderDialog 保持一致(异步, 在 SDL 事件线程上调用), 因此
+   调用方可以按同一套代码在各平台之间切换。 */
 void bongo_cat_windows_show_open_folder_dialog(
     SDL_DialogFileCallback callback, void *userdata, SDL_Window *window,
     const char *default_location, bool allow_many);

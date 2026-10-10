@@ -5,6 +5,13 @@
 
 typedef struct BongoCatApp BongoCatApp;
 
+/*
+ * 模型封面缓存 (实现在 preferences_model_cover.c)。
+ * 使用节奏是固定三步, 顺序不能变:
+ * covers_begin -> 画卡片时对每张卡调 cover() 取图 -> covers_prune
+ * 返回的指针只在"本帧 begin/prune 之间"有效: prune 会回收本帧没被取过的槽位, 所以
+ * 拿到指针后不要跨帧保存。请求尺寸按物理像素给 (卡片会乘 raster_scale)。
+ */
 typedef struct BongoCatModelCover {
     unsigned int texture;
     int width;

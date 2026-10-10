@@ -1,3 +1,15 @@
+/*
+ * 运行时重建字体图集 (用户在设置里换了字体 / 改了语言)。做法是先在栈上搭一个
+ * "临时 backend", 把新图集烘到它身上, 成功后再整体搬到真 backend —— 这样烘焙失败
+ * 时旧图集毫发无损, 界面不会变成一团豆腐。
+ *
+ * 几个必须遵守的点:
+ *  - frame_building 期间禁止调用: 此时 Nuklear 已经把本帧的图集指针记进命令缓冲,
+ *    中途换掉等于让命令引用释放后的纹理;
+ *  - 临时 backend 必须共享同一个 vk (见下面的注释), 否则会走 GL 路径去建纹理;
+ *  - Vulkan 下只搬纹理、保留原 id: 旧图集先注销, 新纹理搬到同一个槽位, 已经烘进
+ *    Nuklear 的 id 就不用改。
+ */
 #include "ui_font_atlas.h"
 
 #include <SDL3/SDL_opengl.h>
@@ -44,6 +56,9 @@ bool bongo_cat_ui_font_atlas_reload(BongoCatUIBackend *ui,
         bongo_cat_ui_texture_unregister(ui, id);
         bongo_cat_ui_texture_move(ui, &next, id);
     } else if (ui->font_texture) glDeleteTextures(1, &ui->font_texture);
+    /* 整体接管临时后端的成果。指针 (字体句柄 / range 数组) 都是所有权转移, 搬完
+       之后不能再对 next 调 atlas_destroy —— 那会把它 free 掉, ui 就悬垂了。
+       raster_scale 也要跟着更新: 下一次重载和缓存命中判定都以它为准。 */
     bongo_cat_ui_font_atlas_destroy(ui);
     ui->atlas = next.atlas;
     ui->null_texture = next.null_texture;

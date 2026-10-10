@@ -1,3 +1,14 @@
+/*
+ * 设置窗口用到的图片资源 (logo / 图标图集 / 支持者素材)。
+ *
+ * 所有纹理 id 都来自 bongo_cat_ui_texture_* 这一套后端无关的接口, 它内部把 id 记在
+ * BONGO_CAT_UI_VK_TEXTURES 纹理表里 —— GL 与 Vulkan 下同一个数字的含义不同, 所以
+ * 绝不能把 id 直接交给 GL 或 Vulkan 的原始 API, 释放也必须走 release_id。
+ *
+ * 另一条不变量: 每张图都有一个"按光栅倍率算出来的像素尺寸" (raster_size)。
+ * 图集/封面必须按 raster_scale 加载, 否则高 DPI 下会糊; 而 raster_scale 变了以后
+ * 旧纹理不会被自动重载, 得靠 refresh_raster 这条路重新走一遍 assets_load。
+ */
 #include "preferences_state.h"
 #include "ui_icons.h"
 #include "bongo_cat/image.h"
@@ -7,6 +18,11 @@
 #include <SDL3/SDL_opengl.h>
 #include <math.h>
 
+/*
+ * 加载单张图片。size 传 0 表示按原图尺寸 (图标图集要按像素格对齐, 不能被缩放)。
+ * 失败时要保证 "要么 id 有效、要么是 0", 所以创建成功但上传出错的那条路上必须
+ * 显式释放 id —— 这里用的是"先当成功、再回滚"的写法, 免得调用方拿到半个纹理。
+ */
 static unsigned int load(BongoCatPreferences *value, const char *name,
     int size, int *width, int *height) {
     char path[BONGO_CAT_PATH_CAP];
@@ -29,6 +45,7 @@ static unsigned int load(BongoCatPreferences *value, const char *name,
     return texture;
 }
 
+/* 光栅尺寸 = 逻辑尺寸 x raster_scale, 夹在 [logical, logical*4] 之间: 上界防显存爆炸 */
 static int raster_size(const BongoCatPreferences *value, int logical) {
     float scale = value->ui.raster_scale > 0.0f ? value->ui.raster_scale : 1.0f;
     return SDL_clamp((int)ceilf(logical * scale), logical, logical * 4);
@@ -42,6 +59,11 @@ void bongo_cat_preferences_assets_load(BongoCatPreferences *value) {
     value->icon_hidpi_attempted = false;
 }
 
+/*
+ * @4x 图标图集是"按需加载"的: 只在真的需要大图标或高 DPI 时才去读文件, 且只试一次
+ * (icon_hidpi_attempted)。用一次性的标志而不是每次判断文件是否存在, 是因为这个函数
+ * 是每个图标每个绘制帧都会调的, 不能在里面做文件系统访问。
+ */
 void bongo_cat_preferences_icon_draw(BongoCatPreferences *value,
     struct nk_command_buffer *canvas, int icon, struct nk_rect bounds,
     struct nk_color color) {
@@ -64,6 +86,11 @@ void bongo_cat_preferences_icon_draw(BongoCatPreferences *value,
     nk_draw_image(canvas, bounds, &image, color);
 }
 
+/*
+ * 支持者素材是"关于"页专有的重资源, 所以单独一对 load/clear, 由 page_cache_clear
+ * 在离开该页时调用。support_assets_loaded 兼作"已尝试过"的标记: 素材缺失时也置真,
+ * 否则每次进这一页都会重新去读一遍磁盘。
+ */
 void bongo_cat_preferences_support_assets_load(BongoCatPreferences *value) {
     if (value->support_assets_loaded) return;
     value->support_assets_loaded = true;
@@ -99,6 +126,11 @@ void bongo_cat_preferences_support_assets_clear(BongoCatPreferences *value) {
     value->support_assets_loaded = false;
 }
 
+/*
+ * 关窗/销毁时把本窗口持有的全部纹理交还后端。
+ * 顺序上没有依赖, 但必须把 support_assets_loaded / icon_hidpi_attempted 一起复位,
+ * 否则下次开窗会以为素材还在, 于是画出一堆 id 为 0 的空白图。
+ */
 void bongo_cat_preferences_assets_clear(BongoCatPreferences *value) {
     if (!value) return;
     clear_texture(value, &value->logo_texture);
@@ -108,6 +140,12 @@ void bongo_cat_preferences_assets_clear(BongoCatPreferences *value) {
     bongo_cat_preferences_support_assets_clear(value);
 }
 
+/*
+ * abandon 与 clear 的区别: clear 是在上下文可用时走的正常释放 (会把纹理从
+ * BONGO_CAT_UI_VK_TEXTURES 表里摘掉); abandon 用在上下文已经不可用的时候 ——
+ * 这时后端马上要被整体销毁, 表也跟着没了, 再逐个 release 反而会去碰失效的驱动对象。
+ * 两者都必须把标志位复位, 不能只把 id 清零。
+ */
 void bongo_cat_preferences_assets_abandon(BongoCatPreferences *value) {
     if (!value) return;
     value->logo_texture = 0;

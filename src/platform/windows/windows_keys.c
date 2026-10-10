@@ -3,6 +3,13 @@
 #ifdef _WIN32
 #include <stdio.h>
 
+/*
+ * 原始键码 -> 事件名(用户在配置里看到的名字)与"设备内索引"。
+ *
+ * 名字是外部契约: 它与 shortcuts / sound_shortcut 的 token 表、以及用户已经写进
+ * settings.json 的字符串一一对应, 只能新增不能改。
+ * 索引用于给每台设备记录按键状态, 所以同一个物理键必须永远映射到同一个下标。
+ */
 unsigned bongo_cat_windows_key_index(const RAWKEYBOARD *key) {
     if (key->MakeCode && key->MakeCode < 256)
         return key->MakeCode + ((key->Flags & RI_KEY_E1) ? 512u :
@@ -10,9 +17,13 @@ unsigned bongo_cat_windows_key_index(const RAWKEYBOARD *key) {
     return 768u + key->VKey;
 }
 
+/* 索引把 MakeCode 与 E0/E1 前缀拼在一起(上限见 windows_keys.h 的 1024), 这样小键盘
+   与主键区、以及左右修饰键都能区分开; 没有有效 MakeCode 的报文退到 VKey 段。 */
 const char *bongo_cat_windows_key_name(const RAWKEYBOARD *key, char output[16]) {
     if (!key || key->VKey < VK_BACK || key->VKey >= 255 ||
         key->MakeCode == KEYBOARD_OVERRUN_MAKE_CODE) return NULL;
+    /* 先用 VKey 处理与布局无关的通用键(字母 / 数字 / 功能键), 再单独处理小键盘 ——
+       小键盘在 NumLock 关闭时会伪装成方向键与编辑键, 所以那一段必须按 VKey 判断。 */
     unsigned code = key->VKey;
     if (code >= 'A' && code <= 'Z') {
         snprintf(output, 16, "Key%c", (char)code);
@@ -34,6 +45,9 @@ const char *bongo_cat_windows_key_name(const RAWKEYBOARD *key, char output[16]) 
     case VK_UP: return "Kp8"; case VK_PRIOR: return "Kp9";
     case VK_DELETE: return "KpDecimal"; default: break;
     }
+    /* 主映射表。左右修饰键的位置很关键: 系统有时只给通用的 VK_SHIFT / VK_CONTROL /
+       VK_MENU, 这时只能靠 MakeCode 或 E0 标志区分左右, 所以这几条要放在具体
+       VK_LSHIFT 之类的分支之后、default 之前。 */
     switch (code) {
     case VK_ESCAPE: return "Escape";
     case VK_PAUSE: return "Pause";
@@ -86,6 +100,8 @@ const char *bongo_cat_windows_key_name(const RAWKEYBOARD *key, char output[16]) 
     case VK_OEM_PERIOD: return "Period";
     case VK_OEM_2: return "Slash";
     default:
+        /* 没见过的键退化成十进制 VKey: 仍然能被记录和显示, 只是在配置里不好写。
+           所有分支返回的字符串都以 NUL 结尾, 调用方可以直接当字符串用。 */
         snprintf(output, 16, "%u", code);
         return output;
     }

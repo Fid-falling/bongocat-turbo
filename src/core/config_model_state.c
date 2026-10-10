@@ -5,6 +5,14 @@
 #include <stdio.h>
 #include <string.h>
 
+/*
+ * 模型级别的用户设置(自定义显示名 / 已删除的模型), 对应 settings.json 里的
+ * modelOverrides 与 removedModels。
+ *
+ * 两个数组都是定长(CAP)紧凑列表: 顺序即写入顺序, 删除靠 memmove 前移并把
+ * 尾巴清零, 保证磁盘上不会出现空条目。所有 set_* 都先调用 validate 兜底, 因此
+ * 即使配置结构被外部改坏也不会越界写。
+ */
 const char *bongo_cat_settings_model_label(const BongoCatSettings *config,
     const char *id) {
     if (!config || !id) return NULL;
@@ -16,6 +24,8 @@ const char *bongo_cat_settings_model_label(const BongoCatSettings *config,
     return NULL;
 }
 
+/* label 为空 = 删除这条自定义名; 返回 false 表示"没有任何变化"而不是出错,
+   调用方据此避免无意义地重写配置文件。 */
 bool bongo_cat_settings_set_model_label(BongoCatSettings *config,
     const char *id, const char *label) {
     if (!config || !id || !id[0] || strlen(id) >= BONGO_CAT_ID_CAP ||
@@ -100,6 +110,8 @@ bool bongo_cat_settings_set_model_removed(BongoCatSettings *config,
     return true;
 }
 
+/* 模型 id 有两种形态: "<package>" 表示包本身, "<package>~<序号>" 表示包内
+   的单条模型。恢复整个包时这两类条目都要清掉。 */
 static bool package_model_id(const char *id, const char *package_id) {
     size_t length = package_id ? strlen(package_id) : 0;
     if (!id || !length || strncmp(id, package_id, length) != 0) return false;
@@ -111,6 +123,8 @@ static bool package_model_id(const char *id, const char *package_id) {
     return true;
 }
 
+/* 双指针原地压缩(一边扫描一边前移), 一趟完成过滤; 返回值表示是否真的删掉了
+   条目, 调用方据此决定要不要落盘。 */
 bool bongo_cat_settings_restore_model_package(BongoCatSettings *config,
     const char *package_id) {
     if (!config || !package_id || !package_id[0]) return false;

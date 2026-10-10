@@ -1,5 +1,11 @@
 #include "linux_evdev_internal.h"
 
+/*
+ * 内核键码 -> 事件名。名字必须与 Windows 侧(windows_keys.c)以及用户已经写进配置文件的
+ * 字符串完全一致, 否则同一个快捷键在两个平台上会变成两回事。
+ * 表用指定初始化器, 没列出的键在表里就是 NULL(被上层过滤掉): KEY_CNT 有七百多个, 只
+ * 收录真正有意义的键, 全填一遍既没意义也容易填错。
+ */
 static const char *const evdev_key_names[KEY_CNT] = {
     [KEY_A] = "KeyA", [KEY_B] = "KeyB", [KEY_C] = "KeyC", [KEY_D] = "KeyD",
     [KEY_E] = "KeyE", [KEY_F] = "KeyF", [KEY_G] = "KeyG", [KEY_H] = "KeyH",
@@ -45,6 +51,8 @@ static const char *const evdev_key_names[KEY_CNT] = {
     [KEY_DOT] = "Period", [KEY_SLASH] = "Slash"
 };
 
+/* 索引用于全局引用计数, 所以"同一个物理键的不同上报"必须归一到同一个下标: 右 Meta 与
+   左 Meta、小键盘回车与主回车在语义上是同一个键(见下面的映射)。 */
 const char *bongo_cat_evdev_key_name(unsigned code) {
     return code < KEY_CNT ? evdev_key_names[code] : NULL;
 }

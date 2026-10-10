@@ -3,12 +3,20 @@
 #include <stdio.h>
 #include <unistd.h>
 
+/*
+ * 内核事件 -> BongoCatInputEvent 的翻译, 以及唤醒主循环。
+ *
+ * 唤醒策略: 只在"队列由空变非空"的那一刻推一次 SDL 用户事件, 否则高回报率鼠标会把
+ * 事件队列塞满。
+ */
 static void wake_consumer(LinuxEvdevState *state) {
     SDL_Event wake = {0};
     wake.type = state->platform->wake_event_type;
     SDL_PushEvent(&wake);
 }
 
+/* 鼠标按键名必须与配置文件以及 Windows 侧共用同一套(Left/Right/Middle/Back/Forward),
+   这样快捷键配置才能跨平台通用。 */
 static const char *button_name(unsigned code) {
     switch (code) {
     case BTN_LEFT: return "Left";
@@ -20,6 +28,14 @@ static const char *button_name(unsigned code) {
     }
 }
 
+/*
+ * 单个按键/按钮的状态变化 -> 事件。三道过滤:
+ *   - 与这台设备上次的状态相同(重复报文)直接丢弃;
+ *   - 键名映射不到(未收录的键)丢弃;
+ *   - 键的种类与设备类型不匹配(键盘设备报鼠标键, 或反之)丢弃。
+ * held[] 是跨设备的引用计数: 只有 0->1 才发按下、1->0 才发抬起, 于是两把键盘按同一个键
+ * 不会互相打断。
+ */
 static void key_event(LinuxEvdevState *state, EvdevDevice *device,
     unsigned code, bool down) {
     if (code >= KEY_CNT || device->down[code] == down) return;
@@ -42,6 +58,8 @@ static void key_event(LinuxEvdevState *state, EvdevDevice *device,
     if (bongo_cat_input_push(state->platform->input, &input)) wake_consumer(state);
 }
 
+/* 把该设备当前按着的所有键补发抬起。设备被拔掉、内核丢事件(SYN_DROPPED)、程序退出时
+   都要靠它兜底 —— 否则猫会永远保持按下姿势。 */
 void bongo_cat_evdev_release(LinuxEvdevState *state, EvdevDevice *device) {
     for (unsigned code = 0; code < KEY_CNT; ++code)
         if (device->down[code]) key_event(state, device, code, false);
@@ -53,6 +71,10 @@ void bongo_cat_evdev_motion_reset(LinuxEvdevState *state) {
     SDL_UnlockMutex(state->motion_lock);
 }
 
+/* 单条事件的分发。SYN_DROPPED 表示内核事件队列溢出, 此时设备状态已不可信: 先补发所有
+   抬起来止损, 再进入 desynchronized, 忽略这一包不完整的数据, 直到看见完整的 SYN_REPORT
+   才恢复采信(见下面原有的英文注释)。
+   相对位移会钳到 ±32768: 内核给的是 int, 但一个异常大的值足以把猫甩出屏幕。 */
 void bongo_cat_evdev_event(LinuxEvdevState *state, EvdevDevice *device,
     const struct input_event *event) {
     if (event->type == EV_SYN && event->code == SYN_DROPPED) {
@@ -81,6 +103,9 @@ void bongo_cat_evdev_event(LinuxEvdevState *state, EvdevDevice *device,
     }
 }
 
+/* 一次读一批事件(64 条)。返回值表示"这台设备还能不能继续用": 读空或 EINTR/EAGAIN 都是
+   正常情况(非阻塞 fd), 真正的错误、以及"字节数不是事件大小的整数倍"才让调用方摘掉
+   设备。 */
 bool bongo_cat_evdev_read(LinuxEvdevState *state, EvdevDevice *device) {
     struct input_event events[64];
     ssize_t bytes = read(device->fd, events, sizeof(events));

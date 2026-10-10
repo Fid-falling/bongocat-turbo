@@ -1,9 +1,18 @@
+/*
+ * 音频播放器的生命周期与空闲回收。
+ *
+ * 全部状态由 app 线程独占 (无锁)。collect 是唯一的回收点, 最多每秒跑一次, 负责三件事:
+ * 发现异步解码的失败、回收播完的 voice、整体空闲时卸载引擎 —— 于是闲下来的桌宠既不会占着
+ * 音频设备, 也不会留着解码线程。
+ */
 #include "audio_internal.h"
 
 #include <SDL3/SDL.h>
 #include <stdlib.h>
 #include <string.h>
 
+/* 释放后 memset 置零, 这就是"槽位空了"的唯一判据 (ready == false): 池里没有别的空闲链表,
+ * 所以以后新增字段也会被这一把清零自动复位。 */
 /* App-thread owned. Streaming bounds decoded memory independently of clip
    duration; the pool bounds decoder/file handles during rapid key presses. */
 void bongo_cat_audio_voice_release(AudioVoice *voice) {
@@ -29,6 +38,8 @@ void bongo_cat_audio_stop(BongoCatAudio *audio) {
     for (size_t i = 0; i < AUDIO_VOICES; ++i) bongo_cat_audio_voice_release(&audio->voices[i]);
 }
 
+/* 卸载引擎并让限频计时归零, 这样重新开始播放后第一次回收不会被旧的节流窗口挡掉。
+ * 只有已初始化时才 uninit —— miniaudio 的 uninit 对未初始化的引擎不是无操作。 */
 void bongo_cat_audio_reset(BongoCatAudio *audio) {
     if (!audio) return;
     bongo_cat_audio_stop(audio);
@@ -37,6 +48,9 @@ void bongo_cat_audio_reset(BongoCatAudio *audio) {
     audio->next_collect = 0;
 }
 
+/* 唯一的回收点, 由 bongo_cat_audio_update 驱动。用外部传入的 now 而不是自己取时钟, 是为了
+ * 让离线测试里的回收时机可确定。解码失败只有在这里才查得到 —— miniaudio 是异步初始化,
+ * 当时的返回值只说明"任务已排队"。 */
 void bongo_cat_audio_collect(BongoCatAudio *audio, uint64_t now) {
     if (!audio || !audio->initialized || now < audio->next_collect) return;
     audio->next_collect = now + 1000;

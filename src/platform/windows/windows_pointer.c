@@ -8,11 +8,20 @@
 #include <SDL3/SDL_properties.h>
 #include <windows.h>
 
+/*
+ * 命中测试、点击穿透与窗口几何。所有屏幕坐标在这里换算成客户区坐标, 上层只看
+ * 像素坐标。
+ *
+ * 这个文件是透明窗口几个坑的集中地: 下面几段长注释各自对应一个用户可见的问题
+ * (OBS 采集卡住、穿透后点不到猫、改尺寸时窗口闪动), 改动前请先读完。
+ */
 static HWND native_window(BongoCatPlatform *platform) {
     return (HWND)SDL_GetPointerProperty(SDL_GetWindowProperties(platform->window),
         SDL_PROP_WINDOW_WIN32_HWND_POINTER, NULL);
 }
 
+/* 屏幕坐标 -> 客户区坐标, 并用返回值说明这个点是否落在窗口内部。返回 false 时
+   仍然会写出换算结果(可能是负数或超出宽高)—— 调用方可能正需要它做边缘判定。 */
 bool bongo_cat_platform_pointer_local(BongoCatPlatform *platform, double screen_x,
     double screen_y, float *local_x, float *local_y) {
     if (!platform || !local_x || !local_y) return false;
@@ -56,6 +65,9 @@ void bongo_cat_platform_set_click_through(BongoCatPlatform *platform,
         pointer_transparent);
 }
 
+/* 把窗口抬到最前(托盘菜单或快捷键触发)。存在代理窗口时要一并抬起 —— 它才是
+   真正把画面显示出来的那个窗口。末尾对采集属性的处理见下面原有的英文注释:
+   只对登记过的采集源重做样式事务, 对设置窗口仅做透明修复。 */
 void bongo_cat_platform_raise_window(SDL_Window *window) {
     if (!window) return;
     SDL_ShowWindow(window);
@@ -77,6 +89,10 @@ void bongo_cat_platform_raise_window(SDL_Window *window) {
         bongo_cat_windows_capture_repair_transparency(handle);
 }
 
+/* 移动 / 改尺寸。三处细节: 需要改尺寸时必须临时把窗口置为可调整大小, 否则
+   SetWindowPos 不会真的改变尺寸; 只改其中一维时用 SWP_NOMOVE / SWP_NOSIZE 让
+   另一维保持不动; preserve_screen 包住整个调用, 免得窗口在改动过程中被"拉回
+   屏幕内"的逻辑挪走。 */
 bool bongo_cat_platform_set_geometry(BongoCatPlatform *platform,
     int x, int y, int width, int height) {
     if (!platform || !platform->window) return false;

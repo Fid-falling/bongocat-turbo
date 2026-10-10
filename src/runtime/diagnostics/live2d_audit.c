@@ -1,3 +1,9 @@
+/* Live2D 冒烟场景的总入口: 场景名来自命令行 --ci-live2d-scenario= (见 startup_arguments.c),
+ * 存在 app->smoke_live2d_scenario 里。apply() 负责"施加操作", assertions() 负责"读回参数判定",
+ * 两者刻意分开: 断言失败只影响 live2d-audit.txt 里的 assertions= 字段, 只有 cubism 原生构建才会
+ * 把失败升级成 app->exit_code=1, 因为 stub 构建没有真实模型可判。断言读到的参数值是"上一帧提交后"
+ * 的状态, 所以需要额外步进的场景必须自己推进帧 (见 parameter_override_scenario 之后的 4 帧)。
+ */
 #include "runtime.h"
 #include "live2d_audit_scenario.h"
 #include "live2d_pointer_audit.h"
@@ -8,10 +14,16 @@
 #include <stdlib.h>
 #include <string.h>
 
+/* 本文件内的三个缩写别名, 只为了让下面的场景分发读起来像表格; 真正的实现在 live2d_audit_scenario.c
+ * 与模型层, 不要在别处复用这些宏。
+ */
 #define input bongo_cat_live2d_audit_input
 #define motion bongo_cat_live2d_audit_motion
 #define parameter_override_scenario bongo_cat_live2d_audit_parameter_override
 
+/* 参数不存在时返回 false 且不写 *output ——"模型没有这个参数"和"参数值恰好是 0"必须区分开,
+ * 断言里大量依赖这个区别 (例如 inactive() 要求参数存在且接近 0)。
+ */
 static bool value(BongoCatApp *app, const char *id, float *output) {
     BongoCatParameterRange range;
     if (!bongo_cat_live2d_parameter(app->live2d, id, &range)) return false;
@@ -22,6 +34,10 @@ static bool value(BongoCatApp *app, const char *id, float *output) {
 /* Viewer 5.3.03: (7.2727275 / 30) target speed * 30-degree range * 1.2 gain. */
 #define POINTER_VISIBLE_STEP_LIMIT 8.8f
 
+/* 返回值 = 这个场景的操作是否被接受 (模型能切、动作/表情存在、投影算得出来), 不代表断言通过。
+ * "switch:<model-id>" 的后半段就是目标模型 id; 认不出来的名字交给 motion-N / expression-N 处理。
+ * 走完 if-else 链的分支末尾统一置 app->dirty 触发重绘, 提前 return 的分支自己负责。
+ */
 static bool apply(BongoCatApp *app, const char *scenario) {
     if (strncmp(scenario, "switch:", 7) == 0)
         return bongo_cat_app_select_model(app, scenario + 7);
@@ -84,6 +100,9 @@ static bool apply(BongoCatApp *app, const char *scenario) {
     return true;
 }
 
+/* 把参数值写进审计文件: 参数不存在时写 unavailable 而不是 0, 这样 CI 能看出"模型缺这个参数"与
+ * "参数真的是 0"的区别; 方括号里是该参数的取值范围, 供人工核对。
+ */
 static void parameter(FILE *file, BongoCatApp *app, const char *id) {
     BongoCatParameterRange range;
     if (bongo_cat_live2d_parameter(app->live2d, id, &range))
@@ -92,6 +111,9 @@ static void parameter(FILE *file, BongoCatApp *app, const char *id) {
     else fprintf(file, "parameter.%s=unavailable\n", id);
 }
 
+/* 三个判定助手, 阈值集中在这里: >0.5 算激活, <=0.5 算未激活, |值|>0.05 才算有方向。
+ * 参数缺失时一律 false —— 把"没这个参数"当成"未激活"会让断言假通过。
+ */
 static bool active(BongoCatApp *app, const char *id) {
     float current = 0.0f;
     return value(app, id, &current) && current > 0.5f;
@@ -107,6 +129,10 @@ static bool signed_value(BongoCatApp *app, const char *id, bool positive) {
     return value(app, id, &current) && (positive ? current > 0.05f : current < -0.05f);
 }
 
+/* operation 为假说明操作本身就被拒绝了, 直接判失败、不再读参数 (此时参数值没有意义)。
+ * switch: 场景比的是 session.active_model_id (会话目标), 而不是 loaded_model (可能还没加载完)。
+ * 返回 false 会让调用方在 cubism 构建下把 exit_code 置 1。
+ */
 static bool assertions(BongoCatApp *app, const char *scenario, bool operation) {
     if (!operation) return false;
     if (strncmp(scenario, "switch:", 7) == 0)
@@ -169,6 +195,10 @@ static bool assertions(BongoCatApp *app, const char *scenario, bool operation) {
     return false;
 }
 
+/* 入口: 没有 --ci-live2d-scenario= 时立即返回, 非冒烟运行零开销。按键/手柄/鼠标按下这类场景需要
+ * 额外步进 4 帧参数才会真正提交到模型; 结果写 state_root/live2d-audit.txt, stub 构建只写
+ * renderer=diagnostic 并跳过失败升级。
+ */
 void bongo_cat_live2d_audit_run(BongoCatApp *app) {
     if (!app || !app->smoke_live2d_scenario[0]) return;
     uint64_t started = SDL_GetTicksNS();
@@ -203,6 +233,9 @@ void bongo_cat_live2d_audit_run(BongoCatApp *app) {
         "ParamEyeBallX", "ParamEyeBallY"};
     for (size_t i = 0; i < sizeof(parameters) / sizeof(parameters[0]); ++i)
         parameter(file, app, parameters[i]);
+    /* 指针四角数据只有 mouse-reverse 场景会填 (ran=true), 其他场景这整段都不输出,
+     * 所以读审计文件的人不能假定 pointer.* 一定存在。
+     */
     if (bongo_cat_pointer_audit.ran) {
         static const char *names[] = {"tl", "tr", "bl", "br"};
         fprintf(file, "pointer.maximum_step=%.4f\npointer.has_mouse=%d\n",

@@ -5,6 +5,11 @@
 #include "bongo_cat/config.h"
 #include "nuklear_config.h"
 
+/*
+ * 数值/开关类控件的实现入口 (实现在 preferences_controls.c)。
+ * 契约: id 必须在整个设置窗口内唯一且跨帧稳定 —— 数字编辑的草稿、按住连发、拖拽
+ * 都按 id 记账, id 变了等于换了一个控件 (草稿丢失、拖拽中断)。
+ */
 /* Stable, unique ids retain numeric drafts; valid edits update value immediately.
  * Integer fields accept digits and an optional minus; floats also accept a dot.
  * Values are clamped to the supplied range. Clicking away discards incomplete text.

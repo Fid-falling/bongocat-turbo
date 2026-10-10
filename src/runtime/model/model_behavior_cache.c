@@ -1,9 +1,16 @@
+/* 行为目录缓存: 用户在几个模型之间来回切换时复用已解析的 behavior catalog, 省掉重读
+ * model3.json 并拍平动作/表情的代价 (缓存按值拷贝, 惰性分配)。只缓存内容不会自己变的模型:
+ * 内置 preset 或带内容摘要的已安装包; nearby (managed) 模型归用户的源目录所有, 一律不缓存。
+ */
 #include "model_behavior_cache.h"
 
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
+/* 可缓存判据: preset 由应用自己发布, 因此只比 id; 其余必须是非 managed 且带 content_digest,
+ * 这样目录内容变了能被 matches 认出来, 不会拿旧结果顶替。
+ */
 static bool cacheable(const BongoCatModelEntry *entry) {
     /* Installed Mver trees keep a stable content digest. Nearby models are
        managed by their source directory, so do not retain stale data. */

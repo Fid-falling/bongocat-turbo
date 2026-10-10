@@ -5,6 +5,14 @@
 #include <SDL3/SDL.h>
 #include <SDL3/SDL_properties.h>
 
+/*
+ * macOS 的窗口外观与开机自启。
+ *
+ * 自动启动用 LaunchAgent(~/Library/LaunchAgents 下的 plist + RunAtLoad), 参数带
+ * --autostart, 让程序知道这次是自启。@autoreleasepool 是必需的: 这个函数可能被非主线程
+ * 调用, 没有池子就会持续泄漏 Objective-C 对象。
+ * 关闭时"文件本来就不存在"也算成功 —— 目标状态已经达成。
+ */
 BongoCatResult bongo_cat_platform_set_autostart(bool enabled,
     BongoCatError *error) {
     @autoreleasepool {
@@ -37,6 +45,11 @@ BongoCatResult bongo_cat_platform_set_autostart(bool enabled,
     }
 }
 
+/* 设置窗口的外观改造: 加上 FullSizeContentView、隐藏标题并把标题栏设成透明, 于是它看起来
+   没有标题栏(与主窗口的无边框风格一致), 但保留关闭/最小化/缩放三个按钮 —— 设置窗口是
+   普通窗口, 用户需要这些按钮。
+   tabbingMode 设为 Disallowed: 否则 macOS 会把多个窗口合并成带标签页的窗口, 设置窗口会
+   被并进主窗口的标签组; movableByWindowBackground 关掉是为了避免拖动内容区时误移窗口。 */
 void bongo_cat_platform_configure_preferences_window(SDL_Window *sdl_window) {
     if (!sdl_window) return;
     NSWindow *window = (__bridge NSWindow *)SDL_GetPointerProperty(

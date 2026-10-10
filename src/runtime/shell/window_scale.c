@@ -1,9 +1,18 @@
+/* 以"窗口中心不动"的方式改缩放: 滚轮缩放与设置页的缩放滑杆都走这里, 保证放大缩小时视觉
+ * 中心 (桌宠站的位置) 不跑。scale 是百分比, 基准状态由调用方给 —— 滚轮手势传的是手势
+ * 开始时的尺寸与缩放快照, 免得连续滚动积累舍入误差。
+ * 有交互快照时同步预览矩形; 非 Windows 平台快照是空实现, 但窗口状态照常维护。
+ */
 #include "runtime.h"
 
+/* 屏幕坐标可以是负数, 所以按符号决定取整偏移 (int 截断朝零, 否则负半像素会偏)。 */
 static int round_position(double value) {
     return (int)(value + (value < 0.0 ? -0.5 : 0.5));
 }
 
+/* 以当前窗口中心为基准改缩放: 用"当前尺寸 + 当前缩放"作基准, 因为 session 里的尺寸就是
+   真实窗口尺寸。返回 false 表示没有变化 (已经在目标值上) 或窗口不可用 —— 不是错误, 调用
+   方不必报错。 */
 bool bongo_cat_window_set_scale(BongoCatApp *app, float scale) {
     if (!app || !app->window) return false;
     int x, y, width, height;
@@ -21,6 +30,10 @@ bool bongo_cat_window_set_scale(BongoCatApp *app, float scale) {
         x + width * 0.5f, y + height * 0.5f);
 }
 
+/* scale 是百分比; base_* 与 base_scale 是基准状态 (通常是手势开始时的快照), center_* 是
+   屏幕坐标的中心点。有交互快照时同步子像素预览矩形, 滚轮缩放的平滑就来自这里。尺寸真的
+   变了才重建表面, 并在返回前补画一帧 —— 否则合成器可能先显示"移动后的旧帧", 看起来是
+   跳动。 */
 bool bongo_cat_window_apply_scale_centered(BongoCatApp *app, float scale,
     int base_width, int base_height, float base_scale,
     float center_x, float center_y) {

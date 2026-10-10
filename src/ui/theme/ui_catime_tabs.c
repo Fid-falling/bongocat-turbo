@@ -1,3 +1,19 @@
+/*
+ * 侧边栏导航标签页。
+ *
+ * 高度是"反推"出来的: 用窗口可用高度先减掉品牌页头, 剩下的平均分给 count 个标签,
+ * 再把单格夹在 [40, 68] 之间; 多出来的空隙 gap 平均分配在每格上下 —— 这就是
+ * top_padding + i * gap 那一串偏移的来历。这样窗口拉高时标签会一起变高 (而不是留
+ * 一大片空白), 但不会高到失去比例。count 必须 > 0, 否则 slot_height 除零。
+ *
+ * 两个必须成对的不变量:
+ *  - hit 是"画出来的 tile 向外扩 10/1 像素"的判定框, 必须和绘制用同一个矩形;
+ *  - 悬停时 tile 上移 hover_weight 像素, 命中框 (hit) 不跟着动 —— 否则鼠标停在
+ *    边缘会出现"一动就脱离悬停"的抖动。
+ *
+ * 动画 id 用 snprintf 拼出 "sidebar-active-N"/"sidebar-hover-N": 状态表按字符串
+ * 查键, 所以 id 必须在两帧之间完全一致 (见 ui_animation.c 的说明)。
+ */
 #include "ui_catime.h"
 #include "ui_animation.h"
 #include "ui_backend.h"
@@ -17,6 +33,9 @@ static void centered(struct nk_command_buffer *canvas,
         nk_rgba(0, 0, 0, 0), color);
 }
 
+/* 标签放不下时按空格折成两行, 挑"两行里较长那行最短"的切点 —— 比按字符数硬切好看,
+   也比缩小字号稳 (字号是全局的)。找不到空格 (纯中文标签) 就退回单行居中, 宁可
+   左右各切一点, 也不要中间突然换行。 */
 static void nav_label(struct nk_command_buffer *canvas, struct nk_rect bounds,
     const char *text, const struct nk_user_font *font, struct nk_color color) {
     int length = nk_strlen(text);

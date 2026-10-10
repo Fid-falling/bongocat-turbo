@@ -1,3 +1,9 @@
+/*
+ * 更新模块的私有头: 只有 update_* 这几个 .c 包含, 不对外导出。
+ * 这里固定两件事: 一是并发模型 —— mutex 保护界面可见的状态字段, http_mutex 保护取消
+ * 标志与在飞的网络句柄; 二是内部接口契约 —— http_fetch 的平台实现写在 update_http.c
+ * (Windows) 与 update_http_unix.c (Unix), 平台策略写在 update_channel.c。
+ */
 #ifndef BONGO_CAT_UPDATE_INTERNAL_H
 #define BONGO_CAT_UPDATE_INTERNAL_H
 
@@ -5,6 +11,8 @@
 #include "bongo_cat/app.h"
 #include <SDL3/SDL.h>
 
+/* 抓取结果: 只有 OK 时 *response 有效; CANCELLED 会让工作线程静默退出且不发事件; 其余
+ * 取值都必须带 error 文案上报。UNSUPPORTED 目前没有任何实现会返回, 是保留值。 */
 typedef enum BongoCatUpdateFetchResult {
     BONGO_CAT_UPDATE_FETCH_OK,
     BONGO_CAT_UPDATE_FETCH_CANCELLED,

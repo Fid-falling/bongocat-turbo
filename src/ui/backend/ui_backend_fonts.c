@@ -1,3 +1,9 @@
+/*
+ * 字号查询的统一入口。为什么要绕一层而不是直接用 ui->xxx_font: 这些函数拿到的
+ * 只有 nk_context, 需要先反查回 backend (context_backend 全局指针, 见
+ * ui_backend.c)。查不到时 (例如宠物窗口那条路径传进来的 context) 一律回退到
+ * Nuklear 的默认字体, 保证任何调用点都不会拿到 NULL。
+ */
 #include "ui_backend.h"
 
 static const BongoCatUIBackend *backend(const struct nk_context *context) {

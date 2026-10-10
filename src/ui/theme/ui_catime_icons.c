@@ -1,3 +1,9 @@
+/*
+ * 没有图标图集时的手绘兜底 (index 与 BongoCatUIIcon 一一对应, 见 ui_icons.h)。
+ * 只用 Nuklear 的描边/填充图元拼形状, 因此不依赖任何纹理, 在任何后端下都能画出来。
+ * 坐标是相对于 bounds 中心算的, 假设调用方给的是接近正方形的框 (调用点都给 20~24px),
+ * 换成极端长宽比会变形。
+ */
 #include "ui_catime.h"
 
 void bongo_cat_ui_fallback_icon(struct nk_command_buffer *canvas,

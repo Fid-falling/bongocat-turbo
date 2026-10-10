@@ -14,6 +14,12 @@
 #include <sys/mman.h>
 #endif
 
+/*
+ * TTF 文件的加载: 用 mmap / CreateFileMapping 把整个文件映射进来, 而不是 read 到堆。
+ * 原因是 Nuklear 的烘焙器只借这段内存 (ttf_blob 指针), 一个中文字体动辄 15-20MB,
+ * 复制一份到堆纯属浪费, 而且映射失败时能干净地回退到"用内置默认字体"。
+ * 失败时 source 保持 {0} (file 可能是 NULL, data 一定为 NULL), 调用方据此判断。
+ */
 bool bongo_cat_ui_font_source_load(UIFontSource *source, const char *path) {
     source->file = bongo_cat_file_open(path, "rb");
     if (!source->file || fseek(source->file, 0, SEEK_END) != 0) return false;
@@ -57,6 +63,12 @@ static struct nk_font_config font_config(float size, const nk_rune *ranges) {
     return config;
 }
 
+/*
+ * 加一份字体。merge=true 是"往已有字体上补字形", 此时 Nuklear 不新建 nk_font, 而是
+ * 把 config 挂到 atlas->fonts 那条循环链表上, 并且返回的是函数里初值为 0 的局部
+ * 变量 —— 也就是 NULL。所以这里必须自己返回 atlas->fonts, 否则调用方会以为失败。
+ * font_num 用来判断这次 add 到底成没成功 (Nuklear 失败时不增加计数)。
+ */
 static struct nk_font *add_font(struct nk_font_atlas *atlas,
     const UIFontSource *source, float size, const nk_rune *ranges, bool merge) {
     struct nk_font_config config = font_config(size, ranges);
@@ -84,6 +96,11 @@ void bongo_cat_ui_font_detach_source(struct nk_font_atlas *atlas,
     }
 }
 
+/* Nuklear 的 merge 一律挂到 atlas->fonts (链表头那个字体) 上, 而新建的字体是追加到
+   链表尾的 —— 于是"第二个家族做主字体"时, 它的 CJK 回退会被 merge 进第一个家族里,
+   结果是正文字体莫名其妙多了一堆字形、而标题字体缺字。
+   所以每建完一个家族的主字体就把它挪到表头, 让接下来的 merge 落到自己身上。
+   (nk_font_find_glyph 按 config 链表的顺序找字形, 主字体在前也保证了它优先命中。) */
 static void font_to_front(struct nk_font_atlas *atlas, struct nk_font *font) {
     if (!atlas || !font || atlas->fonts == font) return;
     struct nk_font *previous = atlas->fonts;

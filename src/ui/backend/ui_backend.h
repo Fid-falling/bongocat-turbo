@@ -1,3 +1,14 @@
+/*
+ * 设置界面的渲染后端。一个 BongoCatUIBackend 对应一个 SDL 窗口 + 一个 Nuklear
+ * 上下文, 并且可能是两套完全不同的实现:
+ *  - GL 路径 (vk == NULL): 自己建 program/vao/vbo/ebo, 纹理就是 GL 纹理名;
+ *  - Vulkan 路径 (vk != NULL): 顶点与绘制命令交给 vk_backend, 纹理登记进
+ *    vk_textures 表, Nuklear 拿到的 id 是表下标 + 1。
+ * 两条路径共享同一套上层绘制代码, 所以下面每个字段都要问一句"另一条路径怎么办"。
+ *
+ * 生命周期: init() 失败会自己清理干净 (不会留下半个 backend); 拆的时候按上下文
+ * 是否还有效区分 destroy() 与 abandon()。
+ */
 #ifndef BONGO_CAT_UI_BACKEND_H
 #define BONGO_CAT_UI_BACKEND_H
 
@@ -29,6 +40,7 @@ typedef struct BongoCatUIBackend {
     /* 非空表示这个界面由 Vulkan 渲染 (设置窗口的独立上下文) */
     BongoCatVk *vk;
     BongoCatVkTexture *vk_textures[BONGO_CAT_UI_VK_TEXTURES];
+    /* 两套缩放, 别混用: layout 用于逻辑布局与输入坐标换算, raster 用于字体/图形烘焙 */
     float layout_scale;
     float raster_scale;
     BongoCatGL gl;
@@ -46,6 +58,7 @@ typedef struct BongoCatUIBackend {
     GLuint resize_cache_texture;
     int resize_cache_width;
     int resize_cache_height;
+    /* 实时缩放快路径的计数: 前者说明它确实生效, 后者说明这台机器上不可用 (自动退化) */
     unsigned resize_cache_presentations;
     unsigned resize_cache_failures;
     int font_atlas_width;
@@ -62,6 +75,7 @@ typedef struct BongoCatUIBackend {
     void *elements;
     size_t vertex_capacity;
     size_t element_capacity;
+    /* 上一帧的转换结果, 只在诊断与 frame_valid() 里读, 不参与渲染决策 */
     size_t last_vertex_bytes;
     size_t last_element_bytes;
     uint64_t paint_frame_marker;
@@ -79,7 +93,9 @@ typedef struct BongoCatUIBackend {
     bool font_path_found;
     bool font_file_loaded;
     bool dark_theme;
+    /* 实时缩放中: 为省时间跳过发光/阴影这类模糊效果 (见 ui_catime.c 的 shell_draw) */
     bool live_resize_fast;
+    /* 正在构建某一帧。字体图集重建会检查它, 避免换掉本帧命令里已经引用的纹理 */
     bool frame_building;
     bool double_click_down;
     SDL_Cursor *default_cursor;

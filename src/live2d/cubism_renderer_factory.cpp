@@ -16,6 +16,9 @@
 
 namespace bongo_cat {
 namespace {
+/* 进程级的后端开关。默认 false (OpenGL): 即使 Vulkan 路径还没接通, 行为也和以前完全一样。
+ * 由 cubism_vulkan_bridge.cpp 的 remember() 在窗口创建时打开 —— 那时还没有任何模型, 所以
+ * 不存在"建到一半切后端"的竞态。 */
 bool g_use_vulkan = false;
 }
 
@@ -41,6 +44,8 @@ CubismRenderer *CubismRenderer::Create(csmUint32 width, csmUint32 height) {
     return CSM_NEW CubismRenderer_OpenGLES2(width, height);
 }
 
+/* StaticRelease 必须把两个后端都放掉: 编译期两个后端的静态资源都可能被建过
+ * (例如先跑 GL 再切 Vulkan), 只释放当前那个会留下进程退出时的泄漏报告。 */
 void CubismRenderer::StaticRelease() {
     CubismRenderer_OpenGLES2::DoStaticRelease();
 #ifdef BONGO_CAT_HAS_VULKAN

@@ -7,6 +7,13 @@
 #include <string.h>
 #include <yyjson.h>
 
+/*
+ * 模型动作目录: 把模型清单里的 Motions / Expressions 和适配器元数据里的声音、
+ * 特效绑定拍平成一张可枚举的列表, 供设置界面显示, 也供快捷键绑定。
+ *
+ * 契约: id 的格式 "<模型id>:<类型>:..." 必须保持稳定 —— 用户配置里保存的就是它
+ * (behaviorOverrides 的 behaviorId), 改了格式等于把所有人的绑定清空。
+ */
 static bool add_behavior(BongoCatBehaviorCatalog *catalog, const BongoCatModelEntry *model,
     BongoCatBehaviorKind kind, const char *group, int index, const char *label,
     const char *asset, const char *asset_root) {
@@ -36,6 +43,8 @@ static bool add_behavior(BongoCatBehaviorCatalog *catalog, const BongoCatModelEn
     return true;
 }
 
+/* Motions 是"分组名 -> 动作数组"的对象。清单里没有人类可读的名字, 标签只能由
+   "组名 + 序号"拼出来, 所以序号从 1 开始, 与设置界面上看到的一致。 */
 static bool read_motions(BongoCatBehaviorCatalog *catalog, const BongoCatModelEntry *model,
     yyjson_val *motions) {
     if (!yyjson_is_obj(motions)) return true;
@@ -56,6 +65,8 @@ static bool read_motions(BongoCatBehaviorCatalog *catalog, const BongoCatModelEn
     return true;
 }
 
+/* 表达式数组。Name 缺失时用固定的 "Expression" 兜底, 保证每个条目都有可显示
+   的名字(界面不接受空标签)。 */
 static bool read_expressions(BongoCatBehaviorCatalog *catalog,
     const BongoCatModelEntry *model, yyjson_val *expressions) {
     if (!yyjson_is_arr(expressions)) return true;
@@ -70,6 +81,13 @@ static bool read_expressions(BongoCatBehaviorCatalog *catalog,
     return true;
 }
 
+/*
+ * 读适配器元数据里的 bindings 数组 —— 这是本项目自己加的扩展, 原版模型没有这个
+ * 文件, 所以读不到就直接返回成功: 只靠 Motions / Expressions 也能用。
+ * kind 决定条目性质: sound / effect 各带一个资源文件, 而 sound-clear /
+ * effect-clear 是"停止播放"用的条目。两者共用同一个序号计数器, 因此序号里会
+ * 留下空位 —— 这是刻意的, 序号一旦发布给用户就不能再变。
+ */
 static bool read_adapter_assets(BongoCatBehaviorCatalog *catalog,
     const BongoCatModelEntry *model) {
     char path[BONGO_CAT_PATH_CAP];
@@ -120,6 +138,8 @@ static bool read_adapter_assets(BongoCatBehaviorCatalog *catalog,
     return ok;
 }
 
+/* 每次加载先整体清零: 动作目录与模型强绑定, 不允许跨模型累积。setting_file 是
+   相对 directory 的路径(见 model_catalog.c 的 add_model)。 */
 BongoCatResult bongo_cat_behaviors_load(BongoCatBehaviorCatalog *catalog,
     const BongoCatModelEntry *model, BongoCatError *error) {
     if (!catalog || !model) return BONGO_CAT_ERROR_ARGUMENT;

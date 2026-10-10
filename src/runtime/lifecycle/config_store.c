@@ -1,3 +1,15 @@
+/*
+ * 配置持久化 (settings.json / session.json) 的"脏了也不立刻写"策略。
+ *
+ * 为什么用内容哈希而不是 dirty 标记: 拖窗口/滚轮缩放会高频改 session, 直接落盘会把
+ * IO 打满; 哈希还天然处理了"改回原值"的情况 —— 值没变就什么都不做。观察到变化后从
+ * 那一刻起延迟 300ms 写, 期间继续变就顺延; 写失败 1s 后重试。
+ *
+ * 两个 blocked 开关: 配置文件解析失败时先改名成 *.rejected[.N] 保留证据, 再当默认值
+ * 用; 如果连改名都失败 (权限/被占用), 就置 blocked —— 绝不用默认值覆盖用户文件。
+ *
+ * 副宠进程不写 settings (只写自己的 session); SMOKE 运行完全不落盘, 保证 CI 可复现。
+ */
 #include "runtime.h"
 #include "bongo_cat/path.h"
 
@@ -7,6 +19,8 @@
 #define SAVE_DELAY_NS 300000000ull
 #define RETRY_DELAY_NS 1000000000ull
 
+/* FNV-1a, 只用来判断"内容是否变化", 不是安全用途。逐字段哈希结构体 (含 padding),
+   所以结构体成员增删都会改变哈希 —— 这正是想要的。 */
 static uint64_t hash_bytes(uint64_t hash, const void *data, size_t size) {
     const unsigned char *bytes = data;
     for (size_t i = 0; i < size; ++i) {
@@ -78,6 +92,8 @@ static uint64_t session_hash(const BongoCatSessionState *session) {
     return hash;
 }
 
+/* 从 path.rejected 开始往后找一个没被占用的名字 (最多 1000 个), 用改名而不是删除:
+   用户的数据不能因为一次解析失败就消失。 */
 static bool reject_configuration(const char *path, char *rejected,
     size_t capacity) {
     for (unsigned index = 0; index < 1000; ++index) {
@@ -91,6 +107,8 @@ static bool reject_configuration(const char *path, char *rejected,
     return false;
 }
 
+/* 只有"格式错误 + 文件确实存在"才走保留路径; 其它错误 (IO/权限) 把文件留在原地并置
+   blocked, 免得之后用默认值把它覆盖掉。 */
 static void handle_rejected_configuration(const char *description,
     const char *path, BongoCatResult result, bool *blocked) {
     if (result != BONGO_CAT_ERROR_FORMAT || !bongo_cat_path_is_file(path)) {
@@ -109,6 +127,9 @@ static void handle_rejected_configuration(const char *description,
         description, path);
 }
 
+/* 读两份配置。settings 与 session 各自的 valid/blocked 结果决定后面还写不写盘。
+   语言只在"没有有效 settings"时才按系统区域猜一次: 用户显式选过的语言必须优先于系统
+   区域, 否则换个系统语言就会把用户的选择冲掉。 */
 void bongo_cat_config_store_load(BongoCatApp *app) {
     app->settings_store_valid = false;
     app->session_store_valid = false;
@@ -147,6 +168,8 @@ void bongo_cat_config_store_load(BongoCatApp *app) {
         handle_rejected_configuration("Session", app->session_path,
             loaded, &app->session_store_blocked);
     }
+    /* 没有可用配置时把 saved_hash 取反: 主循环第一轮就会认为"与磁盘不一致", 于是把
+       默认设置写出来, 下一次启动就有文件可读了。 */
     uint64_t settings = settings_hash(&app->settings);
     uint64_t session = session_hash(&app->session);
     app->settings_observed_hash = settings;
@@ -157,6 +180,8 @@ void bongo_cat_config_store_load(BongoCatApp *app) {
         app->session_store_blocked ? session : ~session;
 }
 
+/* 保存前必过 validate: 内存里的值可能被外部 JSON / 命令行塞进越界内容。写成功后同步
+   三个哈希 (saved / observed / store_valid)。 */
 static bool save_settings(BongoCatApp *app) {
     bongo_cat_settings_validate(&app->settings);
     uint64_t hash = settings_hash(&app->settings);
@@ -187,6 +212,8 @@ static bool save_session(BongoCatApp *app) {
     return true;
 }
 
+/* 主循环末尾每轮调用。注意副宠只允许写 session —— 两个进程同时写 settings.json 会
+   互相覆盖。 */
 void bongo_cat_config_store_update(BongoCatApp *app, uint64_t now) {
     if (!app || app->smoke || !app->settings_path[0] || !app->session_path[0]) return;
     uint64_t settings = settings_hash(&app->settings);
@@ -218,6 +245,8 @@ void bongo_cat_config_store_update(BongoCatApp *app, uint64_t now) {
             ? 0 : now + RETRY_DELAY_NS;
 }
 
+/* 关闭路径上的最后一次写: 不看延迟, 直接把"与磁盘不一致"的都写掉并让哈希对齐, 免得
+   退出前又排出一个 pending 保存。 */
 void bongo_cat_config_store_flush(BongoCatApp *app) {
     if (!app || app->smoke || !app->settings_path[0] || !app->session_path[0]) return;
     uint64_t settings = settings_hash(&app->settings);

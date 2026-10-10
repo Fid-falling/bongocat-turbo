@@ -41,6 +41,11 @@ public:
     }
 };
 
+/*
+ * 框架是进程级单例 (全局分配器 + Id 管理器), 但运行时对象可以有多个。所以用引用计数:
+ * 第一个 create 时 StartUp, 最后一个 destroy 时才 CleanUp —— 中间任何时候提前收摊都会把
+ * 还活着的模型一起带走。resource_root 是进程级的一份: 它只用来兜底找相对路径的资源。
+ */
 Allocator allocator;
 CubismFramework::Option framework_option;
 std::string resource_root;
@@ -50,6 +55,9 @@ void log_message(const char *message) {
     if (message) std::fprintf(stderr, "[Cubism] %s\n", message);
 }
 
+/* 资源查找顺序: 当前工作目录 -> exe 目录 -> 内嵌资源根目录。SDK 传进来的都是相对路径,
+ * 而进程的工作目录被 attach() 切到过着色器目录 (见 cubism_vulkan_bridge.cpp), 所以前两者
+ * 都可能命中; 最后一个兜底"用户只复制了一个 exe"的发布形态。 */
 Csm::csmByte *load_file(const std::string path, Csm::csmSizeInt *size) {
     if (size) *size = 0;
     FILE *file = bongo_cat_file_open(path.c_str(), "rb");
@@ -121,6 +129,8 @@ bool start_framework(BongoCatError *error) {
     return true;
 }
 
+/* 只有最后一个运行时对象销毁时才真正收摊: Dispose/CleanUp 会释放 Id 管理器与全局分配器
+ * 的内部状态, 提前做会让仍然活着的模型下一次分配就崩。 */
 void stop_framework() {
     if (--runtime_count > 0) return;
     CubismFramework::Dispose();
@@ -147,6 +157,8 @@ extern "C" BongoCatLive2D *bongo_cat_live2d_create(const char *asset_root,
     return create_runtime(asset_root, error);
 }
 
+/* 释放顺序不能动: 退休队列 -> 当前模型 -> 运行时对象 -> 停框架。模型必须在框架还活着的
+ * 时候删 —— 它们析构时会调 SDK 的分配器和 GL 释放路径, 先 CleanUp 就是 use-after-free。 */
 extern "C" void bongo_cat_live2d_destroy(BongoCatLive2D *runtime) {
     if (!runtime) return;
     if (runtime->retired_count) SDL_Log("[runtime] Live2D resource handoff: "
@@ -180,6 +192,8 @@ extern "C" bool bongo_cat_live2d_viewport(const BongoCatLive2D *runtime,
         runtime->model->viewport(x, y, width, height);
 }
 
+/* resize 会把新尺寸推给 SDK 的重绘目标, reshape 只更新画布与视口; 两者都先把尺寸记在运行时
+ * 对象上, 因为加载新模型时要按这个尺寸 reshape (见 cubism_bridge_load.cpp)。 */
 extern "C" void bongo_cat_live2d_resize(BongoCatLive2D *runtime, int width, int height) {
     if (!runtime) return;
     if (width > 0 && height > 0) {
@@ -196,6 +210,8 @@ extern "C" void bongo_cat_live2d_reshape(BongoCatLive2D *runtime, int width, int
     }
     if (runtime->model) runtime->model->reshape(width, height);
 }
+/* 返回值是脏标记。特别注意 retired_count > 0 时也必须报"有变化": 退休队列要靠 draw() 推进,
+ * 如果新模型是静态的、上层据此跳过重绘, 旧模型的贴图就永远释放不掉。 */
 extern "C" bool bongo_cat_live2d_update(BongoCatLive2D *runtime, float elapsed) {
     if (!runtime) return false;
     bool changed = runtime->model && runtime->model->update(elapsed);

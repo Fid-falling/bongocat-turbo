@@ -1,3 +1,13 @@
+/*
+ * 开关 (toggle) 与"OBS 纯色背景"复合控件。
+ *
+ * 命中区比视觉上的开关大: effect_margin 18px 是往**左**扩的, 这样用户点标题右边
+ * 那片空白也能切换 —— 44px 宽的开关本体在高 DPI 下很难点准。
+ * 开关的滑块位置直接由补间值 progress 驱动 (不是布尔量), 所以开关是平滑滑过去的;
+ * 悬停时整块会放大 5%, 但命中区用的是放大前的 interaction, 避免边缘抖动。
+ *
+ * id 会拼进动画 key (toggle-hover-<id>), 所以每个开关必须有唯一 id。
+ */
 #include "preferences_controls.h"
 #include "ui_animation.h"
 #include "ui_backend.h"
@@ -7,6 +17,7 @@
 
 #include <stdio.h>
 
+/* 开关本体。cell 是表单行给的整个右列, 开关右对齐到列尾 (再留 18px 让命中区外扩) */
 static bool toggle_at(struct nk_context *context, const char *id,
     bool *value, struct nk_rect cell) {
     const float effect_margin = 18.0f;
@@ -60,6 +71,10 @@ bool bongo_cat_pref_control_toggle(struct nk_context *context,
     return toggle_at(context, id, value, cell);
 }
 
+/*
+ * OBS 背景色色板: 每个色块选中时放大 6px (动画驱动), 色块本体 14px, 都画在 24px 的
+ * 命中格子里 —— 格子不变、只有圆变大, 所以点击位置不会随选中状态跳。
+ */
 static bool draw_swatches(struct nk_context *context, const char *id,
     struct nk_rect cell, BongoCatObsBackgroundColor *selected) {
     const float slot = 25.0f, switch_width = 64.0f;
@@ -100,6 +115,10 @@ static bool draw_swatches(struct nk_context *context, const char *id,
     return changed;
 }
 
+/*
+ * 色板只在开关打开时才画、才响应点击: 关掉时 `*enabled && ...` 短路掉整个色板,
+ * 所以关掉状态下点同一个位置只会切换开关本身, 不会顺手改颜色。
+ */
 bool bongo_cat_pref_control_obs_background(struct nk_context *context,
     const char *id, bool *enabled, BongoCatObsBackgroundColor *color) {
     struct nk_rect cell;

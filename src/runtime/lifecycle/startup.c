@@ -1,3 +1,17 @@
+/*
+ * 启动的可观测性: 日志输出、启动阶段标记、启动失败记录。
+ *
+ * 阶段标记 (state_root/startup-stage.txt) 是崩溃诊断的核心: 每个阶段进入时写一次
+ * (先写 .tmp 再原子替换), 跑到 running 就删掉。下次启动如果发现文件还在, 说明上次
+ * 是在那个阶段挂的 —— begin_log() 会把它读出来并 WARN。因此**新增启动步骤时一定要
+ * 补一个 bongo_cat_startup_stage()**, 否则崩溃现场就断在这后面了。
+ *
+ * runtime-state.txt 记的是"最后到达的阶段", 正常退出写 clean-shutdown, 用来区分
+ * 崩溃 / 被强杀 / 挂起。
+ *
+ * 日志是进程内单例 (log_mutex + runtime_log_path 都是文件级静态变量): 主进程负责清空
+ * 本次 session 日志, 副宠只追加 —— 否则副宠启动会把主进程已经写下的诊断擦掉。
+ */
 #include "runtime.h"
 #include "runtime_state.h"
 #include "bongo_cat/file.h"
@@ -32,6 +46,8 @@ static const char *priority_name(SDL_LogPriority priority) {
     }
 }
 
+/* 自己拼一行日志: 时间戳/来源/分类/级别 + 去掉换行的正文, 一次 append 写完。前缀长度
+   先用 snprintf(NULL, 0) 预算, 因此正文里带换行也不会把日志撕裂成多行。 */
 static void append_log(const char *path, const char *timestamp,
     int category, SDL_LogPriority priority, const char *message) {
     if (!path || !path[0]) return;
@@ -55,6 +71,8 @@ static void append_log(const char *path, const char *timestamp,
     free(line);
 }
 
+/* 挂到 SDL 的日志钩子上: 先过 bongo_cat_log_enabled 的过滤 (避免重复落盘), 再上锁 ——
+   日志可能来自音频/网络线程。 */
 static void SDLCALL log_output(void *userdata, int category,
     SDL_LogPriority priority, const char *message) {
     (void)userdata;
@@ -68,6 +86,8 @@ static void SDLCALL log_output(void *userdata, int category,
     if (log_mutex) SDL_UnlockMutex(log_mutex);
 }
 
+/* 正常退出的收尾: 补一条"关闭完成"日志 (之后 log_mutex 会被销毁), 再把 runtime-state
+   清掉。所以它必须发生在 bongo_cat_runtime_log_stop() 之前。 */
 void bongo_cat_runtime_clean_shutdown(BongoCatApp *app, int exit_code) {
     char timestamp[64], message[80];
     bongo_cat_runtime_timestamp(timestamp, sizeof(timestamp));
@@ -82,6 +102,7 @@ void bongo_cat_runtime_clean_shutdown(BongoCatApp *app, int exit_code) {
     bongo_cat_runtime_state_clean(app, timestamp);
 }
 
+/* 先摘指针再销毁: 免得别的线程在销毁过程中继续往钩子里写。 */
 void bongo_cat_runtime_log_stop(void) {
     if (!log_mutex) return;
     SDL_Mutex *mutex = log_mutex;
@@ -99,6 +120,9 @@ static void set_log_source(const BongoCatApp *app) {
             log_source[i] = ' ';
 }
 
+/* 日志机制自己必须能容错, 顺序也不能乱: 先读上一次的 runtime-state 与 startup-stage
+   (要在覆盖它们之前读), 再 (仅主进程) 清空日志文件, 然后装钩子、压默认日志级别
+   (只给 lifecycle/update/input 开 INFO), 最后把上次没走完的阶段/异常退出 WARN 出来。 */
 static void begin_log(BongoCatApp *app) {
     char stage_path[BONGO_CAT_PATH_CAP];
     char stage_temporary[BONGO_CAT_PATH_CAP];
@@ -151,6 +175,8 @@ static void begin_log(BongoCatApp *app) {
             unexpected);
 }
 
+/* 参数 -> 存储路径 -> 日志, 顺序不能反: 日志路径来自 log_root, 而 log_root 可能被
+   --storage-root= 改掉。 */
 bool bongo_cat_startup_prepare(BongoCatApp *app, int argc, char **argv,
     BongoCatError *error) {
     if (!bongo_cat_startup_arguments(app, argc, argv, error) ||
@@ -158,6 +184,7 @@ bool bongo_cat_startup_prepare(BongoCatApp *app, int argc, char **argv,
     begin_log(app); bongo_cat_startup_stage(app, "paths-ready"); return true;
 }
 
+/* 写阶段标记。写失败只降级不影响启动 —— 它纯粹是诊断设施。 */
 void bongo_cat_startup_stage(BongoCatApp *app, const char *stage) {
     if (!app || !app->state_root[0] || !stage) return;
     char path[BONGO_CAT_PATH_CAP], temporary[BONGO_CAT_PATH_CAP];
@@ -176,6 +203,8 @@ void bongo_cat_startup_stage(BongoCatApp *app, const char *stage) {
     SDL_LogInfo(BONGO_CAT_LOG_LIFECYCLE, "[runtime] Startup stage: %s", stage);
 }
 
+/* 幂等。主循环在第一次成功呈现后调用它: 也就是说"启动完成"的定义是"第一帧真的端出去
+   了", 而不是"初始化返回了 true"。 */
 void bongo_cat_startup_ready(BongoCatApp *app) {
     if (!app || startup_is_ready) return;
     startup_is_ready = true;
@@ -188,12 +217,15 @@ void bongo_cat_startup_ready(BongoCatApp *app) {
     SDL_LogInfo(BONGO_CAT_LOG_LIFECYCLE, "[runtime] Startup ready");
 }
 
+/* 启动失败: 留下 failed 阶段 (下次启动能看到上次是失败退出的), 然后打日志。 */
 void bongo_cat_startup_failure(BongoCatApp *app, const BongoCatError *error) {
     const char *message = error && error->message[0] ? error->message : "Initialization failed";
     if (app) bongo_cat_startup_stage(app, "failed");
     SDL_LogError(SDL_LOG_CATEGORY_APPLICATION, "Startup failed: %s", message);
 }
 
+/* CI 失败会置 exit_code=1, 但**不**中断启动: 让进程照常跑到 smoke deadline, 好把剩下
+   的诊断全部写完。 */
 void bongo_cat_startup_ci_failure(BongoCatApp *app,
     const BongoCatError *error) {
     if (!app) return;

@@ -1,3 +1,13 @@
+/*
+ * 帧节奏与事件等待超时。两个概念要分清:
+ *   - frame_interval_ns(): 模型动画的推进间隔, 由设置里的"最大帧率"决定
+ *     (无限 -> 0, 表示每轮循环都该出新帧);
+ *   - bongo_cat_window_wait_timeout(): 这次 SDL_WaitEventTimeout 最多睡多久 —— 取所有
+ *     "必须在那之前醒来"的 deadline 的最小值 (帧预算、滚轮/悬停动画、命中检测、设置
+ *     窗口、快照、点击穿透), 250ms 兜底。
+ * 这里的任何改动都直接影响 CPU 占用与手感: 睡短了空转, 睡长了掉帧/卡交互。
+ * 没编译 Cubism 时 (诊断后端) 没有真实动画, 固定 10 FPS 推进, 好让冒烟结果可复现。
+ */
 #include "runtime.h"
 #include "window_wheel_internal.h"
 #include "bongo_cat/preferences.h"
@@ -65,6 +75,8 @@ void bongo_cat_app_apply_frame_pacing(BongoCatApp *app) {
     SDL_Log("[runtime] 垂直同步已%s (最大帧率=%d)", vsync ? "开启" : "关闭", fps);
 }
 
+/* 只算"睡多久", 不改任何状态: 每个分支都是"取更小的等待", 所以新增唤醒源时注意别
+   写成覆盖 (那样会把帧预算吃掉)。 */
 int bongo_cat_window_wait_timeout(const BongoCatApp *app, uint64_t now) {
     if (!app) return 250;
     uint64_t frame_deadline = app->last_frame_ns + frame_interval_ns(app);
@@ -92,6 +104,8 @@ int bongo_cat_window_wait_timeout(const BongoCatApp *app, uint64_t now) {
     return hit_wait < wait_ms ? hit_wait : wait_ms;
 }
 
+/* SDL_WaitEventTimeout 在部分平台上会提前返回 (窗口消息等), 这里循环等到真正的
+   deadline; 返回 false 表示超时, 调用方据此走"没有事件也要更新"的路径。 */
 bool bongo_cat_wait_event(SDL_Event *event, int timeout_ms) {
     if (!event) return false;
     if (timeout_ms <= 0) return SDL_PollEvent(event);
@@ -106,6 +120,8 @@ bool bongo_cat_wait_event(SDL_Event *event, int timeout_ms) {
     }
 }
 
+/* --ci-menu 用的自测: 用 calloc 造一个假 app 直接验算各条 deadline, 不需要真实窗口。
+   改动上面的等待策略时要同步改这里, 否则 CI 会先挂。 */
 bool bongo_cat_window_wait_timeout_self_test(void) {
     const uint64_t now = 1000000000ull;
     BongoCatApp *app = calloc(1, sizeof(*app));

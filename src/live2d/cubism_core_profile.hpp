@@ -12,6 +12,8 @@ struct CoreProfileBuffers {
     CoreProfileBuffers(const CoreProfileBuffers &) = delete;
     CoreProfileBuffers &operator=(const CoreProfileBuffers &) = delete;
 
+    /* 释放句柄并清零, 让对象回到"可以再次创建"的状态。析构刻意不做这件事: 释放必须在还
+     * 有 GL 上下文的时候显式调用 (见 NativeModel::release_renderer 的调用点)。 */
     void release() {
         glDeleteVertexArrays(1, &vao);
         glDeleteBuffers(3, buffers);
@@ -20,6 +22,12 @@ struct CoreProfileBuffers {
     }
 };
 
+/*
+ * macOS 的 GL 3.3 core profile 没有默认 VAO, 而 SDK 的顶点回调是静态函数, 拿不到"当前
+ * 正在画哪个模型"。所以这里用一条 thread_local 的绑定链把当前模型的缓冲记下来: 绑定对象
+ * 构造/析构成对出现 (RAII), 回调通过 attribute()/draw() 从 active_ 取缓冲, 并在析构时把
+ * 调用前的 VAO / ARRAY_BUFFER 绑定恢复原状, 不给其它模块留状态。
+ */
 // SDK callbacks use the buffers of the model currently being drawn.
 class CoreProfileBinding {
 public:

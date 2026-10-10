@@ -1,8 +1,17 @@
+/* 多显示器几何: 判断窗口是否落在显示器"可用区域"的并集内, 越界时夹回或恢复。
+ * 位置语义: 全部是屏幕坐标下的逻辑像素 (与 SDL_GetWindowPosition 一致), 不是渲染
+ * 用的像素尺寸; keep_in_screen 只夹位置, 不改窗口尺寸。
+ * 调用时序: 拖动/滚轮中随时可以调 clamp_to_display; 显示器热插拔与分辨率变化先由
+ * display_event 记下, 再经 update_display_recovery 落地。
+ * 易改错: DISPLAY_RECT_CAP 是栈数组的容量约定, 枚举结果超出就放弃判断 —— 宁愿不动。
+ */
 #include "runtime.h"
 
 #define DISPLAY_RECOVERY_DELAY_NS 750000000ull
 #define DISPLAY_RECT_CAP 32
 
+/* 取窗口当前的位置与逻辑尺寸; 任一 SDL 调用失败或尺寸非正都返回 false, 调用方据此
+   跳过后续几何处理 (窗口还没建好, 或正在被销毁)。 */
 static bool window_rect(BongoCatApp *app, SDL_Rect *rect) {
     return app && app->window && rect &&
         SDL_GetWindowPosition(app->window, &rect->x, &rect->y) &&
@@ -18,6 +27,8 @@ static bool intersects_bounds(const SDL_Rect *window,
     return false;
 }
 
+/* 窗口是否与任一显示器相交。*known 区分"确实都不相交"与"枚举不到显示器": 后者调用方
+   不能动窗口 —— 在没有输出的环境里没有可夹取的边界。列表由 SDL 分配, 这里负责 free。 */
 static bool intersects_available_display(const SDL_Rect *window, bool *known) {
     int count = 0;
     SDL_DisplayID *displays = SDL_GetDisplays(&count);
@@ -32,6 +43,8 @@ static bool intersects_available_display(const SDL_Rect *window, bool *known) {
     return intersects;
 }
 
+/* 纯计算, 不碰窗口: 把位置夹进一个显示器的 bounds。SDL_max 保证下界不超过上界, 窗口比
+   显示器还大时结果会退化到 bounds 的左上角 (这种尺寸本来也放不进去)。 */
 static SDL_Point fitted_position(const SDL_Rect *window,
     const SDL_Rect *bounds) {
     int max_x = SDL_max(bounds->x, bounds->x + bounds->w - window->w);
@@ -72,6 +85,9 @@ static void sort_clips(SDL_Rect *values, int count) {
     }
 }
 
+/* 窗口矩形是否被若干显示器矩形的并集完整覆盖 (允许跨显示器拼接与负坐标)。做法是按所有
+   左右边界切竖条, 每条内按 y 贪心累加覆盖高度, 有一条没盖满就返回 false。边最多 66 个,
+   所以排序用插入排序; count 超上限或参数非法同样返回 false。 */
 static bool bounds_cover_window(const SDL_Rect *window,
     const SDL_Rect *bounds, int count) {
     if (!window || !bounds || window->w <= 0 || window->h <= 0 ||
@@ -106,6 +122,8 @@ static bool bounds_cover_window(const SDL_Rect *window,
     return true;
 }
 
+/* 收集显示器边界到调用方给的定长数组: 优先"可用区域" (扣掉任务栏/dock), 失败才退回
+   整块显示器。返回写入的条数, 0 表示枚举失败或超出数组容量。 */
 static int available_bounds(SDL_Rect bounds[DISPLAY_RECT_CAP]) {
     int count = 0;
     SDL_DisplayID *displays = SDL_GetDisplays(&count);
@@ -120,6 +138,8 @@ static int available_bounds(SDL_Rect bounds[DISPLAY_RECT_CAP]) {
     return found;
 }
 
+/* 拖动中优先用拖动开始时缓存的显示器布局: 每次移动都重新枚举既慢, 又可能读到正在变化
+   的布局; 没有缓存时现查。 */
 static bool available_displays_cover(BongoCatApp *app,
     const SDL_Rect *window) {
     if (app && app->window_drag_active && app->drag_display_bounds &&
@@ -131,6 +151,8 @@ static bool available_displays_cover(BongoCatApp *app,
     return bounds_cover_window(window, bounds, count);
 }
 
+/* 刷新缓存: 先释放旧块, 分配失败就保持"没有缓存"状态 (由 available_displays_cover
+   退回现查)。所有权归 app, 由 bongo_cat_window_drag_bounds_clear 释放。 */
 void bongo_cat_window_drag_bounds_refresh(BongoCatApp *app) {
     if (!app) return;
     bongo_cat_window_drag_bounds_clear(app);
@@ -149,6 +171,8 @@ void bongo_cat_window_drag_bounds_clear(BongoCatApp *app) {
     app->drag_display_count = 0;
 }
 
+/* 拖动/缩放时以指针所在显示器为准 (窗口还停在旧显示器上); 其余情况按窗口、再按矩形、
+   最后落到主显示器逐级回退。 */
 static SDL_DisplayID target_display(BongoCatApp *app, const SDL_Rect *rect) {
     if (app->window_drag_active || app->resize_gesture) {
         float pointer_x = 0.0f, pointer_y = 0.0f;
@@ -162,6 +186,8 @@ static SDL_DisplayID target_display(BongoCatApp *app, const SDL_Rect *rect) {
     return display ? display : SDL_GetPrimaryDisplay();
 }
 
+/* 把窗口夹进指定显示器。返回 false 有两种含义: 位置本来就合法 (没动窗口), 或者平台
+   拒绝移动 —— 调用方两种都只需当成"无需再处理"。 */
 static bool fit_to_display(BongoCatApp *app, SDL_DisplayID display,
     const SDL_Rect *window) {
     SDL_Rect bounds;
@@ -177,6 +203,8 @@ static bool fit_to_display(BongoCatApp *app, SDL_DisplayID display,
     return true;
 }
 
+/* keep_in_screen 打开时的入口: 已经被显示器并集覆盖就什么都不做, 免得拖动过程中每个
+   鼠标事件都下发一次 SetWindowPos。 */
 void bongo_cat_window_clamp_to_display(BongoCatApp *app) {
     SDL_Rect rect;
     if (!app || !app->settings.window.keep_in_screen || !window_rect(app, &rect)) return;
@@ -184,6 +212,8 @@ void bongo_cat_window_clamp_to_display(BongoCatApp *app) {
     fit_to_display(app, target_display(app, &rect), &rect);
 }
 
+/* 拖动落点, 入参是屏幕逻辑坐标: 越界时按目标显示器夹取, 坐标没变就直接返回 (拖动中
+   大量重复事件)。有交互快照时同步预览几何, rect 为 NULL 表示跟随原生窗口矩形。 */
 void bongo_cat_window_drag_to(BongoCatApp *app, int x, int y) {
     int width = 0, height = 0, current_x = 0, current_y = 0;
     if (!app || !app->window || !SDL_GetWindowSize(app->window, &width, &height) ||
@@ -208,6 +238,8 @@ void bongo_cat_window_drag_to(BongoCatApp *app, int x, int y) {
     }
 }
 
+/* keep_in_screen 关闭时的补救: 只在窗口与所有显示器都不相交时才拉回, 部分越界是允许的
+   (桌宠可以骑在屏幕边缘上); 枚举不到显示器时不动窗口。 */
 bool bongo_cat_window_recover_to_display(BongoCatApp *app) {
     SDL_Rect rect;
     if (!window_rect(app, &rect)) return false;
@@ -218,6 +250,8 @@ bool bongo_cat_window_recover_to_display(BongoCatApp *app) {
     return fit_to_display(app, display, &rect);
 }
 
+/* 显示器事件 (热插拔/分辨率/DPI): 先结束交互快照, 重置指针追踪, 再把恢复排到 750ms
+   之后 —— 系统切换显示模式时会连发多个事件, 立刻处理会反复移动窗口。 */
 void bongo_cat_window_display_event(BongoCatApp *app, const SDL_Event *event) {
     if (!app || !event) return;
     if (event->type < SDL_EVENT_DISPLAY_FIRST ||
@@ -229,6 +263,8 @@ void bongo_cat_window_display_event(BongoCatApp *app, const SDL_Event *event) {
     app->display_recovery_due_ns = SDL_GetTicksNS() + DISPLAY_RECOVERY_DELAY_NS;
 }
 
+/* 主循环每轮调用; due 为 0 表示没有待办。到点后按 keep_in_screen 选择钳制或恢复, 并
+   清掉 due, 保证只执行一次。 */
 void bongo_cat_window_update_display_recovery(BongoCatApp *app, uint64_t now) {
     if (!app || !app->display_recovery_due_ns ||
         now < app->display_recovery_due_ns) return;
@@ -237,6 +273,9 @@ void bongo_cat_window_update_display_recovery(BongoCatApp *app, uint64_t now) {
     else bongo_cat_window_recover_to_display(app);
 }
 
+/* 纯逻辑自检, 不创建也不移动真实窗口: 用构造出来的显示器布局覆盖拼接、负坐标、纵向堆叠、
+   显示器间留缝等情形; 传入 app 时还会验证 display 事件确实重置了指针状态并排定了恢复。
+   返回 false 时由调用方报错。 */
 bool bongo_cat_window_display_self_test(BongoCatApp *app) {
     const SDL_Rect displays[] = {{0, 0, 1920, 1040}, {1920, 0, 1920, 1040}};
     const SDL_Rect gapped[] = {{0, 0, 1920, 1040}, {2020, 0, 1920, 1040}};

@@ -3,11 +3,22 @@
 #include <math.h>
 #include <stddef.h>
 
+/*
+ * Mver(Live2D 旧格式)手臂跟随鼠标的几何计算。
+ *
+ * 这里所有坐标都在"模型画布坐标系"里(与 1000 归一化画布同一套单位)。常量
+ * (211,159)、(258,228)、60.0、20.0 这些是照着该模型原始布局复刻出来的固有
+ * 几何, 不是可调参数, 不能凭手感改; 真正可调的部分在 config(hand_offset /
+ * offset)里, 由用户设置的模型偏移提供。
+ */
 typedef struct DoublePoint {
     double x;
     double y;
 } DoublePoint;
 
+/* factorial[n] 存的是 n!/1000 而不是 n!: 直接算到 20! 会超出 double 的整数
+   精度。代价是 bezier 里算出的权重整体大了 1000 倍, 所以那里末尾要把结果除回
+   1000 —— 改动这张表就必须同时改那处除法。 */
 static const double factorial[] = {
     0.001, 0.001, 0.002, 0.006, 0.024, 0.12, 0.72, 5.04,
     40.32, 362.88, 3628.8, 39916.8, 479001.6, 6227020.8,
@@ -16,6 +27,8 @@ static const double factorial[] = {
     51090942171709440.0
 };
 
+/* 一般形式的 n 次贝塞尔(伯恩斯坦展开): points 是控制点, ratio 取 [0,1]。
+   阶数由控制点个数决定, 最大用到 18 阶, 所以下面 path 固定 19 个点。 */
 static DoublePoint bezier(double ratio, const DoublePoint *points,
     size_t count) {
     DoublePoint result = {0.0, 0.0};
@@ -39,6 +52,8 @@ static double clamp_ratio(float value) {
     return value;
 }
 
+/* 绝对坐标 -> [0,1] 比例。越界只钳制不算失败: 鼠标可能跑到窗口外, 对模型来说
+   "贴住边缘"比"不动"更合理。只有 bounds 非法(宽高 <= 0)才返回 false。 */
 bool bongo_cat_mver_pointer_ratios(double x, double y,
     const BongoCatMverPointerBounds *bounds,
     float *x_ratio, float *y_ratio) {
@@ -51,6 +66,13 @@ bool bongo_cat_mver_pointer_ratios(double x, double y,
     return true;
 }
 
+/*
+ * 指针位置的累积与钳制, 两种模式:
+ *   - 绝对模式(use_relative=false): 直接用系统给的绝对坐标并重置 initialized;
+ *   - 相对模式(true): 在已有状态上累加位移, 用于拿不到绝对坐标的场合(远程
+ *     桌面、独占全屏等), 但第一次仍然要用绝对坐标定初值。
+ * 结果始终钳制在 bounds 内: 越界会让手臂贴图跑出手臂骨架。
+ */
 bool bongo_cat_mver_pointer_update(BongoCatMverPointerState *state,
     double absolute_x, double absolute_y, double relative_x,
     double relative_y, bool use_relative,
@@ -79,6 +101,14 @@ bool bongo_cat_mver_pointer_update(BongoCatMverPointerState *state,
     return true;
 }
 
+/*
+ * 由鼠标比例位置反推手臂三段曲线的采样点, 输出 BONGO_CAT_MVER_ARM_POINT_COUNT
+ * 个骨架点。这是一个封闭几何: 19 个点的拼装顺序(左曲线采样 -> 端点 -> 中段
+ * 曲线 -> 端点 -> 右曲线逆序采样 -> 锚点)必须和末尾的 path_count != 19 校验
+ * 一致, 少一个点整帧就被判失败。
+ * 末尾用 isfinite 兜底: 输入退化(两点重合导致法线长度为 0)时宁可让调用方放弃
+ * 这一帧, 也不要把 NaN 写进骨架。
+ */
 bool bongo_cat_mver_pointer_geometry(float x_ratio, float y_ratio,
     const BongoCatMverPointerConfig *config,
     BongoCatMverPointerGeometry *geometry) {

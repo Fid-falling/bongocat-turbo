@@ -1,3 +1,14 @@
+/*
+ * 鼠标指针形状。绘制代码只知道 nk_context, 所以用 active_backend 这个全局指针反查
+ * (和 ui_backend.c 的 context_backend 同一套路, 但这里再存一份是为了让 cursor 模块
+ * 不依赖 backend 的初始化顺序)。
+ *
+ * 工作方式是"按帧请求再统一应用": 绘制过程中通过 hover_* 记录想要的形状, 帧末由
+ * bongo_cat_ui_cursor_apply() 设一次。这样同一个控件被画多次、或前后顺序变化时,
+ * 结果都是确定的; 直接调 SDL_SetCursor 则会变成"最后画的那个说了算"。
+ * 光标对象的创建是惰性的 (cursor_begin), 销毁时必须先把当前光标切回系统默认 ——
+ * 否则会留下一个指向已释放 SDL_Cursor 的悬垂指针。
+ */
 #include "ui_backend.h"
 
 static BongoCatUIBackend *active_backend;

@@ -25,6 +25,11 @@ struct BongoCatVk;
  * 没有编译 Vulkan 后端、没有编译 Cubism、设备没就绪。
  */
 /*
+ * remember() 必须在模型加载之前调用, 而且它是唯一允许在 CubismFramework::StartUp
+ * 之前调用的入口 —— 它只记值, 不碰任何 SDK 对象 (SDK 的容器依赖框架装好的全局分配器)。
+ * 之后 attach() 不带参数调用时会复用这里记下的句柄与尺寸。
+ */
+/*
  * 窗口创建时调用: 只记住后端指针与尺寸并打开渲染器工厂开关, 不碰任何 SDK 函数
  * (SDK 的 csmMap 依赖 CubismFramework::StartUp 设置的全局分配器)。
  * 真正的挂载 attach() 推迟到模型创建渲染器时, 那时框架已经启动。
@@ -38,6 +43,10 @@ bool bongo_cat_live2d_vulkan_remember(struct BongoCatVk *vk, int width, int heig
  */
 bool bongo_cat_live2d_vulkan_shaders_available(const char *assets_root);
 void bongo_cat_live2d_vulkan_set_shader_root(const char *assets_root);
+/*
+ * 档位只决定"下次重建离屏目标时用几倍": 目标已经建好时改档不会立刻生效, 要等窗口尺寸
+ * 变化或 release_target()。传入 0/1/2 以外的值一律按 0 (自动) 处理。
+ */
 /* 超采样档位 ([性能] 区): 0=自动 (目标面积大时退回 1x) 1=质量 (2x) 2=省内存 (1x) */
 void bongo_cat_live2d_vulkan_set_supersample(int mode);
 /* 内存清理: 释放离屏目标 (下次绘制自动重建) */
@@ -60,6 +69,11 @@ void *bongo_cat_live2d_vulkan_create_texture_attached(const void *pixels,
 /* 把贴图绑到渲染器上 (两个参数都是不透明句柄) */
 bool bongo_cat_live2d_vulkan_bind_texture(void *renderer, void *texture);
 
+/*
+ * 返回的宽高是**超采样之后**的缓冲尺寸 (通常 2 倍窗口), 不是窗口像素尺寸: 合成方按它
+ * 建纹理包装、在采样时线性缩小, 这就是 Vulkan 侧替代 MSAA 的做法。尺寸变化即表示离屏
+ * 目标被重建过, 合成方应当据此重建自己的纹理包装 (见 vk_scene.c)。
+ */
 /* 离屏结果 (纹理与尺寸), 供合成到宠物窗口时使用 */
 bool bongo_cat_live2d_vulkan_target_info(void **image, void **view, void **sampler,
     int *width, int *height);

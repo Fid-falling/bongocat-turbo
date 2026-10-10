@@ -1,3 +1,5 @@
+/* ZIP 导入：后缀识别（is_archive）、解压到临时目录（archive_extract）与临时树清理
+ * （archive_cleanup）。extract 成功时 directory 是 temporary 的子目录，失败时两者都清空。 */
 #ifndef BONGO_CAT_MODEL_IMPORT_ARCHIVE_H
 #define BONGO_CAT_MODEL_IMPORT_ARCHIVE_H
 

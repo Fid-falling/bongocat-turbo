@@ -1,3 +1,6 @@
+/* 交互预览 (Windows 快照窗口) 的内部接口, 实现见 window_snapshot.c: 拖动/缩放期间把上一帧
+   画面交给原生预览窗口, 交互结束后回到实时渲染。begin/end/discard 必须成对 —— end 会补画
+   一帧而 discard 不会; present 失败会自行降级为不可用。 */
 #ifndef BONGO_CAT_WINDOW_SNAPSHOT_H
 #define BONGO_CAT_WINDOW_SNAPSHOT_H
 

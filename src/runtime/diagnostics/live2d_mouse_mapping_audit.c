@@ -1,8 +1,15 @@
+/* 鼠标映射的两条审计路径, 由 live2d_audit.c 的 mouse-screen / mouse-hand-screen 场景调用: 前者关掉
+ * "以模型为中心"的映射, 用落点所在显示器边界归一化, 验证屏幕绝对映射; 后者打开它, 用 MVER 指针包围盒
+ * 验证窗口/模型相对映射与参数方向。两者都临时改写 app->settings.model.mouse_centered, 所有出口都会恢复。
+ */
 #include "runtime.h"
 #include "mouse_internal.h"
 
 #include <math.h>
 
+/* 屏幕中心应当给出≈0 的头部角度, 偏离中心的落点只允许很小的 Z 倾斜 (0.25)。每步按 1/60s 推进
+ * 90 帧, 是为了让 Viewer 那套弹簧参数收敛到稳态后再读值, 否则量到的是过渡过程中的中间值。
+ */
 bool bongo_cat_app_audit_screen_pointer(BongoCatApp *app) {
     SDL_Rect bounds;
     SDL_DisplayID display = SDL_GetPrimaryDisplay();
@@ -28,6 +35,9 @@ bool bongo_cat_app_audit_screen_pointer(BongoCatApp *app) {
     return passed;
 }
 
+/* 依赖 mouse_centered=true 时的 MVER 指针包围盒: 投影算不出来或不是居中模式就直接失败。期望方向: 左上角
+ * → ParamMouseX 为负、ParamMouseY 为正, 右下角相反 (屏幕 Y 向下而参数 Y 向上), 且用的是包围盒四角。
+ */
 bool bongo_cat_app_audit_display_pointer(BongoCatApp *app) {
     BongoCatMouseProjection projection;
     if (!app) return false;

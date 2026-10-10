@@ -5,6 +5,12 @@
 #include <stddef.h>
 #include <stdint.h>
 
+/*
+ * 验证工具共用的图像容器: 32 位 BGRA, 每行紧密排列(没有行填充)。
+ *
+ * 契约: bgra 由加载 / 归一化函数分配, 必须用 bongo_cat_validation_image_free
+ * 释放; 表示区域的 rect 用左上原点的像素坐标、左闭右开区间。
+ */
 typedef struct BongoCatValidationImage {
     int width;
     int height;

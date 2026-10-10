@@ -1,3 +1,7 @@
+/* 读取 --ci-viewer-trace= 指向的参考 trace, 把抓图时刻换算回帧号: 6 个 track 与 6 个 return 名字各取
+ * 一个, 用来验证这一轮的抓帧时机与参考运行一致 —— 时机漂了, 回归数据就不再可比。没给参数或文件不存在
+ * 时返回 true (首次运行没有基线), 缺行或顺序倒退返回 false。track/returning 由调用方提供, 各需 6 个 int。
+ */
 #include "live2d_viewer_timing.h"
 #include "bongo_cat/file.h"
 
@@ -6,6 +10,10 @@
 #include <stdlib.h>
 #include <string.h>
 
+/* 空路径与打不开的路径语义不同: 空 = 不需要检查 (true), 有路径但 open 失败 = 失败。
+ * 每行至少要能解析出三列 (名字、一个被忽略的数值、毫秒时刻), 毫秒换算成帧号后会夹到 >=1,
+ * 因为第 0 帧无法作为抓图时机; 名字不在那 12 个之内的行直接忽略, 允许 trace 带额外条目。
+ */
 bool bongo_cat_live2d_viewer_timing(const char *path, int *track,
     int *returning) {
     static const char *track_names[] = {"track-001", "track-002",

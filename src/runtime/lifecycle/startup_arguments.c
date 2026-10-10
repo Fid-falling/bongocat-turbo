@@ -1,3 +1,11 @@
+/*
+ * 命令行解析, 分两类:
+ *   - 用户/系统参数: --autostart, --storage-root=, --cache-root=, --nearby-root=,
+ *     --secondary-pet= / --secondary-position= (多宠子进程由主进程拉起);
+ *   - --ci-* 冒烟参数: 只影响这一次运行, 用来无人值守地驱动设置窗口、导入模型、跑
+ *     自测; 它们不写回配置 (config_store 在 smoke 下不落盘)。
+ * 不认识的参数静默忽略 —— Windows 会往命令行里塞一些系统注入的参数。
+ */
 #include "runtime.h"
 #include "bongo_cat/i18n.h"
 
@@ -20,6 +28,8 @@ static bool store_argument(char *target, size_t capacity, const char *value,
     return false;
 }
 
+/* nearby_root 只是"额外多扫一个目录"的来源, 取不到就不设 (不算失败); 真正由
+   --nearby-root= 给的路径太长才报错。 */
 static bool prepare_nearby_root(BongoCatApp *app, BongoCatError *error) {
 #ifdef _WIN32
     /* A packaged full-trust app is commonly launched with System32 as its
@@ -45,6 +55,8 @@ static bool prepare_nearby_root(BongoCatApp *app, BongoCatError *error) {
     return stored;
 }
 
+/* 先算 nearby_root (它要用工作目录/程序目录, 跟命令行无关), 再逐条解析: 带路径的参数
+   写不下时直接失败 —— 被静默截断的路径比启动失败难查得多。 */
 bool bongo_cat_startup_arguments(BongoCatApp *app, int argc, char **argv,
     BongoCatError *error) {
     if (!prepare_nearby_root(app, error)) return false;
@@ -124,6 +136,7 @@ bool bongo_cat_startup_arguments(BongoCatApp *app, int argc, char **argv,
                 sizeof(app->smoke_live2d_scenario), arg + 21,
                 "Scenario", error)) return false;
     }
+/* 没显式给 --ci-exit-ms= 的冒烟运行统一 1.5s 后自动退出, 免得 CI 挂住。 */
     if (app->smoke && !app->smoke_deadline_ns)
         app->smoke_deadline_ns = 1500000000ull;
     return true;

@@ -1,3 +1,21 @@
+/*
+ * 托盘图标与托盘菜单 (Windows 通知区域 / 各平台原生托盘)。
+ *
+ * 菜单文案全部来自 i18n 表 (composables.useAppMenu.labels.*), 第二个参数是查不到 key 时
+ * 的英文兜底 —— 所以**新增菜单项必须同时补 i18n key**, 不能只写死英文, 否则除英文外的
+ * 语言会漏翻; 切语言后靠 tray_sync 里的 last_language 比较把文案重新贴一遍。
+ *
+ * 托盘是可选件: 设置里关掉、加载图标失败、原生托盘创建失败都只降级为"没有托盘"
+ * (见 app.c 的警告), 因此这里所有对外函数都必须容忍 NULL。
+ *
+ * Windows 资源管理器重启会把托盘图标一起干掉: 平台层回调 on_tray_restore 只置
+ * restore_requested, 由 tray_sync 销毁并重建整个托盘 (旧菜单项指针已全部失效, 不能复用),
+ * 重建失败 1s 后重试。
+ *
+ * 每个菜单回调都要做齐三件事: 改 app 状态 -> 同步窗口 (可见性/穿透/置顶) -> tray_sync
+ * (勾选态) -> preferences_invalidate (设置窗口正开着时跟着刷新)。少做一步就会出现
+ * "界面显示的和实际状态不一致"。
+ */
 #include "bongo_cat/tray.h"
 #include "bongo_cat/app.h"
 #include "bongo_cat/image.h"
@@ -28,6 +46,8 @@ struct BongoCatTray {
     BongoCatLanguage last_language;
 };
 
+/* 菜单动作。托盘菜单本身不存状态: 真相始终在 app->session / app->settings 里, 回调只负责
+   改它, 再由 tray_sync 把勾选态贴回去。 */
 static void on_visible(void *userdata, SDL_TrayEntry *entry) {
     (void)entry;
     BongoCatTray *tray = userdata;
@@ -90,12 +110,15 @@ static void on_tray_restore(void *userdata) {
     tray->restore_after_ns = 0;
 }
 
+/* 原生菜单的深浅色由平台层统一处理, 这里只把系统主题传下去。 */
 void bongo_cat_tray_prepare_menu(BongoCatTray *tray, void *native_handle) {
     if (!tray || !tray->app) return;
     bool dark = SDL_GetSystemTheme() == SDL_SYSTEM_THEME_DARK;
     bongo_cat_ui_native_menu_prepare_native(native_handle, dark);
 }
 
+/* 插入菜单项的统一封装: 一律追加到末尾 (-1 是 SDL 的"追加"约定), 并把回调与 userdata
+   一起绑上。label 为 NULL 就是分隔线, 不绑回调。 */
 static SDL_TrayEntry *add(SDL_TrayMenu *menu, const char *label,
     SDL_TrayEntryFlags flags, SDL_TrayCallback callback, BongoCatTray *tray) {
     SDL_TrayEntry *entry = SDL_InsertTrayEntryAt(menu, -1, label, flags);
@@ -103,6 +126,7 @@ static SDL_TrayEntry *add(SDL_TrayMenu *menu, const char *label,
     return entry;
 }
 
+/* 先摘掉平台层回调再销毁: 否则销毁过程中到达的回调会拿到已经释放的 tray。 */
 static void destroy_native_tray(BongoCatTray *tray) {
     if (!tray || !tray->handle) return;
     bongo_cat_platform_set_tray_callbacks(
@@ -114,6 +138,8 @@ static void destroy_native_tray(BongoCatTray *tray) {
     tray->state_valid = false;
 }
 
+/* 菜单项是顺序敏感的 (两条分隔线的位置固定), 所以任何一项建失败都整体销毁重来 ——
+   半截菜单比没有菜单更难查。 */
 static bool create_native_tray(BongoCatTray *tray, BongoCatError *error) {
     tray->handle = SDL_CreateTray(tray->icon.surface, BONGO_CAT_TRAY_TITLE);
     if (!tray->handle) {
@@ -156,6 +182,8 @@ static bool create_native_tray(BongoCatTray *tray, BongoCatError *error) {
     return true;
 }
 
+/* app->settings.app.tray_visible 为 false (用户在设置里关掉托盘) 时返回 NULL 不算错误;
+   图标加载或原生托盘创建失败才算失败, 调用方降级为"没有托盘"。 */
 BongoCatTray *bongo_cat_tray_create(BongoCatApp *app, BongoCatError *error) {
     if (!app || !app->settings.app.tray_visible) return NULL;
     BongoCatTray *tray = calloc(1, sizeof(*tray));
@@ -177,6 +205,8 @@ BongoCatTray *bongo_cat_tray_create(BongoCatApp *app, BongoCatError *error) {
     return tray;
 }
 
+/* restore_requested 表示"Windows shell 重启过": 先销毁再重建, 失败时保留标志并 1s 后重试
+   (旧菜单项指针全部失效, 不能复用)。 */
 static bool restore_native_tray(BongoCatTray *tray) {
     if (!tray->restore_requested) return tray->handle != NULL;
     uint64_t now = SDL_GetTicksNS();
@@ -197,6 +227,8 @@ static bool restore_native_tray(BongoCatTray *tray) {
     return true;
 }
 
+/* 幂等 + 便宜的脏检查: 只有四项状态 (可见/穿透/置顶/语言) 之一变了才真的改菜单, 因为
+   SDL_UpdateTrays 会让 shell 重画托盘。语言也算一项 —— 换语言必须重贴文案。 */
 void bongo_cat_tray_sync(BongoCatTray *tray) {
     if (!tray || !restore_native_tray(tray)) return;
     BongoCatApp *app = tray->app;
@@ -227,6 +259,8 @@ void bongo_cat_tray_sync(BongoCatTray *tray) {
     SDL_UpdateTrays();
 }
 
+/* --ci-menu 用的自测: 走一遍真实回调并每项点两次 (验证改回去也能恢复), 最后检查状态与
+   进入时一致; Windows 上还会先模拟一次 shell 重启。 */
 bool bongo_cat_tray_self_test(BongoCatTray *tray) {
     if (!tray || !tray->handle || !tray->visible || !tray->pass_through ||
         !tray->always_on_top || !tray->preferences || !tray->exit) return false;

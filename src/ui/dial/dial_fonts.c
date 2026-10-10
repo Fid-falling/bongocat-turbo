@@ -1,3 +1,15 @@
+/*
+ * 菜单的字体与字形图集。
+ *
+ * 与设置窗口的区别: 菜单是短命窗口 (开一次建一次), 所以图集不做增量维护 —— 直接把
+ * "这次菜单可能显示的全部文字"扫一遍, 收集用到的码点, 生成范围表再烘焙一次。
+ * 这个"全部文字"的清单就在 ranges() 里: 根项标签、模型名/动作名/表情名/声音名、
+ * 以及"添加模型"。新增任何会显示的文字来源都必须加进去, 漏了就会显示成方块。
+ *
+ * 图集上传同样分两条路: Vulkan 走单通道纹理接口 + 纹理表登记, GL 走 R8 + 通道
+ * swizzle (把单通道塞进的 red 当成 alpha, RGB 补 1)。两条路最后都要 nk_font_atlas_end
+ * 把纹理句柄告诉 Nuklear。
+ */
 #include "dial_internal.h"
 #include "bongo_cat/vk_backend.h"
 #include "ui_font.h"
@@ -5,10 +17,18 @@
 #include <stdlib.h>
 #include <string.h>
 
+/*
+ * 码点位图: 0x110000 个码点需要 136KB 的位图, 临时分配一次比排序去重简单得多,
+ * 而且这张表只在这一处用 (烘焙完就 free)。
+ */
 static bool contains(const uint8_t *used, nk_rune rune) {
     return (used[rune >> 3] & (1u << (rune & 7))) != 0;
 }
 
+/*
+ * 解码一段 UTF-8 并把用到的码点记进位图。坏字节直接终止 (调用方给的都是内部字符串,
+ * 出现非法序列说明数据本身有问题, 继续解码只会越解越乱)。
+ */
 static void collect(uint8_t *used, const char *s) {
     if (!s) return;
     int length = (int)strlen(s);
@@ -22,6 +42,12 @@ static void collect(uint8_t *used, const char *s) {
     }
 }
 
+/*
+ * 生成 Nuklear 需要的字形范围表: 把位图里的连续码点合并成 [start, end] 区间, 以 0 结尾。
+ * 一开始就无条件加入 32..126 (ASCII 可见字符): 百分比数字、模型名里的拉丁字母都要用,
+ * 而且它们一定在, 不必逐个判断。
+ * 返回的表由调用方持有并负责 free (最终由 dial_paint_free 释放)。
+ */
 static nk_rune *ranges(Dial *d) {
     uint8_t *used = calloc(0x110000 / 8,1);
     if (!used) return NULL;
@@ -50,6 +76,15 @@ static nk_rune *ranges(Dial *d) {
     return result;
 }
 
+/*
+ * 建图集。字体是三段式 (常规 + 回退 + 韩文回退), 与设置窗口同一套 ui_font 工具;
+ * 字号按显示密度放大但封顶 2 倍 (height = 24 * clamp(scale*raster_scale, 1, 2)):
+ * 菜单开在高 DPI 屏上时字要够清楚, 但再大下去图集尺寸和烘焙时间都不划算。
+ * 上传前用设备的最大纹理尺寸校验一次 (GL_MAX_TEXTURE_SIZE / Vulkan 的设备限值):
+ * 中文字图集很容易超过老设备的 2048, 不检查的话上传会失败而且看不出原因。
+ * 失败时 ranges[1..3] 置空: split_ranges 在失败时已经释放了部分分配, 留着悬空指针
+ * 会让 dial_paint_free 二次释放。
+ */
 bool dial_fonts_init(Dial *d) {
     DialPaint *p = &d->paint;
     p->ranges[0] = ranges(d);
@@ -122,6 +157,13 @@ bool dial_fonts_init(Dial *d) {
     return ok;
 }
 
+/*
+ * 画一行文字: 逐字形取图集里的矩形再贴出来 (没有用 Nuklear 的绘制命令, 直接产出
+ * dial_quad 顶点, 这样文字和菜单其余部分走同一条管线)。
+ * 两个宽度约束: 若整行超过 width 就整体等比压缩 (scale = width/total), 而不是截断 ——
+ * 菜单里的名字都很有信息量, 宁可小一点也要显示全。
+ * glyphs[] 数组是按 BONGO_CAT_MENU_LABEL_CAP 定长的, 超长文本会被截断在这里。
+ */
 static void line(Dial *d, const char *s, int length, float x, float y,
     float width, float size, uint32_t color) {
     struct nk_font *font = d->paint.font;
@@ -148,6 +190,14 @@ static void line(Dial *d, const char *s, int length, float x, float y,
     }
 }
 
+/*
+ * 文本入口, 两种特殊排版:
+ *   1. "live2d_xxx" 这种内部 id 拆成两行显示 (上一行 live2d, 下一行剩下部分): 直接显示
+ *      会又长又难读, 而这类名字在动作列表里很常见;
+ *   2. 普通长名先试一行; 一行放不下时找"让两行宽度尽量相等"的 UTF-8 边界再折成两行
+ *      (见英文注释)。折行而不缩字号, 是因为缩到能放下时字会小到看不清。
+ * 两条路最后都落到 line(), 所以行内的压缩逻辑只需维护一份。
+ */
 void dial_text(Dial *d, const char *s, float x, float y, float width,
     float size, uint32_t color) {
     if (!s || !d->paint.font) return;

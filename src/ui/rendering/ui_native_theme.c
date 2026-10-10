@@ -1,3 +1,11 @@
+/*
+ * Windows 原生外观 (标题栏/菜单/圆角) 的适配。除了 DwmSetWindowAttribute 的公开
+ * 属性号以外, 其余接口都是 uxtheme 里没有名字、只能按序号取的内部函数 (133/135/
+ * 136), 它们随 Windows 版本变化 —— 所以这里一律 GetProcAddress 按需取、取不到就
+ * 静默跳过, 绝不静态链接。低于 Win10 1903 (build 18362) 时这些序号含义不同,
+ * 必须直接放弃暗色菜单。
+ * 所有失败路径都当"没效果"处理: 主题是锦上添花, 不能因为它让窗口起不来。
+ */
 #include "ui_native_theme.h"
 
 #ifdef _WIN32
@@ -13,6 +21,12 @@ typedef BOOL (WINAPI *AllowDarkModeForWindowFn)(HWND, BOOL);
 typedef void (WINAPI *FlushMenuThemesFn)(void);
 typedef LONG (WINAPI *RtlGetVersionFn)(OSVERSIONINFOW *);
 
+/*
+ * applied_mode 是"整进程"级别的偏好 (SetPreferredAppMode 影响所有窗口), 所以要
+ * 缓存最后一次设过的值: 每个窗口每帧都调一次的话, 会连带 FlushMenuThemes 一起反复
+ * 刷新系统主题, 菜单弹出时会闪。初值 -1 表示从未设置过 —— 与"已设为 0 (系统默认)"
+ * 区分开, 否则首次调用会被当成重复而跳过。
+ */
 static SetWindowThemeFn set_window_theme;
 static SetPreferredAppModeFn set_preferred_mode;
 static AllowDarkModeForWindowFn allow_dark_window;

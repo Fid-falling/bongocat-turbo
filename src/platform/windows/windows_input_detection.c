@@ -4,6 +4,8 @@
 #include <math.h>
 #include <stdlib.h>
 
+/* 判"在内侧"而不是"在范围内": 留 4 像素边距。贴边的光标通常意味着游戏把鼠标困在
+   中心之后又撞到了边界, 那不属于正常桌面移动。 */
 static bool interior(POINT point, const RECT *bounds) {
     const int margin = 4;
     return (long long)point.x > (long long)bounds->left + margin &&
@@ -22,6 +24,8 @@ bool bongo_cat_windows_pointer_clip_locked(const RECT *clip) {
     return width <= 2 && height <= 2;
 }
 
+/* 单次观察能给出的最强提示(还不是结论): 极小裁剪 > 光标隐藏 > 桌面。真正下结论要等
+   累积到足够的运动证据, 见下面的 detect。 */
 static WindowsPointerReason lock_hint(const WindowsPointerObservation *sample) {
     if (sample->clip_known && bongo_cat_windows_pointer_clip_locked(&sample->clip))
         return WINDOWS_POINTER_CLIPPED;
@@ -30,6 +34,8 @@ static WindowsPointerReason lock_hint(const WindowsPointerObservation *sample) {
     return WINDOWS_POINTER_DESKTOP;
 }
 
+/* 开启一个新的观察窗口: 重置锚点与全部累加量。窗口长度由 detect 里的 128/256ms
+   阈值决定 —— 窗口太短会把正常抖动误判成锁定, 太长则会让第一次按键的延迟很明显。 */
 static void begin_window(WindowsPointerDetection *state, POINT point,
     ULONGLONG now_ms) {
     state->anchor = point;
@@ -42,6 +48,14 @@ static void begin_window(WindowsPointerDetection *state, POINT point,
     state->excursion = 0;
 }
 
+/*
+ * 状态机主体。时间阈值(32 / 128 / 192 / 256 ms)与样本数阈值(2 / 4)是照着"人按下并
+ * 移动鼠标"的时间尺度定的: 在极小裁剪里持续 32ms 才算直接证据, 128ms 且至少 4 个
+ * 运动报文才算有足够证据。
+ * 判定为锁定之后不会因为"鼠标停住"而自动解除 —— 停手时设备仍在报位移(被 recenter),
+ * 只有真实的光标旅行才能推翻它(见末尾原有的英文注释)。
+ * 每个窗口结束时都会 begin_window 重新计数, 因此证据是逐窗累积的。
+ */
 bool bongo_cat_windows_pointer_detect(WindowsPointerDetection *state,
     const WindowsPointerObservation *sample, ULONGLONG now_ms) {
     if (!state || !sample) return false;

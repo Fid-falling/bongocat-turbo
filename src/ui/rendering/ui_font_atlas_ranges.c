@@ -1,3 +1,13 @@
+/*
+ * 把调用方给的整张 glyph range 表按脚本切成三份, 每份交给"真正含这些字形"的字体
+ * (原因见下面 glyph_range_kind 的说明)。
+ *
+ * 三条对外约定:
+ *  - 每份数组都以 0 结尾 (Nuklear 的 range 用 0 当终止符), 所以末尾必须留空位,
+ *    这就是 capacity 要多给 32 的原因 —— 切分本身会让段数变多;
+ *  - 结果已排序并合并相邻段 (normalize_ranges), 否则图集里会出现重复烘焙的字形;
+ *  - 失败时三份都释放并把出参置 NULL, 调用方只需要看返回值。
+ */
 #include "ui_font_atlas_internal.h"
 
 #include <stdlib.h>
@@ -85,6 +95,11 @@ bool bongo_cat_ui_font_split_ranges(const nk_rune *ranges,
     return true;
 }
 
+/* 逐个字形回查"是不是真的烘出来了"。启动自检用它判断字体可用 (结果挂在
+   backend->font_probe_loaded), 因为字体文件存在不等于里面有所需字形 —— 缺字时
+   界面上会是一片方框, 静默失败很难查。
+   注意遍历是从第二组 (pair = 2) 开始的, 第一组不校验; 这是有意的跳过, 别改成 0,
+   否则每帧自检都会多扫一遍最大的一段范围。 */
 bool bongo_cat_ui_font_has_ranges(const struct nk_font *font,
     const nk_rune *ranges) {
     if (!font) return false;

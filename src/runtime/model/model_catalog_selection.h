@@ -1,3 +1,5 @@
+/* 目录重扫与删除期间的选中状态快照及 reconcile 接口（实现见 model_catalog_selection.c）：
+ * 快照是纯值拷贝，回滚时只恢复目录里仍然存在的 id。 */
 #ifndef BONGO_CAT_MODEL_CATALOG_SELECTION_H
 #define BONGO_CAT_MODEL_CATALOG_SELECTION_H
 

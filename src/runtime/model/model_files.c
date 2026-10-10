@@ -1,3 +1,8 @@
+/* 模型选择与加载的事务实现：从 id 到屏幕上真的换了模型的全部副作用都在
+ * bongo_cat_app_select_model_with_error() 里完成（行为目录、渲染参数、叠加层、几何、音频、
+ * 封面、内存策略）。它由主循环或设置窗口在渲染线程同步调用，期间用 model_load_progress
+ * 回调插播小帧维持窗口响应；加载失败不会重建旧模型，只保证状态不悬空。改这条路径最常见的
+ * 错误是漏掉某个子系统的重置或上下文还原。 */
 #include "runtime.h"
 #include "model_import.h"
 #include "model_behavior_cache.h"
@@ -13,6 +18,8 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+/* 把目录条目变成当前选择：多宠开启时新主模型要从附加列表里摘掉（否则同一模型被算两次），
+ * 关闭时清空附加列表；模式决定是否启用手柄输入。不做渲染或磁盘副作用。 */
 static void select_model_state(BongoCatApp *app, const BongoCatModelEntry *entry) {
     if (app->settings.model.multiple_pets)
         bongo_cat_session_remove_model(&app->session, entry->id);
@@ -22,6 +29,8 @@ static void select_model_state(BongoCatApp *app, const BongoCatModelEntry *entry
     app->loaded_mode = entry->mode;
     bongo_cat_gamepads_set_enabled(app, entry->mode == BONGO_CAT_MODE_GAMEPAD);
 }
+/* reveal 为真时把隐藏、最小化或悬停隐藏的窗口拉回可见，否则只把越界窗口夹回显示器；无论
+ * 哪条路径都会标脏命中测试与 app->dirty，让主循环下一帧出图。 */
 static void request_model_frame(BongoCatApp *app, bool reveal) {
     if (!app) return;
     if (app->window) {
@@ -53,6 +62,8 @@ static void model_running_stage(BongoCatApp *app, const char *model_id) {
     bongo_cat_runtime_stage(app, state);
 }
 
+/* 只负责阶段跳变那一次上报：progress 落进 1/2/3 三档，与上一档相同时直接返回。这里读的是
+ * loading_model 而不是 loaded_model —— 加载期间后者仍是旧模型。 */
 static void model_progress_runtime_stage(BongoCatApp *app, float progress) {
     static const char *names[] = {"", "model-core", "texture-loading",
         "finalizing"};
@@ -65,6 +76,10 @@ static void model_progress_runtime_stage(BongoCatApp *app, float progress) {
     bongo_cat_runtime_stage(app, state);
 }
 
+/* Live2D 加载期间被同步回调（仍在主线程，此时主循环被完全阻塞）。做三件事：上报阶段与进
+ * 度条，SDL_PumpEvents() 让窗口消息不至于饿死，以及在替换已有模型时按 ~60fps 插播小帧让旧
+ * 模型继续动 —— 小帧只在 model_load_last_frame_ns 非零时启用，加载前会置位、加载结束立刻
+ * 清零。 */
 static void model_load_progress(void *userdata, float progress) {
     BongoCatApp *app = userdata;
     model_progress_runtime_stage(app, progress);
@@ -93,6 +108,8 @@ static void model_load_progress(void *userdata, float progress) {
     bongo_cat_app_render_now(app);
 }
 
+/* 提交选择：id 与模式都没变且未强制刷新时是空操作。model_selection_serial 自增是给 UI 与
+ * 封面等观察者识别发生过切换的序号，每次真正提交都要加一。 */
 static void commit_model(BongoCatApp *app,
     const BongoCatModelEntry *entry, bool force_refresh, bool reveal) {
     bool changed = strcmp(app->session.active_model_id, entry->id) != 0 ||
@@ -103,6 +120,10 @@ static void commit_model(BongoCatApp *app,
     request_model_frame(app, reveal);
 }
 
+/* 返回 bool，失败信息写进 *error（传 NULL 时写进内部局部变量，调用方可以不关心）。前置条
+ * 件：app 与渲染器已就绪，id 必须存在于 app->models。已经加载同一个 id 时只补一次 commit
+ * （模式可能变过），不重新加载。失败返回后 app->models 与 session 不变，但 live2d 可能已经
+ * 没有可用模型（loaded_model 被清空）。 */
 bool bongo_cat_app_select_model_with_error(BongoCatApp *app,
     const char *id, BongoCatError *error) {
     BongoCatError local = {0};
@@ -119,6 +140,8 @@ bool bongo_cat_app_select_model_with_error(BongoCatApp *app,
             "Model is not installed: %s", id);
         return false;
     }
+    /* 快照预览要先补画最后一帧实时画面才能释放，所以必须在切换模型与 GL 上下文之前结束
+       它，否则补画用的是已经被替换掉的状态。 */
     bongo_cat_window_snapshot_end(app);
     if (app->loaded_model[0] && strcmp(app->loaded_model, entry->id) == 0) {
         commit_model(app, entry, false, false);
@@ -128,6 +151,9 @@ bool bongo_cat_app_select_model_with_error(BongoCatApp *app,
     bool replacing_model = app->loaded_model[0] != '\0';
     if (replacing_model)
         bongo_cat_model_cover_capture_before_switch(app);
+    /* 行为目录优先复用 app->behavior_cache（仅限已安装包且内容摘要匹配），否则重新解析。解
+       析失败不是致命错误：模型照样显示，只是没有动作与表情；这里只记下 validity 供缓存判
+       定使用。 */
     BongoCatError optional = {0};
     BongoCatBehaviorCatalog *behaviors = calloc(1, sizeof(*behaviors));
     if (!behaviors) {
@@ -145,6 +171,8 @@ bool bongo_cat_app_select_model_with_error(BongoCatApp *app,
         if (!behavior_catalog_valid)
             SDL_LogWarn(SDL_LOG_CATEGORY_APPLICATION, "%s", optional.message);
     }
+    /* 适配器 profile 是导入时生成的运行时参数（投影、指针边界等）；读不到就用零初始化的默
+       认值。它同时写进 app->model_render_options 供后续帧复用。 */
     BongoCatLive2DRenderOptions render_options = {0};
     bool adapted_profile = bongo_cat_import_render_options(
         entry->adapter_directory, &render_options);
@@ -162,6 +190,8 @@ bool bongo_cat_app_select_model_with_error(BongoCatApp *app,
        glGetError, 其余流程完全一致。 */
     const bool gl_backend =
         bongo_cat_renderer_active() != BONGO_CAT_RENDERER_VULKAN;
+    /* 只有 OpenGL 后端需要临时切换上下文；成功与失败两条出口都会还原入场时的窗口与上下
+       文，不把调用方的 GL 状态改掉。 */
     bool restore_context = gl_backend && (previous_window != app->window ||
         previous_context != app->gl_context);
     if (restore_context && !SDL_GL_MakeCurrent(app->window, app->gl_context)) {
@@ -181,6 +211,8 @@ bool bongo_cat_app_select_model_with_error(BongoCatApp *app,
         "gl_error=0x%x", previous_model, entry->id, (void *)app->window,
         (void *)app->gl_context, (void *)SDL_GL_GetCurrentWindow(),
         (void *)SDL_GL_GetCurrentContext(), (unsigned)initial_gl_error);
+    /* 先用当前像素尺寸 reshape，让新模型在加载期就按最终窗口构图；加载完成后几何还可能变
+       化，那时会再 resize 一次。 */
     bongo_cat_live2d_reshape(app->live2d, pixel_width, pixel_height);
     snprintf(app->loading_model, sizeof(app->loading_model), "%s", entry->id);
     app->model_load_runtime_stage = 0;
@@ -191,6 +223,9 @@ bool bongo_cat_app_select_model_with_error(BongoCatApp *app,
         model_load_progress, app, failure);
     app->model_load_last_frame_ns = 0;
     if (replacing_model) app->last_frame_ns = SDL_GetTicksNS();
+    /* 失败时旧模型通常已被销毁，所以只在 live2d 确实不可用时清空 loaded_model；若渲染器仍
+       能画出旧模型就保留它，让用户看到的是没换成而不是黑屏。behaviors 在这里释放，
+       app->behaviors 保持不变。 */
     if (load_result != BONGO_CAT_OK) {
         SDL_LogError(SDL_LOG_CATEGORY_APPLICATION, "Model switch transaction: "
             "stage=failed previous=%s next=%s elapsed_ms=%.2f gl_error=0x%x "
@@ -219,6 +254,8 @@ bool bongo_cat_app_select_model_with_error(BongoCatApp *app,
     app->model_render_options = render_options;
     bongo_cat_app_reset_pointer_tracking(app);
     bongo_cat_live2d_set_render_options(app->live2d, &render_options);
+    /* 覆盖 app->behaviors 之前，先把上一个模型的目录存进缓存（仅当缓存原本有效且确实有上
+       一个模型），供用户切回去时复用；否则显式作废缓存，避免摘要与内容对不上。 */
     if (app->loaded_model[0] && app->behavior_catalog_valid) {
         const BongoCatModelEntry *previous_entry = bongo_cat_models_find(
             &app->models, app->loaded_model);
@@ -253,6 +290,8 @@ bool bongo_cat_app_select_model_with_error(BongoCatApp *app,
         SDL_GetWindowSizeInPixels(app->window, &pixel_width, &pixel_height);
     }
     bongo_cat_live2d_resize(app->live2d, pixel_width, pixel_height);
+    /* 音频与声音快捷键状态属于上一个模型：新模型可能没有对应音效，而且切换时按住的键不会
+       再有按下与抬起事件，不清零就会一直响着。 */
     bongo_cat_audio_reset(app->audio);
     memset(&app->sound_shortcut_state, 0, sizeof(app->sound_shortcut_state));
     memset(app->sound_shortcut_active, 0, sizeof(app->sound_shortcut_active));

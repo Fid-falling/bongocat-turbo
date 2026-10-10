@@ -1,3 +1,8 @@
+/* 多桌宠的文件请求协议 (父、子两个方向共用一套约定): 子进程把 pass-through.request 与
+ * primary.request 写进自己的状态目录, 父进程每帧取走并删除 —— 请求都是一次性的,
+ * 先删后判, 内容坏掉也只报错不重放。反方向 (父进程的实时可见性与穿透) 走 control.txt,
+ * 见 multi_pet_process.c。两侧读同一批文件, 所以路径都从 primary_state_root 加模型哈希拼出来。
+ */
 #include "runtime.h"
 #include "bongo_cat/file.h"
 #include "bongo_cat/path.h"
@@ -9,6 +14,9 @@
 #define PASS_THROUGH_REQUEST_FILE "pass-through.request"
 #define PRIMARY_REQUEST_FILE "primary.request"
 
+/* 拼 <primary_state_root>/pets/<hash>/<请求文件>: 所有调用方都传 primary_state_root,
+ * 请求文件固定放在"模型自己"的状态目录里。
+ */
 static bool request_path(char *target, size_t capacity, const char *root,
     const char *model_id, const char *request_file) {
     char directory[BONGO_CAT_PATH_CAP];
@@ -17,6 +25,7 @@ static bool request_path(char *target, size_t capacity, const char *root,
         bongo_cat_path_join(target, capacity, directory, request_file);
 }
 
+/* 启动新子进程之前清掉历史穿透请求, 否则它第一帧就会把旧的穿透状态盖回主窗口。 */
 void bongo_cat_multi_pet_clear_pass_through_request(BongoCatApp *app,
     const char *model_id) {
     char path[BONGO_CAT_PATH_CAP];
@@ -29,6 +38,7 @@ void bongo_cat_multi_pet_clear_pass_through_request(BongoCatApp *app,
             "removed: model=%s path=%s", model_id, path);
 }
 
+/* 同上, 清的是 preferences / exit 一类主进程请求; 删不掉只告警, 不阻塞启动。 */
 void bongo_cat_multi_pet_clear_primary_request(BongoCatApp *app,
     const char *model_id) {
     char path[BONGO_CAT_PATH_CAP];
@@ -40,6 +50,9 @@ void bongo_cat_multi_pet_clear_primary_request(BongoCatApp *app,
             "model=%s path=%s", model_id, path);
 }
 
+/* 写请求的公共实现: 先写 .tmp 再原子替换。只允许副进程调用 (app->secondary_pet 必须为真),
+ * 因为请求文件写的是"自己"的状态目录, 主进程没有这个目录。
+ */
 static bool write_primary_request(BongoCatApp *app, const char *action) {
     char path[BONGO_CAT_PATH_CAP], temporary[BONGO_CAT_PATH_CAP];
     int length;
@@ -59,6 +72,7 @@ static bool write_primary_request(BongoCatApp *app, const char *action) {
     return false;
 }
 
+/* 副桌宠请求主实例打开设置窗口或整体退出; 主进程在下一次 primary_requests_update 时消费。 */
 bool bongo_cat_multi_pet_request_preferences(BongoCatApp *app) {
     return write_primary_request(app, "preferences");
 }
@@ -67,6 +81,9 @@ bool bongo_cat_multi_pet_request_exit(BongoCatApp *app) {
     return write_primary_request(app, "exit");
 }
 
+/* 副桌宠请求切换穿透 (用户在副桌宠的托盘菜单里操作): 写进自己目录的请求文件,
+ * 由父进程统一应用到主窗口, 避免两个进程同时改窗口的点击穿透。
+ */
 bool bongo_cat_multi_pet_request_pass_through(BongoCatApp *app,
     bool enabled) {
     char path[BONGO_CAT_PATH_CAP], temporary[BONGO_CAT_PATH_CAP];
@@ -89,6 +106,9 @@ bool bongo_cat_multi_pet_request_pass_through(BongoCatApp *app,
     return true;
 }
 
+/* 父进程取走穿透请求: 文件存在就先删再判内容 —— 内容非法也不重放, 否则会一直失败下去。
+ * 只接受 "0"/"1" 加尾部空白; 返回 false 表示这次没有可用请求 (含文件不存在)。
+ */
 static bool take_request(BongoCatApp *app, const char *model_id,
     bool *enabled) {
     char path[BONGO_CAT_PATH_CAP], content[8] = {0};
@@ -131,6 +151,9 @@ typedef enum PrimaryRequest {
     PRIMARY_REQUEST_EXIT
 } PrimaryRequest;
 
+/* 取走并解析 primary.request: 去掉尾部空白后整词匹配, 不认识的内容报错并按"没有请求"处理
+ * (文件这时已经被删掉了)。
+ */
 static PrimaryRequest take_primary_request(BongoCatApp *app,
     const char *model_id) {
     char path[BONGO_CAT_PATH_CAP], content[32] = {0};
@@ -164,6 +187,9 @@ static PrimaryRequest take_primary_request(BongoCatApp *app,
     return PRIMARY_REQUEST_NONE;
 }
 
+/* 父进程每帧处理所有副桌宠的 primary 请求: exit 立即停掉整个应用并放弃其余请求;
+ * preferences 只置标志, 循环结束后统一打开 —— 同一个窗口不能被开两次。子进程直接返回。
+ */
 void bongo_cat_multi_pet_primary_requests_update(BongoCatApp *app) {
     if (!app || app->secondary_pet) return;
     bool show_preferences = false;
@@ -179,6 +205,9 @@ void bongo_cat_multi_pet_primary_requests_update(BongoCatApp *app) {
     if (show_preferences) bongo_cat_preferences_show(app->preferences);
 }
 
+/* 把各副桌宠的穿透请求应用到主窗口: 同一帧多个请求时后者覆盖前者, 最后统一置命中脏位、
+ * 同步穿透并让设置界面失效。
+ */
 void bongo_cat_multi_pet_pass_through_requests_update(BongoCatApp *app) {
     if (!app || app->secondary_pet) return;
     bool changed = false;

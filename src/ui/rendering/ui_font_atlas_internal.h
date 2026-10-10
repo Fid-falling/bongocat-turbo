@@ -7,6 +7,14 @@
 #include <stddef.h>
 #include <stdio.h>
 
+/*
+ * 图集构建的内部接口, 只给 rendering/ 下的实现文件用。
+ *
+ * UIFontSource 的生命周期固定为三步, 顺序不能变:
+ *   load() -> (建图集) -> detach_source() -> release()
+ * detach 的意义是在 Nuklear 真正释放 config 之前把 ttf_blob 置空, 免得它去 free
+ * 一块 mmap/MapViewOfFile 来的内存 (Windows 上直接崩, Linux 上是 munmap 报错)。
+ */
 typedef struct UIFontSource {
     void *data;
     size_t size;

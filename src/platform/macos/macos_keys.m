@@ -2,8 +2,12 @@
 
 #include <stdio.h>
 
+/* 表按 ANSI 物理位置排列, 所以顺序看起来是乱的(0=A, 1=S, 2=D, ...): 这些数字是苹果定义
+   的键码, 不能按字母顺序重排。 */
 typedef struct MacKeyName { CGKeyCode code; const char *name; } MacKeyName;
 
+/* 这三个媒体键(PrintScreen / ScrollLock / Pause)在 mac 键盘上并不存在, 但配置里可能
+   存着跨平台共享的快捷键字符串, 所以保留映射, 让同一份配置在 mac 上仍能被解析。 */
 const char *bongo_cat_macos_key_name(CGKeyCode code, char output[16]) {
     if (code == 105) return "PrintScreen";
     if (code == 107) return "ScrollLock";
@@ -31,6 +35,8 @@ const char *bongo_cat_macos_key_name(CGKeyCode code, char output[16]) {
     };
     for (size_t i = 0; i < sizeof(keys) / sizeof(keys[0]); ++i)
         if (keys[i].code == code) return keys[i].name;
+    /* F1..F20 的键码在苹果的定义里同样是乱的, 只能单独列表, 并用下标推出 "F<n>";
+       表里的顺序就是 F1 到 F20 的顺序, 不能重排。 */
     static const CGKeyCode function_codes[] = {122,120,99,118,96,97,98,100,101,
         109,103,111,105,107,113,106,64,79,80,90};
     for (size_t i = 0; i < sizeof(function_codes) / sizeof(function_codes[0]); ++i) {

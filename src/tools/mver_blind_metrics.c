@@ -9,10 +9,22 @@
 #include <stdio.h>
 #include <stdlib.h>
 
+/*
+ * 两张图(通常是 Mver 猫与原生猫的渲染结果)的差异指标, 输出 JSON。
+ *
+ * 同时给出整体和"前景"两套数字: 整体相似度会被大块透明/黑色背景拉高, 真正有
+ * 意义的是前景部分。前景的判定有三种模式(见输出里的 ForegroundMode):
+ *   - 给了 mask 图: 用 mask 的 alpha 或亮度;
+ *   - 两张图自带透明(alpha 有变化): 用 alpha 阈值;
+ *   - 都没有: 退回"非黑即前景"。
+ * 退出码 0/1/2, 与其它验证工具一致。
+ */
 static int maximum_rgb(const unsigned char *pixel) {
     return max(pixel[0], max(pixel[1], pixel[2]));
 }
 
+/* 参数: LEFT RIGHT [mask|-] [sample-step] [alpha-threshold=8]
+   [background-threshold=4]。mask 传 "-" 或省略表示不做遮罩。 */
 int wmain(int argc, wchar_t **argv) {
     BongoCatValidationImage first = {0}, second = {0}, mask = {0};
     int sample_step, alpha_threshold, background_threshold, step, alpha_step;
@@ -38,6 +50,8 @@ int wmain(int argc, wchar_t **argv) {
     if (first.width != second.width || first.height != second.height) {
         fwprintf(stderr, L"Frame dimensions differ\n"); goto done;
     }
+    /* 自动步长按面积算: 目标约 25 万次采样, 让大图小图耗时接近。alpha 用更粗的
+       步长, 因为它只需要回答"图里有没有透明像素"这个是非题。 */
     step = sample_step > 0 ? sample_step : max(1, (int)sqrt(
         first.width * (double)first.height / 250000.0));
     alpha_step = max(step, 8);
@@ -88,6 +102,8 @@ int wmain(int argc, wchar_t **argv) {
         }
         ++samples;
     }
+    /* 一个前景像素都没找到, 说明前景判定彻底失败(全黑或全透明), 这时输出任何
+       百分比都没有意义 —— 直接报错, 而不是给出一个漂亮的 100%。 */
     if (foreground == 0) {
         fwprintf(stderr, L"No foreground pixels found\n"); goto done;
     }

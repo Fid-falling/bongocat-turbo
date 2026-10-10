@@ -1,3 +1,10 @@
+/*
+ * 适配元数据(.bongo-cat-adapter.json)的消费端: 行为快捷键绑定与 Mver 渲染参数。
+ * 元数据由 Mver 适配器在导入或缓存时生成, 属于可选增强: 文件缺失、版本不符或字段非法
+ * 都只是"没有增强", 不能让模型加载失败 —— 所以这里对错误一律静默返回。
+ * 时序: 目录扫描与切换模型之后由 catalog 调 apply_metadata; 加载模型时读 render_options。
+ * 最容易改错: 绑定 id 与字段默认值必须与生成端严格一致, 否则用户改过的快捷键会错位。
+ */
 #include "model_import.h"
 #include "runtime.h"
 #include "bongo_cat/json.h"
@@ -7,6 +14,8 @@
 #include <string.h>
 #include <yyjson.h>
 
+/* schemaVersion == 1 且 kind == "bongo-cat-runtime-adapter" 才认作自己的元数据,
+   否则整个文件忽略 —— 避免把别人放的 JSON 当成适配参数。 */
 static bool metadata_version(yyjson_val *root) {
     if (!yyjson_is_obj(root)) return false;
     yyjson_val *schema = yyjson_obj_get(root, "schemaVersion");
@@ -16,6 +25,8 @@ static bool metadata_version(yyjson_val *root) {
         strcmp(kind, "bongo-cat-runtime-adapter") == 0;
 }
 
+/* "sound" 与 "sound-clear"、"effect" 与 "effect-clear" 视为同一族: 生成端把"清除绑定"
+   也按顺序编号, 序号计数如果不合并同族, 读出来的 id 会与生成端整体错位。 */
 static bool same_family(const char *left, const char *right) {
     bool left_effect = left && (strcmp(left, "effect") == 0 ||
         strcmp(left, "effect-clear") == 0);
@@ -28,6 +39,8 @@ static bool same_family(const char *left, const char *right) {
     return (left_effect && right_effect) || (left_sound && right_sound);
 }
 
+/* 序号 = 之前同族绑定的个数, 与生成端"按出现顺序编号"的规则对齐。O(n²) 但绑定数很少,
+   换哈希表不值得。 */
 static int sequential_index(yyjson_val *bindings, size_t index, const char *kind) {
     int result = 0;
     for (size_t before = 0; before < index; ++before) {
@@ -38,6 +51,7 @@ static int sequential_index(yyjson_val *bindings, size_t index, const char *kind
     return result;
 }
 
+/* 线性查找已有绑定; 返回 NULL 表示这是一条尚未存在的新绑定。 */
 static BongoCatBehaviorShortcut *shortcut_for(BongoCatApp *app, const char *id) {
     for (size_t i = 0; i < app->settings.behavior_shortcut_count; ++i)
         if (strcmp(app->settings.behavior_shortcuts[i].id, id) == 0)
@@ -45,6 +59,8 @@ static BongoCatBehaviorShortcut *shortcut_for(BongoCatApp *app, const char *id) 
     return NULL;
 }
 
+/* 生成持久化用的绑定 id, 必须与生成端逐字节一致: 声音与特效按同族序号, 表情按 index,
+   动作按 group 加 index。返回 false 表示这种 kind 不参与快捷键, 该条直接跳过。 */
 static bool behavior_id(char *id, size_t capacity, const char *model_id,
     yyjson_val *bindings, size_t index, yyjson_val *item) {
     const char *kind = yyjson_get_str(yyjson_obj_get(item, "kind"));
@@ -66,6 +82,9 @@ static bool behavior_id(char *id, size_t capacity, const char *model_id,
     return true;
 }
 
+/* 幂等: catalog 每次刷新都会调一次。已存在的绑定只补空的 label, 绝不覆盖用户改过的
+   快捷键; 新增受 BONGO_CAT_BEHAVIOR_BINDING_CAP 限制, 满了就静默停止。
+   只在内存里改 app->settings, 落盘由设置保存流程负责。 */
 void bongo_cat_import_apply_metadata(BongoCatApp *app, const char *model_id,
     const char *directory) {
     char path[BONGO_CAT_PATH_CAP];
@@ -101,6 +120,10 @@ void bongo_cat_import_apply_metadata(BongoCatApp *app, const char *model_id,
     yyjson_doc_free(document);
 }
 
+/* 返回值 = 是否成功读到导入适配的渲染参数: true 时 options 被填满; false 时调用方沿用
+   内置 Live2D 默认投影(函数已清零 options, 可以安全忽略其内容)。
+   profile 只认 "mver-0.1.6"(其余版本的参数含义可能不同), scale 必须落在 (0, 100],
+   参考分辨率必须为正。 */
 bool bongo_cat_import_render_options(const char *directory,
     BongoCatLive2DRenderOptions *options) {
     if (!options) return false;
@@ -148,6 +171,8 @@ bool bongo_cat_import_render_options(const char *directory,
             yyjson_obj_get(render, "pointerRight"));
         options->pointer_bottom = (int)yyjson_get_sint(
             yyjson_obj_get(render, "pointerBottom"));
+        /* 自定义指针范围必须满足 right > left 且 bottom > top, 否则退回内置范围:
+           坏数据不应该把指针锁死在屏幕外。 */
         if (options->custom_pointer_bounds &&
             (options->pointer_right <= options->pointer_left ||
              options->pointer_bottom <= options->pointer_top))

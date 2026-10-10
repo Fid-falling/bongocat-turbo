@@ -16,6 +16,8 @@
 #include "bongo_cat/vk_backend.h"
 #include "bongo_cat/live2d_vulkan.h"
 
+/* 还要等几个"已呈现帧"才真正回收; 由 model_loaded / ui_loaded 置位, 由 presented /
+   idle 消费。 */
 static unsigned pending_presented_frames;
 static bool pending_ui_frame;
 
@@ -35,14 +37,20 @@ static void consume_pending_frame(void) {
     if (!pending_presented_frames) trim_memory();
 }
 
+/* 模型加载完成后延迟两帧再回收: 加载那一帧还没画出来, 立刻 trim 会把马上要用的缓冲
+   放掉, 下一帧再白分配一次。 */
 void bongo_cat_memory_policy_model_loaded(void) {
     pending_presented_frames = 2;
 }
 
+/* 渲染路径在"帧真的呈现之后"调用 (不是画完就算): 缓冲可能马上要被复用, 呈现完才是
+   安全点。 */
 void bongo_cat_memory_policy_frame_presented(void) {
     consume_pending_frame();
 }
 
+/* 窗口不可见 / 最小化时主循环每轮都会调用它, 所以这里是"没人看画面"时的兜底消费点
+   —— 托盘模式可能永远不出帧, 只靠 presented 消费的话永远等不到。 */
 void bongo_cat_memory_policy_idle(void) {
     /* Tray-only and minimized modes may not present a frame after loading. */
     consume_pending_frame();
@@ -53,6 +61,7 @@ void bongo_cat_memory_policy_idle(void) {
     bongo_cat_live2d_vulkan_release_target();
 }
 
+/* 设置窗口的 UI 纹理同理: 打开后延迟一帧回收 (UI 缓存自己另有一套 use_counter 机制)。 */
 void bongo_cat_memory_policy_ui_loaded(void) {
     pending_ui_frame = true;
 }

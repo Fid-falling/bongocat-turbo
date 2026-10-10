@@ -1,3 +1,11 @@
+/*
+ * 就近模型扫描: 把可执行文件旁的 Mver 或 Tauri 模型包就地适配成运行时适配器, 原始目录保持不动,
+ * 适配器落在 cache 的 model-adapters 下。
+ * 位置: 启动与刷新模型时由 model_catalog_runtime.c 调用; 全程必须在 model_import_lock 之内 ——
+ * 本文件只有 import_root 一层加锁, 加锁后不得再调用其它会加锁的入口 (互斥量不可重入)。
+ * 契约: 返回 BONGO_CAT_OK 只表示扫描跑完, 不代表发现了模型; 单个候选的失败在 _scan 入口下只记日志
+ * 跳过, 在 _root 入口下直接失败返回。
+ */
 #include "model_import.h"
 #include "model_import_lock.h"
 #include "model_import_probe.h"
@@ -14,8 +22,12 @@
 #include <stdlib.h>
 #include <string.h>
 
+/* 限时扫描的总预算: 启动路径上宁可少发现几个模型, 也不能让扫描拖慢窗口出现。到期后
+   bongo_cat_import_scan_budget 直接收工, 已经加进去的条目保留。 */
 #define NEARBY_SCAN_BUDGET_NS 500000000ull
 
+/* 目录里是否已有模式相同、内容指纹相同的模型; ignored 用于跳过正在更新的那一条自身。
+   content_digest 为空的条目视为内容未知, 不参与判重。 */
 static bool existing_identity(const BongoCatModelCatalog *models,
     const char *identity, BongoCatModelMode mode,
     const BongoCatModelEntry *ignored) {
@@ -35,6 +47,8 @@ static BongoCatModelEntry *model_with_id(BongoCatApp *app, const char *id) {
     return NULL;
 }
 
+/* 候选对应的磁盘来源: 补丁用 patch_root (用户往往直接选中补丁目录), 其余用 package_root, 都没有
+   时退回调用方给的 fallback。 */
 static const char *candidate_source(const BongoCatImportCandidate *candidate,
     const char *fallback) {
     if (candidate->format == BONGO_CAT_IMPORT_MVER_PATCH &&
@@ -42,6 +56,8 @@ static const char *candidate_source(const BongoCatImportCandidate *candidate,
     return candidate->package_root[0] ? candidate->package_root : fallback;
 }
 
+/* 生成显示名, 一般就是来源目录名。特例: 补丁目录名与其 package_root 同名 (用户选中了完整包目录)
+   时改用上一级目录名, 否则补丁会顶掉用户熟悉的名字。 */
 static void candidate_name(const char *source,
     const BongoCatImportCandidate *candidate, char *name, size_t capacity) {
     const char *value = bongo_cat_path_name(source);
@@ -54,6 +70,11 @@ static void candidate_name(const char *source,
     snprintf(name, capacity, "%s", value && value[0] ? value : "Nearby model");
 }
 
+/* 把一个候选适配进模型目录。id 由来源路径哈希加模式名派生, 因此同一路径重复扫描是幂等的: 指纹与
+   适配器都没变就直接复用缓存标记, 连适配器目录都不重建。同一 id 若是用户自己放进去的非 managed
+   条目则原样保留。
+   返回 false 表示候选不可用 (指纹无法确定或超出模型容量), 由调用方决定是致命还是跳过;
+   first_created 记录本次第一个真正新建的 id, 供上层决定要不要自动切换当前模型。 */
 static bool add_candidate(BongoCatApp *app, const char *cache_root,
     const char *source, const BongoCatImportCandidate *candidate,
     char first_created[BONGO_CAT_ID_CAP], BongoCatError *error) {
@@ -79,6 +100,8 @@ static bool add_candidate(BongoCatApp *app, const char *cache_root,
             source, signature, identity, true, candidate->mode);
         return true;
     }
+    /* 补丁候选额外查一次: 它若建立在未改动的内置模型之上 (底层清单仍是官方那份), 或者底层包的
+       内容已经在目录里, 这个补丁就不算独立模型, 直接沿用已有条目。 */
     if (candidate->format == BONGO_CAT_IMPORT_MVER_PATCH) {
         char base_identity[65];
         bool base_placeholder = false;
@@ -92,6 +115,8 @@ static bool add_candidate(BongoCatApp *app, const char *cache_root,
             source, signature, identity, false, candidate->mode);
         return true;
     }
+    /* 内容与目录里已有模型相同: 记下指纹 (但不标 adapter_ready, 表示它没有自己的适配器) 后跳过,
+       下次扫描连指纹化都能省掉。 */
     if (!same_id && app->models.count >= BONGO_CAT_MODEL_CAP) {
         bongo_cat_error_set(error, BONGO_CAT_ERROR_FORMAT,
             "Too many models while adding nearby package");
@@ -121,6 +146,8 @@ typedef struct NearbyAdd {
     bool best_effort;
 } NearbyAdd;
 
+/* 遍历发现结果里的每个候选。best_effort 为真 (即限时扫描入口) 时把单个候选的错误降级成警告日志
+   后继续, 启动扫描不能因为一个坏模型全灭; 为假时立刻返回错误码, 让上层能看到原因。 */
 static BongoCatResult add_discovery(NearbyAdd *add, const char *fallback,
     BongoCatImportDiscovery *discovery, BongoCatError *error) {
     for (size_t i = 0; i < discovery->count; ++i) {
@@ -145,6 +172,9 @@ static BongoCatResult add_scanned(void *userdata, const char *source,
     return add_discovery(userdata, source, discovery, error);
 }
 
+/* 在 root 上做发现。bounded 走 probe_exact (只认精确包根, 不向上回溯) 以控制耗时; 否则按 Mver
+   宽查找、Mver 补丁、Tauri 的顺序依次尝试, 每次失败都清空 discovery 与 error, 免得上一个适配器
+   的残留影响下一个。 */
 static int discover_direct(const char *root, bool bounded,
     BongoCatImportDiscovery *discovery, BongoCatError *error) {
     if (bounded) return bongo_cat_import_probe_exact(root, discovery,
@@ -166,6 +196,10 @@ static int discover_direct(const char *root, bool bounded,
     return found;
 }
 
+/* 加锁内的主流程: 建缓存目录, 先试精确发现, 找不到再做限时或完整的递归扫描。成功后若当前选中项
+   为空或还是内置默认 id, 就把选中项切到本次新建的第一个模型。
+   前提: app 与 root 非空且 app->cache_root 已设置, root 不存在时直接返回 OK。
+   discovery 是本函数堆分配并释放的临时工作区, 不返回给调用方。 */
 static BongoCatResult import_root_unlocked(BongoCatApp *app, const char *root,
     bool bounded, BongoCatError *error) {
     if (!app || !root || !app->cache_root[0])
@@ -199,6 +233,8 @@ static BongoCatResult import_root_unlocked(BongoCatApp *app, const char *root,
     return result;
 }
 
+/* 加锁外壳: 模型目录的扫描与写盘共用一个互斥量, 因此这里不能嵌套调用另一个会加锁的入口 (会自
+   死锁)。 */
 static BongoCatResult import_root(BongoCatApp *app, const char *root,
     bool bounded, BongoCatError *error) {
     bongo_cat_import_storage_lock();
@@ -207,16 +243,20 @@ static BongoCatResult import_root(BongoCatApp *app, const char *root,
     return result;
 }
 
+/* 非限时入口: 精确发现加完整递归扫描, 单个候选的错误视为致命。 */
 BongoCatResult bongo_cat_import_nearby_root(BongoCatApp *app,
     const char *root, BongoCatError *error) {
     return import_root(app, root, false, error);
 }
 
+/* 限时入口: 给启动路径用, 预算 500 ms, 单个候选失败只记日志。 */
 BongoCatResult bongo_cat_import_nearby_scan(BongoCatApp *app,
     const char *root, BongoCatError *error) {
     return import_root(app, root, true, error);
 }
 
+/* 面向用户选中目录的入口: 先扫选中目录, 一个模型都没新增时再扫它的父目录 —— 用户常常只选中包里
+   的 img 或子目录, 父目录才是包根。 */
 BongoCatResult bongo_cat_import_nearby(BongoCatApp *app,
     const char *root, BongoCatError *error) {
     if (!app || !root) return BONGO_CAT_ERROR_ARGUMENT;

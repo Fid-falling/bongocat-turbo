@@ -133,6 +133,27 @@ void bongo_cat_vk_collect_readback(BongoCatVk *vk) {
             return;
         }
         SDL_memcpy(pixels, readback->mapped, bytes);
+        /*
+         * 交换链优先用 B8G8R8A8 (见 vk_swapchain.c 的优先格式表), 所以回读到的
+         * 字节序是 BGRA; 而消费端 (模型封面写 PNG、帧诊断写 BMP 与分量统计) 一律
+         * 按 RGBA 解释。在这里统一换一次 R/B, 让"回读结果 = RGBA"成为本模块的
+         * 对外契约 —— 否则封面与诊断预览会红蓝互换 (蓝色渲出来变黄白), 且 GL 路径
+         * 是对的 (glReadPixels 直接要 GL_RGBA), 两个后端就对不上了。
+         *
+         * 踩过的坑: 当初验收只比了"不透明像素占比 / 有色像素占比"这类统计量, 而
+         * 互换通道不改变这些比例, 于是漏掉了; 比较颜色请比对分量均值, 别只比占比。
+         */
+        if (vk->format == VK_FORMAT_B8G8R8A8_UNORM ||
+            vk->format == VK_FORMAT_B8G8R8A8_SRGB) {
+            const size_t count =
+                (size_t)readback->width * (size_t)readback->height;
+            for (size_t i = 0; i < count; ++i) {
+                unsigned char *pixel = pixels + i * 4u;
+                const unsigned char swap = pixel[0];
+                pixel[0] = pixel[2];
+                pixel[2] = swap;
+            }
+        }
         vk->frame_pixels = pixels;
         vk->frame_width = readback->width;
         vk->frame_height = readback->height;

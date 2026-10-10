@@ -1,3 +1,14 @@
+/*
+ * 关于页底部信息条: 版本号 + 更新按钮 + 反馈链接 + 打开日志目录。
+ *
+ * 两条是本文件的核心逻辑:
+ * 1. 布局是"能并排就并排, 放不下就换两行"(stacked)。所有宽度都是先把各段量出来
+ * 再累加得到的, 加一项就要把它算进 total/actions_width, 否则窄窗口下会被裁掉;
+ * 2. 更新按钮是一个多态按钮, 文案和点击行为都由 update_snapshot 的 status 决定
+ * (检查中/有新版/商店版/不支持自更新/普通检查)。文案由 update_label 统一给出,
+ * 状态判断在这里重复了一次 —— 改动状态语义时两处要一起改。
+ * 版本号用 BONGO_CAT_VERSION_DISPLAY (带构建渠道信息), 不要再拼别的字符串。
+ */
 #include "preferences_about_footer.h"
 #include "preferences_notice.h"
 #include "preferences_state.h"
@@ -11,6 +22,11 @@
 #include <SDL3/SDL.h>
 #include <stdio.h>
 
+/*
+ * 4/5 缩放的说明: 日志链接要比其它链接小一号, 但 Nuklear 的字体是不可变的,
+ * 所以这里复制一份 caption_font 改高度, 存进 state (不能是局部变量: 这一帧里
+ * Nuklear 还持有这个指针)。
+ */
 #define SUPPORT_LOGS_SCALE (4.0f / 5.0f)
 #define SUPPORT_LOGS_ICON_SIZE (14.0f * SUPPORT_LOGS_SCALE)
 #define SUPPORT_LOGS_GAP 4.0f
@@ -24,6 +40,7 @@ static float width(const struct nk_user_font *font, const char *value) {
     return font->width(font->userdata, font->height, value, nk_strlen(value));
 }
 
+/* 每次都按当前 caption_font 重算, 因为字体图集重建后原来的指针会失效 */
 static const struct nk_user_font *logs_font(BongoCatPreferences *value) {
     value->support_logs_font = *value->ui.caption_font;
     value->support_logs_font.height =
@@ -64,6 +81,7 @@ static struct nk_color link_color(struct nk_context *context,
     return bongo_cat_ui_color_mix(p.accent, p.pink, amount);
 }
 
+/* 打开日志目录失败要明确提示: 这一项是排障入口, 点了没反应会让用户以为程序坏了 */
 static void open_logs(BongoCatPreferences *value) {
     if (bongo_cat_platform_open_directory(value->app->log_root)) return;
     SDL_LogWarn(SDL_LOG_CATEGORY_APPLICATION,
@@ -72,6 +90,12 @@ static void open_logs(BongoCatPreferences *value) {
         "native.support.openLogsFailed", "Unable to open logs folder"), true);
 }
 
+/*
+ * 更新按钮。右上角那个小红点是"真有可下载的新版本"的标记 —— 它和按钮文案是两套
+ * 判断: 文案可能只写"检查更新", 但有红点就说明点下去会去下载。
+ * CHECKING 状态下点击直接返回 (不发第二次请求); 打开商店/发布页失败时把
+ * SDL_GetError 一起带上, 否则用户只看到"无法打开"而不知道是系统拒绝了 URL。
+ */
 static void draw_update(BongoCatPreferences *value,
     struct nk_context *context, struct nk_command_buffer *canvas,
     struct nk_rect bounds, const char *label, float content_width,
@@ -122,6 +146,7 @@ static void draw_update(BongoCatPreferences *value,
     }
 }
 
+/* 更新按钮的文案表。buffer 由调用方提供, 因为"更新到 vX.Y.Z"要拼接版本号 */
 static const char *update_label(BongoCatPreferences *value,
     const BongoCatUpdateSnapshot *snapshot, char *buffer, size_t capacity) {
     switch (snapshot->status) {
@@ -149,6 +174,7 @@ static const char *update_label(BongoCatPreferences *value,
     }
 }
 
+/* 反馈链接与"打开日志": 日志那一项用小字体加一个文件夹图标, 中间那条竖线是分隔符 */
 static void draw_links(BongoCatPreferences *value,
     struct nk_context *context, struct nk_command_buffer *canvas,
     struct nk_rect feedback, struct nk_rect logs, const char *feedback_label,
@@ -180,6 +206,13 @@ static void draw_links(BongoCatPreferences *value,
     if (hit(context, logs)) open_logs(value);
 }
 
+/*
+ * 底部信息条。所有子宽度先量后排, 最后用一个 total 判断要不要折行:
+ * info 段 = "App version" + 版本号
+ * actions 段 = 更新按钮 + 反馈 + 日志
+ * 折行时两段各自居中, 并让 info 行上移 8px / actions 行下移 22px —— 这两个偏移量
+ * 是配合 34px 行高调出来的, 改行高要一起改。
+ */
 void bongo_cat_preferences_about_footer(BongoCatPreferences *value,
     struct nk_context *context, struct nk_command_buffer *canvas,
     struct nk_rect bounds, BongoCatUIPalette p) {

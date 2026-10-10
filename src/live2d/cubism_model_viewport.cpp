@@ -5,6 +5,11 @@
 
 namespace bongo_cat {
 
+/*
+ * 把 frame (以画布比例表示的边距) 换算成像素视口。frame 描述"内容之外还要留多少", 所以
+ * 内容尺寸 = 窗口尺寸 / (1 + 两侧边距之和); 结果钳进窗口并保证至少 1 像素, 免得极端
+ * 比例下算出 0 或负数, 让 GL/Vulkan 的视口设置直接报错。
+ */
 void NativeModel::update_viewport() {
     float horizontal = 1.0f + frame_.left + frame_.right;
     float vertical = 1.0f + frame_.top + frame_.bottom;
@@ -44,6 +49,9 @@ bool NativeModel::viewport(int *x, int *y, int *width, int *height) const {
     return true;
 }
 
+/* 把内容视口折进投影矩阵 (缩放 + 平移), 而不是去改视口设置: 叠加层 (背景/键盘/指针) 和
+ * 模型必须落在同一块内容区域里才能对齐, 而两条渲染路径下发视口的方式不同, 折进矩阵是
+ * 唯一一处两条路径都能共享的做法 (见 vk_backend.h 关于叠加层视口的说明)。 */
 void NativeModel::apply_viewport_projection(
     Csm::CubismMatrix44 &projection) const {
     if (width_ <= 0 || height_ <= 0 || viewport_width_ <= 0 ||
@@ -63,6 +71,8 @@ void NativeModel::apply_viewport_projection(
     matrix[13] = matrix[13] * scale_y + translate_y;
 }
 
+/* 只统计数据、不改渲染: 给自动化测试和"模型到底画出来没有"的诊断用。顺手把可见包络经
+ * 投影变换到 NDC 存下来, 渲染路径就不必再算一遍 (visual_state_ready_ 置位后外部才能读到)。 */
 void NativeModel::record_visible_state(Csm::CubismMatrix44 &projection) {
     visual_state_.drawable_count = _model->GetDrawableCount();
     for (int i = 0; i < _model->GetDrawableCount(); ++i) {

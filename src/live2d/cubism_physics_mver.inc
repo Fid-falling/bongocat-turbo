@@ -1,3 +1,14 @@
+/*
+ * 配置阶段由 cmake/CubismMverPhysics.cmake 用 #include 插进 SDK 的 CubismPhysics.cpp,
+ * 展开在 CubismPhysics 的成员函数之间 —— 所以这里既不能有 include guard, 也不能用
+ * namespace 包裹 (它已经在 SDK 的命名空间里了), 但可以直接使用 _physicsRig / _options /
+ * UpdateParticles() 这些本类的私有成员, 这也是它必须被"插进来"而不是写成独立文件的原因。
+ * 好处是 vendor 下的 SDK 保持原样: 升级 SDK 时只需重新核对 cmake 里的锚点字符串。
+ *
+ * 整段是 SDK Evaluate() 的 Mver 兼容变体: 按 SubRig 遍历, 先把输入参数归一化成平移与
+ * 角度 (输入参数的索引是惰性解析的, -1 表示还没查过), 再旋转合成、推进粒子, 最后把结果
+ * 写回输出参数。属性名与 SDK 的私有成员一一对应, 改名会在这里直接编译失败。
+ */
 void CubismPhysics::EvaluateMver(CubismModel* model, csmFloat32 deltaTimeSeconds)
 {
     csmFloat32 totalAngle;
