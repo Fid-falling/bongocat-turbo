@@ -3,6 +3,8 @@
 #include "preferences_model_cover.h"
 #include "runtime.h"
 #include "bongo_cat/file.h"
+#include "bongo_cat/render.h"
+#include "bongo_cat/vk_backend.h"
 
 #include <SDL3/SDL.h>
 #include <SDL3/SDL_opengl.h>
@@ -48,6 +50,33 @@ static void flip_cover_pixels(unsigned char *pixels, int height, size_t pitch) {
 
 static unsigned char *read_cover_pixels(const char *path, int width,
     int height, size_t pitch, size_t bytes) {
+    /*
+     * Vulkan 没有可读的 GL 前后缓冲: 用整帧回读的结果 (vk_readback.c)。
+     * Vulkan 图像第 0 行在视觉上方, 与 glReadPixels 相反, 所以这里不翻转。
+     */
+    if (bongo_cat_renderer_active() == BONGO_CAT_RENDERER_VULKAN) {
+        int sample_width = 0, sample_height = 0;
+        const unsigned char *sample = NULL;
+        if (!bongo_cat_vk_take_frame_sample(bongo_cat_vk_current(),
+                &sample_width, &sample_height, &sample) ||
+            sample_width < width || sample_height < height || !sample) {
+            SDL_LogWarn(SDL_LOG_CATEGORY_VIDEO,
+                "Model cover readback not ready (Vulkan): path=%s sample=%dx%d "
+                "window=%dx%d", path, sample_width, sample_height, width, height);
+            return NULL;
+        }
+        unsigned char *copy = malloc(bytes);
+        if (!copy) {
+            SDL_LogWarn(SDL_LOG_CATEGORY_VIDEO,
+                "Model cover refresh allocation failed for %zu bytes: %s",
+                bytes, path);
+            return NULL;
+        }
+        for (int y = 0; y < height; ++y)
+            SDL_memcpy(copy + (size_t)y * pitch,
+                sample + (size_t)y * (size_t)sample_width * 4u, pitch);
+        return copy;
+    }
     unsigned char *pixels = malloc(bytes);
     if (!pixels) {
         SDL_LogWarn(SDL_LOG_CATEGORY_VIDEO,

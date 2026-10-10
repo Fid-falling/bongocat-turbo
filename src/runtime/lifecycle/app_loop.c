@@ -35,8 +35,18 @@ static bool render(BongoCatApp *app, bool present) {
     }
     /* Vulkan 后端有自己的一整条帧路径 (交换链获取/绘制/呈现), 这里直接分叉,
        不碰任何 OpenGL 状态。 */
-    if (bongo_cat_renderer_active() == BONGO_CAT_RENDERER_VULKAN)
-        return bongo_cat_vk_render_main(app, present);
+    if (bongo_cat_renderer_active() == BONGO_CAT_RENDERER_VULKAN) {
+        if (!bongo_cat_vk_render_main(app, present)) return false;
+        if (present) return true;
+        /*
+         * 离屏截帧 (模型封面): 与 GL 路径在同一处收尾 —— vk_render_main 刚把这一帧
+         * 渲染并呈现, 同时把整帧入队回读; 这里尝试取像素写 PNG。第一次通常还没
+         * 回来 (回读有一帧延迟), 于是返回 false 交给上层 defer, 下一帧才写成。
+         */
+        int width = 0, height = 0;
+        SDL_GetWindowSizeInPixels(app->window, &width, &height);
+        return bongo_cat_model_cover_capture(app, width, height);
+    }
     uint64_t now = SDL_GetTicksNS();
     if (app->render_retry_ns > now) return false;
     if (!SDL_GL_MakeCurrent(app->window, app->gl_context)) {

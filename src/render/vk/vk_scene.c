@@ -52,11 +52,13 @@ static BongoCatVkTexture *live2d_target_texture(BongoCatApp *app) {
 
 bool bongo_cat_vk_render_main(BongoCatApp *app, bool present) {
     if (!app || !app->vk || !app->window) return false;
-    if (!present) {
-        /* 离屏截帧 (模型封面) 需要把这一帧渲染到可回读的独立图像里, 属于
-           后续阶段的 Vulkan 回读路径; 现在直接让调用方延后处理。 */
-        return false;
-    }
+    /*
+     * 离屏截帧 (模型封面): Vulkan 没有可读的 GL 前后缓冲, 改成"照常渲染这一帧,
+     * 另外把整帧入队回读"。这一帧仍然 present (消费 acquire, 画面与普通帧一致),
+     * 像素要到下一次复用帧槽时才拿得到 (vk_readback.c 的一帧延迟语义), 于是封面
+     * 分两帧完成: 这一帧排队, 下一帧 take 到结果再写 PNG。
+     */
+    const bool cover_capture = !present;
     uint64_t now = SDL_GetTicksNS();
     if (app->render_retry_ns > now) return false;
     int width = 0, height = 0;
@@ -158,6 +160,12 @@ bool bongo_cat_vk_render_main(BongoCatApp *app, bool present) {
                 (int)(local_y * pixel_height / window_height));
         }
     }
+
+    /* 封面帧: 整帧入队, 结果由下一帧的 take_frame_sample 取走 */
+    if (cover_capture &&
+        !bongo_cat_vk_queue_frame_sample(app->vk, 0, 0, width, height))
+        SDL_LogWarn(SDL_LOG_CATEGORY_VIDEO,
+            "[vulkan] 封面整帧回读入队失败 (%dx%d)", width, height);
 
     app->render_retry_ns = 0;
     bool presented = bongo_cat_vk_end_frame(app->vk);
