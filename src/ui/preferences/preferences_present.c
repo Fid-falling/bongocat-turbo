@@ -18,6 +18,17 @@ static void stage_log(const char *stage) {
     if (enabled) SDL_LogWarn(SDL_LOG_CATEGORY_VIDEO, "[prefs] stage=%s", stage);
 }
 
+/*
+ * 设置界面的渲染节流: 60 Hz。
+ *
+ * 界面是事件驱动渲染 (滚动/拖动/动画期间 render_dirty 会一直为真), 而它是挂在
+ * 宠物窗口的主循环里跑的 —— 宠物窗口设成"无限制"时主循环能到 800 Hz, 设置界面
+ * 就会以同样的频率去 present。开着 RTSS (微星小飞机 OSD) / OBS 这类叠加层钩子时,
+ * 每次 present 都要过一遍钩子, 于是被放大成严重掉帧。节流后 present 次数与刷新率
+ * 对齐, 滚动依旧是逐帧的, 观感不变。
+ */
+#define BONGO_CAT_PREFERENCES_FRAME_NS 16666667ull
+
 void bongo_cat_preferences_render(BongoCatPreferences *value) {
     bongo_cat_preferences_release_idle_window(value);
     if (!value || !value->window || !value->visible) return;
@@ -27,6 +38,9 @@ void bongo_cat_preferences_render(BongoCatPreferences *value) {
         value->raster_retry_ns <= now;
     if (value->render_retry_ns > now ||
         (!value->render_dirty && value->last_render_ns && !raster_due)) return;
+    /* 这里不清 render_dirty: 这一轮跳过, 下一轮主循环接着画 */
+    if (value->last_render_ns && !raster_due &&
+        now - value->last_render_ns < BONGO_CAT_PREFERENCES_FRAME_NS) return;
     value->render_dirty = false;
     value->ui.context.delta_time_seconds = value->last_render_ns ? NK_CLAMP(
         .001f, (float)(now - value->last_render_ns) / 1000000000.0f,
