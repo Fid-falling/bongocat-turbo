@@ -41,6 +41,7 @@
         },
         "hints": {
         "rendererRestart": "렌더러 변경은 BongoCat을 다시 시작한 뒤에 적용됩니다.",
+        "supersample": "자동: 창이 크면 1x로 낮춥니다. 2x는 면적이 4배라 VRAM을 더 씁니다",
           "hoverUnavailable": "현재 데스크톱 환경에서는 마우스를 올려 숨기기 기능을 사용할 수 없습니다.",
           "gameInput": "게임 중 데스크톱 펫이 반응하지 않나요?",
           "gameInputHelp": "BongoCat을 관리자 권한으로 실행하고 게임을 창 모드로 설정해 보세요.",

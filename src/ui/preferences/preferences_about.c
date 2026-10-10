@@ -129,7 +129,7 @@ static void hero_title(BongoCatPreferences *value, struct nk_context *context,
     BongoCatUIPalette p) {
     const char *title = "BongoCat";
     const char *by = tr(value, "native.support.by", "by ");
-    const char *developer = "vladelaina";
+    const char *developer = "vladelaina & Fid_falling";
     float gap = 8, title_width = width(value->ui.hero_font, title);
     float by_width = width(value->ui.caption_font, by),
         developer_width = width(value->ui.caption_font, developer);

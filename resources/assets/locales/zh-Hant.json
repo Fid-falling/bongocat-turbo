@@ -41,6 +41,7 @@
         },
         "hints": {
         "rendererRestart": "渲染後端切換後，需要重新啟動 BongoCat 才會生效。",
+        "supersample": "自動: 視窗較大時退回 1x; 2x 是 4 倍面積, 更吃顯示記憶體",
           "hoverUnavailable": "目前桌面環境暫不支援滑鼠移入隱藏。",
           "gameInput": "遊戲中桌寵沒反應？",
           "gameInputHelp": "試試以系統管理員身分啟動 BongoCat，並將遊戲設為視窗模式。",

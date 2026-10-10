@@ -163,7 +163,9 @@ static void page_display(BongoCatApp *app, struct nk_context *context) {
         /* 用下拉而不是主题那种图标分段控件: 这里要显示"自动/质量/省内存"文字 */
         selected = bongo_cat_pref_combo(context, "supersample",
             tr(app, "pages.preference.cat.labels.supersampleQuality",
-                "Supersampling"), "",
+                "Supersampling"),
+            tr(app, "pages.preference.cat.hints.supersample",
+                "自动: 窗口较大时退回 1x; 2x 是 4 倍面积, 更吃显存"),
             labels, count, selected);
         if (selected != app->settings.window.supersample) {
             app->settings.window.supersample = selected;

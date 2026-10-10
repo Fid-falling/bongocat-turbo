@@ -41,6 +41,7 @@
         },
         "hints": {
         "rendererRestart": "レンダラーの変更は BongoCat の再起動後に反映されます。",
+        "supersample": "自動: 大きいウィンドウでは 1x に低下。2x は面積 4 倍で VRAM を多く使います",
           "hoverUnavailable": "現在のデスクトップ環境では、マウスを重ねて非表示にする機能は利用できません。",
           "gameInput": "ゲーム中にデスクトップペットが反応しない？",
           "gameInputHelp": "BongoCat を管理者として起動し、ゲームをウィンドウモードに設定してみてください。",
