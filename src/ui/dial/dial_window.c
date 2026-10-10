@@ -109,10 +109,22 @@ static bool create(Dial *d) {
     if (!d->window) return false;
     d->window_id = SDL_GetWindowID(d->window);
     if (dial_vulkan) {
-        /* 菜单窗口自己的 Vulkan 上下文 (与设置窗口同一套写法) */
+        /*
+         * 复用主窗口的 instance/device/queue, 只建自己的交换链。
+         *
+         * 独立建第二套设备在注入了叠加层钩子的环境里会崩: RTSS (微星小飞机 OSD) /
+         * OBS graphics-hook / NVIDIA 叠加层普遍假定单设备, 第一帧走到
+         * vkQueuePresentKHR 里就炸 —— 设置窗口当初就是这个原因改成共享设备的
+         * (见 preferences_scale.c 的注释)。bongo_cat_vk_current() 返回的正是主
+         * 上下文 (设置窗口的不会被登记)。
+         */
         BongoCatError error = {0};
-        d->vk = bongo_cat_vk_create(d->window, &error);
+        BongoCatVk *owner = bongo_cat_vk_current();
+        d->vk = owner ? bongo_cat_vk_create_shared(d->window, owner, &error)
+                      : bongo_cat_vk_create(d->window, &error);
         if (!d->vk) return false;
+        /* 菜单是模态的: 呈现不等垂直回扫, 展开/收起的动画更顺 (同设置窗口) */
+        bongo_cat_vk_set_vsync(d->vk, false);
     } else {
     int sharing = 0;
     SDL_GL_GetAttribute(SDL_GL_SHARE_WITH_CURRENT_CONTEXT,&sharing);
