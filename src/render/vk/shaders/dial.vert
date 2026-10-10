@@ -21,6 +21,7 @@ layout(location = 1) out vec4 vertex_color;
 layout(push_constant, std430) uniform Push {
     vec2 scale;    /* 2/width, 2/height */
     vec2 offset;   /* -1, -1 */
+    int color_texture;  /* 见 dial.frag: 1=RGBA 纹理, 0=单通道遮罩 */
 } projection;
 
 void main() {

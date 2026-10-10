@@ -289,6 +289,8 @@ bool bongo_cat_vk_draw_dial(BongoCatVk *vk, BongoCatVkTexture *texture,
     push.scale[1] = 2.0f / (float)height;
     push.offset[0] = -1.0f;
     push.offset[1] = -1.0f;
+    /* 菜单里既有 RGBA 图标也有单通道字形图集, 见 dial.frag */
+    push.color_texture = texture->alpha_mask ? 0 : 1;
     VkCommandBuffer command = vk->frames[vk->frame_index].command;
     vkCmdBindPipeline(command, VK_PIPELINE_BIND_POINT_GRAPHICS, vk->dial_pipeline);
     vkCmdBindDescriptorSets(command, VK_PIPELINE_BIND_POINT_GRAPHICS,
