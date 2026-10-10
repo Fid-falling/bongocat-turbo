@@ -50,6 +50,10 @@ static bool reserve_bytes(BongoCatUIBackend *backend,
                 item->used < backend->paint_frame_marker;
             if (stale && (!oldest || item->used < oldest->used)) oldest = item;
         }
+        if (SDL_getenv("BONGO_CAT_TEST_PREFS_STAGES"))
+            SDL_LogWarn(SDL_LOG_CATEGORY_VIDEO,
+                "[paint] 挤出 used=%zuKB required=%zuKB limit=%uKB", used / 1024,
+                required / 1024, (unsigned)(PAINT_CACHE_BYTE_LIMIT / 1024));
         if (used <= PAINT_CACHE_BYTE_LIMIT &&
             required <= PAINT_CACHE_BYTE_LIMIT - used) return true;
         if (!oldest) return false;

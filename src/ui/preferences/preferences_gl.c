@@ -26,12 +26,12 @@ bool bongo_cat_preferences_gl_create(BongoCatPreferences *value) {
         return false;
     /*
      * renderer=vulkan 且这个窗口允许时: 设置界面走自己的 Vulkan 上下文。
-     * BONGO_CAT_PREFS_OPENGL=1 可以强制设置窗口走 OpenGL —— 某些叠加层
-     * (RTSS / 微星小飞机 OSD) 在 Vulkan 上每次 present 都要做不少活, 用这个开关
-     * 对比两条路径的开销, 不用重新编译。
+     * 注意窗口的图形 API 标志是在创建时按 prefer_vulkan 定下的
+     * (preferences_scale.c), 而 prefer_vulkan 已经考虑了
+     * BONGO_CAT_PREFERENCES_OPENGL 退回开关 —— 这里不能再改, 给一个
+     * SDL_WINDOW_VULKAN 窗口建 GL 上下文会被 SDL 拒绝。
      */
-    const char *force_gl = SDL_getenv("BONGO_CAT_PREFS_OPENGL");
-    if (!(force_gl && force_gl[0] == '1') && value->prefer_vulkan &&
+    if (value->prefer_vulkan &&
         bongo_cat_renderer_active() == BONGO_CAT_RENDERER_VULKAN) {
         BongoCatError error = {0};
         /*

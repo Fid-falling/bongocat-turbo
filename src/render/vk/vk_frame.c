@@ -224,10 +224,12 @@ bool bongo_cat_vk_end_frame(BongoCatVk *vk) {
     submit.signalSemaphoreCount = 1;
     submit.pSignalSemaphores = &present_semaphore;
     vk->frame_active = false;
+    const uint64_t submit_start_ns = SDL_GetTicksNS();
     if (vkQueueSubmit(vk->queue, 1, &submit, frame->fence) != VK_SUCCESS) {
         SDL_LogError(SDL_LOG_CATEGORY_VIDEO, "[vulkan] 命令提交失败");
         return false;
     }
+    const uint64_t submit_end_ns = SDL_GetTicksNS();
     VkPresentInfoKHR present = {0};
     present.sType = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR;
     present.waitSemaphoreCount = 1;
@@ -236,6 +238,14 @@ bool bongo_cat_vk_end_frame(BongoCatVk *vk) {
     present.pSwapchains = &vk->swapchain;
     present.pImageIndices = &vk->image_index;
     VkResult result = vkQueuePresentKHR(vk->queue, &present);
+    if (SDL_getenv("BONGO_CAT_TEST_PREFS_STAGES")) {
+        const uint64_t present_end_ns = SDL_GetTicksNS();
+        SDL_LogWarn(SDL_LOG_CATEGORY_VIDEO,
+            "[vulkan] submit=%.2fms present_wait=%.2fms extent=%ux%u",
+            (double)(submit_end_ns - submit_start_ns) / 1000000.0,
+            (double)(present_end_ns - submit_end_ns) / 1000000.0,
+            vk->extent.width, vk->extent.height);
+    }
     vk->frame_index = (vk->frame_index + 1) % BONGO_CAT_VK_FRAMES_IN_FLIGHT;
     vk->frame_counter++;
     if (result == VK_ERROR_OUT_OF_DATE_KHR || result == VK_SUBOPTIMAL_KHR) {

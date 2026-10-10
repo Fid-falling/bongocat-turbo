@@ -219,6 +219,11 @@ void bongo_cat_ui_paint_shadow(struct nk_context *context,
     int width, height; float sx, sy; BongoCatUIBackend *backend;
     if (!texture_dimensions(context, target, &width, &height, &sx, &sy,
         &backend)) return;
+    /* 同 glow: 阴影也是模糊效果, 按 1/2 分辨率烘焙 (像素数 1/4) */
+    width = NK_MAX(1, (int)(width * BONGO_CAT_UI_PAINT_BLUR_SCALE));
+    height = NK_MAX(1, (int)(height * BONGO_CAT_UI_PAINT_BLUR_SCALE));
+    sx *= BONGO_CAT_UI_PAINT_BLUR_SCALE;
+    sy *= BONGO_CAT_UI_PAINT_BLUR_SCALE;
     float scale = (sx + sy) * .5f;
     struct nk_color tint = color;
     BongoCatUIPaintKey key = {BONGO_CAT_UI_PAINT_SHADOW, width, height,
