@@ -1,3 +1,11 @@
+/*
+ * 后端选择。AUTO 现在解析成 Vulkan, 只有探针失败才退回 OpenGL: Vulkan 这一侧的功能
+ * 已经对齐 (轮盘文字/模型封面/冒烟审计/整帧回读), 上层代码两个后端都能跑。
+ *
+ * 排查"画面不对"时先看启动日志里的 "[render] 请求后端=… 实际使用=…", 别靠猜 ——
+ * Windows 10 上遇到不支持的能力 (例如交换链只报 OPAQUE) 时很容易静默退回。
+ */
+
 #include "bongo_cat/render.h"
 #include "bongo_cat/log.h"
 #include "bongo_cat/vk_backend.h"

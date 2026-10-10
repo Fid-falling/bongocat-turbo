@@ -1,3 +1,16 @@
+/*
+ * 一帧的 Vulkan 生命周期: begin (等本帧槽的 fence / 取交换链图像 / 开 render pass)
+ * -> 绘制 -> end (记录回读 / 提交 / 呈现)。
+ *
+ * 不变量与取舍:
+ *   - image_available 用帧槽、present 信号量用图像索引: 同一张图像只有在上一次呈现
+ *     完成之后才会被重新获取, 混用会撞上"信号量还在被等待";
+ *   - end_frame 里刻意不加任何等待: 提交与呈现都是发出去就返回, 该等的在 begin 等。
+ *     设置窗口 present 那十几毫秒是 DWM 的取帧节奏 (同一 API 的宠物窗口只要 0.4ms),
+ *     在这里加同步只会更慢;
+ *   - 回读必须在 end render pass 之后、vkEndCommandBuffer 之前记录。
+ */
+
 #include "vk_internal.h"
 #include "bongo_cat/log.h"
 

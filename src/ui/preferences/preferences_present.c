@@ -1,3 +1,17 @@
+/*
+ * 设置窗口的一帧: 收事件 -> 画 Nuklear UI -> 提交绘制 -> present。
+ *
+ * 两个踩过的坑, 改这里之前先读:
+ *   1. 不要用"渲染节流"跳过整帧。滚轮/点击是 Nuklear 在 draw_frame 里消费的, 跳过
+ *      整帧等于跳过输入处理, 表现是滚轮迟钝、有时干脆没反应 (加过又撤掉了);
+ *   2. 不要在这里顺手清 UI 纹理缓存。关窗口时 release_window 已经会清 (还会把工作集
+ *      还给系统), 在渲染路径里再清一次既冗余, 又可能连带清掉不该清的东西。
+ *
+ * 流程: 界面是事件驱动渲染, render_dirty 为真才画, 画完才清它; 输入收尾 (input_end)
+ * 必须跟着渲染走, 别提前 return。每帧耗时可以用 BONGO_CAT_TEST_PREFS_STAGES=1 打印
+ * ([prefs] frame ms=... present_ms=...), 排查掉帧先看它。
+ */
+
 #include "preferences_state.h"
 #include "preferences_render_internal.h"
 #include "preferences_controls.h"
