@@ -160,10 +160,11 @@ static void page_display(BongoCatApp *app, struct nk_context *context) {
         int selected = app->settings.window.supersample;
         if (selected < 0 || selected >= count) selected = 0;
         bongo_cat_pref_row_icon(context, BONGO_CAT_PREF_ICON_RENDERER);
-        selected = bongo_cat_pref_theme(context, "supersample",
+        /* 用下拉而不是主题那种图标分段控件: 这里要显示"自动/质量/省内存"文字 */
+        selected = bongo_cat_pref_combo(context, "supersample",
             tr(app, "pages.preference.cat.labels.supersampleQuality",
-                "Supersampling"),
-            labels, selected);
+                "Supersampling"), "",
+            labels, count, selected);
         if (selected != app->settings.window.supersample) {
             app->settings.window.supersample = selected;
             app->dirty = true;
