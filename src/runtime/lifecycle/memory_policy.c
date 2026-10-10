@@ -1,6 +1,7 @@
 #include "runtime.h"
 #include "bongo_cat/memory.h"
 #include "bongo_cat/vk_backend.h"
+#include "bongo_cat/live2d_vulkan.h"
 
 static unsigned pending_presented_frames;
 static bool pending_ui_frame;
@@ -32,6 +33,11 @@ void bongo_cat_memory_policy_frame_presented(void) {
 void bongo_cat_memory_policy_idle(void) {
     /* Tray-only and minimized modes may not present a frame after loading. */
     consume_pending_frame();
+    /*
+     * 最小化/托盘: 画面没人看, 把 Live2D 的离屏目标也还掉 —— 超采样后它是窗口的
+     * 2 倍大 (十几到几十 MB), 下次绘制时按当前尺寸重建, 只多花一帧。
+     */
+    bongo_cat_live2d_vulkan_release_target();
 }
 
 void bongo_cat_memory_policy_ui_loaded(void) {

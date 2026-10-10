@@ -40,6 +40,8 @@ bool bongo_cat_live2d_vulkan_shaders_available(const char *assets_root);
 void bongo_cat_live2d_vulkan_set_shader_root(const char *assets_root);
 /* 超采样档位 ([性能] 区): 0=自动 (目标面积大时退回 1x) 1=质量 (2x) 2=省内存 (1x) */
 void bongo_cat_live2d_vulkan_set_supersample(int mode);
+/* 内存清理: 释放离屏目标 (下次绘制自动重建) */
+void bongo_cat_live2d_vulkan_release_target(void);
 bool bongo_cat_live2d_vulkan_attach(struct BongoCatVk *vk, int width, int height);
 bool bongo_cat_live2d_vulkan_ready(void);
 bool bongo_cat_live2d_vulkan_begin_frame(void);

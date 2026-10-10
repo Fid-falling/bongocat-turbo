@@ -209,6 +209,9 @@ bool bongo_cat_live2d_vulkan_shaders_available(const char *assets_root) {
     return true;
 }
 
+void bongo_cat_live2d_vulkan_release_target(void) {
+}
+
 void bongo_cat_live2d_vulkan_set_supersample(int mode) {
     (void)mode;
 }

@@ -38,6 +38,15 @@ void bongo_cat_preferences_render(BongoCatPreferences *value) {
     bongo_cat_preferences_release_idle_window(value);
     if (!value || !value->window || !value->visible) return;
     bongo_cat_preferences_drag_tick(value);
+    /*
+     * 界面长时间没有重绘 (放在那儿没人动): 把纹理缓存还给系统 —— 浅色主题下
+     * 那些全屏模糊项合计几十 MB。下次重绘会重新生成, 只是多花几毫秒。
+     */
+    if (!value->render_dirty && value->last_render_ns &&
+        SDL_GetTicksNS() - value->last_render_ns > 30000000000ull) {
+        bongo_cat_ui_paint_destroy(&value->ui);
+        value->render_dirty = true;
+    }
     /* [性能]区: 关掉发光/阴影类特效 (浅色主题下这些全屏模糊是每帧最贵的一项) */
     bongo_cat_ui_set_effects_enabled(!value->app->settings.window.disable_effects);
     uint64_t now = SDL_GetTicksNS();

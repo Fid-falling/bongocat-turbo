@@ -1,12 +1,8 @@
 /*
- * Cubism Live2D 渲染器的 Vulkan 桥。
- *
- * 目标: 用主窗口的 VkDevice/queue/command pool, 把模型渲染进一张离屏纹理,
+ * Cubism Live2D 渲染器的 Vulkan 桥。 目标: 用主窗口的 VkDevice/queue/command pool, 把模型渲染进一张离屏纹理,
  * 之后由 Vulkan 后端的合成路径画到宠物窗口上。参照 SDK 的
  * Samples/Vulkan/Demo (LAppDelegate / LAppView / LAppLive2DManager) 的调用顺序。
- *
- * 任何一步失败都返回 false, 让上层回退 OpenGL —— 绝不能让 Vulkan 路径把
- * 已经能工作的 GL 路径拖下水。
+ * 任何一步失败都返回 false, 让上层回退 OpenGL —— 绝不能让 Vulkan 路径把 已经能工作的 GL 路径拖下水。
  */
 
 #include "bongo_cat/live2d_vulkan.h"
@@ -83,8 +79,7 @@ bool ensure_target_size(int width, int height) {
     target->CreateRenderTarget(g_device, g_physical, extent.width,
         extent.height, g_format, kDepthFormat);
     if (!target->IsValid()) {
-        SDL_LogWarn(SDL_LOG_CATEGORY_VIDEO,
-            "[live2d/vk] 离屏目标重建失败 (%dx%d)", width, height);
+        SDL_LogWarn(SDL_LOG_CATEGORY_VIDEO, "[live2d/vk] 离屏目标重建失败 (%dx%d)", width, height);
         CSM_DELETE(target);
         return false;
     }
@@ -118,6 +113,17 @@ int bongo_cat_live2d_vulkan_supersample_for(int width, int height) {
 void bongo_cat_live2d_vulkan_set_supersample(int mode) {
     bongo_cat_live2d_vulkan_supersample_mode =
         mode == 1 || mode == 2 ? mode : 0;
+}
+
+/* 内存清理时释放离屏目标; 设备/管线都留着, 下一帧按当前尺寸重建。 */
+void bongo_cat_live2d_vulkan_release_target(void) {
+    if (!g_target) return;
+    if (g_device) vkDeviceWaitIdle(g_device);
+    g_target->DestroyRenderTarget();
+    CSM_DELETE(g_target);
+    g_target = nullptr;
+    g_target_width = g_target_height = 0;
+    SDL_LogWarn(SDL_LOG_CATEGORY_VIDEO, "[live2d/vk] 已释放离屏目标 (内存清理), 下次绘制会重建");
 }
 
 bool bongo_cat_live2d_vulkan_shaders_available(const char *assets_root) {
@@ -169,8 +175,7 @@ bool bongo_cat_live2d_vulkan_attach(struct BongoCatVk *vk, int width, int height
     VkExtent2D extent = {(unsigned int)width, (unsigned int)height};
     /*
      * 顺序按 SDK 示例: 先 SetConstantSettings (它建管线/描述符), 之后才能建离屏
-     * 目标。着色器按相对路径打开, 所以先把工作目录切到能看见 FrameworkShaders 的
-     * 地方 (exe 目录或解出来的内嵌资源目录)。
+     * 目标。着色器按相对路径打开, 所以先把工作目录切到能看见 FrameworkShaders 的 地方 (exe 目录或解出来的内嵌资源目录)。
      */
     SDL_LogWarn(SDL_LOG_CATEGORY_VIDEO,
         "[live2d/vk] attach: Step 1 SetConstantSettings (view=%p extent=%dx%d "
@@ -186,8 +191,7 @@ bool bongo_cat_live2d_vulkan_attach(struct BongoCatVk *vk, int width, int height
                 "[live2d/vk] attach: 着色器目录=%s",
                 std::filesystem::current_path().string().c_str());
         } else {
-            SDL_LogWarn(SDL_LOG_CATEGORY_VIDEO,
-                "[live2d/vk] attach: 找不到 FrameworkShaders (exe 目录与内嵌资源里都没有)");
+            SDL_LogWarn(SDL_LOG_CATEGORY_VIDEO, "[live2d/vk] attach: 找不到 FrameworkShaders (exe 目录与内嵌资源里都没有)");
         }
     }
     Csm::Rendering::CubismRenderer_Vulkan::SetConstantSettings(g_device,
@@ -200,8 +204,7 @@ bool bongo_cat_live2d_vulkan_attach(struct BongoCatVk *vk, int width, int height
          */
         VK_NULL_HANDLE, g_format, kDepthFormat);
     Csm::Rendering::CubismRenderer_Vulkan::EnableChangeRenderTarget();
-    SDL_LogWarn(SDL_LOG_CATEGORY_VIDEO,
-        "[live2d/vk] attach: Step 2 SetConstantSettings 返回");
+    SDL_LogWarn(SDL_LOG_CATEGORY_VIDEO, "[live2d/vk] attach: Step 2 SetConstantSettings 返回");
     /* GetDeviceInfo 内部会建近 500 条管线并加载 .spv, 必须在静态设置之后调用 */
     if (!Csm::Rendering::CubismDeviceInfo_Vulkan::GetDeviceInfo(g_device)) {
         SDL_LogWarn(SDL_LOG_CATEGORY_VIDEO, "[live2d/vk] attach: GetDeviceInfo 失败");
@@ -247,10 +250,8 @@ bool bongo_cat_live2d_vulkan_begin_frame(void) {
     device_info->GetOffscreenManager()->BeginFrameProcess();
     VkExtent2D extent = {g_target->GetBufferWidth(), g_target->GetBufferHeight()};
     /*
-     * 每帧刷新 SDK 的静态设置。窗口改尺寸会重建我们的交换链 (新的 imageView),
-     * 而 SDK 把这些值缓存在静态变量里 —— 只在 attach 时设过一次的话, resize 之后
-     * 它仍按旧 extent/旧 imageView 记账, 在遮罩目标 BeginDraw 里越界
-     * (校验层拖慢时稳定复现)。SetConstantSettings 只是纯赋值, 每帧调用开销可忽略。
+     * 每帧刷新 SDK 的静态设置。窗口改尺寸会重建我们的交换链 (新的 imageView), 而 SDK 把这些值缓存在静态变量里 —— 只在 attach 时设过一次的话, resize 之后
+     * 它仍按旧 extent/旧 imageView 记账, 在遮罩目标 BeginDraw 里越界 (校验层拖慢时稳定复现)。SetConstantSettings 只是纯赋值, 每帧调用开销可忽略。
      */
     Csm::Rendering::CubismRenderer_Vulkan::SetConstantSettings(
         (VkDevice)current.device, (VkPhysicalDevice)current.physical_device,
@@ -276,8 +277,7 @@ bool bongo_cat_live2d_vulkan_end_frame(void) {
         bongo_cat_live2d_vulkan_transition_sampled(&native,
             (void *)g_target->GetTextureImage());
         /*
-         * SDK 的 Vulkan 渲染器自己提交命令 (DrawModel / 遮罩), 而我们的帧随后要采样
-         * 这张离屏图像。开校验层时曾出现 ~2 秒后的崩溃, 像是提交与采样之间的竞态,
+         * SDK 的 Vulkan 渲染器自己提交命令 (DrawModel / 遮罩), 而我们的帧随后要采样 这张离屏图像。开校验层时曾出现 ~2 秒后的崩溃, 像是提交与采样之间的竞态,
          * 所以这里显式把设备等空, 让"SDK 提交"与"我们录制帧"完全串行。
          */
         if (native.device) vkDeviceWaitIdle((VkDevice)native.device);
