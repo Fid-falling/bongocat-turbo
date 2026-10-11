@@ -135,6 +135,13 @@ typedef struct Dial {
     int count, active, child, page, pressed;
     bool done, dark, dirty, child_focus, shown, popup;
     /*
+     * "已经忽略过一条假的 MOUSE_LEAVE" 的记账位 (只在代理分层模式下会置位)。
+     * 代理模式下这条事件跟着每一条真实的鼠标移动来, 光标不停就一直在来 —— 不能每次
+     * 都写日志, 否则诊断日志自己就变成新的风暴。见 dial_input.c 的
+     * pointer_inside_window。
+     */
+    bool leave_filtered;
+    /*
      * 帧率诊断: frames 是模态循环的迭代次数, presents 是真正提交出去的帧数。
      * 代理分层呈现下两者会明显分离 —— 静止的菜单一次都不回读(见 dial_paint_frame),
      * 这正是"别把 GL 拖成幻灯片"的关键, 出问题时靠这两个数分辨。

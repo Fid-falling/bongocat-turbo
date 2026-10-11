@@ -102,11 +102,38 @@ static void key(Dial *d, const SDL_KeyboardEvent *event) {
 }
 
 /*
+ * 光标此刻是否还在菜单窗口的矩形内。窗口是无边框的, 所以窗口位置就是客户区原点。
+ *
+ * 为什么需要它: 代理分层呈现(仅 Windows, 见 windows_layered.c)下真正显示画面的是
+ * 代理窗口, 真实窗口被压成全透明; 系统认为光标在代理窗口上, 而 SDL 只认识真实窗口
+ * —— 代理窗口每转投一条 WM_MOUSEMOVE, SDL 都会带出一对事件: 先 MOUSE_ENTER, 紧接着
+ * (因为光标并不在真实窗口上, TrackMouseEvent 立刻报 LEAVE)再来一条 MOUSE_LEAVE。
+ * 风暴的源头(同一个坐标被系统反复重发)已经在 windows_layered_window.c 里挡掉了, 但
+ * 只要光标在动, 这个"motion 后面永远跟着一条 LEAVE"就一直成立。
+ *
+ * 老逻辑对每一条 MOUSE_LEAVE 都清空选中, 于是代理模式下悬停高亮会被立刻抹掉、方向键
+ * 永远从"什么都没选"开始(实测 0 -> 1 -> 2 变成 -1 -> 0 -> 1; 非代理模式下同一套按键
+ * 是好的, 这正是它被漏掉的原因)。判据必须是"光标真的在窗口外", 否则用户把指针移出
+ * 菜单时高亮会留在原地。
+ */
+static bool pointer_inside_window(const Dial *d) {
+    float x = 0, y = 0;
+    int window_x = 0, window_y = 0;
+    /* SDL_GetGlobalMouseState 返回的是按键掩码(没按键时就是 0), 不是成败 —— 别拿它
+       当布尔用: 那样"没按住鼠标"会被误判成"问不到光标位置", 整个过滤永远不生效。 */
+    SDL_GetGlobalMouseState(&x, &y);
+    if (!SDL_GetWindowPosition(d->window, &window_x, &window_y)) return false;
+    x -= (float)window_x; y -= (float)window_y;
+    return x >= 0 && y >= 0 && x < (float)d->width && y < (float)d->height;
+}
+
+/*
  * 事件分发。几处刻意的行为:
  *   - 非左键按下直接关菜单: 右键再按一次、中键之类都应当被理解为"取消";
  *   - 松开时要求 pressed 与当前目标一致, pressed 用 DIAL_ROOTS+child 编码子项,
  *     是为了让"第 3 个根项"和"第 3 个子项"不会互相冒充;
- *   - 鼠标离开窗口 = 清空选中 (但不关闭), 指针回来会重新选中;
+ *   - 鼠标离开窗口 = 清空选中 (但不关闭), 指针回来会重新选中; 代理分层模式下"离开"
+ *     事件基本全是假的, 只在光标真的出了窗口矩形时才清 (见 pointer_inside_window);
  *   - 失焦/隐藏导致的关闭都带 d->shown 条件: 窗口创建和显示过程本身会排进一两个
  *     瞬时的失焦事件, 不加这个条件菜单会在刚打开时立刻自己关掉;
  *   - 尺寸/像素密度变化统一走一段重算 scale/raster_scale 的代码 (见那里的英文注释):
@@ -140,7 +167,23 @@ void dial_event(Dial *d, const SDL_Event *e) {
         break;
     }
     case SDL_EVENT_KEY_DOWN: key(d,&e->key); break;
-    case SDL_EVENT_WINDOW_MOUSE_LEAVE: dial_select(d,-1,-1); break;
+    case SDL_EVENT_WINDOW_MOUSE_LEAVE:
+        /*
+         * 代理分层模式下这条事件基本全是假的(见 pointer_inside_window): 光标还在窗口
+         * 里就把它当噪声丢掉。实测少了这一条, 悬停高亮会被"紧跟每条真实 motion 而来
+         * 的 LEAVE"抹掉 —— 方向键于是永远从"什么都没选"开始(0 -> 1 -> 2 变成
+         * -1 -> 0 -> 1), 截图里也看不到任何高亮。
+         * 日志只写一次: 这个分支本身是高频的, 每来一次写一行等于自己造风暴。
+         */
+        if (d->layered && pointer_inside_window(d)) {
+            if (!d->leave_filtered) {
+                d->leave_filtered = true;
+                SDL_LogInfo(BONGO_CAT_LOG_LIFECYCLE,
+                    "[probe] 轮盘: 忽略代理模式下的假 MOUSE_LEAVE (光标仍在窗口内)");
+            }
+            break;
+        }
+        dial_select(d,-1,-1); break;
     case SDL_EVENT_WINDOW_SHOWN: d->shown = true; d->dirty = true; break;
     case SDL_EVENT_WINDOW_HIDDEN:
         if (d->shown && (SDL_GetWindowFlags(d->window) & SDL_WINDOW_HIDDEN)) d->done = true;

@@ -72,11 +72,37 @@ bool bongo_cat_windows_layered_requested(bool configured) {
  */
 static const wchar_t proxy_source_property[] = L"BongoCat.LayeredSource";
 static const wchar_t proxy_input_proc_property[] = L"BongoCat.LayeredInputProc";
+/* 上一次已经转投过的鼠标位置 (打包成属性值, NULL = 还没有转过)。打包时两个坐标都 +1,
+   这样 (0,0) 打包出来也不是 NULL —— 属性值 NULL 与"没转过"没法区分。 */
+static const wchar_t proxy_last_move_property[] = L"BongoCat.LayeredLastMove";
 
 static LRESULT CALLBACK layered_proxy_input_proc(HWND window, UINT message,
     WPARAM wparam, LPARAM lparam) {
     switch (message) {
-    case WM_MOUSEMOVE:
+    case WM_MOUSEMOVE: {
+        HWND source = (HWND)GetPropW(window, proxy_source_property);
+        if (source) {
+            /*
+             * 位置和上一次转投的一模一样就丢掉 —— 系统会把同一个 WM_MOUSEMOVE 反复
+             * 重发: 分层窗口每次提交(UpdateLayeredWindow)都会让系统重新判定光标下的
+             * 窗口, 于是又投一条。实测 976 条里只有 4 个不同坐标。
+             *
+             * 原样转投的代价全在 SDL 侧: 每条都变成一条"位置没变"的 MOUSE_MOTION,
+             * 轮盘会拿它重新选中光标下那一项 —— 键盘刚用方向键选好的项立刻被拉回去
+             * (实测按三次右键选中项一直停在 0, 而不是 0->1->2), 主窗口那边则是白跑
+             * 命中测试。真实移动一定改变坐标, 不会被误丢; 光标移开再回到同一像素也
+             * 不会丢, 因为中间那条已经把记账刷新了。
+             */
+            LONG packed = (LONG)((((LONG)LOWORD(lparam) + 1) << 16) |
+                ((LONG)HIWORD(lparam) + 1));
+            if ((LONG)(LONG_PTR)GetPropW(window, proxy_last_move_property) == packed)
+                return 0;
+            SetPropW(window, proxy_last_move_property, (HANDLE)(LONG_PTR)packed);
+            PostMessageW(source, message, wparam, lparam);
+            return 0;
+        }
+        break;
+    }
     case WM_LBUTTONDOWN: case WM_LBUTTONUP: case WM_LBUTTONDBLCLK:
     case WM_RBUTTONDOWN: case WM_RBUTTONUP: case WM_RBUTTONDBLCLK:
     case WM_MBUTTONDOWN: case WM_MBUTTONUP: case WM_MBUTTONDBLCLK:
