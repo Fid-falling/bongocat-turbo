@@ -128,6 +128,8 @@ cmake -S . -B build -G Ninja \
 
 ## 📌 项目状态
 
+
+* 图形后端：默认 Vulkan（OpenGL 作为回退），每次改动都会构建并验证两者。
 ![Alt](https://repobeats.axiom.co/api/embed/74334755a589dea40c5d31f8d2bcdc6c2bd39d87.svg "Repobeats analytics image")
 
 ## 📜 许可证
@@ -242,9 +244,16 @@ BONGOCAT_ENABLE_EVDEV=1 ./build/BongoCat
 退出程序才会停止监听，隐藏宠物不会停止；不带该变量重新启动即可恢复默认后端。
 鼠标跟随使用未经加速的设备位移，窗口定位、点击穿透和置顶仍取决于 Wayland 合成器。
 
-### 🖼️ 为什么使用 OpenGL 而不是 Vulkan？
+### 🖼️ 用哪个图形后端？
 
-这不是因为 Vulkan 不好，而是 BongoCat 不需要那种程度的复杂性。应用主要渲染一个 Live2D 模型、少量 UI 图层和透明桌面窗口，OpenGL 已能轻松满足需求，并且能自然地与 SDL3 及 Cubism 的 OpenGL 渲染器配合。迁移到 Vulkan 将需要在三个桌面平台维护更多渲染和同步代码，却不会为用户带来明显提升。对于 BongoCat 当前的工作负载，OpenGL 让渲染器更精简、更易调试和维护，同时仍能提供所需性能。
+原生运行时**同时**内置 Vulkan 与 OpenGL 两套渲染器。默认的 `auto` 解析为 **Vulkan**，只有 Vulkan 探测失败时才回退到 OpenGL。Vulkan 这条路径已经追平功能：Live2D 渲染、轮盘、模型封面捕获、帧审计与冒烟测试都和 OpenGL 跑同一套上层代码、产出相同的结果。
+
+可以在设置里选择后端（`renderer`），或在 `settings.json` 里用同一个键强制指定。有几点值得知道：
+
+* Vulkan 渲染器与 Cubism 桥**刻意共享同一个** `VkDevice`。以前用过第二套设备，在 RTSS / OBS / NVIDIA 这类假定"一个进程一个设备"的叠加层下会崩溃。
+* Windows 10 上交换链只提供 `OPAQUE`。透明依然可用：我们先尝试 `VK_COMPOSITE_ALPHA_PRE_MULTIPLIED_BIT_KHR`，只有驱动拒绝时才回退。
+* 两个审计工具（`live2d-visual-audit`、`live2d-viewer-audit`）仍然需要 OpenGL，因为它们要自己渲染一帧离屏画面。其余部分都与后端无关。
+* 启动日志总会打印"请求的后端"与"实际使用的后端"，不用猜自己用的是哪个。
 
 ## 🙏 特别感谢
 > [!TIP]

@@ -169,6 +169,9 @@ cmake -S . -B build -G Ninja \
 ## 📌 État du projet
 
 
+
+* Graphismes : Vulkan par défaut (OpenGL en secours) ; les deux sont compilés et vérifiés à chaque changement.
+
 ## 📜 Licence
 
 Le code source et le runtime natif de BongoCat sont distribués sous licence
@@ -353,20 +356,16 @@ vérification de mise à jour est effectuée, l'application demande uniquement l
 métadonnées publiques des versions ; elle n'envoie aucune donnée d'entrée,
 de configuration ou d'utilisation.
 
-### 🖼️ Pourquoi OpenGL plutôt que Vulkan ?
+### 🖼️ Quel backend graphique est utilisé ?
 
-Nous avons choisi OpenGL non pas parce que Vulkan serait mauvais, mais parce que
-BongoCat n'a tout simplement pas besoin de ce niveau de complexité.
-L'application affiche principalement un modèle Live2D, quelques couches
-d'interface et une fenêtre de bureau transparente. OpenGL prend déjà très bien
-en charge cette charge de travail et s'intègre naturellement à SDL3 ainsi qu'au
-renderer OpenGL de Cubism.
+Le runtime natif embarque **les deux** moteurs de rendu, Vulkan et OpenGL. La valeur par défaut `auto` choisit **Vulkan** et ne retombe sur OpenGL que si la détection de Vulkan échoue. La voie Vulkan a atteint la parité fonctionnelle : rendu Live2D, menu radial, capture des couvertures de modèles, audits d'images et tests de fumée utilisent les mêmes couches supérieures qu'OpenGL et produisent le même résultat.
 
-Passer à Vulkan impliquerait de maintenir beaucoup plus de code de rendu et de
-synchronisation sur trois plateformes de bureau, sans amélioration perceptible
-pour les utilisateurs. Pour la charge de travail actuelle de BongoCat, OpenGL
-permet de conserver un renderer plus compact, plus simple à déboguer et plus
-facile à maintenir, tout en fournissant les performances dont nous avons besoin.
+Le backend se choisit dans les réglages (`renderer`) ou se force avec la même clé dans `settings.json`. À savoir :
+
+* Le moteur Vulkan et le pont Cubism partagent **volontairement un seul** `VkDevice`. Un second périphérique plantait sous les overlays (RTSS / OBS / NVIDIA) qui supposent un périphérique par processus.
+* Sous Windows 10, la chaîne d'échange ne propose que `OPAQUE`. La transparence fonctionne quand même : on tente d'abord `VK_COMPOSITE_ALPHA_PRE_MULTIPLIED_BIT_KHR` et on ne recule que si le pilote refuse.
+* Deux outils d'audit (`live2d-visual-audit`, `live2d-viewer-audit`) ont toujours besoin d'OpenGL, car ils rendent leur propre image hors écran. Tout le reste est indépendant du backend.
+* Le journal de démarrage indique toujours le backend demandé et celui réellement utilisé.
 
 ## État du projet
 

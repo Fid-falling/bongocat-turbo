@@ -128,6 +128,8 @@ cmake -S . -B build -G Ninja \
 
 ## 📌 Projektstatus
 
+
+* Grafik: standardmäßig Vulkan (OpenGL als Ausweichlösung); beide werden bei jeder Änderung gebaut und geprüft.
 ![Alt](https://repobeats.axiom.co/api/embed/74334755a589dea40c5d31f8d2bcdc6c2bd39d87.svg "Repobeats analytics image")
 
 ## 📜 Lizenz
@@ -228,9 +230,16 @@ flowchart TB
 
 Nein. BongoCat verarbeitet Tastatur- und Mauseingaben lokal, um Animationen und Tastenkürzel anzutreiben. Es zeichnet weder Tastenanschläge, Mausaktionen noch andere Interaktionsdaten auf oder lädt sie hoch. Auch die Konfiguration wird nur lokal gespeichert; die Anwendung enthält keine Werbung, Analyse-Tools oder Code zur Nutzerverfolgung. Bei Update-Checks werden nur öffentliche Versionsmetadaten abgefragt; es werden keine Eingabe-, Konfigurations- oder Nutzungsdaten gesendet.
 
-### 🖼️ Warum OpenGL und nicht Vulkan?
+### 🖼️ Welches Grafik-Backend wird verwendet?
 
-Nicht weil Vulkan schlecht ist, sondern weil BongoCat diese Komplexität nicht benötigt. Die Anwendung rendert hauptsächlich ein Live2D-Modell, einige UI-Ebenen und ein transparentes Desktop-Fenster – das bewältigt OpenGL mühelos, und es harmoniert auf natürliche Weise mit SDL3 und dem OpenGL-Renderer von Cubism. Eine Migration zu Vulkan würde mehr Render- und Synchronisationscode auf drei Desktop-Plattformen erfordern, ohne dem Nutzer einen spürbaren Vorteil zu bringen. Für die aktuellen Arbeitslasten von BongoCat macht OpenGL den Renderer schlanker, besser debugbar und wartbarer und liefert weiterhin die benötigte Leistung.
+Die native Laufzeit enthält **beide** Renderer – Vulkan und OpenGL. Der Standardwert `auto` wählt **Vulkan** und weicht nur dann auf OpenGL aus, wenn die Vulkan-Prüfung fehlschlägt. Der Vulkan-Pfad ist funktional gleichgezogen: Live2D-Rendering, das radiale Menü, die Modell-Cover-Aufnahme, die Frame-Audits und die Smoke-Tests nutzen dieselben oberen Schichten wie OpenGL und liefern dasselbe Ergebnis.
+
+Das Backend lässt sich in den Einstellungen wählen (`renderer`) oder mit demselben Schlüssel in `settings.json` erzwingen. Wissenswertes:
+
+* Vulkan-Renderer und Cubism-Brücke teilen sich **absichtlich ein** `VkDevice`. Ein zweites Gerät stürzte unter Overlays (RTSS / OBS / NVIDIA) ab, die ein Gerät pro Prozess annehmen.
+* Unter Windows 10 meldet die Swapchain nur `OPAQUE`. Transparenz funktioniert trotzdem: Wir versuchen zuerst `VK_COMPOSITE_ALPHA_PRE_MULTIPLIED_BIT_KHR` und weichen nur aus, wenn der Treiber ablehnt.
+* Zwei Audit-Werkzeuge (`live2d-visual-audit`, `live2d-viewer-audit`) brauchen weiterhin OpenGL, weil sie selbst ein Offscreen-Bild rendern. Alles andere ist backend-unabhängig.
+* Das Startprotokoll gibt immer das angeforderte und das tatsächlich verwendete Backend aus.
 
 ## 🙏 Besonderer Dank
 > [!TIP]

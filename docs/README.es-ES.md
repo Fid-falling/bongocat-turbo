@@ -128,6 +128,8 @@ cmake -S . -B build -G Ninja \
 
 ## 📌 Estado del proyecto
 
+
+* Gráficos: Vulkan por defecto (OpenGL como alternativa); ambos se compilan y verifican en cada cambio.
 ![Alt](https://repobeats.axiom.co/api/embed/74334755a589dea40c5d31f8d2bcdc6c2bd39d87.svg "Repobeats analytics image")
 
 ## 📜 Licencia
@@ -228,9 +230,16 @@ flowchart TB
 
 No. BongoCat procesa las entradas de teclado y ratón localmente para impulsar animaciones y atajos. No registra ni sube pulsaciones de teclas, acciones del ratón ni otros datos de interacción. La configuración también se guarda solo localmente; la aplicación no incluye anuncios, herramientas de análisis ni código de seguimiento de usuarios. Al comprobar actualizaciones solo se solicitan los metadatos públicos de versión; no se envían datos de entrada, configuración ni uso.
 
-### 🖼️ ¿Por qué OpenGL y no Vulkan?
+### 🖼️ ¿Qué backend gráfico utiliza?
 
-No porque Vulkan sea malo, sino porque BongoCat no necesita ese nivel de complejidad. La aplicación renderiza principalmente un modelo Live2D, algunas capas de interfaz y una ventana de escritorio transparente; OpenGL lo cubre con facilidad y se integra de forma natural con SDL3 y el renderizador OpenGL de Cubism. Migrar a Vulkan implicaría mantener más código de renderizado y sincronización en tres plataformas de escritorio, sin un beneficio notable para el usuario. Para la carga de trabajo actual de BongoCat, OpenGL hace que el renderizador sea más ligero, más fácil de depurar y mantener, y sigue ofreciendo el rendimiento necesario.
+El runtime nativo incluye **ambos** renderizadores, Vulkan y OpenGL. El valor predeterminado `auto` se resuelve en **Vulkan** y solo recurre a OpenGL si falla la comprobación de Vulkan. La ruta de Vulkan ya alcanzó la paridad funcional: el renderizado de Live2D, el menú radial, la captura de portadas de modelos, las auditorías de fotogramas y las pruebas de humo usan las mismas capas superiores que OpenGL y producen el mismo resultado.
+
+El backend se elige en los ajustes (`renderer`) o se fuerza con la misma clave en `settings.json`. Conviene saber:
+
+* El renderizador Vulkan y el puente de Cubism comparten **un solo** `VkDevice` a propósito. Un segundo dispositivo provocaba fallos bajo superposiciones (RTSS / OBS / NVIDIA) que asumen un dispositivo por proceso.
+* En Windows 10 la cadena de intercambio solo ofrece `OPAQUE`. La transparencia sigue funcionando: primero probamos `VK_COMPOSITE_ALPHA_PRE_MULTIPLIED_BIT_KHR` y solo retrocedemos si el controlador lo rechaza.
+* Dos herramientas de auditoría (`live2d-visual-audit`, `live2d-viewer-audit`) siguen necesitando OpenGL, porque renderizan su propio fotograma fuera de pantalla. Todo lo demás es independiente del backend.
+* El registro de inicio siempre indica el backend solicitado y el real, así que no hay que adivinar.
 
 ## 🙏 Agradecimientos especiales
 > [!TIP]

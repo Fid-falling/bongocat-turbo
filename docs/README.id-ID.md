@@ -169,6 +169,9 @@ cmake -S . -B build -G Ninja \
 ## 📌 Status Proyek
 
 
+
+* Grafis: Vulkan secara bawaan (OpenGL sebagai cadangan); keduanya dibangun dan diuji pada setiap perubahan.
+
 ## 📜 Lisensi
 
 Kode sumber dan runtime native BongoCat dilisensikan di bawah
@@ -334,20 +337,16 @@ pelacakan pengguna. Saat pemeriksaan pembaruan dilakukan, aplikasi hanya meminta
 metadata rilis publik; aplikasi tidak mengirim data input, konfigurasi, atau
 penggunaan.
 
-### 🖼️ Mengapa OpenGL, bukan Vulkan?
+### 🖼️ Backend grafis mana yang dipakai?
 
-Kami memilih OpenGL bukan karena Vulkan buruk, tetapi karena BongoCat tidak
-memerlukan tingkat kompleksitas tersebut. Aplikasi terutama merender satu model
-Live2D, beberapa lapisan UI, dan sebuah jendela desktop transparan. OpenGL sudah
-menangani kebutuhan tersebut dengan nyaman dan bekerja secara alami dengan SDL3
-serta renderer OpenGL milik Cubism. Beralih ke Vulkan berarti harus memelihara
-lebih banyak kode rendering dan sinkronisasi di tiga platform desktop, tanpa
-peningkatan yang terasa bagi pengguna. Untuk beban kerja BongoCat saat ini, OpenGL
-menjaga renderer tetap lebih kecil, lebih mudah di-debug, dan lebih mudah
-dipelihara sambil tetap memberikan performa yang dibutuhkan.
+Runtime native menyertakan **keduanya**, perender Vulkan dan OpenGL. Nilai bawaan `auto` memilih **Vulkan**, dan hanya mundur ke OpenGL bila pemeriksaan Vulkan gagal. Jalur Vulkan sudah setara fiturnya: perenderan Live2D, menu radial, pengambilan sampul model, audit bingkai, dan uji asap memakai lapisan atas yang sama dengan OpenGL dan menghasilkan keluaran yang sama.
 
+Backend dipilih di Pengaturan (`renderer`), atau dipaksa dengan kunci yang sama di `settings.json`. Beberapa hal yang perlu diketahui:
 
-
+* Perender Vulkan dan jembatan Cubism **sengaja berbagi satu** `VkDevice`. Perangkat kedua dulu membuat crash di bawah overlay (RTSS / OBS / NVIDIA) yang mengasumsikan satu perangkat per proses.
+* Di Windows 10 swapchain hanya menyediakan `OPAQUE`. Transparansi tetap berfungsi: kami coba `VK_COMPOSITE_ALPHA_PRE_MULTIPLIED_BIT_KHR` lebih dulu dan hanya mundur bila driver menolak.
+* Dua alat audit (`live2d-visual-audit`, `live2d-viewer-audit`) masih butuh OpenGL karena merender bingkai offscreen sendiri. Sisanya tidak bergantung backend.
+* Log awal selalu mencetak backend yang diminta dan yang benar-benar dipakai.
 
 ## Status Proyek
 ![Alt](https://repobeats.axiom.co/api/embed/74334755a589dea40c5d31f8d2bcdc6c2bd39d87.svg "Repobeats analytics image")
