@@ -86,6 +86,15 @@ static void forward_proxy_input(BongoCatPlatform *platform, HWND source) {
      * 下真实窗口本来就不该参与命中判定, 所以这里放开这个限制。
      */
     SDL_SetHint(SDL_HINT_MOUSE_FOCUS_CLICKTHROUGH, "1");
+    /*
+     * 代理窗口当初是按"只做点击穿透"设计的, 创建时就带 WS_EX_TRANSPARENT —— 那会让点击
+     * 直接落到桌面上 (实测: 拖动时桌面图标被框选)。这里去掉它, 把"要不要穿透"交还给应用
+     * 自己的命中测试 (光标落在透明像素上时才穿透), 点击才会先到代理窗口再转发给真实窗口。
+     */
+    LONG_PTR proxy_ex_style = GetWindowLongPtrW(proxy, GWL_EXSTYLE);
+    if (proxy_ex_style & WS_EX_TRANSPARENT)
+        SetWindowLongPtrW(proxy, GWL_EXSTYLE,
+            proxy_ex_style & ~WS_EX_TRANSPARENT);
     if (GetPropW(proxy, proxy_input_proc_property)) return;
     WNDPROC previous = (WNDPROC)GetWindowLongPtrW(proxy, GWLP_WNDPROC);
     if (!previous) return;
@@ -142,7 +151,8 @@ void bongo_cat_platform_set_click_through(BongoCatPlatform *platform,
         layered_transparency_requested());
     /* 代理模式下真实窗口收不到鼠标消息, 必须在代理窗口上补一条转发, 否则拖不动。 */
     if (layered_transparency_requested()) forward_proxy_input(platform, window);
-    bongo_cat_windows_borderless_set_click_through(window, forced,
+    HWND proxy = bongo_cat_windows_layered_proxy(window);
+    bongo_cat_windows_borderless_set_click_through(proxy ? proxy : window, forced,
         pointer_transparent);
 }
 
