@@ -242,6 +242,14 @@ bool NativeModel::create_renderer(BongoCatError *error) {
         SDL_LogWarn(SDL_LOG_CATEGORY_VIDEO,
             "[live2d] 创建渲染器时尺寸无效, 兜底用 %dx%d", width_, height_);
     }
+    /*
+     * 排查探针: 先把"创建之前"就积压的 GL 错误排空并逐条记下来。glGetError 只返回第一条
+     * 并清空队列, 不排空的话下面 CreateRenderer 之后的检查会把更早的陈旧错误误记成
+     * "CreateRenderer 出错" —— 0x501 到底出自哪一步, 就靠这两行区分。
+     */
+    for (GLenum stale = glGetError(); stale != GL_NO_ERROR; stale = glGetError())
+        SDL_LogWarn(SDL_LOG_CATEGORY_VIDEO,
+            "[live2d] CreateRenderer 之前已积压 GL 错误: 0x%x", (unsigned)stale);
     CreateRenderer((Csm::csmUint32)width_, (Csm::csmUint32)height_,
         buffer_count);
     const GLenum create_error = glGetError();
