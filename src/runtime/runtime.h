@@ -104,6 +104,7 @@ void bongo_cat_window_update_display_recovery(BongoCatApp *app, uint64_t now);
 bool bongo_cat_window_display_self_test(BongoCatApp *app);
 void bongo_cat_window_drag_begin(BongoCatApp *app,
     const SDL_MouseButtonEvent *event);
+void bongo_cat_window_poll_global_drag(BongoCatApp *app);
 void bongo_cat_window_drag_motion(BongoCatApp *app,
     const SDL_MouseMotionEvent *event);
 void bongo_cat_window_drag_end(BongoCatApp *app);

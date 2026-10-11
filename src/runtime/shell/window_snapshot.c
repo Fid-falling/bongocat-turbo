@@ -102,6 +102,8 @@ void bongo_cat_window_snapshot_end(BongoCatApp *app) {
    已松开也会在这里兜底结束拖动 (收不到 BUTTON_UP 的场合)。 */
 void bongo_cat_window_snapshot_update(BongoCatApp *app, uint64_t now) {
     if (!app) return;
+    /* 每轮都跑: 用全局鼠标驱动拖动 (代理/穿透模式下窗口收不到鼠标消息) */
+    bongo_cat_window_poll_global_drag(app);
     if (!app->window_snapshot) {
         if (!app->window_drag_active && !app->wheel_animation_active &&
             now >= app->snapshot_deadline_ns) app->snapshot_blocked = false;

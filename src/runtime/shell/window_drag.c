@@ -81,6 +81,45 @@ void bongo_cat_window_drag_motion(BongoCatApp *app,
     }
 }
 
+/* B: 不依赖窗口消息的拖动驱动。
+   代理分层呈现 / 穿透模式下, 真实窗口收不到鼠标消息, 而拖动原先只由 SDL 的
+   BUTTON_DOWN + MOTION 事件触发 —— 于是"开了透明就拖不动"。这里改成轮询全局鼠标:
+   左键按下(上升沿)且光标落在模型不透明像素上就进入拖动候选, 之后每帧喂一次 motion。
+   motion 自己读全局坐标, 事件只用于非空判断, 所以传一个零值事件即可。
+   正常模式下触发条件与原来一致(同样是"按在不透明像素上"), 行为不变。 */
+void bongo_cat_window_poll_global_drag(BongoCatApp *app) {
+    static bool previous_down = false;
+    if (!app || !app->window || !app->session.window.visible ||
+        app->window_minimized || app->hover_hidden ||
+        app->settings.window.pass_through) {
+        previous_down = false;
+        return;
+    }
+    float gx = 0.0f, gy = 0.0f;
+    bool down = (SDL_GetGlobalMouseState(&gx, &gy) & SDL_BUTTON_LMASK) != 0;
+    bool fresh_press = down && !previous_down;
+    previous_down = down;
+    if (app->drag_candidate || app->window_drag_active) {
+        SDL_MouseMotionEvent event = {0};
+        event.type = SDL_EVENT_MOUSE_MOTION;
+        bongo_cat_window_drag_motion(app, &event);
+        return;
+    }
+    if (!fresh_press) return;
+    int window_x = 0, window_y = 0;
+    if (!SDL_GetWindowPosition(app->window, &window_x, &window_y)) return;
+    /* 无边框窗口的客户区原点就是窗口原点, 全局坐标减去它即为事件里的窗口内坐标。 */
+    if (!bongo_cat_window_visible_at_pointer(app, gx - (float)window_x,
+        gy - (float)window_y)) return;
+    SDL_MouseButtonEvent event = {0};
+    event.type = SDL_EVENT_MOUSE_BUTTON_DOWN;
+    event.button = SDL_BUTTON_LEFT;
+    event.down = true;
+    event.clicks = 1;
+    event.x = gx - (float)window_x;
+    event.y = gy - (float)window_y;
+    bongo_cat_window_drag_begin(app, &event);
+}
 /* 幂等, 未在拖动时调用也安全 (隐藏、最小化、退出路径都会调)。结束前先夹回显示器, 并丢弃
    显示器布局缓存; 最后把指针位置重新喂给模型, mouse_centered 下它要跟着窗口走。 */
 void bongo_cat_window_drag_end(BongoCatApp *app) {
