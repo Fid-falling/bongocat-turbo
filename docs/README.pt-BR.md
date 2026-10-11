@@ -38,7 +38,7 @@
 
 - GitHub Releases
 
-  Baixe a versão mais recente nas [GitHub Releases](https://github.com/vladelaina/BongoCat/releases/latest).
+  Baixe a versão mais recente nas [GitHub Releases](https://github.com/Fid-falling/bongocat-vulkan/releases/latest).
 
 ## 🛠️ Compilar a partir do código-fonte
 

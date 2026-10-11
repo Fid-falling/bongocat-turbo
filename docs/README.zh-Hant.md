@@ -56,7 +56,7 @@
 
 - GitHub Releases
 
-  從 [GitHub Releases](https://github.com/vladelaina/BongoCat/releases/latest) 下載最新版本。
+  從 [GitHub Releases](https://github.com/Fid-falling/bongocat-vulkan/releases/latest) 下載最新版本。
 
 ## 🛠️ 從原始碼建置
 

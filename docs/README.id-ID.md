@@ -57,7 +57,7 @@
 
 - GitHub Releases
 
-  Unduh rilis terbaru dari [GitHub Releases](https://github.com/vladelaina/BongoCat/releases/latest).
+  Unduh rilis terbaru dari [GitHub Releases](https://github.com/Fid-falling/bongocat-vulkan/releases/latest).
 
 ## 🛠️ Membangun dari Kode Sumber
 

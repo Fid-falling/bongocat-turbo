@@ -38,7 +38,7 @@
 
 - GitHub Releases
 
-  Скачайте последнюю версию из [GitHub Releases](https://github.com/vladelaina/BongoCat/releases/latest).
+  Скачайте последнюю версию из [GitHub Releases](https://github.com/Fid-falling/bongocat-vulkan/releases/latest).
 
 ## 🛠️ Сборка из исходного кода
 

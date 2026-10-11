@@ -38,7 +38,7 @@
 
 - GitHub Releases
 
-  [GitHub Releases](https://github.com/vladelaina/BongoCat/releases/latest)에서 최신 버전을 다운로드하세요.
+  [GitHub Releases](https://github.com/Fid-falling/bongocat-vulkan/releases/latest)에서 최신 버전을 다운로드하세요.
 
 ## 🛠️ 소스 코드로 빌드하기
 
