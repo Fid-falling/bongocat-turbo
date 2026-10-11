@@ -106,18 +106,25 @@ void bongo_cat_window_poll_global_drag(BongoCatApp *app) {
         return;
     }
     if (!fresh_press) return;
-    int window_x = 0, window_y = 0;
+    int window_x = 0, window_y = 0, width = 0, height = 0;
     if (!SDL_GetWindowPosition(app->window, &window_x, &window_y)) return;
-    /* 无边框窗口的客户区原点就是窗口原点, 全局坐标减去它即为事件里的窗口内坐标。 */
-    if (!bongo_cat_window_visible_at_pointer(app, gx - (float)window_x,
-        gy - (float)window_y)) return;
+    SDL_GetWindowSize(app->window, &width, &height);
+    /* 无边框窗口的客户区原点就是窗口原点, 全局坐标减去它即为窗口内坐标。 */
+    float local_x = gx - (float)window_x, local_y = gy - (float)window_y;
+    /*
+     * 必须先要求光标落在窗口矩形内。只靠下面的命中测试是不够的: 命中状态在"尚未算出"
+     * 时是保守值, 单用它就会出现"在任何地方点击都拖动桌宠"。
+     */
+    if (local_x < 0.0f || local_y < 0.0f || local_x >= (float)width ||
+        local_y >= (float)height) return;
+    if (!bongo_cat_window_visible_at_pointer(app, local_x, local_y)) return;
     SDL_MouseButtonEvent event = {0};
     event.type = SDL_EVENT_MOUSE_BUTTON_DOWN;
     event.button = SDL_BUTTON_LEFT;
     event.down = true;
     event.clicks = 1;
-    event.x = gx - (float)window_x;
-    event.y = gy - (float)window_y;
+    event.x = local_x;
+    event.y = local_y;
     bongo_cat_window_drag_begin(app, &event);
 }
 /* 幂等, 未在拖动时调用也安全 (隐藏、最小化、退出路径都会调)。结束前先夹回显示器, 并丢弃
