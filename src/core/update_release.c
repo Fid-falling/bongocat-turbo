@@ -14,9 +14,9 @@
  * 的打包脚本依赖, 属于跨仓库契约, 改一边就要改另一边。
  */
 #define RELEASE_PREFIX \
-    "https://github.com/vladelaina/BongoCat/releases/tag/"
+    "https://github.com/Fid-falling/bongocat-vulkan/releases/tag/"
 #define DOWNLOAD_PREFIX \
-    "https://github.com/vladelaina/BongoCat/releases/download/"
+    "https://github.com/Fid-falling/bongocat-vulkan/releases/download/"
 
 /* 统一的字符串字段拷贝。required 表示字段必须有且非空; truncate 表示超长时
    截断而不是失败 —— 只有 release notes 用它, 正文太长不该让整次更新检查失败。 */
@@ -36,7 +36,7 @@ static bool copy_text(char *target, size_t capacity, yyjson_val *value,
     return true;
 }
 
-/* 必须落在预期前缀(写死的 https://github.com/vladelaina/BongoCat/...)之下,
+/* 必须落在预期前缀(写死的 https://github.com/Fid-falling/bongocat-vulkan/...)之下,
    且不能含控制字符或反斜杠: 前者防伪造域名, 后者防止 URL 在 Windows 上被当成
    本地路径解析。 */
 static bool safe_url(const char *url, const char *prefix) {
