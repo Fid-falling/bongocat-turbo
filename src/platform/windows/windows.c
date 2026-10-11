@@ -90,6 +90,13 @@ BongoCatResult bongo_cat_platform_init(BongoCatPlatform *platform, SDL_Window *w
        WS_EX_TOOLWINDOW may recreate the DWM surface, so the configure path
        must be able to repair it before the window is first shown. */
     bongo_cat_windows_capture_mark_transparent(hwnd, transparent);
+    /*
+     * 主窗口也要装上透明处理器 (与上面 configure_preferences_window 同一套做法)。
+     * 只修复一次是不够的: 之后的样式事务 / 置顶与穿透切换 / 显示隐藏 / DPI 变化都会
+     * 重建 DWM 表面, 把逐像素 alpha 合成撤掉; 没有处理器就没人再修, 表现就是 GL 模式
+     * 下猫画出来了、背景却是一片黑。
+     */
+    if (transparent) bongo_cat_windows_capture_install_transparency_handler(hwnd);
     bongo_cat_windows_capture_configure(hwnd);
     SDL_SetWindowsMessageHook(windows_message_hook, NULL);
     if (!SDL_SetWindowResizable(window, true)) {

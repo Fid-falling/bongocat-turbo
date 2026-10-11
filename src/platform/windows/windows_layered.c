@@ -1,4 +1,5 @@
 #include "windows_layered.h"
+#include "bongo_cat/log.h"
 #include "windows_layered_internal.h"
 #include "windows_capture.h"
 #ifdef _WIN32
@@ -181,7 +182,8 @@ void bongo_cat_windows_layered_set_click_through(
     if (!value || (value->mode_logged && value->active == enabled)) return;
     value->mode_logged = true;
     value->active = enabled;
-    SDL_Log("Windows presentation path: forced_click_through=%d", enabled);
+    SDL_LogWarn(BONGO_CAT_LOG_LIFECYCLE,
+        "[probe] 呈现路径: 代理分层=%d (0=直接 GL 呈现)", enabled);
     if (enabled) {
         value->has_frame = false;
         ensure_proxy(platform);
