@@ -5,6 +5,11 @@
 #include "bongo_cat/log.h"
 #include "bongo_cat/memory.h"
 #include <stdlib.h>
+#ifdef _WIN32
+/* 代理分层呈现(仅 Windows)。头文件在 src/platform/windows 下, 非 Windows 构建不会
+   走到这一行, 所以不需要那里的 include 路径。 */
+#include "windows_layered.h"
+#endif
 
 static bool SDLCALL collect_event(void *userdata, SDL_Event *event) {
     Dial *d = userdata;
@@ -139,12 +144,32 @@ static bool create(Dial *d) {
         d->width < 1 || d->height < 1) return false;
     d->scale = (float)SDL_min(d->width,d->height)/608;
     d->raster_scale = (float)d->pixel_width/(float)d->width;
+#ifdef _WIN32
+    /*
+     * GL 模式下的逐像素透明: 轮盘是独立窗口、没有自己的 BongoCatPlatform, 拿不到主窗口
+     * 那份呈现器(它是按窗口持有的实例), 所以这里给它单独挂一份 —— 否则主窗口透明了,
+     * 菜单背景仍然是恒定的黑(普通窗口的 GL 缓冲 alpha 会被 DWM 忽略)。
+     * Vulkan 有自己的 alpha 合成, 开关关闭时一律保持原样(照旧 SDL_GL_SwapWindow)。
+     */
+    if (!dial_vulkan && bongo_cat_windows_layered_requested())
+        d->layered = bongo_cat_windows_layered_window_attach(d->window,d->owner,true);
+#endif
     if (!dial_paint_init(d)) return false;
     d->opened_at = d->changed_at = d->animation_at = SDL_GetTicks();
     d->opening = .85f;
     d->input_after_ns = SDL_GetTicksNS();
     if (!dial_paint_frame(d) || !SDL_ShowWindow(d->window)) return false;
+    /*
+     * 代理模式下隐藏窗口不提交帧(见 bongo_cat_windows_layered_window_present 的返回值
+     * 说明), 所以上面那一帧并没有真正显示出去; 显示之后必须立刻补一帧, 否则真实窗口会
+     * 以未呈现的内容停留一帧 —— 用户看到的是黑方块闪一下。
+     */
+    if (d->layered && !dial_paint_frame(d)) return false;
     if (!d->popup) SDL_RaiseWindow(d->window);
+#ifdef _WIN32
+    /* 真正显示画面的是代理窗口, 它得跟着一起抬到最前。 */
+    if (d->layered) bongo_cat_windows_layered_window_raise(d->layered);
+#endif
     d->dirty = true;
     SDL_LogInfo(BONGO_CAT_LOG_LIFECYCLE,
         "Radial menu opened: driver=%s window=%u size=%dx%d popup=%d",
@@ -168,6 +193,7 @@ BongoCatMenuAction bongo_cat_platform_context_menu(BongoCatPlatform *platform,
     if (!ready) SDL_LogError(SDL_LOG_CATEGORY_APPLICATION,"Radial menu initialization failed: %s",SDL_GetError());
     while (ready && !d->done) {
         uint64_t start = SDL_GetTicks();
+        ++d->frames;
         SDL_PumpEvents();
         if (!SDL_GetWindowFromID(d->window_id)) { d->done = true; break; }
         d->event_count = 0;
@@ -201,6 +227,18 @@ BongoCatMenuAction bongo_cat_platform_context_menu(BongoCatPlatform *platform,
         uint64_t elapsed = SDL_GetTicks()-start;
         if (elapsed < 16) SDL_Delay((Uint32)(16-elapsed));
     }
+    /*
+     * 帧率诊断。frames 是模态循环的迭代率, presents 才是真正回读整窗并提交给 DWM 的次数
+     * —— 代理分层呈现下这两个数会明显分离(静止的菜单 presents 不再增长), 这正是帧率问题
+     * 的第一手证据, 出问题时先看这一行。
+     */
+    if (ready) {
+        uint64_t total = SDL_GetTicks()-d->opened_at;
+        SDL_LogInfo(BONGO_CAT_LOG_LIFECYCLE,
+            "Radial menu loop: frames=%d presents=%d elapsed_ms=%llu fps=%.1f",
+            d->frames,d->presents,(unsigned long long)total,
+            total ? 1000.0*(double)d->frames/(double)total : 0.0);
+    }
     if (d->vk || !d->context || (SDL_GetWindowFromID(d->window_id) &&
         SDL_GL_MakeCurrent(d->window,d->context))) dial_paint_free(d);
     else {
@@ -212,6 +250,11 @@ BongoCatMenuAction bongo_cat_platform_context_menu(BongoCatPlatform *platform,
     }
     /* 交换链/表面必须在窗口销毁之前释放。 */
     if (d->vk) bongo_cat_vk_destroy(d->vk);
+#ifdef _WIN32
+    /* 同理, 呈现器也要在窗口销毁之前拆: 代理窗口是菜单窗口的 owned window, 会跟着
+       owner 一起消失, 之后就没人能恢复真实窗口的样式与属性了。 */
+    if (d->layered) bongo_cat_windows_layered_destroy(d->layered);
+#endif
     if (d->context) SDL_GL_DestroyContext(d->context);
     if (d->window_id && SDL_GetWindowFromID(d->window_id)) SDL_DestroyWindow(d->window);
     if (d->previous_window && d->previous_context)

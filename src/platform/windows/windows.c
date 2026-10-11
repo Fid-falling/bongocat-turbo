@@ -64,7 +64,8 @@ BongoCatResult bongo_cat_platform_init(BongoCatPlatform *platform, SDL_Window *w
     if (!platform || !window || !input) return BONGO_CAT_ERROR_ARGUMENT;
     memset(platform, 0, sizeof(*platform));
     platform->window = window; platform->input = input;
-    platform->window_opacity = 1.0f; platform->presenter = bongo_cat_windows_layered_create();
+    platform->window_opacity = 1.0f;
+    platform->presenter = bongo_cat_windows_layered_create(window);
     if (!platform->presenter) {
         bongo_cat_error_set(error, BONGO_CAT_ERROR_MEMORY,
             "Cannot allocate the Windows layered presenter");
@@ -72,7 +73,8 @@ BongoCatResult bongo_cat_platform_init(BongoCatPlatform *platform, SDL_Window *w
     }
     platform->wake_event_type = SDL_RegisterEvents(1);
     if (platform->wake_event_type == (Uint32)-1) {
-        bongo_cat_windows_layered_destroy(platform);
+        bongo_cat_windows_layered_destroy(platform->presenter);
+        platform->presenter = NULL;
         bongo_cat_error_set(error, BONGO_CAT_ERROR_PLATFORM,
             "Cannot reserve the Windows input wake event");
         return BONGO_CAT_ERROR_PLATFORM;
@@ -116,7 +118,8 @@ void bongo_cat_platform_shutdown(BongoCatPlatform *platform) {
     HWND window = native_window(platform);
     if (window) bongo_cat_windows_borderless_uninstall(window);
     bongo_cat_windows_input_stop(platform);
-    bongo_cat_windows_layered_destroy(platform);
+    bongo_cat_windows_layered_destroy(platform->presenter);
+    platform->presenter = NULL;
     SDL_SetWindowsMessageHook(NULL, NULL);
 }
 
@@ -167,7 +170,7 @@ void bongo_cat_platform_set_always_on_top(BongoCatPlatform *platform, bool enabl
         SetWindowPos(window, enabled ? HWND_TOPMOST : HWND_NOTOPMOST,
             0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE);
     apply_window_level(window, enabled);
-    bongo_cat_windows_layered_set_always_on_top(platform, enabled);
+    bongo_cat_windows_layered_set_always_on_top(platform->presenter, enabled);
     bongo_cat_windows_capture_configure(window);
     bongo_cat_windows_capture_log(window, "window-level");
 }

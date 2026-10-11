@@ -15,6 +15,11 @@
 #include "bongo_cat/vk_backend.h"
 #include <stddef.h>
 #include <stdlib.h>
+#ifdef _WIN32
+/* 代理分层呈现(仅 Windows)。头文件在 src/platform/windows 下, 非 Windows 构建不会
+   走到这一行, 所以不需要那里的 include 路径。 */
+#include "windows_layered.h"
+#endif
 
 /*
  * 顶点着色器: 只做投影变换 (正交投影由 CPU 算好传入), 不做任何模型变换 ——
@@ -102,7 +107,7 @@ bool dial_paint_frame(Dial *d) {
        pointer hits on some native transparent-window implementations. */
     p->alpha = fmaxf(.15f,fminf(1,(float)(SDL_GetTicks()-d->opened_at)/180));
     dial_scene(d);
-    if (p->failed) return SDL_SetError("Radial menu geometry budget exceeded");
+    if (p->failed) return SDL_SetError("Radial menu geometry budget exceeded");
     if (d->vk) {
         /*
          * Vulkan 菜单窗口: 几何已由 dial_scene() 后端无关地构建好, 这里只提交绘制。
@@ -145,6 +150,20 @@ bool dial_paint_frame(Dial *d) {
         glDrawArrays(GL_TRIANGLES,b.first,b.count);
     }
     if (glGetError() != GL_NO_ERROR) return SDL_SetError("Radial menu OpenGL draw failed");
+    ++d->presents;
+#ifdef _WIN32
+    /*
+     * 代理分层呈现(见 windows_layered.c): 普通窗口的 GL 缓冲 alpha 会被 DWM 忽略,
+     * 所以开了 BONGO_CAT_GL_TRANSPARENCY 时画面改由代理窗口以 ULW_ALPHA 提交, 否则
+     * 背景恒为黑。没有呈现器(含 Vulkan —— 它在函数前半段就返回了, 走不到这里)时
+     * 仍然是普通的 SDL_GL_SwapWindow。
+     * 呈现器只在真的画了新内容时才被调用: 模态循环用 d->dirty 把关, 静止的菜单一次
+     * 都不回读整窗像素 —— 那是这条路径上最贵的一步。
+     */
+    if (d->layered)
+        return bongo_cat_windows_layered_window_present(d->layered,
+            d->pixel_width, d->pixel_height);
+#endif
     return SDL_GL_SwapWindow(d->window);
 }
 
@@ -180,8 +199,8 @@ void dial_vk_texture_release(Dial *d, unsigned int id) {
     if (texture && d->vk) bongo_cat_vk_texture_destroy(d->vk, texture);
 }
 
-void dial_paint_free(Dial *d) {
-    DialPaint *p = &d->paint;
+void dial_paint_free(Dial *d) {
+    DialPaint *p = &d->paint;
 /*
  * 释放全部渲染资源。两条路差别很大:
  *   - Vulkan: 纹理对象交给后端销毁 (这里的 id 不是 GL 纹理名, 调 glDeleteTextures 是

@@ -7,12 +7,16 @@
 #include <windows.h>
 
 /*
- * 分层窗口模式下的窗口级状态设置(不透明度 / 逐像素 alpha 查询 / 显示隐藏),
- * 也就是 platform.h 上那几个 set_* 的 Windows 实现。
+ * 平台结构(BongoCatPlatform)与分层窗口呈现器之间的适配层, 也就是 platform.h 上那几个
+ * 窗口级 set_* / 呈现入口的 Windows 实现。
  *
- * 平台层始终有两条路径: 走分层窗口(active)时透明度由我们自己合成进像素, 否则
- * 退回 SDL 的整窗不透明度。每个函数都要照顾到两条路径, 漏一条就会在某些配置下
- * 静默失效。
+ * 为什么要有这一层: 呈现器本身是按窗口持有的实例(主窗口一份, 轮盘一份), 它不认识
+ * BongoCatPlatform。主窗口把它放在 platform->presenter 上, 于是"平台的 window_opacity"
+ * 与"实例的不透明度镜像"必须在这里保持同步 —— 两处不一致的表现是恢复窗口时突然变亮
+ * 或变暗。轮盘不走这条路, 它自己 attach 实例(见 windows_layered_window.c)。
+ *
+ * 平台层始终有两条路径: 走分层窗口(active)时透明度由我们自己合成进像素, 否则退回
+ * SDL 的整窗不透明度。每个函数都要照顾到两条路径, 漏一条就会在某些配置下静默失效。
  */
 static HWND native_window(BongoCatPlatform *platform) {
     return platform && platform->window ? (HWND)SDL_GetPointerProperty(
@@ -32,6 +36,8 @@ bool bongo_cat_platform_set_opacity(BongoCatPlatform *platform,
     BongoCatWindowsLayered *value = platform->presenter;
     float previous = platform->window_opacity;
     platform->window_opacity = SDL_clamp(opacity, 0.0f, 1.0f);
+    /* 呈现器要自己拿这个值去合成像素与恢复窗口, 所以镜像必须跟着走(含下面的回滚)。 */
+    if (value) value->opacity = platform->window_opacity;
     bool updated;
     /* 已经提交过、而且 alpha 和上次相同, 就不必再打扰 DWM: 设置界面拖动滑块时会
        反复调用这里, 每次都重传整帧会明显卡顿。 */
@@ -39,31 +45,36 @@ bool bongo_cat_platform_set_opacity(BongoCatPlatform *platform,
         BYTE alpha = (BYTE)(platform->window_opacity * 255.0f + 0.5f);
         updated = !value->has_frame ||
             (value->applied_alpha_valid && value->applied_alpha == alpha) ||
-            bongo_cat_windows_layered_update_proxy(platform, value);
+            bongo_cat_windows_layered_update_proxy(value);
     } else {
         updated = SDL_SetWindowOpacity(platform->window, platform->window_opacity);
     }
-    if (!updated) platform->window_opacity = previous;
+    if (!updated) {
+        platform->window_opacity = previous;
+        if (value) value->opacity = previous;
+    }
     return updated;
 }
 
 /*
  * 取某个像素的 alpha, 供点击穿透的命中测试使用(见 windows_pointer.c)。
- * 优先用 readback(最近一次真正提交出去的内容), 只有它还没准备好时才退回 pixels
- * —— "刚写完但还没提交"的那一刻两者是不同的。
- * 尺寸不匹配直接返回 false: 拿旧尺寸的 alpha 会算出错误的穿透区域。
+ * 判定细节在 bongo_cat_windows_layered_frame_alpha 里(它优先读 readback: 最近一次
+ * 真正提交出去的内容, 而不是刚写完还没提交的 pixels), 这里只做平台侧的取用。
  */
 bool bongo_cat_platform_frame_alpha(const BongoCatPlatform *platform,
     int width, int height, int x, int y, uint8_t *alpha) {
-    const BongoCatWindowsLayered *value = platform ? platform->presenter : NULL;
-    const unsigned char *pixels = value && value->readback_valid ?
-        value->readback : value ? value->pixels : NULL;
-    if (!value || !value->active || !value->has_frame || !pixels ||
-        value->source_width != width || value->source_height != height ||
-        !alpha || x < 0 || y < 0 || x >= width || y >= height)
-        return false;
-    *alpha = pixels[((size_t)y * (size_t)width + (size_t)x) * 4 + 3];
-    return true;
+    return bongo_cat_windows_layered_frame_alpha(
+        platform ? platform->presenter : NULL, width, height, x, y, alpha);
+}
+
+/*
+ * 每帧呈现。实现在 windows_layered.c —— 未启用代理模式时它就是普通的
+ * SDL_GL_SwapWindow, 所以这里只负责把 platform 上的实例取出来。
+ */
+bool bongo_cat_platform_present(BongoCatPlatform *platform, int width, int height) {
+    if (!platform || !platform->window) return false;
+    if (!platform->presenter) return SDL_GL_SwapWindow(platform->window);
+    return bongo_cat_windows_layered_present(platform->presenter, width, height);
 }
 
 /*

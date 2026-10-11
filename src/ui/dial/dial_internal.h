@@ -61,7 +61,7 @@ typedef struct DialBatch { unsigned int texture; int first, count; } DialBatch;
 typedef struct DialCover { unsigned int texture; float width, height; bool attempted; } DialCover;
 typedef struct DialPaint {
     BongoCatGL gl;
-    GLuint program, vao, vbo, white, font_texture;
+    GLuint program, vao, vbo, white, font_texture;
     /*
      * Vulkan 菜单窗口的纹理句柄表: 批/封面里存的是 id, 画的时候要换成
      * bongo_cat_vk_draw_triangles 需要的纹理指针。id = 下标 + 1。
@@ -72,7 +72,7 @@ typedef struct DialPaint {
      * bongo_cat_vk_draw_triangles 需要的纹理指针。id = 下标 + 1。
      * 与设置窗口里 BongoCatUIBackend.vk_textures[] 同一套做法。
      */
-    struct BongoCatVkTexture *vk_textures[8];
+    struct BongoCatVkTexture *vk_textures[8];
     GLint projection, sampler;
     DialVertex *vertices;
     size_t count, capacity;
@@ -103,7 +103,7 @@ typedef struct DialPaint {
  */
 typedef struct Dial {
     SDL_Window *window, *owner;
-    SDL_GLContext context, previous_context;
+    SDL_GLContext context, previous_context;
     /*
      * 菜单窗口自己的 Vulkan 上下文 (renderer=vulkan 时非空, 否则为 NULL 走 GL)。
      * 用前置声明避免这个头文件依赖 vk_backend.h。
@@ -115,12 +115,25 @@ typedef struct Dial {
      * 施工图: docs/vulkan-dial-port-recipe.md
      */
     struct BongoCatVk *vk;
+    /*
+     * 菜单窗口自己的分层呈现器实例 (仅 Windows + GL 渲染 + 开了
+     * BONGO_CAT_GL_TRANSPARENCY 时非空, 否则 NULL)。类型对上层不透明, 见
+     * src/platform/windows/windows_layered.h —— 这里的 void * 让本文件不必包含
+     * 平台头文件, 非 Windows 平台这个字段永远是 NULL。
+     */
+    void *layered;
     SDL_Window *previous_window;
     SDL_WindowID window_id;
     const BongoCatMenuLabels *labels;
     DialItem items[DIAL_ROOTS];
     int count, active, child, page, pressed;
     bool done, dark, dirty, child_focus, shown, popup;
+    /*
+     * 帧率诊断: frames 是模态循环的迭代次数, presents 是真正提交出去的帧数。
+     * 代理分层呈现下两者会明显分离 —— 静止的菜单一次都不回读(见 dial_paint_frame),
+     * 这正是"别把 GL 拖成幻灯片"的关键, 出问题时靠这两个数分辨。
+     */
+    int frames, presents;
     uint64_t input_after_ns;
     BongoCatMenuAction result, preview;
     int width, height, pixel_width, pixel_height;
@@ -157,11 +170,11 @@ bool dial_paint_frame(Dial *d);
 void dial_scene(Dial *d);
 void dial_triangle(Dial *d, DialPoint a, DialPoint b, DialPoint c,
     uint32_t ca, uint32_t cb, uint32_t cc);
-/* Vulkan 纹理句柄表 (id = 下标 + 1, 0 表示无) */
-int dial_vk_texture_register(Dial *d, struct BongoCatVkTexture *texture);
-struct BongoCatVkTexture *dial_vk_texture_lookup(const Dial *d, unsigned int id);
-void dial_vk_texture_release(Dial *d, unsigned int id);
-
+/* Vulkan 纹理句柄表 (id = 下标 + 1, 0 表示无) */
+int dial_vk_texture_register(Dial *d, struct BongoCatVkTexture *texture);
+struct BongoCatVkTexture *dial_vk_texture_lookup(const Dial *d, unsigned int id);
+void dial_vk_texture_release(Dial *d, unsigned int id);
+
 void dial_quad(Dial *d, unsigned int texture, float x, float y, float w, float h,
     float u0, float v0, float u1, float v1, uint32_t color);
 void dial_stroke(Dial *d, const DialPoint *points, int count, float width,

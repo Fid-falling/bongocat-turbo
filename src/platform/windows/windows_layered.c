@@ -4,9 +4,7 @@
 #include "windows_capture.h"
 #ifdef _WIN32
 #include <SDL3/SDL.h>
-#include <SDL3/SDL_opengl.h>
 #include <SDL3/SDL_properties.h>
-#include <stb_image_resize2.h>
 #include <stdlib.h>
 #include <windows.h>
 /*
@@ -17,46 +15,44 @@
  * 是: 把真实(源)窗口压成全透明(SetLayeredWindowAttributes alpha=0), 再用一个
  * WS_EX_LAYERED 的代理窗口把抓到的帧显示出来。
  *
- * 整条链路是"预乘 alpha": glReadPixels 取回 BGRA, 缩放用 STBIR_BGRA_PM(告诉重采样
- * 器数据已预乘), UpdateLayeredWindow 用 ULW_ALPHA(要求预乘)—— 三者必须一致, 任何
- * 一环改成直通 alpha, 透明边缘就会出现黑边或亮边。
+ * 本文件负责窗口与模式(建/销毁、真实窗口的压制与恢复、代理窗口、每帧入口); 像素通路
+ * (抓帧 + 提交)在 windows_layered_frame.c, 平台适配在 windows_layered_state.c。
+ *
+ * 实例是按窗口持有的: 主窗口一份, 轮盘一份(见 windows_layered_window.c), 所以这里
+ * 不出现 BongoCatPlatform, 也不假定全进程只有一个代理窗口 —— 代理句柄按源窗口属性存,
+ * 各窗口互不干扰。
  *
  * 只有强制点击穿透时才启用这套路径(原因见 windows_pointer.c), 平时走 SDL 直接呈现。
  */
 static const wchar_t proxy_class[] = L"BongoCat.LayeredPresenter";
 static const wchar_t proxy_property[] = L"BongoCat.LayeredProxy";
 /* SDL's OpenGL window owns a DC, so a separate layered window presents frames. */
-static HWND native_window(BongoCatPlatform *platform) {
-    return platform && platform->window ? (HWND)SDL_GetPointerProperty(
-        SDL_GetWindowProperties(platform->window),
+HWND bongo_cat_windows_layered_window_handle(SDL_Window *window) {
+    return window ? (HWND)SDL_GetPointerProperty(SDL_GetWindowProperties(window),
         SDL_PROP_WINDOW_WIN32_HWND_POINTER, NULL) : NULL;
 }
-void *bongo_cat_windows_layered_create(void) {
+HWND bongo_cat_windows_layered_native_window(const BongoCatWindowsLayered *value) {
+    return value ? bongo_cat_windows_layered_window_handle(value->window) : NULL;
+}
+void *bongo_cat_windows_layered_create(SDL_Window *window) {
+    if (!window) return NULL;
     BongoCatWindowsLayered *value = calloc(1, sizeof(*value));
     if (!value) return NULL;
+    value->window = window;
+    /* 不透明度的初值必须与 windows.c 里 platform->window_opacity 的初值一致, 否则
+       第一次"恢复源窗口"会把窗口设成另一个亮度。 */
+    value->opacity = 1.0f;
     value->memory_dc = CreateCompatibleDC(NULL);
     if (value->memory_dc) return value;
     free(value);
     return NULL;
 }
 
-/* 删除 DIB 之前必须先 SelectObject 换回原位图 —— 还选在 DC 里的位图不能删。
-   同时清掉 pixels/width/height, 让 resize_bitmap 下次必定重建。 */
-static void release_bitmap(BongoCatWindowsLayered *value) {
-    if (!value || !value->bitmap) return;
-    SelectObject(value->memory_dc, value->original_bitmap);
-    DeleteObject(value->bitmap);
-    value->bitmap = NULL;
-    value->original_bitmap = NULL;
-    value->pixels = NULL;
-    value->width = value->height = 0;
-}
 /* 把源窗口恢复成普通窗口: 去掉 WS_EX_LAYERED / WS_EX_TRANSPARENT 与全透明属性,
    并用 SWP_FRAMECHANGED 让系统重新计算非客户区。恢复后必须重设一次 SDL 的窗口
    不透明度(分层属性会把它盖掉), 并修复 DWM 的透明合成。 */
-static void restore_source(BongoCatPlatform *platform) {
-    BongoCatWindowsLayered *value = platform ? platform->presenter : NULL;
-    HWND source = native_window(platform);
+static void restore_source(BongoCatWindowsLayered *value) {
+    HWND source = bongo_cat_windows_layered_native_window(value);
     if (!value || !source || !value->source_transparent) return;
     LONG_PTR style = GetWindowLongPtrW(source, GWL_EXSTYLE);
     SetWindowLongPtrW(source, GWL_EXSTYLE,
@@ -64,22 +60,23 @@ static void restore_source(BongoCatPlatform *platform) {
     SetWindowPos(source, NULL, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE |
         SWP_NOZORDER | SWP_NOACTIVATE | SWP_FRAMECHANGED);
     value->source_transparent = false;
-    SDL_SetWindowOpacity(platform->window, platform->window_opacity);
+    SDL_SetWindowOpacity(value->window, value->opacity);
     bongo_cat_windows_capture_restore_transparency(source);
     bongo_cat_windows_capture_log(source, "layered-source-restored");
 }
-void bongo_cat_windows_layered_destroy(BongoCatPlatform *platform) {
-    BongoCatWindowsLayered *value = platform ? platform->presenter : NULL;
+void bongo_cat_windows_layered_destroy(void *presenter) {
+    BongoCatWindowsLayered *value = presenter;
     if (!value) return;
-    HWND source = native_window(platform);
-    restore_source(platform);
-    if (source) RemovePropW(source, proxy_property);
-    if (value->proxy) DestroyWindow(value->proxy);
-    release_bitmap(value);
+    HWND source = bongo_cat_windows_layered_native_window(value);
+    restore_source(value);
+    /* 源窗口可能已经先一步被销毁(调用方的清理顺序不保证), 所以属性和代理窗口都要
+       各自判一次有效性 —— 对死句柄调 RemovePropW/DestroyWindow 只会静默失败。 */
+    if (source && IsWindow(source)) RemovePropW(source, proxy_property);
+    if (value->proxy && IsWindow(value->proxy)) DestroyWindow(value->proxy);
+    bongo_cat_windows_layered_release_frame(value);
     free(value->readback);
     if (value->memory_dc) DeleteDC(value->memory_dc);
     free(value);
-    platform->presenter = NULL;
 }
 /* 代理窗口类只注册一次; 已经存在就直接复用。窗口过程用 DefWindowProcW: 代理窗口
    不接收输入(TRANSPARENT + NOACTIVATE), 不需要自己的消息处理。 */
@@ -95,23 +92,23 @@ static bool register_proxy_class(void) {
     type.lpszClassName = proxy_class;
     return RegisterClassExW(&type) != 0;
 }
-/* 按需创建代理窗口: 以源窗口为 owner(层级与任务栏归属跟着源窗口), 并继承标题和
-   大小图标(否则任务栏上会是个无名窗口)。样式固定 TOOLWINDOW | NOACTIVATE |
+/* 按需创建代理窗口: 以 proxy_owner(默认源窗口) 为 owner, 层级与任务栏归属跟着它, 并
+   继承标题和大小图标(否则任务栏上会是个无名窗口)。样式固定 TOOLWINDOW | NOACTIVATE |
    TRANSPARENT | LAYERED: 不抢焦点、不接收鼠标。句柄同时写进源窗口的属性, 方便
    其它模块(windows_pointer.c 抬窗口、诊断)按窗口找到它。 */
-static bool ensure_proxy(BongoCatPlatform *platform) {
-    BongoCatWindowsLayered *value = platform ? platform->presenter : NULL;
-    HWND source = native_window(platform);
+static bool ensure_proxy(BongoCatWindowsLayered *value) {
+    HWND source = bongo_cat_windows_layered_native_window(value);
     if (!value || !source) return false;
     if (value->proxy) return true;
     if (!register_proxy_class()) return false;
+    HWND owner = value->proxy_owner ? value->proxy_owner : source;
     wchar_t title[128] = L"BongoCat - Pet";
     GetWindowTextW(source, title, (int)(sizeof(title) / sizeof(title[0])));
     DWORD style = WS_EX_LAYERED | WS_EX_TRANSPARENT |
         WS_EX_TOOLWINDOW | WS_EX_NOACTIVATE;
     if (value->topmost) style |= WS_EX_TOPMOST;
     value->proxy = CreateWindowExW(style, proxy_class, title, WS_POPUP,
-        0, 0, 1, 1, source, NULL, GetModuleHandleW(NULL), NULL);
+        0, 0, 1, 1, owner, NULL, GetModuleHandleW(NULL), NULL);
     if (!value->proxy) return false;
     HICON large = (HICON)SendMessageW(source, WM_GETICON, ICON_BIG, 0);
     HICON small_icon = (HICON)SendMessageW(source, WM_GETICON, ICON_SMALL, 0);
@@ -122,41 +119,12 @@ static bool ensure_proxy(BongoCatPlatform *platform) {
     bongo_cat_windows_capture_log(value->proxy, "layered-proxy-created");
     return true;
 }
-/* 把内存 DC 里的整帧提交给 DWM。destination 用源窗口的屏幕位置, 所以窗口每次移动
-   后都要重新提交; blend 里的 SourceConstantAlpha 就是整窗不透明度, 提交成功后记进
-   applied_alpha, 好让 set_opacity 跳过"值没变"的重复提交。
-   失败细节交给 SDL_SetError, 上层只看到 false 加一条错误信息。 */
-bool bongo_cat_windows_layered_update_proxy(BongoCatPlatform *platform,
-    BongoCatWindowsLayered *value) {
-    HWND source_window = native_window(platform);
-    RECT bounds;
-    if (!source_window || !value || !value->proxy || !value->bitmap ||
-        !GetWindowRect(source_window, &bounds))
-        return SDL_SetError("Cannot locate the Windows layered window");
-    POINT destination = {bounds.left, bounds.top};
-    POINT source = {0, 0};
-    SIZE size = {value->width, value->height};
-    BLENDFUNCTION blend = {AC_SRC_OVER, 0,
-        (BYTE)(platform->window_opacity * 255.0f + 0.5f), AC_SRC_ALPHA};
-    HDC screen = GetDC(NULL);
-    bool presented = screen && UpdateLayeredWindow(value->proxy, screen,
-        &destination, &size, value->memory_dc, &source, 0, &blend,
-        ULW_ALPHA) != FALSE;
-    DWORD failure = presented ? ERROR_SUCCESS : GetLastError();
-    if (screen) ReleaseDC(NULL, screen);
-    if (!presented) return SDL_SetError(
-        "UpdateLayeredWindow failed (%lu)", (unsigned long)failure);
-    value->applied_alpha = blend.SourceConstantAlpha;
-    value->applied_alpha_valid = true;
-    return true;
-}
 
 /* 把源窗口压成全透明(alpha=0), 桌面上就只剩代理窗口的画面。
    LWA_ALPHA 失败时必须先把样式改回去再返回 false —— 半途而废会让窗口既不是普通
    窗口也不透明, 用户会直接看到一块黑。 */
-static bool make_source_transparent(BongoCatPlatform *platform) {
-    BongoCatWindowsLayered *value = platform ? platform->presenter : NULL;
-    HWND source = native_window(platform);
+static bool make_source_transparent(BongoCatWindowsLayered *value) {
+    HWND source = bongo_cat_windows_layered_native_window(value);
     if (!value || !source) return false;
     if (value->source_transparent) return true;
     LONG_PTR style = GetWindowLongPtrW(source, GWL_EXSTYLE);
@@ -177,8 +145,8 @@ static bool make_source_transparent(BongoCatPlatform *platform) {
    与 active 一起做记忆); 打开时先隐藏代理窗口(等第一帧成功后再显示), 关闭时直接
    恢复源窗口。 */
 void bongo_cat_windows_layered_set_click_through(
-    BongoCatPlatform *platform, bool enabled) {
-    BongoCatWindowsLayered *value = platform ? platform->presenter : NULL;
+    void *presenter, bool enabled) {
+    BongoCatWindowsLayered *value = presenter;
     if (!value || (value->mode_logged && value->active == enabled)) return;
     value->mode_logged = true;
     value->active = enabled;
@@ -186,21 +154,23 @@ void bongo_cat_windows_layered_set_click_through(
         "[probe] 呈现路径: 代理分层=%d (0=直接 GL 呈现)", enabled);
     if (enabled) {
         value->has_frame = false;
-        ensure_proxy(platform);
+        ensure_proxy(value);
         if (value->proxy) ShowWindow(value->proxy, SW_HIDE);
-        bongo_cat_windows_capture_log(native_window(platform),
+        bongo_cat_windows_capture_log(
+            bongo_cat_windows_layered_native_window(value),
             "layered-presenter-ready");
     } else {
         if (value->proxy) ShowWindow(value->proxy, SW_HIDE);
-        restore_source(platform);
-        bongo_cat_windows_capture_log(native_window(platform),
+        restore_source(value);
+        bongo_cat_windows_capture_log(
+            bongo_cat_windows_layered_native_window(value),
             "direct-opengl-presenter");
     }
 }
 
 void bongo_cat_windows_layered_set_always_on_top(
-    BongoCatPlatform *platform, bool enabled) {
-    BongoCatWindowsLayered *value = platform ? platform->presenter : NULL;
+    void *presenter, bool enabled) {
+    BongoCatWindowsLayered *value = presenter;
     if (!value) return;
     value->topmost = enabled;
     if (!value->proxy) return;
@@ -213,75 +183,22 @@ HWND bongo_cat_windows_layered_proxy(HWND source) {
     return source ? (HWND)GetPropW(source, proxy_property) : NULL;
 }
 
-/* 尺寸没变就复用现有 DIB。biHeight 用正值 = 自下而上的行序, 与 glReadPixels 的
-   输出方向一致, 因此拷进去之后不需要翻转。 */
-static bool resize_bitmap(BongoCatWindowsLayered *value, int width, int height) {
-    if (value->bitmap && value->width == width && value->height == height) return true;
-    release_bitmap(value);
-    BITMAPINFO info = {0};
-    info.bmiHeader.biSize = sizeof(info.bmiHeader);
-    info.bmiHeader.biWidth = width;
-    info.bmiHeader.biHeight = height;
-    info.bmiHeader.biPlanes = 1;
-    info.bmiHeader.biBitCount = 32;
-    info.bmiHeader.biCompression = BI_RGB;
-    void *pixels = NULL;
-    value->bitmap = CreateDIBSection(value->memory_dc, &info,
-        DIB_RGB_COLORS, &pixels, NULL, 0);
-    if (!value->bitmap || !pixels) {
-        if (value->bitmap) DeleteObject(value->bitmap);
-        value->bitmap = NULL;
-        return false;
-    }
-    value->original_bitmap = SelectObject(value->memory_dc, value->bitmap);
-    value->pixels = pixels;
-    value->width = width;
-    value->height = height;
-    return true;
-}
-
-/*
- * 抓取 GL 前缓冲。渲染尺寸与窗口尺寸相同时直接读进 pixels; 不同时(高 DPI 缩放、
- * supersample)先读进 readback 再缩放 —— readback_valid 就是"这一帧走了缩放路径"
- * 的标记, 逐像素 alpha 查询要靠它决定读哪块内存。
- * 缩放必须按预乘 alpha 处理(见文件头的不变量): 按预乘值插值, 透明边缘才不会出现
- * 深色或亮色描边。
- */
-static bool read_frame(BongoCatWindowsLayered *value, int width, int height,
-    int display_width, int display_height) {
-    value->source_width = width; value->source_height = height;
-    value->readback_valid = width != display_width || height != display_height;
-    if (!value->readback_valid) {
-        glReadPixels(0, 0, width, height, GL_BGRA, GL_UNSIGNED_BYTE, value->pixels);
-        return true;
-    }
-    size_t bytes = (size_t)width * (size_t)height * 4;
-    if (width <= 0 || height <= 0 ||
-        bytes / 4 != (size_t)width * (size_t)height) return false;
-    if (value->readback_capacity < bytes) {
-        unsigned char *next = realloc(value->readback, bytes);
-        if (!next) return false;
-        value->readback = next;
-        value->readback_capacity = bytes;
-    }
-    glReadPixels(0, 0, width, height, GL_BGRA, GL_UNSIGNED_BYTE, value->readback);
-    return stbir_resize_uint8_linear(value->readback, width, height, width * 4,
-        value->pixels, display_width, display_height, display_width * 4,
-        STBIR_BGRA_PM) != NULL;
-}
-
 /*
  * 呈现入口(平台层的 present)。没有启用代理模式时就是普通的 SDL_GL_SwapWindow。
  * 启用时: 源窗口不可见或被最小化就直接返回 false —— 此时拿不到画面, 也不该让代理
  * 窗口显示一帧旧内容(隐藏状态没有可暴露的帧, 由启动路径先显示窗口再重试)。
  * 任何一步失败都会清掉 has_frame, 避免 set_opacity 误以为"已经提交过同 alpha 的
  * 帧"而跳过重提交。
+ *
+ * 代价提示: 这里每调用一次就是一次整窗 glReadPixels(GPU->CPU 同步) + 一次
+ * UpdateLayeredWindow 拷贝, 是这条路径上最贵的一步 —— 调用方必须只在画面真的变了
+ * 的时候调它(轮盘就是用 d->dirty 把关的, 静止时一次都不回读)。
  */
-bool bongo_cat_platform_present(BongoCatPlatform *platform, int width, int height) {
-    if (!platform || !platform->window) return false;
-    BongoCatWindowsLayered *value = platform->presenter;
-    if (!value || !value->active) return SDL_GL_SwapWindow(platform->window);
-    HWND source = native_window(platform);
+bool bongo_cat_windows_layered_present(void *presenter, int width, int height) {
+    BongoCatWindowsLayered *value = presenter;
+    if (!value || !value->window) return false;
+    if (!value->active) return SDL_GL_SwapWindow(value->window);
+    HWND source = bongo_cat_windows_layered_native_window(value);
     if (!source || !value->visible || !IsWindowVisible(source) || IsIconic(source)) {
         if (value->proxy) ShowWindow(value->proxy, SW_HIDE);
         /* A hidden source has no frame to expose through the proxy. Let the
@@ -292,19 +209,22 @@ bool bongo_cat_platform_present(BongoCatPlatform *platform, int width, int heigh
     if (!GetWindowRect(source, &bounds)) return false;
     int display_width = bounds.right - bounds.left,
         display_height = bounds.bottom - bounds.top;
-    if (!ensure_proxy(platform) || width <= 0 || height <= 0 ||
+    if (!ensure_proxy(value) || width <= 0 || height <= 0 ||
         display_width <= 0 || display_height <= 0 ||
-        !resize_bitmap(value, display_width, display_height) ||
-        !read_frame(value, width, height, display_width, display_height)) {
+        !bongo_cat_windows_layered_capture(value, width, height,
+            display_width, display_height)) {
         value->has_frame = false;
         return SDL_SetError("Cannot allocate the Windows layered frame");
     }
-    if (!bongo_cat_windows_layered_update_proxy(platform, value)) {
+    /* 菜单窗口(模态)要求整块矩形都能被点到; 主窗口不设这个标记, 保持"透明处点穿"。
+       必须在提交之前改像素 —— UpdateLayeredWindow 拷走的是此刻的内存 DC。 */
+    if (value->solid_hit_area) bongo_cat_windows_layered_solidify_hit_area(value);
+    if (!bongo_cat_windows_layered_update_proxy(value)) {
         value->has_frame = false;
         return false;
     }
     value->has_frame = true;
-    if (!make_source_transparent(platform))
+    if (!make_source_transparent(value))
         return SDL_SetError("Cannot suppress the OpenGL source window");
     ShowWindow(value->proxy, SW_SHOWNOACTIVATE);
     return true;

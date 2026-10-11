@@ -25,7 +25,9 @@ if(WIN32)
     src/platform/windows/windows_input_probe.c
     src/platform/windows/windows_popup.c
     src/platform/windows/windows_layered.c
+    src/platform/windows/windows_layered_frame.c
     src/platform/windows/windows_layered_state.c
+    src/platform/windows/windows_layered_window.c
     src/platform/windows/windows_opacity.c
     src/platform/windows/windows_tray.c
     src/platform/windows/windows_assets.c

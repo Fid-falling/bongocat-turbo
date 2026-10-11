@@ -138,7 +138,11 @@ void dial_event(Dial *d, const SDL_Event *e) {
         break;
     case SDL_EVENT_WINDOW_FOCUS_LOST:
         /* Creation/show may queue a transient loss before focus settles. */
-        if (d->shown && SDL_GetKeyboardFocus() != d->window) d->done = true;
+        /* 代理分层呈现(仅 Windows, 见 windows_layered.c)下这条整体不适用: 真正显示画面的
+           是代理窗口, 它带 WS_EX_NOACTIVATE, 点它必然把键盘焦点交给别的窗口(通常是猫),
+           于是每次点菜单都会先收到一条失焦事件 —— 按老逻辑就变成"点哪都关菜单、动作不
+           执行"。代理模式下菜单的关闭改由"点在扇区外"的点击或 ESC 决定。 */
+        if (d->shown && !d->layered && SDL_GetKeyboardFocus() != d->window) d->done = true;
         break;
     case SDL_EVENT_WINDOW_CLOSE_REQUESTED: d->done = true; break;
     case SDL_EVENT_WINDOW_EXPOSED: d->dirty = true; break;
