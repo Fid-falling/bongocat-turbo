@@ -179,6 +179,8 @@ cmake -S . -B build -G Ninja \
 
 ## 📌 Project Status
 
+* Graphics: Vulkan by default (OpenGL available as a fallback), both built and exercised on every change.
+
 
 ## 📜 License
 
@@ -361,19 +363,28 @@ without the variable to return to the default backend. Evdev mouse following
 uses unaccelerated device motion; Wayland placement, click-through, and
 always-on-top support still depend on the compositor.
 
-### 🖼️ Why OpenGL instead of Vulkan?
+### 🖼️ Which graphics backend does it use?
 
-We chose OpenGL not because Vulkan is bad, but because BongoCat does not need
-that level of complexity. The app mainly renders one Live2D model, a few UI
-layers, and a transparent desktop window. OpenGL already handles that
-comfortably, and it works naturally with SDL3 and Cubism's OpenGL renderer.
-Moving to Vulkan would mean maintaining much more rendering and synchronization
-code across three desktop platforms, without a noticeable improvement for
-users. For BongoCat's current workload, OpenGL keeps the renderer smaller,
-easier to debug, and easier to maintain while still delivering the performance
-we need.
+The native runtime ships **both** a Vulkan and an OpenGL renderer. The default
+`auto` resolves to **Vulkan**, and only falls back to OpenGL when the Vulkan
+probe fails. The Vulkan path has reached feature parity: Live2D rendering, the
+radial menu, model-cover capture, the frame audits and the smoke tests all run
+the same upper layers as OpenGL and produce the same output.
 
+Pick a backend in Settings (`renderer`), or force it with the same key in
+`settings.json`. Things worth knowing:
 
+* The Vulkan renderer and the Cubism bridge share **one** `VkDevice` on purpose.
+  A second device used to crash under overlays (RTSS / OBS / NVIDIA) that
+  assume a single device per process.
+* On Windows 10 the swapchain only advertises `OPAQUE`. Transparency still
+  works: we try `VK_COMPOSITE_ALPHA_PRE_MULTIPLIED_BIT_KHR` first and fall back
+  only if the driver refuses.
+* Two audit tools (`live2d-visual-audit`, `live2d-viewer-audit`) still need
+  OpenGL, because they render their own offscreen frame. Everything else is
+  backend-agnostic.
+* The startup log always prints the requested vs. actual backend, so you never
+  have to guess which one you got.
 
 ## Project Status
 ![Alt](https://repobeats.axiom.co/api/embed/74334755a589dea40c5d31f8d2bcdc6c2bd39d87.svg "Repobeats analytics image")
