@@ -141,17 +141,16 @@ static bool make_source_transparent(BongoCatWindowsLayered *value) {
     return true;
 }
 
-/* 切换呈现路径。这个函数会被反复调用, 所以只在模式真的变化时才动窗口(mode_logged
-   与 active 一起做记忆); 打开时先隐藏代理窗口(等第一帧成功后再显示), 关闭时直接
-   恢复源窗口。 */
-void bongo_cat_windows_layered_set_click_through(
-    void *presenter, bool enabled) {
-    BongoCatWindowsLayered *value = presenter;
+/* 切换呈现路径(不含日志, 幂等)。这个函数会被反复调用, 所以只在模式真的变化时才动
+   窗口(mode_logged 与 active 一起做记忆); 打开时先隐藏代理窗口(等第一帧成功后再显示),
+   关闭时直接恢复源窗口。
+   调用方直接用它 = 不往日志里写"呈现路径"那一行: 轮盘每次打开都会新建一个呈现器实例,
+   而日志里那行是给主窗口看的(轮盘有自己的"轮盘呈现路径"), 否则每开一次菜单都像开关翻转。 */
+void bongo_cat_windows_layered_apply_mode(BongoCatWindowsLayered *value,
+    bool enabled) {
     if (!value || (value->mode_logged && value->active == enabled)) return;
     value->mode_logged = true;
     value->active = enabled;
-    SDL_LogWarn(BONGO_CAT_LOG_LIFECYCLE,
-        "[probe] 呈现路径: 代理分层=%d (0=直接 GL 呈现)", enabled);
     if (enabled) {
         value->has_frame = false;
         ensure_proxy(value);
@@ -166,6 +165,16 @@ void bongo_cat_windows_layered_set_click_through(
             bongo_cat_windows_layered_native_window(value),
             "direct-opengl-presenter");
     }
+}
+
+/* 主窗口的呈现路径开关 = 唯一会写那条诊断日志的入口(见上面 apply_mode 的说明)。 */
+void bongo_cat_windows_layered_set_click_through(
+    void *presenter, bool enabled) {
+    BongoCatWindowsLayered *value = presenter;
+    if (!value || (value->mode_logged && value->active == enabled)) return;
+    SDL_LogWarn(BONGO_CAT_LOG_LIFECYCLE,
+        "[probe] 呈现路径: 代理分层=%d (0=直接 GL 呈现)", enabled);
+    bongo_cat_windows_layered_apply_mode(value, enabled);
 }
 
 void bongo_cat_windows_layered_set_always_on_top(

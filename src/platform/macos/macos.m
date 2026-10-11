@@ -154,6 +154,12 @@ void bongo_cat_platform_set_click_through(BongoCatPlatform *platform,
     apply_click_through_shape(platform, enabled);
     [native_window(platform) setIgnoresMouseEvents:enabled];
 }
+/* macOS 的窗口本来就带逐像素 alpha(NSWindow 的合成路径), 没有 Windows 那套代理分层
+   窗口, 所以"透明背景"这一项在这里是 no-op(设置界面也只在 Windows 上显示它)。保留空
+   实现是为了让上层的下发入口可以无条件调用, 不必到处条件编译。 */
+void bongo_cat_platform_apply_transparency(BongoCatPlatform *platform) {
+    (void)platform;
+}
 bool bongo_cat_platform_set_opacity(BongoCatPlatform *platform, float opacity) {
     if (!platform || !platform->window) return false;
     opacity = SDL_clamp(opacity, 0.0f, 1.0f);

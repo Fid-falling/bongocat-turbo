@@ -221,6 +221,9 @@ bool bongo_cat_platform_set_capture_only(BongoCatPlatform *platform, bool enable
     SDL_LogInfo(BONGO_CAT_LOG_LIFECYCLE,
         "[runtime] capture-only=%d (仅在录屏软件中显示: %s, 桌面%s显示, 采集仍可捕获)",
         enabled ? 1 : 0, enabled ? "已开启" : "已关闭", enabled ? "不再" : "恢复");
+    /* 采集状态是代理分层的第二个输入(桌面上看不见时不启用代理): 它变了必须立刻重下发,
+       否则代理窗口会跟着"桌面不显示"一起失效, 或者恢复显示后一直空着。 */
+    bongo_cat_platform_apply_transparency(platform);
     return true;
 }
 #endif

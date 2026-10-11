@@ -210,6 +210,9 @@ void bongo_cat_window_apply(BongoCatApp *app) {
        (and on some drivers black) back buffer. */
     bongo_cat_platform_set_visible(&app->platform,
         state->visible && !app->startup_visibility_pending);
+    /* 呈现路径(代理分层)只由"透明背景"这个设置决定, 所以它是独立的一步, 不跟着下面
+       的穿透同步走; 采集模式那一步结尾会再按采集状态重下发一次。 */
+    bongo_cat_window_apply_transparency(app);
     bongo_cat_window_sync_click_through(app);
     bongo_cat_platform_set_always_on_top(&app->platform,
         preferences->always_on_top);

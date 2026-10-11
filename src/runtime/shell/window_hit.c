@@ -177,20 +177,32 @@ void bongo_cat_window_schedule_hit_check(BongoCatApp *app) {
     app->pointer_hit_deadline_ns = SDL_GetTicksNS() + 100000000ull;
 }
 
+/* 把"透明背景"设置下发到平台。这是代理分层呈现开关的唯一入口(平台侧见
+   bongo_cat_platform_apply_transparency), 只在设置/环境变量/采集模式变化时被调用。
+   以前这段镜像是长在下面的穿透同步里的, 而那个函数每帧、每次鼠标移动都会跑, 于是
+   呈现路径被挂在一条逐帧变化的路径上 —— 命中测试的结果一抖, 用户刚打开的开关就跟着翻。 */
+void bongo_cat_window_apply_transparency(BongoCatApp *app) {
+    if (!app || !app->window) return;
+    app->platform.gl_transparency = app->settings.window.gl_transparency != 0;
+    bongo_cat_platform_apply_transparency(&app->platform);
+}
+
 /* 把"是否穿透"下发给平台。调用点分散在状态可能变化之后 (呈现后、鼠标输入后、可见性变化
    后), 但只有 forced 或 pointer_transparent 与上次不同才真的调平台接口 —— Windows 上每次
    调用都要重设窗口样式。鼠标按下期间冻结判定 (拖动中窗口突然变透明会丢事件);
-   click_through_* 三个字段同时充当下一次的比较基准。 */
+   click_through_* 三个字段同时充当下一次的比较基准。
+   这里只做穿透, 不下发呈现路径(见 bongo_cat_window_apply_transparency)。 */
 void bongo_cat_window_sync_click_through(BongoCatApp *app) {
     if (!app || !app->window) return;
     /*
-     * window.glTransparency 每帧同步进平台结构: 平台层读不到 BongoCatSettings, 而它
-     * 要用这个值决定主窗口走不走代理分层呈现(见 windows_pointer.c)。
-     * 值变了必须让下面的"与上次相同就提前返回"失效, 否则用户点了开关要重启才生效。
+     * window.glTransparency 的镜像: 平台层读不到 BongoCatSettings, 而它要用这个值决定
+     * 主窗口走不走代理分层呈现(见 windows_pointer.c)。只有值真的变了才下发, 且下发的
+     * 是"设置"(不是命中结果) —— 设置界面改完 app->settings 后总会有一次穿透同步跑到
+     * 这里, 所以开关不需要重启就能生效。
      */
     bool gl_transparency = app->settings.window.gl_transparency != 0;
     if (app->platform.gl_transparency != gl_transparency) {
-        app->platform.gl_transparency = gl_transparency;
+        bongo_cat_window_apply_transparency(app);
         app->click_through_valid = false;
     }
     bool forced = app->settings.window.pass_through || app->hover_hidden;

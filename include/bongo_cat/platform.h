@@ -103,6 +103,15 @@ BongoCatResult bongo_cat_platform_init(BongoCatPlatform *platform, SDL_Window *w
 void bongo_cat_platform_shutdown(BongoCatPlatform *platform);
 void bongo_cat_platform_set_click_through(BongoCatPlatform *platform,
     bool forced, bool pointer_transparent);
+/*
+ * 下发"透明背景"设置 (平台层读 platform->gl_transparency 这个镜像)。
+ *
+ * 只在设置/环境变量强制覆盖/采集模式真的变化时调用 —— 这是代理分层呈现的总开关,
+ * 绝不能放进每帧的命中测试或点击穿透同步里: 那些路径的参数逐帧都在变(光标在猫身上
+ * 还是透明处), 一旦让它们参与决策, 开关就会跟着光标来回翻。
+ * 只有 Windows 的 OpenGL 后端有等价机制, 其它平台是 no-op。
+ */
+void bongo_cat_platform_apply_transparency(BongoCatPlatform *platform);
 bool bongo_cat_platform_set_opacity(BongoCatPlatform *platform, float opacity);
 float bongo_cat_platform_get_opacity(const BongoCatPlatform *platform);
 bool bongo_cat_platform_present(BongoCatPlatform *platform, int width, int height);

@@ -81,6 +81,19 @@ bool bongo_cat_preferences_gl_create(BongoCatPreferences *value) {
     /* The transparent settings window relies on per-pixel alpha to clip the
        rounded corners (bongo_cat_ui_paint_rounded_surface). Request an alpha
        channel explicitly so the corner mask reaches the framebuffer. */
+    /*
+     * 这两个属性必须"先记后还原", 不能写死还原成 0。
+     *
+     * SDL_GL_*Attribute 是进程级全局状态, 而 ALPHA_SIZE=0 会让之后新建的每个 GL
+     * 上下文的帧缓冲都没有 alpha 通道 —— 读回来时 alpha 恒为 1.0。受害的是轮盘:
+     * 它每次打开都新建自己的上下文 (dial_window.c), 而 GL 模式的逐像素透明靠代理
+     * 窗口提交 glReadPixels 抓到的整帧 (ULW_ALPHA)。于是"打开过一次设置窗口"之后
+     * 菜单背景就变成一块不透明黑底: 看起来像代理呈现没生效, 其实代理好好挂着, 是
+     * 抓帧的 alpha 全被读成了 255。
+     */
+    int previous_alpha = 8, previous_share = 0;
+    SDL_GL_GetAttribute(SDL_GL_ALPHA_SIZE, &previous_alpha);
+    SDL_GL_GetAttribute(SDL_GL_SHARE_WITH_CURRENT_CONTEXT, &previous_share);
     SDL_GL_SetAttribute(SDL_GL_ALPHA_SIZE, 8);
     if (share && !SDL_GL_SetAttribute(SDL_GL_SHARE_WITH_CURRENT_CONTEXT, 1))
         return fail(value, SDL_GetError());
@@ -96,8 +109,10 @@ bool bongo_cat_preferences_gl_create(BongoCatPreferences *value) {
     char creation_error[256] = {0};
     if (!context) snprintf(creation_error, sizeof(creation_error), "%s",
         SDL_GetError());
-    bool reset = SDL_GL_SetAttribute(SDL_GL_SHARE_WITH_CURRENT_CONTEXT, 0);
-    SDL_GL_SetAttribute(SDL_GL_ALPHA_SIZE, 0);
+    bool reset = SDL_GL_SetAttribute(SDL_GL_SHARE_WITH_CURRENT_CONTEXT,
+        previous_share);
+    /* 还原成原值而不是 0: 主窗口那条路径要求 alpha=8, 清零会把轮盘一起打坏。 */
+    SDL_GL_SetAttribute(SDL_GL_ALPHA_SIZE, previous_alpha);
     if (!context)
         return fail(value, creation_error[0] ? creation_error :
             "SDL_GL_CreateContext returned no context");

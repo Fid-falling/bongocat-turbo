@@ -43,11 +43,10 @@ void bongo_cat_preferences_window_transparency(BongoCatApp *app,
     app->settings.window.gl_transparency = transparent ? 1 : 0;
     app->dirty = true;
     /*
-     * 立刻下发一次。开关本身只写设置, 真正改窗口的是每帧的穿透同步: 它会发现
-     * platform 上的镜像值变了, 于是作废"与上次相同"的缓存并重新调平台接口
-     * (见 window_hit.c), 所以打开/关闭都不需要重启 —— 这正是用户唯一能看到的差别
-     * (猫周围是黑的还是透的) 必须马上跟着变的原因。
+     * 立刻下发一次: 打开/关闭都不需要重启, 用户唯一能看到的差别(猫周围是黑的还是透的)
+     * 必须马上跟着变。这里走的是专门的"透明背景下发"入口, 不是穿透同步 ——
+     * 呈现路径的开关只由设置决定, 挂在逐帧的命中测试路径上会被光标位置来回推翻。
      */
-    bongo_cat_window_sync_click_through(app);
+    bongo_cat_window_apply_transparency(app);
 }
 #endif

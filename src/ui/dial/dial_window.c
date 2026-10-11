@@ -147,11 +147,21 @@ static bool create(Dial *d) {
         /* 菜单是模态的: 呈现不等垂直回扫, 展开/收起的动画更顺 (同设置窗口) */
         bongo_cat_vk_set_vsync(d->vk, false);
     } else {
-    int sharing = 0;
+    /*
+     * 轮盘的逐像素透明依赖"帧缓冲带 alpha 通道": 代理呈现提交的是 glReadPixels 抓
+     * 到的整帧 (ULW_ALPHA), 没有 alpha 通道时读回来的 alpha 恒为 1.0, 菜单背景就是
+     * 一块不透明黑底。SDL_GL_*Attribute 是进程级全局状态, 别的窗口(设置窗口)建上下
+     * 文时可能刚把它改成 0, 所以这里显式要 8; 建完连同共享属性一起还原, 不给下一个
+     * 窗口留下副作用。
+     */
+    int sharing = 0, alpha_size = 8;
     SDL_GL_GetAttribute(SDL_GL_SHARE_WITH_CURRENT_CONTEXT,&sharing);
+    SDL_GL_GetAttribute(SDL_GL_ALPHA_SIZE,&alpha_size);
+    SDL_GL_SetAttribute(SDL_GL_ALPHA_SIZE,8);
     if (!SDL_GL_SetAttribute(SDL_GL_SHARE_WITH_CURRENT_CONTEXT,0)) return false;
     d->context = SDL_GL_CreateContext(d->window);
     SDL_GL_SetAttribute(SDL_GL_SHARE_WITH_CURRENT_CONTEXT,sharing);
+    SDL_GL_SetAttribute(SDL_GL_ALPHA_SIZE,alpha_size);
     if (!d->context || !SDL_GL_MakeCurrent(d->window,d->context)) return false;
     SDL_GL_SetSwapInterval(0); /* The modal tick supplies a 16 ms frame budget. */
     } /* dial_vulkan ? ... : GL */

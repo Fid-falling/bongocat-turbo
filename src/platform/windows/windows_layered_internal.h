@@ -50,6 +50,10 @@ typedef struct BongoCatWindowsLayered {
 /* SDL 窗口 -> 原生 HWND (实现在 windows_layered.c)。 */
 HWND bongo_cat_windows_layered_native_window(const BongoCatWindowsLayered *value);
 HWND bongo_cat_windows_layered_window_handle(SDL_Window *window);
+/* 切换呈现路径(建/销毁代理窗口 + 压制/恢复源窗口), 幂等且不写诊断日志 ——
+   日志只在主窗口的公开入口 bongo_cat_windows_layered_set_click_through 里打一份。 */
+void bongo_cat_windows_layered_apply_mode(BongoCatWindowsLayered *value,
+    bool enabled);
 /* 抓一帧 GL 前缓冲进内存 DC, 以及把 DIB 释放掉 (实现在 windows_layered_frame.c)。 */
 bool bongo_cat_windows_layered_capture(BongoCatWindowsLayered *value,
     int width, int height, int display_width, int display_height);

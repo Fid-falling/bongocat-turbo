@@ -76,6 +76,9 @@ void bongo_cat_app_apply_frame_pacing(BongoCatApp *app);
 bool bongo_cat_wait_event(SDL_Event *event, int timeout_ms);
 bool bongo_cat_app_step_live2d(BongoCatApp *app, float elapsed_seconds);
 void bongo_cat_window_sync_click_through(BongoCatApp *app);
+/* 把"透明背景"设置下发给平台 (代理分层呈现的总开关); 只在设置/采集模式变化时调用,
+   不要放进逐帧路径 —— 见 window_hit.c 的实现说明。 */
+void bongo_cat_window_apply_transparency(BongoCatApp *app);
 void bongo_cat_window_apply_pending_resize(BongoCatApp *app);
 void bongo_cat_window_wheel(BongoCatApp *app, const SDL_MouseWheelEvent *event);
 void bongo_cat_window_update_wheel_animation(BongoCatApp *app, uint64_t now);

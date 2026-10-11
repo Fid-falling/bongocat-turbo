@@ -172,7 +172,12 @@ void *bongo_cat_windows_layered_window_attach(SDL_Window *window, SDL_Window *ow
     value->visible = true;
     /* 菜单是模态的: 整块矩形都要吃点击, 否则点在扇区外会穿到猫身上(见 solidify_hit_area)。 */
     value->solid_hit_area = true;
-    bongo_cat_windows_layered_set_click_through(value, true);
+    /*
+     * 用不写日志的那个入口: 轮盘的呈现器每次打开都是新实例, 走公开入口会让日志里
+     * 反复出现主窗口那行"呈现路径: 代理分层=1", 看起来就像开关在翻转 —— 轮盘有自己
+     * 的"轮盘呈现路径"一行, 两行都打只会互相干扰。
+     */
+    bongo_cat_windows_layered_apply_mode(value, true);
     bongo_cat_windows_layered_forward_input(
         bongo_cat_windows_layered_native_window(value));
     SDL_LogWarn(BONGO_CAT_LOG_LIFECYCLE,

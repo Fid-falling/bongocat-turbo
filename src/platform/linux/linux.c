@@ -152,6 +152,12 @@ void bongo_cat_platform_set_click_through(BongoCatPlatform *platform,
     bool forced, bool pointer_transparent) {
     bongo_cat_linux_x11_click_through(platform, forced || pointer_transparent);
 }
+/* Linux 没有 Windows 那套代理分层窗口: GL 的逐像素透明由合成器负责, 所以"透明背景"
+   这一项在这里是 no-op(设置界面也只在 Windows 上显示它)。保留空实现是为了让上层的
+   下发入口可以无条件调用, 不必到处条件编译。 */
+void bongo_cat_platform_apply_transparency(BongoCatPlatform *platform) {
+    (void)platform;
+}
 bool bongo_cat_platform_set_opacity(BongoCatPlatform *platform, float opacity) {
     if (!platform || !platform->window) return false;
     opacity = SDL_clamp(opacity, 0.0f, 1.0f);
