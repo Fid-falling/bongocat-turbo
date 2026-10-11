@@ -17,6 +17,7 @@
 #include "preferences_widgets.h"
 #include "bongo_cat/i18n.h"
 #include "runtime.h"
+#include "bongo_cat/render.h"
 
 #ifdef _WIN32
 static const char *tr(BongoCatApp *app, const char *key, const char *fallback) {
@@ -26,6 +27,12 @@ static const char *tr(BongoCatApp *app, const char *key, const char *fallback) {
 void bongo_cat_preferences_window_transparency(BongoCatApp *app,
     struct nk_context *context) {
     if (!app || !context) return;
+    /*
+     * 只在 OpenGL 后端显示这一行。Vulkan 的交换链本来就声明预乘 alpha, 透明是原生的,
+     * 这一项在那边是彻底的 no-op (平台层也加了护栏) —— 给用户一个点了没有任何变化的
+     * 开关只会让人困惑, 所以直接不画。
+     */
+    if (bongo_cat_renderer_active() != BONGO_CAT_RENDERER_OPENGL) return;
     bool transparent = app->settings.window.gl_transparency != 0;
     bongo_cat_pref_row_icon(context, BONGO_CAT_PREF_ICON_PASS_THROUGH);
     if (!bongo_cat_pref_toggle(context, "gl-transparency", tr(app,
