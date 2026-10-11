@@ -1,5 +1,6 @@
 #include "windows_layered.h"
 #include "bongo_cat/log.h"
+#include "bongo_cat/render.h"
 #include "windows_layered_internal.h"
 #include "windows_capture.h"
 
@@ -26,13 +27,28 @@
  *
  * Windows 上普通窗口的 GL 缓冲 alpha 会被 DWM 忽略, 所以 UI 透明的唯一办法就是那条
  * 代理路径: 把真实窗口压成全透明, 再用一个 WS_EX_LAYERED 代理窗口以 ULW_ALPHA 显示
- * 抓到的帧。它默认关闭的原因是"用户在 OBS 里按标题采集真实窗口时, 一开透明画面就卡住"
- * (见 windows_pointer.c 的长注释) —— 先由 BONGO_CAT_GL_TRANSPARENCY=1 验证。
+ * 抓到的帧。
+ *
+ * 三个输入, 优先级从高到低:
+ *   1) BONGO_CAT_GL_TRANSPARENCY: 调试用的强制覆盖, "1" 强制开、"0" 强制关。
+ *      用户可感知的设置项是下面那个, 环境变量只留给排查问题的人;
+ *   2) configured: 设置界面的[透明背景] (window.glTransparency), 默认关闭 ——
+ *      用户在 OBS 里按标题采集"真实窗口"时, 一开透明画面就卡住(见 windows_pointer.c
+ *      的长注释), 所以不做成默认行为;
+ *   3) 渲染后端: 这套呈现抓的是 GL 前缓冲 (windows_layered_frame.c 的 glReadPixels),
+ *      Vulkan 下没有可读的前缓冲, 强开只会让代理窗口显示一块无效内存合成的黑块,
+ *      所以非 OpenGL 后端一律返回 false。
+ *
  * 主窗口与轮盘共用这一个判断, 否则会出现"猫透明了、菜单还是黑底"的半开状态。
  */
-bool bongo_cat_windows_layered_requested(void) {
+bool bongo_cat_windows_layered_requested(bool configured) {
+    if (bongo_cat_renderer_active() != BONGO_CAT_RENDERER_OPENGL) return false;
     const char *value = SDL_getenv("BONGO_CAT_GL_TRANSPARENCY");
-    return value && value[0] == '1';
+    if (value && value[1] == '\0') {
+        if (value[0] == '1') return true;
+        if (value[0] == '0') return false;
+    }
+    return configured;
 }
 
 /*

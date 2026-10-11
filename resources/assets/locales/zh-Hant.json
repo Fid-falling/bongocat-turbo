@@ -21,6 +21,8 @@
           "alwaysOnTop": "視窗置頂",
           "keepInScreen": "保持在螢幕內",
           "captureOnly": "僅在錄影軟體中顯示",
+          "glTransparency": "透明背景",
+          "glTransparencyHint": "讓寵物背景真正透明，可能影響錄影軟體對它的擷取",
           "windowSize": "視窗尺寸",
           "windowCorners": "視窗圓角 (%)",
           "opacity": "不透明度",

@@ -82,6 +82,18 @@ typedef struct BongoCatWindowPreferences {
     int disable_effects;
     /* 1 = 启动时不检查/不请求管理员权限 (默认 0 = 自动提权) */
     int disable_elevation;
+    /*
+     * 1 = 让宠物背景在桌面上真正透明 (默认 0 = 关闭)。
+     *
+     * 为什么需要它: OpenGL 模式下普通窗口的缓冲 alpha 会被 DWM 忽略, 猫以外的区域
+     * 只能显示成黑块。开启后改走"代理分层呈现"(真实窗口压成全透明 + 一个分层代理
+     * 窗口显示抓到的帧, 见 windows_layered_window.c)。
+     * 为什么是 int 而不是 bool: 配置读取走可选的 read_int, 老配置文件缺键时保持
+     * 默认值 0, 不会因为"键不存在"判定配置损坏。写入侧同样按 int 存。
+     * 代价: 录屏软件按标题采集"真实窗口"时拿到的是全透明画面, 要采代理窗口
+     * (设置界面与文档里都写明了这一点)。
+     */
+    int gl_transparency;
     bool obs_background;
     bool random_expression;
     bool rounded_corners;

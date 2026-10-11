@@ -21,6 +21,8 @@
           "alwaysOnTop": "Toujours au premier plan",
           "keepInScreen": "Maintenir à l'écran",
           "captureOnly": "Uniquement dans les logiciels de capture",
+          "glTransparency": "Fond transparent",
+          "glTransparencyHint": "Rend le fond de la mascotte vraiment transparent ; peut gêner la capture de cette fenêtre par un logiciel d'enregistrement",
           "windowSize": "Taille de la fenêtre",
           "windowCorners": "Coins arrondis (%)",
           "opacity": "Opacité",

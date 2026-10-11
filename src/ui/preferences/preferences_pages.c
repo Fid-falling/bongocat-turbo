@@ -91,6 +91,11 @@ static void page_display(BongoCatApp *app, struct nk_context *context) {
             app->dirty = true;
         }
     }
+    /* 透明背景: 实现在 preferences_window_transparency.c, 只有 Windows 有等价机制,
+       其它平台连定义都没有, 所以调用点也要跟着条件编译。 */
+#ifdef _WIN32
+    bongo_cat_preferences_window_transparency(app, context);
+#endif
     bongo_cat_pref_row_icon(context, BONGO_CAT_PREF_ICON_SOLID_BACKGROUND);
     if (bongo_cat_pref_obs_background(context, "obs-background", tr(app,
         "pages.preference.cat.labels.obsBackground", "Solid Background"), tr(app,

@@ -21,6 +21,8 @@
           "alwaysOnTop": "Immer im Vordergrund",
           "keepInScreen": "Auf dem Bildschirm halten",
           "captureOnly": "Nur in Aufnahmeprogrammen",
+          "glTransparency": "Transparenter Hintergrund",
+          "glTransparencyHint": "Macht den Hintergrund des Tieres wirklich transparent; kann die Aufnahme dieses Fensters beeinträchtigen",
           "windowSize": "Fenstergröße",
           "windowCorners": "Fensterrundung (%)",
           "opacity": "Deckkraft",

@@ -13,6 +13,7 @@
  * 这样"按下后拖走再松手"不会误触发。
  */
 #include "dial_internal.h"
+#include "bongo_cat/log.h"
 
 /*
  * 把屏幕坐标换成逻辑坐标并更新选中, click 表示"这是一次点击判定"而不是悬停。
@@ -75,6 +76,14 @@ static void page(Dial *d, int direction) {
  */
 static void key(Dial *d, const SDL_KeyboardEvent *event) {
     SDL_Keycode value = event->key;
+    /*
+     * 键盘导航的日志。这一块踩过"按键完全收不到"的坑(代理分层呈现下焦点不在菜单窗口
+     * 上, 见 dial_window.c 的 collect_event), 出问题时这一行是分辨"没收到按键"与
+     * "收到了没处理"的唯一依据。
+     */
+    SDL_LogInfo(BONGO_CAT_LOG_LIFECYCLE,
+        "Radial menu key: key=0x%x active=%d child=%d", (unsigned)value,
+        d->active, d->child);
     if (value == SDLK_ESCAPE) {
         if (d->active >= 0 && dial_child_count(d)) dial_select(d,-1,-1);
         else d->done = true;

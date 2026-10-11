@@ -21,6 +21,8 @@
           "alwaysOnTop": "Always on Top",
           "keepInScreen": "Keep on Screen",
           "captureOnly": "Capture Only",
+          "glTransparency": "Transparent background",
+          "glTransparencyHint": "Makes the pet background truly transparent; may affect capture software recording this window",
           "windowSize": "Window Size",
           "windowCorners": "Window Corners (%)",
           "opacity": "Opacity",

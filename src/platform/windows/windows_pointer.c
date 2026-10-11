@@ -65,10 +65,12 @@ void bongo_cat_platform_set_click_through(BongoCatPlatform *platform,
      * 而真实窗口本身就能被采集 (游戏采集 / 窗口采集), 像素级透明的实现也早就
      * 修好了, 所以这里只做点击穿透, 让窗口保持在正常的合成路径上。
      *
-     * 例外: 打开 BONGO_CAT_GL_TRANSPARENCY=1 时仍然启用代理 —— 普通窗口的 GL alpha
+     * 例外: 设置里的"透明背景"(window.glTransparency) 或调试用的
+     * BONGO_CAT_GL_TRANSPARENCY=1 仍然启用代理 —— 普通窗口的 GL alpha
      * 会被 DWM 忽略, 不启用代理 GL 模式就只能是黑底 (见上面 helper 的说明)。
      */
-    bool transparent = bongo_cat_windows_layered_requested();
+    bool transparent = bongo_cat_windows_layered_requested(
+        platform->gl_transparency);
     bongo_cat_windows_layered_set_click_through(platform->presenter, transparent);
     /* 代理模式下真实窗口收不到鼠标消息, 必须在代理窗口上补一条转发, 否则拖不动。 */
     if (transparent) bongo_cat_windows_layered_forward_input(window);

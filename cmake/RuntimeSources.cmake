@@ -283,7 +283,8 @@ set(BONGO_CAT_UI_PREFERENCES_SOURCES
   src/ui/preferences/preferences_toggle.c
   src/ui/preferences/preferences_widget_shortcut.c
   src/ui/preferences/preferences_widgets.c
-  src/ui/preferences/preferences_widgets_compound.c)
+  src/ui/preferences/preferences_widgets_compound.c
+  src/ui/preferences/preferences_window_transparency.c)
 
 set(BONGO_CAT_RUNTIME_SOURCES
   src/core/app_state.c

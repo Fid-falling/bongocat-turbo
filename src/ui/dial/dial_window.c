@@ -17,7 +17,18 @@ static bool SDLCALL collect_event(void *userdata, SDL_Event *event) {
         d->done = true; return true; /* Let the main application handle shutdown. */
     }
     SDL_Window *window = SDL_GetWindowFromEvent(event);
-    if (window != d->window) {
+    bool key = event->type == SDL_EVENT_KEY_DOWN || event->type == SDL_EVENT_KEY_UP;
+    /*
+     * 代理分层呈现(仅 Windows + GL)下键盘焦点不在菜单窗口上: 抢走焦点的是"真实窗口"
+     * 被压成全透明之后仍然可见的宠物窗口 —— 代理窗口带 WS_EX_NOACTIVATE, 点它不会把
+     * 焦点交给菜单, 于是 SDL 把按键事件的 windowID 标成宿主(owner)窗口。
+     * 菜单是模态的: 宿主的主循环此刻正被这里的模态循环挡着, 这些按键除了菜单没有第二
+     * 个消费者, 所以必须收进来 —— 否则 ESC/方向键/回车全部失灵(鼠标却是好的), 而
+     * 失焦关闭那条逻辑也已经被代理模式特意跳过(见 dial_input.c)。
+     * 只认 key 且只认 owner: 别的宠物/设置窗口的事件照旧一个都不碰。
+     */
+    bool owner_keys = d->layered && key && window == d->owner;
+    if (window != d->window && !owner_keys) {
         if ((event->type == SDL_EVENT_MOUSE_BUTTON_DOWN &&
             event->common.timestamp >= d->input_after_ns) ||
             (window == d->owner && event->type == SDL_EVENT_WINDOW_CLOSE_REQUESTED)) d->done = true;
@@ -28,6 +39,11 @@ static bool SDLCALL collect_event(void *userdata, SDL_Event *event) {
         event->type == SDL_EVENT_MOUSE_BUTTON_UP || event->type == SDL_EVENT_MOUSE_WHEEL ||
         event->type == SDL_EVENT_KEY_DOWN || event->type == SDL_EVENT_KEY_UP;
     if (!input || d->event_count == 128) return true;
+    if (owner_keys)
+        SDL_LogInfo(BONGO_CAT_LOG_LIFECYCLE,
+            "[probe] 轮盘收到宿主窗口的按键: key=0x%x down=%d (代理模式下键盘焦点在宠物"
+            "窗口, 见 collect_event 的说明)",
+            (unsigned)event->key.key, event->key.down);
     d->events[d->event_count++] = *event;
     return false;
 }
@@ -151,7 +167,7 @@ static bool create(Dial *d) {
      * 菜单背景仍然是恒定的黑(普通窗口的 GL 缓冲 alpha 会被 DWM 忽略)。
      * Vulkan 有自己的 alpha 合成, 开关关闭时一律保持原样(照旧 SDL_GL_SwapWindow)。
      */
-    if (!dial_vulkan && bongo_cat_windows_layered_requested())
+    if (!dial_vulkan && bongo_cat_windows_layered_requested(d->gl_transparency))
         d->layered = bongo_cat_windows_layered_window_attach(d->window,d->owner,true);
 #endif
     if (!dial_paint_init(d)) return false;
@@ -185,6 +201,8 @@ BongoCatMenuAction bongo_cat_platform_context_menu(BongoCatPlatform *platform,
     Dial *d = calloc(1,sizeof(*d));
     if (!d) return BONGO_CAT_MENU_NONE;
     d->owner = platform->window; d->labels = labels; d->dark = labels->dark_theme;
+    /* 设置项的快照: 菜单是模态的, 打开期间设置不会变, 所以取一次就够(见 dial_internal.h)。 */
+    d->gl_transparency = platform->gl_transparency;
     d->previous_window = SDL_GL_GetCurrentWindow();
     d->previous_context = SDL_GL_GetCurrentContext();
     d->active = d->child = d->pressed = -1;

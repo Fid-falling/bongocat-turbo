@@ -21,6 +21,8 @@
           "alwaysOnTop": "Siempre visible",
           "keepInScreen": "Mantener en pantalla",
           "captureOnly": "Solo en programas de grabación",
+          "glTransparency": "Fondo transparente",
+          "glTransparencyHint": "Hace que el fondo de la mascota sea realmente transparente; puede afectar a su captura",
           "windowSize": "Tamaño de la ventana",
           "windowCorners": "Esquinas redondeadas (%)",
           "opacity": "Opacidad",

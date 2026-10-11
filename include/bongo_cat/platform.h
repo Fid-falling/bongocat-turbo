@@ -18,6 +18,13 @@ typedef struct BongoCatPlatform {
     bool hover_hide_unavailable;
     /* 只在采集软件里可见 (见 bongo_cat_platform_set_capture_only) */
     bool capture_only;
+    /*
+     * window.glTransparency 的镜像: "让背景真正透明"这个设置项 (仅 Windows + OpenGL
+     * 后端有意义)。平台层看不到 BongoCatSettings, 而每帧的穿透同步
+     * (bongo_cat_window_sync_click_through) 又要用到它, 所以由运行时把它同步进来。
+     * 其它平台忽略这个字段。
+     */
+    bool gl_transparency;
 } BongoCatPlatform;
 
 typedef enum BongoCatMenuAction {

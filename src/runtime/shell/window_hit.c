@@ -183,6 +183,16 @@ void bongo_cat_window_schedule_hit_check(BongoCatApp *app) {
    click_through_* 三个字段同时充当下一次的比较基准。 */
 void bongo_cat_window_sync_click_through(BongoCatApp *app) {
     if (!app || !app->window) return;
+    /*
+     * window.glTransparency 每帧同步进平台结构: 平台层读不到 BongoCatSettings, 而它
+     * 要用这个值决定主窗口走不走代理分层呈现(见 windows_pointer.c)。
+     * 值变了必须让下面的"与上次相同就提前返回"失效, 否则用户点了开关要重启才生效。
+     */
+    bool gl_transparency = app->settings.window.gl_transparency != 0;
+    if (app->platform.gl_transparency != gl_transparency) {
+        app->platform.gl_transparency = gl_transparency;
+        app->click_through_valid = false;
+    }
     bool forced = app->settings.window.pass_through || app->hover_hidden;
     if (forced && app->window_snapshot) bongo_cat_window_snapshot_end(app);
     if (!forced && !bongo_cat_platform_dynamic_hit_supported()) {

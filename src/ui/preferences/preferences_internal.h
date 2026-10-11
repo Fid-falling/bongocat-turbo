@@ -82,6 +82,11 @@ bool bongo_cat_preferences_cache_path_event(BongoCatPreferences *value,
 /* 异步文件夹对话框的结果是 SDL 用户事件, 没有窗口 ID, 必须在按窗口过滤之前处理 */
 bool bongo_cat_preferences_cache_path_dialog_event(BongoCatPreferences *value,
     const SDL_Event *event);
+/* [窗口] 区的"透明背景"开关 (window.glTransparency)。定义只在 Windows 编译
+   (preferences_window_transparency.c), 其它平台不显示这一行, 调用点也要用
+   #ifdef _WIN32 包起来。 */
+void bongo_cat_preferences_window_transparency(BongoCatApp *app,
+    struct nk_context *context);
 void bongo_cat_preferences_cache_path_browse(BongoCatPreferences *value);
 void bongo_cat_preferences_cache_path_cancel(BongoCatPreferences *value);
 

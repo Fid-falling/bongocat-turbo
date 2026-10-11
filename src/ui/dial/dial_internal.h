@@ -122,6 +122,12 @@ typedef struct Dial {
      * 平台头文件, 非 Windows 平台这个字段永远是 NULL。
      */
     void *layered;
+    /*
+     * window.glTransparency 的快照 (来自 platform->gl_transparency, 见 platform.h)。
+     * 菜单在打开的那一刻据此决定要不要挂代理呈现器 —— 菜单是模态的, 打开期间用户
+     * 改不了设置, 所以一份快照就够, 不必每帧回查。
+     */
+    bool gl_transparency;
     SDL_Window *previous_window;
     SDL_WindowID window_id;
     const BongoCatMenuLabels *labels;

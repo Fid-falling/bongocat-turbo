@@ -21,6 +21,8 @@
           "alwaysOnTop": "Sempre no Topo",
           "keepInScreen": "Manter na Tela",
           "captureOnly": "Somente em programas de captura",
+          "glTransparency": "Fundo transparente",
+          "glTransparencyHint": "Deixa o fundo do pet realmente transparente; pode afetar a captura desta janela",
           "windowSize": "Tamanho da Janela",
           "windowCorners": "Cantos arredondados (%)",
           "opacity": "Opacidade",

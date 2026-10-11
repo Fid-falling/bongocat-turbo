@@ -1,0 +1,46 @@
+/*
+ * 设置窗口 [窗口] 区里的"透明背景"开关 (window.glTransparency)。
+ *
+ * 为什么单独一个文件: preferences_pages.c 已经贴着 500 行的策略上限 (见
+ * cmake/CheckLines.cmake), 而这一项从文案到"改完立刻生效"都自成一块, 正好搬出来。
+ *
+ * 它背后是 Windows 上的代理分层呈现 (src/platform/windows/windows_layered_window.c):
+ * OpenGL 模式下普通窗口的缓冲 alpha 会被系统忽略, 猫以外的区域只能显示成黑块; 打开
+ * 这一项之后画面改由一个分层代理窗口显示, 黑块才真正透明。因为只有 Windows 有等价
+ * 机制, 这里整块包在 _WIN32 里 —— 其它平台不显示这一行, 免得给用户一个点了没反应的
+ * 开关 (与"仅在录屏软件中显示"同一套做法)。
+ *
+ * 文案上的两条硬要求: 不出现实现术语(每帧/1x/DWM/alpha 之类), 但必须写明可能影响
+ * 录屏软件对这个窗口的采集 —— 那正是它默认关闭的原因。
+ */
+#include "preferences_internal.h"
+#include "preferences_widgets.h"
+#include "bongo_cat/i18n.h"
+#include "runtime.h"
+
+#ifdef _WIN32
+static const char *tr(BongoCatApp *app, const char *key, const char *fallback) {
+    return bongo_cat_i18n_get(app->i18n, key, fallback);
+}
+
+void bongo_cat_preferences_window_transparency(BongoCatApp *app,
+    struct nk_context *context) {
+    if (!app || !context) return;
+    bool transparent = app->settings.window.gl_transparency != 0;
+    bongo_cat_pref_row_icon(context, BONGO_CAT_PREF_ICON_PASS_THROUGH);
+    if (!bongo_cat_pref_toggle(context, "gl-transparency", tr(app,
+        "pages.preference.cat.labels.glTransparency", "Transparent background"),
+        tr(app, "pages.preference.cat.labels.glTransparencyHint",
+        "Makes the pet background truly transparent; may affect capture "
+        "software recording this window"), &transparent)) return;
+    app->settings.window.gl_transparency = transparent ? 1 : 0;
+    app->dirty = true;
+    /*
+     * 立刻下发一次。开关本身只写设置, 真正改窗口的是每帧的穿透同步: 它会发现
+     * platform 上的镜像值变了, 于是作废"与上次相同"的缓存并重新调平台接口
+     * (见 window_hit.c), 所以打开/关闭都不需要重启 —— 这正是用户唯一能看到的差别
+     * (猫周围是黑的还是透的) 必须马上跟着变的原因。
+     */
+    bongo_cat_window_sync_click_through(app);
+}
+#endif
