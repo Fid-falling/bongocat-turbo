@@ -203,6 +203,14 @@ bool bongo_cat_app_initialize(BongoCatApp *app, int argc, char **argv,
     }
     bongo_cat_live2d_audit_run(app);
     if (app->smoke_context_menu) bongo_cat_window_show_context_menu(app);
+    /*
+     * 测试钩子: BONGO_CAT_TEST_TRAY_RENDERER=1 时真实点一次托盘里的"渲染后端"那一项。
+     * 为什么需要它: 真实点击托盘图标没法脚本化, 而这条路径 (写配置 -> 重启确认框 ->
+     * 按选择决定是否重启) 必须能端到端验证。刻意**不**放在 --ci-* 里 —— 那些参数会把
+     * 运行标记成无人值守, 而无人值守下确认框是被抑制的, 正好测不到弹框那一段。
+     */
+    if (SDL_getenv("BONGO_CAT_TEST_TRAY_RENDERER"))
+        bongo_cat_tray_renderer_action(app->tray);
     if (app->smoke_shortcuts && !bongo_cat_app_shortcuts_self_test(app)) {
         BongoCatError shortcut_error = {0};
         bongo_cat_error_set(&shortcut_error, BONGO_CAT_ERROR_PLATFORM, "Shortcut action self-test failed");

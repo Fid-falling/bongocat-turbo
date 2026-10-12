@@ -17,6 +17,7 @@
 #include "bongo_cat/file.h"
 #include "bongo_cat/log.h"
 #include "bongo_cat/path.h"
+#include "portable_mode.h"
 #include "storage_paths.h"
 
 #include <stdint.h>
@@ -110,6 +111,31 @@ void bongo_cat_runtime_log_stop(void) {
     SDL_DestroyMutex(mutex);
 }
 
+/*
+ * 把当前会话日志改名成 BongoCat.previous.log (自动重启之前调用, 见
+ * application_restart.c)。
+ *
+ * 为什么需要: 主进程每次启动都会把日志清空 (begin_log 里的 "wb"), 于是"上一次为什么
+ * 重启"的证据会被新进程当场抹掉 —— 用户回传日志时只剩重启之后的半截。沿用已有的
+ * previous 命名, 一次重启只保留最近一份, 不会无限堆积。
+ * 日志是逐行 append(开-写-关) 的, 改名不会撞上被别人占用的句柄。
+ */
+void bongo_cat_runtime_log_preserve(void) {
+    if (!runtime_log_path[0]) return;
+    static const char suffix[] = ".log";
+    size_t length = strlen(runtime_log_path);
+    if (length <= sizeof(suffix) - 1 ||
+        strcmp(runtime_log_path + length - (sizeof(suffix) - 1), suffix) != 0)
+        return;
+    size_t base = length - (sizeof(suffix) - 1);
+    static const char previous_suffix[] = ".previous.log";
+    char previous[BONGO_CAT_PATH_CAP];
+    if (base + sizeof(previous_suffix) > sizeof(previous)) return;
+    memcpy(previous, runtime_log_path, base);
+    memcpy(previous + base, previous_suffix, sizeof(previous_suffix));
+    bongo_cat_path_rename(runtime_log_path, previous);
+}
+
 static void set_log_source(const BongoCatApp *app) {
     if (app && app->secondary_pet)
         snprintf(log_source, sizeof(log_source), "pet:%s",
@@ -169,10 +195,31 @@ static void begin_log(BongoCatApp *app) {
 #endif
     if (interrupted[0]) SDL_LogWarn(SDL_LOG_CATEGORY_APPLICATION,
         "Previous startup ended before readiness at stage: %s", interrupted);
-    if (unexpected[0] && !strstr(unexpected, "stage=clean-shutdown"))
+    if (unexpected[0] && !strstr(unexpected, "stage=clean-shutdown") &&
+        /* 自动重启: 上一次是主动退出去换新实例, 关闭阶段被标成 shutdown:restart,
+           这不是崩溃 (见 application_restart.c 与 app_entry.c)。 */
+        !strstr(unexpected, "stage=shutdown:restart"))
         SDL_LogWarn(SDL_LOG_CATEGORY_APPLICATION,
             "Previous run ended unexpectedly (crash, forced close, or hang): %s",
             unexpected);
+}
+
+/*
+ * "这一次到底把数据放在哪"必须在这里说, 不能在 storage_paths.c 里说: 那个函数跑在
+ * begin_log 之前, 日志输出函数还没安装, 在那里调 SDL_Log 一个字都留不下 —— 而排查
+ * "数据落到哪去了"时最需要的恰恰是这一行 (--storage-root 与便携模式两条路都覆盖)。
+ */
+static void log_storage_root(const BongoCatApp *app) {
+    if (app->storage_root[0]) {
+        SDL_LogInfo(BONGO_CAT_LOG_LIFECYCLE,
+            "[runtime] 存储根来自 --storage-root=%s", app->storage_root);
+        return;
+    }
+    char portable[BONGO_CAT_PATH_CAP];
+    if (bongo_cat_portable_mode_active() &&
+        bongo_cat_portable_mode_root(portable, sizeof(portable)))
+        SDL_LogInfo(BONGO_CAT_LOG_LIFECYCLE,
+            "[portable] 使用便携存储根: %s", portable);
 }
 
 /* 参数 -> 存储路径 -> 日志, 顺序不能反: 日志路径来自 log_root, 而 log_root 可能被
@@ -181,7 +228,8 @@ bool bongo_cat_startup_prepare(BongoCatApp *app, int argc, char **argv,
     BongoCatError *error) {
     if (!bongo_cat_startup_arguments(app, argc, argv, error) ||
         !bongo_cat_storage_paths_prepare(app, error)) return false;
-    begin_log(app); bongo_cat_startup_stage(app, "paths-ready"); return true;
+    begin_log(app); log_storage_root(app);
+    bongo_cat_startup_stage(app, "paths-ready"); return true;
 }
 
 /* 写阶段标记。写失败只降级不影响启动 —— 它纯粹是诊断设施。 */

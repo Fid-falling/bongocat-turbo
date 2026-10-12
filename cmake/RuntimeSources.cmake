@@ -54,12 +54,18 @@ set(BONGO_CAT_RENDER_SOURCES
 set(BONGO_CAT_RUNTIME_LIFECYCLE_SOURCES
   src/runtime/lifecycle/app.c
   src/runtime/lifecycle/app_entry.c
+  # "改完设置自动重启" 的调度 (渲染后端切换、便携模式开关共用)
+  src/runtime/lifecycle/application_restart.c
   src/runtime/lifecycle/app_input.c
   src/runtime/lifecycle/app_loop.c
   src/runtime/lifecycle/assets.c
   src/runtime/lifecycle/config_store.c
   src/runtime/lifecycle/frame_clock.c
   src/runtime/lifecycle/memory_policy.c
+  # 便携模式 (BongoCatData): 标记判定 + 设置/模型的搬迁
+  src/runtime/lifecycle/portable_mode.c
+  # 搬迁用的复制/删除原语 (单独一份, 免得 portable_mode.c 撞上单文件行数上限)
+  src/runtime/lifecycle/portable_transfer.c
   src/runtime/lifecycle/runtime_flow.c
   src/runtime/lifecycle/runtime_state.c
   src/runtime/lifecycle/shutdown.c
@@ -277,6 +283,7 @@ set(BONGO_CAT_UI_PREFERENCES_SOURCES
   src/ui/preferences/preferences_overlay.c
   src/ui/preferences/preferences_page_dispatch.c
   src/ui/preferences/preferences_pages.c
+  src/ui/preferences/preferences_portable.c
   src/ui/preferences/preferences_present.c
   src/ui/preferences/preferences_render.c
   src/ui/preferences/preferences_row_icons.c
@@ -297,6 +304,7 @@ set(BONGO_CAT_UI_PREFERENCES_SOURCES
 
 set(BONGO_CAT_RUNTIME_SOURCES
   src/core/app_state.c
+  src/platform/common/application_restart.c
   src/platform/common/memory.c
   src/platform/common/update_shutdown.c
   ${BONGO_CAT_MEDIA_SOURCES}

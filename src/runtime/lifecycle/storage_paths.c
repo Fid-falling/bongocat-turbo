@@ -3,14 +3,17 @@
  *
  * 来源优先级:
  *   1. --storage-root= : 六棵树全部挂在它下面 (CI、绿色版、多实例测试);
- *   2. 平台默认: Windows 打包运行用包内存储, 否则 %LOCALAPPDATA%\BongoCat;
+ *   2. 便携模式: 程序目录下的 BongoCatData\ (标记文件见 portable_mode.c) —— 它本质上
+ *      就是"给存储根换一个位置", 所以复用的还是同一套 trees_under 解析;
+ *   3. 平台默认: Windows 打包运行用包内存储, 否则 %LOCALAPPDATA%\BongoCat;
  *      macOS 用 ~/Library/{Application Support,Caches,Logs}; Linux 走 XDG_*;
- *   3. 全部失败就返回 false —— 没有降级方案, 因为配置/日志/模型都必须落盘。
+ *   4. 全部失败就返回 false —— 没有降级方案, 因为配置/日志/模型都必须落盘。
  * 副宠进程会把 state_root 换成按模型 id 命名的子目录 (multi_pet), 免得两个进程抢
  * 同一份 session.json。
  * 每个目录都用"真的写一个探针文件"来判定可写, 而不是看权限位。
  */
 #include "storage_paths.h"
+#include "portable_mode.h"
 #include "runtime.h"
 
 #include "bongo_cat/file.h"
@@ -45,52 +48,52 @@ static bool writable_directory(const char *root) {
 }
 
 /* 六棵树的路径必须全部拼成功才算解析成功; 任何一棵失败都返回 false, 不做部分降级。 */
-static bool roots_under(BongoCatApp *app, const char *root) {
-    return child_path(app->config_root, sizeof(app->config_root),
-            root, "config") &&
-        child_path(app->data_root, sizeof(app->data_root),
-            root, "data") &&
-        child_path(app->models_root, sizeof(app->models_root),
-            root, "models") &&
-        child_path(app->cache_root, sizeof(app->cache_root),
-            root, "cache") &&
-        child_path(app->state_root, sizeof(app->state_root),
-            root, "state") &&
-        child_path(app->log_root, sizeof(app->log_root),
-            root, "logs");
+static bool trees_under(BongoCatStorageTrees *trees, const char *root) {
+    return child_path(trees->config, sizeof(trees->config), root, "config") &&
+        child_path(trees->data, sizeof(trees->data), root, "data") &&
+        child_path(trees->models, sizeof(trees->models), root, "models") &&
+        child_path(trees->cache, sizeof(trees->cache), root, "cache") &&
+        child_path(trees->state, sizeof(trees->state), root, "state") &&
+        child_path(trees->logs, sizeof(trees->logs), root, "logs");
 }
 
-static bool isolated_roots(BongoCatApp *app) {
-    return roots_under(app, app->storage_root);
+/* 解析结果落到 app 上。收成一处而不是六次赋值: 以后加第七棵树时只改这里。 */
+static void trees_to_app(const BongoCatStorageTrees *trees, BongoCatApp *app) {
+    snprintf(app->config_root, sizeof(app->config_root), "%s", trees->config);
+    snprintf(app->data_root, sizeof(app->data_root), "%s", trees->data);
+    snprintf(app->models_root, sizeof(app->models_root), "%s", trees->models);
+    snprintf(app->cache_root, sizeof(app->cache_root), "%s", trees->cache);
+    snprintf(app->state_root, sizeof(app->state_root), "%s", trees->state);
+    snprintf(app->log_root, sizeof(app->log_root), "%s", trees->logs);
 }
 
 #ifdef _WIN32
-static bool platform_roots(BongoCatApp *app) {
+static bool platform_trees(BongoCatStorageTrees *trees) {
     char local_app[BONGO_CAT_PATH_CAP];
     if (bongo_cat_windows_is_packaged())
         return bongo_cat_windows_package_storage_root(local_app,
-            sizeof(local_app)) && roots_under(app, local_app);
+            sizeof(local_app)) && trees_under(trees, local_app);
     const char *local = SDL_getenv("LOCALAPPDATA");
     return child_path(local_app, sizeof(local_app), local, BONGO_CAT_STORAGE_DIR) &&
-        roots_under(app, local_app);
+        trees_under(trees, local_app);
 }
 #elif defined(__APPLE__)
-static bool platform_roots(BongoCatApp *app) {
+static bool platform_trees(BongoCatStorageTrees *trees) {
     const char *home = SDL_GetUserFolder(SDL_FOLDER_HOME);
     char library[BONGO_CAT_PATH_CAP], support[BONGO_CAT_PATH_CAP];
     char app_support[BONGO_CAT_PATH_CAP];
     return child_path(library, sizeof(library), home, "Library") &&
         child_path(support, sizeof(support), library, "Application Support") &&
         child_path(app_support, sizeof(app_support), support, BONGO_CAT_STORAGE_DIR) &&
-        child_path(app->config_root, sizeof(app->config_root),
+        child_path(trees->config, sizeof(trees->config),
             app_support, "config") &&
-        child_path(app->data_root, sizeof(app->data_root), app_support, "data") &&
-        child_path(app->models_root, sizeof(app->models_root),
+        child_path(trees->data, sizeof(trees->data), app_support, "data") &&
+        child_path(trees->models, sizeof(trees->models),
             app_support, "models") &&
-        child_path(app->state_root, sizeof(app->state_root), app_support, "state") &&
-        child_path(app->cache_root, sizeof(app->cache_root),
+        child_path(trees->state, sizeof(trees->state), app_support, "state") &&
+        child_path(trees->cache, sizeof(trees->cache),
             library, "Caches/BongoCat") &&
-        child_path(app->log_root, sizeof(app->log_root),
+        child_path(trees->logs, sizeof(trees->logs),
             library, "Logs/BongoCat");
 }
 #else
@@ -105,29 +108,55 @@ static bool xdg_root(char *target, size_t capacity, const char *variable,
         child_path(target, capacity, fallback, "bongocat");
 }
 
-static bool platform_roots(BongoCatApp *app) {
-    if (!xdg_root(app->config_root, sizeof(app->config_root),
+static bool platform_trees(BongoCatStorageTrees *trees) {
+    if (!xdg_root(trees->config, sizeof(trees->config),
             "XDG_CONFIG_HOME", ".config") ||
-        !xdg_root(app->data_root, sizeof(app->data_root),
+        !xdg_root(trees->data, sizeof(trees->data),
             "XDG_DATA_HOME", ".local/share") ||
-        !xdg_root(app->state_root, sizeof(app->state_root),
+        !xdg_root(trees->state, sizeof(trees->state),
             "XDG_STATE_HOME", ".local/state") ||
-        !xdg_root(app->cache_root, sizeof(app->cache_root),
+        !xdg_root(trees->cache, sizeof(trees->cache),
             "XDG_CACHE_HOME", ".cache")) return false;
-    if (!child_path(app->models_root, sizeof(app->models_root),
-        app->data_root, "models")) return false;
-    return child_path(app->log_root, sizeof(app->log_root),
-        app->state_root, "logs");
+    if (!child_path(trees->models, sizeof(trees->models),
+        trees->data, "models")) return false;
+    return child_path(trees->logs, sizeof(trees->logs),
+        trees->state, "logs");
 }
 #endif
+
+/* 平台默认的六棵树, 忽略 --storage-root 与便携模式。便携模式停用时要把数据并回这里,
+   所以这个入口必须存在 —— 但除了那条合并路径, 别处不要用它绕过上面的解析顺序。 */
+bool bongo_cat_storage_paths_platform_trees(BongoCatStorageTrees *trees) {
+    return trees ? platform_trees(trees) : false;
+}
 
 /* 失败时把 settings_path/session_path 清空: 调用方据此判断"配置不可用", 而空路径会让
    config_store 直接跳过读写, 而不是往相对路径里写出一份野生配置。 */
 bool bongo_cat_storage_paths_prepare(BongoCatApp *app,
     BongoCatError *error) {
     if (!app) return false;
-    bool resolved = app->storage_root[0]
-        ? isolated_roots(app) : platform_roots(app);
+    /*
+     * 解析顺序 (优先级从高到低), 三条路复用的都是同一个 trees_under:
+     *   1. --storage-root= : CI、绿色版、多实例测试显式指定的根;
+     *   2. 便携模式: 程序目录下的 BongoCatData —— 本质就是"给存储根换个位置",
+     *      所以走的还是同一套解析, 只是根从哪来不同;
+     *   3. 平台默认 (%LOCALAPPDATA%\BongoCat / 包内存储 / XDG_*)。
+     * 顺序不能反: 用户显式给的位置必须赢过便携标记, 否则 CI 与多实例测试会互相踩。
+     */
+    BongoCatStorageTrees trees = {0};
+    bool resolved = false;
+    char portable[BONGO_CAT_PATH_CAP];
+    if (app->storage_root[0]) {
+        resolved = trees_under(&trees, app->storage_root);
+    } else if (bongo_cat_portable_mode_active() &&
+        bongo_cat_portable_mode_root(portable, sizeof(portable))) {
+        /* 这里**不能**记日志: 本函数跑在 begin_log 之前, 日志输出函数还没安装, 此时
+           SDL_Log 一个字都留不下。"这次用的是哪个根"由 startup.c 在日志装好之后补记。 */
+        resolved = trees_under(&trees, portable);
+    } else {
+        resolved = platform_trees(&trees);
+    }
+    if (resolved) trees_to_app(&trees, app);
     if (resolved && app->cache_root_override[0]) {
         snprintf(app->cache_root, sizeof(app->cache_root),
             "%s", app->cache_root_override);

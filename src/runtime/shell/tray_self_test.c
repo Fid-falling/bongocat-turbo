@@ -56,6 +56,9 @@ bool bongo_cat_tray_self_test(BongoCatTray *tray) {
     bongo_cat_tray_on_renderer(tray, tray->renderer);
     bool renderer_switched = app->settings.model.renderer == target;
     app->settings.model.renderer = renderer;
+    /* 那一项还会安排一次自动重启 (见 tray_renderer.c)。自测把配置改回去了, 排着的
+       重启请求也必须一起撤掉, 否则一次 --ci-menu 会带着"用户从没选过的后端"重启。 */
+    app->restart_requested = false;
     tray->state_valid = false;
     bongo_cat_tray_sync(tray);
     SDL_Log("Tray self-test: renderer entry applied=%d target=%s restored=%s",

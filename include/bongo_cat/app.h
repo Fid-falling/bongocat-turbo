@@ -145,6 +145,14 @@ typedef struct BongoCatApp {
      * 在无人值守运行里会把进程挂住 —— 那些回调必须能看出"现在没有人在看屏幕"。
      */
     bool automated;
+    /*
+     * "改完设置后自动重启" 的请求位 (切换渲染后端、启停便携模式都会置它)。
+     *
+     * 为什么用标志位而不是当场重启: 新设置由 config_store 延迟落盘, 而且重启前必须把
+     * 单实例互斥体还回去 —— 这两件事都只能在主循环末尾做, 见
+     * runtime/lifecycle/application_restart.c。
+     */
+    bool restart_requested;
     int exit_code;
     bool dirty;
     /* 已经下发给后端的 max_fps (垂直同步跟随它变化), -1 表示还没下发过 */
@@ -255,5 +263,19 @@ void bongo_cat_app_request_model_package_refresh(BongoCatApp *app,
     const char *package_id);
 void bongo_cat_app_request_nearby_model_refresh(BongoCatApp *app);
 void bongo_cat_config_store_flush(BongoCatApp *app);
+/*
+ * 请求"改完设置后自动重启本程序"(切换渲染后端、启停便携模式)。
+ * 返回 true = 已经排上, 主循环末尾会执行; false = 本次运行不允许自动重启 (刚刚就是被
+ * 自动重启出来的, 或者处于 --ci-* 无人值守运行), 调用方应当提示用户手动重启。
+ * 参数与互斥体的处理都在 runtime/lifecycle/application_restart.c。
+ */
+bool bongo_cat_app_request_restart(BongoCatApp *app);
+/*
+ * 重启前的确认框: "现在重启" / "稍后手动重启"。返回 true = 用户选了现在重启。
+ * 无人值守运行 (--ci-* / 冒烟 / BONGO_CAT_TEST_NO_DIALOG) 不弹窗并返回 false —— 模态框
+ * 会把脚本挂死, 而"稍后手动重启"是安全的那条路 (配置照写)。
+ * 调用方拿到 false 时只写配置并提示, 绝不能自己重启。
+ */
+bool bongo_cat_app_confirm_restart(BongoCatApp *app);
 
 #endif

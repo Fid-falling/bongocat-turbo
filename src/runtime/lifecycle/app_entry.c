@@ -43,7 +43,11 @@ int bongo_cat_app_run(int argc, char **argv) {
 /* exit_code 在主循环里可能被 CI / 更新流程改过, 关闭前取一次, 同时用于 shutdown
    与进程返回值, 保证"日志里记的"和"系统看到的"一致。 */
     int exit_code = app->exit_code;
-    bongo_cat_app_shutdown(app, "shutdown:normal", exit_code);
+/* restart_requested 在 update_restart 里被改写: 真的发起了重启时它保持置位, 于是这里
+   把关闭阶段写成 shutdown:restart —— 新进程据此知道上一次是"退出去换新实例", 不会误报
+   成异常退出 (见 startup.c)。自动重启时单实例锁已经还回去了, 下面的 end 是幂等的。 */
+    bongo_cat_app_shutdown(app, app->restart_requested
+        ? "shutdown:restart" : "shutdown:normal", exit_code);
     free(app);
     if (!secondary) bongo_cat_platform_single_instance_end();
     return exit_code;

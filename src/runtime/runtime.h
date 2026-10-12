@@ -49,6 +49,9 @@ void bongo_cat_startup_stage(BongoCatApp *app, const char *stage);
 void bongo_cat_startup_ready(BongoCatApp *app);
 void bongo_cat_runtime_stage(BongoCatApp *app, const char *stage);
 void bongo_cat_runtime_log_stop(void);
+/* 自动重启前把当前会话日志留成 BongoCat.previous.log (新进程启动会清空 BongoCat.log,
+   不先留一份的话"为什么重启"的证据就没了)。 */
+void bongo_cat_runtime_log_preserve(void);
 void bongo_cat_runtime_clean_shutdown(BongoCatApp *app, int exit_code);
 void bongo_cat_app_shutdown(BongoCatApp *app, const char *stage,
     int exit_code);
@@ -160,6 +163,9 @@ bool bongo_cat_system_language(BongoCatLanguage *language);
 void bongo_cat_config_store_load(BongoCatApp *app);
 void bongo_cat_config_store_update(BongoCatApp *app, uint64_t now);
 void bongo_cat_config_store_flush(BongoCatApp *app);
+/* 主循环末尾执行 app->restart_requested: 先落盘设置, 再还回单实例锁并拉起新进程;
+   失败就抢回锁、保持原样并提示手动重启 (见 application_restart.c)。 */
+void bongo_cat_app_update_restart(BongoCatApp *app);
 bool bongo_cat_multi_pet_secondary_argument(int argc, char **argv);
 bool bongo_cat_multi_pet_state_directory(char *target, size_t capacity,
     const char *root, const char *model_id);

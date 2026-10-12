@@ -46,7 +46,8 @@
           "renderer": "렌더러"
         },
         "hints": {
-        "rendererRestart": "렌더러 변경은 BongoCat을 다시 시작한 뒤에 적용됩니다.",
+        "rendererRestart": "설정을 저장했습니다. 적용하려면 BongoCat을 직접 다시 시작하세요.",
+        "rendererRestarting": "새 렌더링 백엔드를 적용하기 위해 BongoCat을 다시 시작하는 중...",
         "supersample": "자동이면 창 크기에 맞춰 조절해 부담을 줄입니다",
           "hoverUnavailable": "현재 데스크톱 환경에서는 마우스를 올려 숨기기 기능을 사용할 수 없습니다.",
           "gameInput": "게임 중 데스크톱 펫이 반응하지 않나요?",
@@ -73,7 +74,8 @@
           "permissionsSettings": "권한 설정",
           "inputMonitoringPermission": "입력 모니터링 권한",
           "administratorPermission": "관리자",
-          "cacheDirectory": "캐시 디렉터리"
+          "cacheDirectory": "캐시 디렉터리",
+          "portableMode": "포터블 모드"
         },
         "options": {
           "auto": "시스템",
@@ -89,8 +91,12 @@
           "inputMonitoringPermissionGuide": "입력 모니터링 권한이 있으면 BongoCat이 다른 앱에서 누른 키를 받을 수 있습니다. 마우스는 권한 없이도 동작합니다. BongoCat은 시작할 때 감시를 만들기 때문에 권한을 바꾼 뒤에는 다시 시작해야 합니다.\n\n단계:\n1. 시스템 설정 → 개인정보 보호 및 보안 → 입력 모니터링을 엽니다.\n2. 목록에 이미 있는 BongoCat 항목을 켭니다. 기존 항목은 삭제하지 마세요.\n3. 목록에 BongoCat이 없으면 \"+\"를 클릭해 현재 실행 중인 앱을 추가합니다(앱 위치를 확인하세요).\n4. BongoCat을 완전히 종료한 뒤 다시 시작해 감시를 다시 만들게 합니다.\n\n키보드가 계속 반응하지 않으면 BongoCat 항목을 직접 삭제하고 다시 추가해 확인할 수 있습니다.",
           "administratorPermission": "앱을 관리자로 실행하면 일부 시스템 키와 입력 이벤트를 더 안정적으로 캡처할 수 있습니다.",
           "administratorPermissionGuide": "일부 시스템 키와 입력 이벤트를 더 안정적으로 캡처하려면 앱을 관리자로 실행하는 것이 좋습니다.\n\n방법:\n1. 먼저 앱을 종료합니다.\n2. 파일 탐색기에서 앱의 exe 파일 또는 바로 가기를 찾습니다.\n3. 실행 방법을 선택합니다:\n   - 한 번만: 마우스 오른쪽 버튼을 누르고 \"관리자 권한으로 실행\"을 선택합니다.\n   - 항상: 오른쪽 클릭 > 속성 > 호환성 > \"관리자 권한으로 이 프로그램 실행\" 선택 > 확인.",
-          "cacheDirectory": "자산 및 모델 캐시에 사용할 폴더입니다. 비워두면 기본값을 사용합니다.",
-          "defaultCache": "기본값 (자동)",
+          "cacheDirectory": "현재 실제로 사용 중인 폴더입니다. '초기화'를 누르면 기본 위치로 돌아갑니다.",
+          "portableMode": "모든 파일을 프로그램 폴더 아래 BongoCatData 폴더에 저장합니다. 프로그램과 이 폴더를 함께 복사하면 그대로 옮길 수 있습니다. 설정과 모델만 복사하며 캐시는 필요할 때 다시 만듭니다.",
+          "portableMigrating": "설정과 모델을 옮기는 중입니다. 잠시만 기다려 주세요...",
+          "portableRestarting": "이동 완료. 새 위치를 사용하기 위해 BongoCat을 다시 시작합니다...",
+          "portableManualRestart": "이동 완료. 새 위치를 사용하려면 BongoCat을 직접 다시 시작하세요.",
+          "portableFailed": "포터블 모드로 전환하지 못했습니다. 변경된 내용은 없습니다.",
           "cacheApplied": "캐시 디렉터리가 업데이트되었습니다",
           "cacheCancelled": "캐시 디렉터리 선택이 취소되었습니다",
           "cacheReset": "캐시 디렉터리가 기본값으로 재설정되었습니다"
@@ -212,7 +218,11 @@
         "model": "모델",
         "addModel": "모델 추가",
         "renderer": "렌더링 백엔드",
-        "rendererRestart": "새 렌더링 백엔드를 적용하려면 BongoCat을 다시 시작하세요.",
+        "rendererRestart": "새 렌더링 백엔드를 적용하려면 BongoCat을 직접 다시 시작하세요.",
+        "rendererRestartConfirm": "렌더링 백엔드를 바꾸려면 BongoCat을 다시 시작해야 합니다. 지금 다시 시작할까요?",
+        "rendererRestartConfirmNow": "지금 다시 시작",
+        "rendererRestartConfirmLater": "나중에 직접 다시 시작",
+        "rendererRestartFailed": "BongoCat을 자동으로 다시 시작하지 못했습니다. 직접 다시 시작해 주세요.",
         "rendererUnavailable": "이 컴퓨터에서는 Vulkan을 사용할 수 없습니다.",
         "rendererOverrideNotice": "참고: 이번 실행에는 --renderer 인수가 있어 저장된 설정보다 우선합니다. 인수를 빼고 다시 시작하세요."
       }

@@ -9,15 +9,18 @@
  * 目标后端由"当前实际在用的后端"决定, 而不是配置里的值: 配置写着 vulkan 但已经
  * 回退成 OpenGL 的机器上, 再"切到 opengl"是没有意义的。
  *
- * 生效方式: 写进 app->settings.model.renderer, 由 config_store 在 300ms 内落盘, 但
- * **本次运行不会切** —— 运行中换后端要把主窗口、Live2D 渲染器、平台层全部重建, 代价
- * 与风险都远大于"重启一次"。所以这里明确弹窗告诉用户需要重启, 而不是假装已经生效
- * (那才是真的把用户困住)。
+ * 生效方式: 写进 app->settings.model.renderer, 由 config_store 在 300ms 内落盘,
+ * **本次运行不切** —— 运行中换后端要把主窗口、Live2D 渲染器、平台层全部重建, 代价与
+ * 风险都远大于一次重启。所以这里改成"落盘 + 自动重启": 新设置先写出去, 主循环末尾用
+ * 同一份 exe 拉起新进程 (application_restart.c), 用户不需要自己去关再开。
+ * 自动重启走不成时 (带防循环标记 / 无人值守运行) 才退回弹窗提示手动重启 —— 绝不能
+ * 假装已经生效, 那才是真的把用户困住。
  *
  * 目标后端不可用时不做任何写入: 把它写成 vulkan 而机器上没有 Vulkan 设备, 用户重启
  * 后只会得到一次"回退到 OpenGL"的日志和一个没变化的界面 —— 不如当场说清楚。
  */
 #include "tray_internal.h"
+#include "preferences_notice.h"
 #include "bongo_cat/i18n.h"
 #include "bongo_cat/log.h"
 #include "bongo_cat/preferences.h"
@@ -55,6 +58,12 @@ const char *bongo_cat_tray_renderer_label(BongoCatTray *tray) {
     return tray->renderer_label;
 }
 
+/* 自动化入口: 真实点一次那一项 (走的是和用户点击完全相同的回调)。 */
+void bongo_cat_tray_renderer_action(BongoCatTray *tray) {
+    if (!tray || !tray->renderer) return;
+    bongo_cat_tray_on_renderer(tray, tray->renderer);
+}
+
 void bongo_cat_tray_on_renderer(void *userdata, SDL_TrayEntry *entry) {
     (void)entry;
     BongoCatTray *tray = userdata;
@@ -76,36 +85,29 @@ void bongo_cat_tray_on_renderer(void *userdata, SDL_TrayEntry *entry) {
     }
     const BongoCatRenderer previous = app->settings.model.renderer;
     app->settings.model.renderer = target;
-    /* 立刻把标签贴成新值, 用户点完就能看到结果 (真正的重启提示在下面的弹窗里)。 */
+    /* 立刻把标签贴成新值, 用户点完就能看到结果。 */
     bongo_cat_tray_sync(tray);
     bongo_cat_preferences_invalidate(app->preferences);
-    SDL_LogInfo(BONGO_CAT_LOG_LIFECYCLE,
-        "[render] 托盘切换后端: 配置 %s -> %s (当前实际在用 %s, 重启后生效)",
-        bongo_cat_renderer_name(previous), bongo_cat_renderer_name(target),
-        bongo_cat_renderer_name(bongo_cat_renderer_active()));
     /*
-     * 模态弹窗在无人值守运行里会把进程挂住 (--ci-menu 的自测会走这个回调, 而
-     * SDL_ShowSimpleMessageBox 会阻塞调用线程直到有人点确定), 所以冒烟/--ci-* 运行
-     * 与设置了 BONGO_CAT_TEST_NO_DIALOG 时只记日志。
+     * 切换生效 = 重启。先问用户"现在重启还是稍后手动重启" (确认框, 见
+     * application_restart.c): 点了这一项不代表他同意现在就关掉正在跑的窗口。
+     * 只有他选了"立即重启"才安排重启 —— 新设置先由 config_store 落盘, 主循环末尾再
+     * 拉起新进程。
      */
-    if (app->smoke || app->automated || SDL_getenv("BONGO_CAT_TEST_NO_DIALOG"))
-        return;
-    char message[512];
-    /* 命令行覆盖会一直压过配置文件, 这时必须把原因说清楚, 否则用户重启后会觉得
-       "切了没用"。 */
-    const char *override_note = app->renderer_override >= 0
-        ? bongo_cat_i18n_get(app->i18n,
-            "composables.useAppMenu.labels.rendererOverrideNotice",
-            "Note: this session was started with a --renderer argument, which "
-            "always wins over the saved setting. Start BongoCat without it to "
-            "use the new value.")
-        : "";
-    snprintf(message, sizeof(message), "%s\n\n%s%s%s",
-        bongo_cat_renderer_description(target),
-        bongo_cat_i18n_get(app->i18n,
-            "composables.useAppMenu.labels.rendererRestart",
-            "Restart BongoCat to apply the new render backend."),
-        override_note[0] ? "\n\n" : "", override_note);
-    SDL_ShowSimpleMessageBox(SDL_MESSAGEBOX_INFORMATION, BONGO_CAT_NAME,
-        message, app->window);
+    bool restarting = bongo_cat_app_confirm_restart(app) &&
+        bongo_cat_app_request_restart(app);
+    SDL_LogInfo(BONGO_CAT_LOG_LIFECYCLE,
+        "[render] 托盘切换后端: 配置 %s -> %s (当前实际在用 %s, %s)",
+        bongo_cat_renderer_name(previous), bongo_cat_renderer_name(target),
+        bongo_cat_renderer_name(bongo_cat_renderer_active()),
+        restarting ? "将立即重启" : "已保存, 稍后手动重启生效");
+    /* 重启已经安排好了就不该再提示: 用户看到提示的时候进程正在退出。 */
+    if (restarting) return;
+    /*
+     * "稍后手动重启"(或者无人值守运行里不能弹框): 只写配置 + 提示。
+     * 这里不再弹第二个模态框 —— 用户刚在确认框里做过选择, 再弹一个只是在烦他。
+     */
+    bongo_cat_preferences_notice_show(app, bongo_cat_i18n_get(app->i18n,
+        "composables.useAppMenu.labels.rendererRestart",
+        "Restart BongoCat to apply the new render backend."), false);
 }

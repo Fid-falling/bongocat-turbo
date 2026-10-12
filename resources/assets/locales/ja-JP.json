@@ -46,7 +46,8 @@
           "renderer": "レンダラー"
         },
         "hints": {
-        "rendererRestart": "レンダラーの変更は BongoCat の再起動後に反映されます。",
+        "rendererRestart": "設定を保存しました。反映するには BongoCat を手動で再起動してください。",
+        "rendererRestarting": "新しいレンダラーバックエンドを適用するため BongoCat を再起動しています...",
         "supersample": "自動ではウィンドウの大きさに合わせて調整し、負担を減らします",
           "hoverUnavailable": "現在のデスクトップ環境では、マウスを重ねて非表示にする機能は利用できません。",
           "gameInput": "ゲーム中にデスクトップペットが反応しない？",
@@ -73,7 +74,8 @@
           "permissionsSettings": "権限設定",
           "inputMonitoringPermission": "入力監視の権限",
           "administratorPermission": "管理者",
-          "cacheDirectory": "キャッシュディレクトリ"
+          "cacheDirectory": "キャッシュディレクトリ",
+          "portableMode": "ポータブルモード"
         },
         "options": {
           "auto": "システム",
@@ -89,8 +91,12 @@
           "inputMonitoringPermissionGuide": "入力監視の権限があると、BongoCat は他のアプリでのキー入力を取得できます。マウスは権限なしでも動作します。BongoCat は起動時に監視を構築するため、権限を変更した場合は再起動が必要です。\n\n手順：\n1. 「システム設定」→「プライバシーとセキュリティ」→「入力監視」を開きます。\n2. 一覧にすでにある BongoCat の項目をオンにします。既存の項目は削除しないでください。\n3. 一覧に BongoCat がない場合は「+」をクリックし、現在実行しているアプリを追加します（アプリの場所を確認してください）。\n4. BongoCat を完全に終了してから再起動し、監視を再構築させます。\n\nキーボードが反応しないままの場合は、ご自身で BongoCat の項目を削除して再追加して確認できます。",
           "administratorPermission": "管理者として実行すると、一部のシステムキーや入力イベントをより確実に取得できます。",
           "administratorPermissionGuide": "一部のシステムキーや入力イベントをより確実に取得するため、アプリを管理者として実行することを推奨します。\n\n手順：\n1. まずアプリを終了します。\n2. エクスプローラーでアプリのexeファイルまたはショートカットを探します。\n3. 起動方法を選びます：\n   - 今回のみ：右クリックして\"管理者として実行\"を選びます。\n   - 常に：右クリック > プロパティ > 互換性 > \"管理者としてこのプログラムを実行する\"にチェック > OK。",
-          "cacheDirectory": "アセットやモデルキャッシュに使用するフォルダ。空の場合はデフォルトを使用します。",
-          "defaultCache": "デフォルト（自動）",
+          "cacheDirectory": "現在実際に使用しているフォルダです。「リセット」で既定の場所に戻ります。",
+          "portableMode": "すべてのファイルをプログラムと同じ場所の BongoCatData フォルダに保存します。プログラムとこのフォルダを一緒にコピーすれば移行できます。コピーするのは設定とモデルだけで、キャッシュは必要に応じて再作成されます。",
+          "portableMigrating": "設定とモデルを移行しています。しばらくお待ちください...",
+          "portableRestarting": "移行が完了しました。新しい保存先を使うため BongoCat を再起動します...",
+          "portableManualRestart": "移行が完了しました。新しい保存先を使うには BongoCat を手動で再起動してください。",
+          "portableFailed": "ポータブルモードに切り替えられませんでした。変更は行われていません。",
           "cacheApplied": "キャッシュディレクトリを更新しました",
           "cacheCancelled": "キャッシュディレクトリの選択をキャンセルしました",
           "cacheReset": "キャッシュディレクトリをデフォルトに戻しました"
@@ -212,7 +218,11 @@
         "model": "モデル",
         "addModel": "モデルを追加",
         "renderer": "レンダリングバックエンド",
-        "rendererRestart": "新しいレンダリングバックエンドを反映するには BongoCat を再起動してください。",
+        "rendererRestart": "新しいレンダラーバックエンドを反映するには BongoCat を手動で再起動してください。",
+        "rendererRestartConfirm": "レンダラーバックエンドの変更は BongoCat の再起動が必要です。今すぐ再起動しますか？",
+        "rendererRestartConfirmNow": "今すぐ再起動",
+        "rendererRestartConfirmLater": "後で手動で再起動",
+        "rendererRestartFailed": "BongoCat を自動で再起動できませんでした。手動で再起動してください。",
         "rendererUnavailable": "この環境では Vulkan を利用できません。",
         "rendererOverrideNotice": "注意: 今回は --renderer 引数付きで起動しているため、保存された設定より引数が優先されます。引数を外して再起動してください。"
       }

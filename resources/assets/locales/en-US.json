@@ -46,7 +46,8 @@
           "renderer": "Renderer"
         },
         "hints": {
-        "rendererRestart": "Renderer changes take effect after restarting BongoCat.",
+        "rendererRestart": "Setting saved. Restart BongoCat manually to apply it.",
+        "rendererRestarting": "Restarting BongoCat to apply the new render backend...",
         "supersample": "Adjusts itself to the window size to save resources",
           "hoverUnavailable": "Hover hiding is unavailable in the current desktop environment.",
           "gameInput": "Pet not responding in games?",
@@ -73,7 +74,8 @@
           "permissionsSettings": "Permissions Settings",
           "inputMonitoringPermission": "Input Monitoring Permission",
           "administratorPermission": "Administrator",
-          "cacheDirectory": "Cache directory"
+          "cacheDirectory": "Cache directory",
+          "portableMode": "Portable mode"
         },
         "options": {
           "auto": "System",
@@ -89,8 +91,12 @@
           "inputMonitoringPermissionGuide": "Input Monitoring lets BongoCat see keys pressed in other apps; the mouse keeps working without it. BongoCat builds the listener when it starts, so a permission change needs a restart.\n\nSteps:\n1. Open System Settings → Privacy & Security → Input Monitoring.\n2. Turn on the BongoCat entry that is already listed; do not remove existing entries.\n3. If BongoCat is not listed, click the \"+\" button and add the copy you are running (check the app location).\n4. Quit BongoCat completely and start it again, so it rebuilds the listener.\n\nIf the keyboard still stays silent, you can remove and re-add the BongoCat entry yourself.",
           "administratorPermission": "Running the app as administrator helps capture some system-level keys and input events more reliably.",
           "administratorPermissionGuide": "To capture some system-level keys and input events more reliably, it is recommended to run the app as administrator.\n\nHow to do it:\n1. Exit the app first.\n2. Find the app exe or its shortcut in File Explorer.\n3. Choose how to launch:\n   • One-time: Right-click and choose \"Run as administrator\".\n   • Always (default): Right-click → Properties → Compatibility tab → check \"Run this program as an administrator\" → OK.",
-          "cacheDirectory": "Folder used for asset and model caches. Leave empty for the default.",
-          "defaultCache": "Default (automatic)",
+          "cacheDirectory": "The folder actually in use right now. Reset goes back to the default location.",
+          "portableMode": "Store everything in a BongoCatData folder next to the program; copy the program together with that folder to move it. Settings and models are copied once, caches are rebuilt when needed.",
+          "portableMigrating": "Migrating settings and models, please wait...",
+          "portableRestarting": "Data migrated. Restarting BongoCat to use the new location...",
+          "portableManualRestart": "Data migrated. Restart BongoCat manually to use the new location.",
+          "portableFailed": "Could not switch portable mode; nothing was changed.",
           "cacheApplied": "Cache directory updated",
           "cacheCancelled": "Cache directory selection cancelled",
           "cacheReset": "Cache directory reset to default"
@@ -212,7 +218,11 @@
         "model": "Model",
         "addModel": "Add Model",
         "renderer": "Render Backend",
-        "rendererRestart": "Restart BongoCat to apply the new render backend.",
+        "rendererRestart": "Restart BongoCat manually to apply the new render backend.",
+        "rendererRestartConfirm": "Switching the render backend needs a restart of BongoCat to take effect. Restart now?",
+        "rendererRestartConfirmNow": "Restart now",
+        "rendererRestartConfirmLater": "I will restart later",
+        "rendererRestartFailed": "BongoCat could not restart automatically. Please restart it manually.",
         "rendererUnavailable": "Vulkan is not available on this machine.",
         "rendererOverrideNotice": "Note: this session was started with a --renderer argument, which always wins over the saved setting. Start BongoCat without it to use the new value."
       }

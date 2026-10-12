@@ -46,7 +46,8 @@
           "renderer": "渲染后端"
         },
         "hints": {
-        "rendererRestart": "渲染后端切换后，需要重启 BongoCat 才会生效。",
+        "rendererRestart": "设置已保存，请手动重启 BongoCat 才会生效。",
+        "rendererRestarting": "正在重启 BongoCat 以应用新的渲染后端...",
         "supersample": "自动时会根据窗口大小调整, 更省资源",
           "hoverUnavailable": "当前桌面环境暂不支持鼠标移入隐藏。",
           "gameInput": "游戏中桌宠没反应？",
@@ -73,7 +74,8 @@
           "permissionsSettings": "权限设置",
           "inputMonitoringPermission": "输入监控权限",
           "administratorPermission": "管理员身份",
-          "cacheDirectory": "缓存目录"
+          "cacheDirectory": "缓存目录",
+          "portableMode": "便携模式"
         },
         "options": {
           "auto": "跟随系统",
@@ -89,8 +91,12 @@
           "inputMonitoringPermissionGuide": "输入监控权限让 BongoCat 能接收其他应用中的按键；鼠标移动和点击无需该权限。BongoCat 在启动时建立监听，因此权限变更后需要重启。\n\n操作方式：\n1. 打开「系统设置」→「隐私与安全性」→「输入监控」。\n2. 直接开启列表中已有的 BongoCat 条目，不要删除现有条目。\n3. 若列表中没有 BongoCat，点击「+」按钮，添加你当前运行的那份应用（注意确认应用位置）。\n4. 完全退出 BongoCat 后重新启动，让它重建监听。\n\n若键盘仍然无响应，可由你自行删除并重新添加 BongoCat 条目来排障。",
           "administratorPermission": "以管理员身份运行应用，可以更稳定地捕获部分系统级按键与输入事件。",
           "administratorPermissionGuide": "为了能更稳定地捕获部分系统级按键与输入事件，建议以管理员身份运行应用。\n\n操作方式：\n1. 先退出应用。\n2. 在资源管理器中找到应用的 exe 或快捷方式。\n3. 根据需要选择启动方式：\n   • 仅本次：右键并选择「以管理员身份运行」。\n   • 永久默认：右键 → 属性 → 兼容性选项卡 → 勾选「以管理员身份运行此程序」→ 确定。",
-          "cacheDirectory": "用于资产和模型缓存的文件夹。留空则使用默认位置。",
-          "defaultCache": "默认（自动）",
+          "cacheDirectory": "当前实际使用的文件夹。点「重置」回到默认位置。",
+          "portableMode": "所有文件都放在程序目录下的 BongoCatData 文件夹里；把程序和这个文件夹一起拷走就能迁移。只复制设置与模型，缓存会按需重建。",
+          "portableMigrating": "正在迁移设置与模型，请稍候...",
+          "portableRestarting": "迁移完成，正在重启 BongoCat 以使用新的位置...",
+          "portableManualRestart": "迁移完成，请手动重启 BongoCat 以使用新的位置。",
+          "portableFailed": "无法切换便携模式，没有任何改动。",
           "cacheApplied": "缓存目录已更新",
           "cacheCancelled": "缓存目录选择已取消",
           "cacheReset": "缓存目录已重置为默认"
@@ -212,7 +218,11 @@
         "model": "模型",
         "addModel": "添加模型",
         "renderer": "渲染后端",
-        "rendererRestart": "重启 BongoCat 后新的渲染后端才会生效。",
+        "rendererRestart": "请手动重启 BongoCat 以应用新的渲染后端。",
+        "rendererRestartConfirm": "切换渲染后端需要重启 BongoCat 才会生效。要现在重启吗？",
+        "rendererRestartConfirmNow": "立即重启",
+        "rendererRestartConfirmLater": "稍后手动重启",
+        "rendererRestartFailed": "BongoCat 无法自动重启，请手动重启。",
         "rendererUnavailable": "这台机器上没有可用的 Vulkan, 无法切换。",
         "rendererOverrideNotice": "注意: 本次运行带有 --renderer 参数, 它的优先级高于设置; 去掉该参数重启才会用新值。"
       }

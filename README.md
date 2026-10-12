@@ -334,6 +334,22 @@ contains no ads, analytics tools, or user-tracking code. When an update check
 is performed, it only requests public release metadata; it does not send input,
 configuration, or usage data.
 
+### 📦 Where does BongoCat keep its files, and how do I make it portable?
+
+By default the settings, models, caches, logs and session state live in the
+per-user application data folder (`%LOCALAPPDATA%\BongoCat` on Windows, the
+XDG folders on Linux, `~/Library` on macOS). `--storage-root=DIR` overrides all
+of them for one launch.
+
+**Portable mode** (Settings → Application → Portable mode) moves everything
+into a `BongoCatData` folder next to the executable. Turning it on copies your
+settings and models there, turns it off merges anything missing back into the
+default location; caches are never copied, they are rebuilt on demand. The
+marker is `BongoCatData\portable.json`, so to migrate to another machine or a
+USB stick just copy the program together with that folder — nothing else is
+needed. Delete `portable.json` to fall back to the default location. The
+settings window always shows the folder that is actually in use.
+
 ### Linux Wayland Input
 
 X11 uses XInput2 by default. Experimental evdev input for Wayland is off by
@@ -367,8 +383,10 @@ Pick a backend in Settings (`renderer`), or force it with the same key in
   `--renderer=opengl` (or the shorter `--opengl`) forces the whole app onto
   OpenGL for that one run, and it **wins over `settings.json` without rewriting
   it**. The tray menu has the same switch as "Render backend: <current> ->
-  <target>"; it saves the setting and asks for a restart. `--help` lists every
-  option and environment variable. Run `BongoCat --help` from a terminal.
+  <target>"; switching it (or the segmented control in Settings) saves the
+  setting and restarts the app automatically, so the new backend is live right
+  away. `--help` lists every option and environment variable. Run
+  `BongoCat --help` from a terminal.
 * The Vulkan renderer and the Cubism bridge share **one** `VkDevice` on purpose.
   A second device used to crash under overlays (RTSS / OBS / NVIDIA) that
   assume a single device per process.

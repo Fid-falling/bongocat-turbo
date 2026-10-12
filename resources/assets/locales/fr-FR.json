@@ -46,7 +46,8 @@
           "renderer": "Moteur de rendu"
         },
         "hints": {
-        "rendererRestart": "Le changement de moteur de rendu prend effet après avoir redémarré BongoCat.",
+        "rendererRestart": "Réglage enregistré. Redémarrez BongoCat manuellement pour l'appliquer.",
+        "rendererRestarting": "Redémarrage de BongoCat pour appliquer le nouveau moteur de rendu...",
         "supersample": "S'adapte à la taille de la fenêtre pour économiser",
           "hoverUnavailable": "Le masquage au survol est indisponible dans cet environnement de bureau.",
           "gameInput": "La mascotte ne réagit pas en jeu ?",
@@ -73,7 +74,8 @@
           "permissionsSettings": "Paramètres des autorisations",
           "inputMonitoringPermission": "Autorisation de surveillance des entrées",
           "administratorPermission": "Administrateur",
-          "cacheDirectory": "Répertoire du cache"
+          "cacheDirectory": "Répertoire du cache",
+          "portableMode": "Mode portable"
         },
         "options": {
           "auto": "Système",
@@ -89,8 +91,12 @@
           "inputMonitoringPermissionGuide": "La surveillance des entrées permet à BongoCat de voir les touches pressées dans d'autres applications ; la souris continue de fonctionner sans elle. BongoCat construit l'écoute à son démarrage, un changement d'autorisation demande donc un redémarrage.\n\nÉtapes :\n1. Ouvrez Réglages Système → Confidentialité et sécurité → Surveillance de l'entrée.\n2. Activez l'entrée BongoCat déjà présente dans la liste ; ne supprimez aucune entrée.\n3. Si BongoCat n'est pas listé, cliquez sur \"+\" et ajoutez la copie que vous exécutez (vérifiez son emplacement).\n4. Quittez complètement BongoCat puis relancez-le pour qu'il reconstruise l'écoute.\n\nSi le clavier reste sans réponse, vous pouvez supprimer puis rajouter vous-même l'entrée BongoCat.",
           "administratorPermission": "Exécuter l'application en tant qu'administrateur permet de capturer plus fiablement certaines touches système et certains événements d'entrée.",
           "administratorPermissionGuide": "Pour capturer plus fiablement certaines touches système et certains événements d'entrée, il est recommandé d'exécuter l'application en tant qu'administrateur.\n\nProcédure :\n1. Quittez d'abord l'application.\n2. Trouvez le fichier exe ou son raccourci dans l'Explorateur de fichiers.\n3. Choisissez le mode de lancement :\n   - Une fois : faites un clic droit et choisissez \"Exécuter en tant qu'administrateur\".\n   - Toujours : clic droit > Propriétés > onglet Compatibilité > cochez \"Exécuter ce programme en tant qu'administrateur\" > OK.",
-          "cacheDirectory": "Dossier utilisé pour les caches de ressources et de modèles. Laissez vide pour la valeur par défaut.",
-          "defaultCache": "Par défaut (automatique)",
+          "cacheDirectory": "Dossier réellement utilisé. « Réinitialiser » revient à l'emplacement par défaut.",
+          "portableMode": "Tout est stocké dans un dossier BongoCatData à côté du programme ; copiez le programme avec ce dossier pour le déplacer. Seuls les réglages et les modèles sont copiés, les caches sont reconstruits au besoin.",
+          "portableMigrating": "Migration des réglages et des modèles, veuillez patienter...",
+          "portableRestarting": "Migration terminée. Redémarrage de BongoCat pour utiliser le nouvel emplacement...",
+          "portableManualRestart": "Migration terminée. Redémarrez BongoCat manuellement pour utiliser le nouvel emplacement.",
+          "portableFailed": "Impossible de basculer le mode portable ; rien n'a été modifié.",
           "cacheApplied": "Répertoire du cache mis à jour",
           "cacheCancelled": "Sélection du répertoire de cache annulée",
           "cacheReset": "Répertoire du cache réinitialisé à la valeur par défaut"
@@ -212,7 +218,11 @@
         "model": "Modèle",
         "addModel": "Ajouter un modèle",
         "renderer": "Moteur de rendu",
-        "rendererRestart": "Redémarrez BongoCat pour appliquer le nouveau moteur de rendu.",
+        "rendererRestart": "Redémarrez BongoCat manuellement pour appliquer le nouveau moteur de rendu.",
+        "rendererRestartConfirm": "Le changement de moteur de rendu nécessite un redémarrage de BongoCat. Redémarrer maintenant ?",
+        "rendererRestartConfirmNow": "Redémarrer maintenant",
+        "rendererRestartConfirmLater": "Redémarrer plus tard",
+        "rendererRestartFailed": "BongoCat n'a pas pu redémarrer automatiquement. Redémarrez-le manuellement.",
         "rendererUnavailable": "Vulkan n'est pas disponible sur cette machine.",
         "rendererOverrideNotice": "Remarque : cette session a été lancée avec un argument --renderer, prioritaire sur le réglage enregistré. Relancez BongoCat sans cet argument."
       }

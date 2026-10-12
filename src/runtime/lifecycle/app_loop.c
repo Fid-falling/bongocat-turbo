@@ -271,6 +271,8 @@ void bongo_cat_app_loop(BongoCatApp *app) {
         bongo_cat_tray_sync(app->tray);
         bongo_cat_window_raise_when_due(app, now);
         bongo_cat_config_store_update(app, now);
+        /* 自动重启排在 config_store 之后: 新设置必须先落盘, 新进程才读得到。 */
+        bongo_cat_app_update_restart(app);
         if (app->smoke_deadline_ns && now >= app->smoke_deadline_ns)
             app->running = false;
     }

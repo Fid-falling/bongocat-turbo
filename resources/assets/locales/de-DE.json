@@ -46,7 +46,8 @@
           "renderer": "Renderer"
         },
         "hints": {
-        "rendererRestart": "Renderer-Änderungen werden erst nach einem Neustart von BongoCat wirksam.",
+        "rendererRestart": "Einstellung gespeichert. Bitte BongoCat manuell neu starten, um sie anzuwenden.",
+        "rendererRestarting": "BongoCat wird neu gestartet, um das neue Render-Backend anzuwenden...",
         "supersample": "Passt sich der Fenstergröße an, um Ressourcen zu sparen",
           "hoverUnavailable": "Ausblenden bei Mausberührung ist in dieser Desktop-Umgebung nicht verfügbar.",
           "gameInput": "Desktop-Tier reagiert im Spiel nicht?",
@@ -73,7 +74,8 @@
           "permissionsSettings": "Berechtigungen",
           "inputMonitoringPermission": "Berechtigung zur Eingabeüberwachung",
           "administratorPermission": "Administrator",
-          "cacheDirectory": "Cache-Verzeichnis"
+          "cacheDirectory": "Cache-Verzeichnis",
+          "portableMode": "Portabler Modus"
         },
         "options": {
           "auto": "System",
@@ -89,8 +91,12 @@
           "inputMonitoringPermissionGuide": "Die Eingabeüberwachung erlaubt BongoCat, in anderen Apps gedrückte Tasten zu sehen; die Maus funktioniert auch ohne sie. BongoCat baut die Überwachung beim Start auf, eine Berechtigungsänderung erfordert daher einen Neustart.\n\nSchritte:\n1. Öffnen Sie Systemeinstellungen → Datenschutz & Sicherheit → Eingabeüberwachung.\n2. Schalten Sie den bereits gelisteten BongoCat-Eintrag ein; entfernen Sie keine vorhandenen Einträge.\n3. Falls BongoCat fehlt, klicken Sie auf \"+\" und fügen Sie die laufende Kopie hinzu (prüfen Sie den Speicherort).\n4. Beenden Sie BongoCat vollständig und starten Sie es erneut, damit es die Überwachung neu aufbaut.\n\nWenn die Tastatur weiterhin nicht reagiert, können Sie den BongoCat-Eintrag selbst entfernen und neu hinzufügen.",
           "administratorPermission": "Als Administrator kann die Anwendung bestimmte Systemtasten und Eingabeereignisse zuverlässiger erfassen.",
           "administratorPermissionGuide": "Für eine zuverlässigere Erfassung bestimmter Systemtasten und Eingabeereignisse wird empfohlen, die Anwendung als Administrator auszuführen.\n\nVorgehen:\n1. Beenden Sie zuerst die Anwendung.\n2. Suchen Sie die exe-Datei oder ihre Verknüpfung im Datei-Explorer.\n3. Wählen Sie die Startart:\n   - Einmalig: Rechtsklick und \"Als Administrator ausführen\" wählen.\n   - Immer: Rechtsklick > Eigenschaften > Kompatibilität > \"Programm als Administrator ausführen\" aktivieren > OK.",
-          "cacheDirectory": "Ordner für Asset- und Modell-Caches. Leer lassen für den Standardwert.",
-          "defaultCache": "Standard (automatisch)",
+          "cacheDirectory": "Der aktuell verwendete Ordner. \"Zurücksetzen\" stellt den Standardort wieder her.",
+          "portableMode": "Alle Dateien liegen in einem Ordner BongoCatData neben dem Programm; zum Umziehen Programm und Ordner zusammen kopieren. Nur Einstellungen und Modelle werden kopiert, Caches werden bei Bedarf neu aufgebaut.",
+          "portableMigrating": "Einstellungen und Modelle werden verschoben, bitte warten...",
+          "portableRestarting": "Daten verschoben. BongoCat wird neu gestartet, um den neuen Ort zu verwenden...",
+          "portableManualRestart": "Daten verschoben. Bitte BongoCat manuell neu starten, um den neuen Ort zu verwenden.",
+          "portableFailed": "Der portable Modus konnte nicht umgeschaltet werden; es wurde nichts geändert.",
           "cacheApplied": "Cache-Verzeichnis aktualisiert",
           "cacheCancelled": "Auswahl des Cache-Verzeichnisses abgebrochen",
           "cacheReset": "Cache-Verzeichnis auf Standard zurückgesetzt"
@@ -212,7 +218,11 @@
         "model": "Modell",
         "addModel": "Modell hinzufügen",
         "renderer": "Render-Backend",
-        "rendererRestart": "BongoCat neu starten, damit das neue Render-Backend wirkt.",
+        "rendererRestart": "Bitte BongoCat manuell neu starten, um das neue Render-Backend anzuwenden.",
+        "rendererRestartConfirm": "Der Wechsel des Render-Backends erfordert einen Neustart von BongoCat. Jetzt neu starten?",
+        "rendererRestartConfirmNow": "Jetzt neu starten",
+        "rendererRestartConfirmLater": "Später neu starten",
+        "rendererRestartFailed": "BongoCat konnte nicht automatisch neu starten. Bitte manuell neu starten.",
         "rendererUnavailable": "Vulkan ist auf diesem Rechner nicht verfügbar.",
         "rendererOverrideNotice": "Hinweis: Diese Sitzung wurde mit einem --renderer-Argument gestartet, das Vorrang vor der gespeicherten Einstellung hat. Starten Sie BongoCat ohne dieses Argument."
       }

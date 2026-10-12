@@ -245,14 +245,24 @@ static void page_display(BongoCatApp *app, struct nk_context *context) {
         (int)model->renderer,
         bongo_cat_renderer_available(BONGO_CAT_RENDERER_VULKAN));
     if (model->renderer != previous_renderer) {
-        /* 后端在宠物窗口创建时一次性选定, 运行中换不了, 所以明确告诉用户要重启,
-           免得选了 Vulkan 却看着还是 OpenGL 的画面。 */
-        bongo_cat_preferences_notice_show(app, tr(app,
-            "pages.preference.cat.hints.rendererRestart",
-            "Renderer changes take effect after restarting BongoCat"), false);
+        /* 后端在宠物窗口创建时一次性选定, 运行中换不了, 所以先弹确认框问用户"现在重启
+           还是稍后手动重启" (application_restart.c); 只有他选了立即重启才安排重启。
+           返回值 false = 用户选了稍后, 或者本次运行不能弹框 (无人值守运行), 那就只写
+           配置 + 提示。
+           在绘制中途弹模态框是安全的: 这一帧此时只是在录制 nuklear 绘制命令, 还没碰
+           GL; 弹框期间窗口冻住, 关掉后这一帧照常画完, 下一帧按新值重画。 */
+        bool restarting = bongo_cat_app_confirm_restart(app) &&
+            bongo_cat_app_request_restart(app);
+        bongo_cat_preferences_notice_show(app, restarting
+            ? tr(app, "pages.preference.cat.hints.rendererRestarting",
+                "Restarting BongoCat to apply the new render backend...")
+            : tr(app, "pages.preference.cat.hints.rendererRestart",
+                "Setting saved. Restart BongoCat manually to apply it."),
+            false);
         SDL_LogInfo(BONGO_CAT_LOG_LIFECYCLE,
-            "[render] 渲染后端偏好改为 %s, 需要重启才会生效",
-            bongo_cat_renderer_name(model->renderer));
+            "[render] 渲染后端偏好改为 %s, %s",
+            bongo_cat_renderer_name(model->renderer),
+            restarting ? "将立即重启" : "已保存, 稍后手动重启生效");
     }
 }
 
@@ -405,4 +415,7 @@ void bongo_cat_preferences_page_settings(BongoCatPreferences *value,
     page_general(app, context);
     section_gap(context, 10);
     bongo_cat_preferences_cache_path_draw(value, context);
+    section_gap(context, 7);
+    /* 便携模式紧挨着上面那行路径: 它们说的是同一件事 (数据放在哪), 用户应该连着看。 */
+    bongo_cat_preferences_portable_draw(value, context);
 }

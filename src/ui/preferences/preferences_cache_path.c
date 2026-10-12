@@ -77,12 +77,27 @@ static bool cache_path_active(const BongoCatPreferences *value) {
  * 结束编辑并落盘。changed 要在写回之前算出来, 否则永远为假; 只有真的变了才去
  * apply_cache 并弹提示 —— 反复点同一路径不该刷出一串"已更新"。
  */
+/*
+ * 这一行显示什么。留空表示"用运行时解析出来的默认位置", 但**用户看到的必须是那条
+ * 真实路径** —— 只写一句"默认"等于让人自己去猜数据落在哪。所以非编辑状态下显示
+ * app->cache_root (它就是 storage_paths 解析/校验过的那一条, 包括便携模式下的
+ * BongoCatData\cache), 而不是自己再拼一遍字符串。
+ */
+static const char *cache_path_shown(BongoCatPreferences *value) {
+    if (bongo_cat_preferences_text_session_active(&value->cache_path))
+        return value->cache_path.text;
+    return value->app->cache_root;
+}
+
 static bool cache_path_save(BongoCatPreferences *value) {
     if (!value) return false;
     BongoCatPreferencesTextSession *session = &value->cache_path;
     if (!bongo_cat_preferences_text_session_active(session)) return false;
     bongo_cat_text_edit_trim(session->text);
-    bool changed = strcmp(session->text, value->app->settings.cache_root) != 0;
+    /* 正在生效的那条路径也算"没变": 用户点进输入框再点出来时, 框里显示的就是
+       app->cache_root, 不该因此刷一条"已更新"。 */
+    bool changed = strcmp(session->text, value->app->settings.cache_root) != 0 &&
+        strcmp(session->text, value->app->cache_root) != 0;
     snprintf(value->app->settings.cache_root,
         sizeof(value->app->settings.cache_root), "%s", session->text);
     bongo_cat_preferences_text_session_reset(session);
@@ -125,23 +140,26 @@ void bongo_cat_preferences_cache_path_draw(BongoCatPreferences *value,
         "pages.preference.general.labels.cacheDirectory", "Cache directory");
     const char *detail = tr(value->app,
         "pages.preference.general.hints.cacheDirectory",
-        "Folder used for asset and model caches. Leave empty for the default.");
+        "Folder actually in use right now.");
     BongoCatUIPalette p = bongo_cat_ui_palette(bongo_cat_ui_dark(context));
     const struct nk_user_font *font = bongo_cat_ui_label_font(context);
     FormStyle saved;
     int lines = bongo_cat_pref_detail_lines(context, detail);
     if (!bongo_cat_pref_form_begin(context, "cache-path", lines + 1, &saved))
         return;
+    /*
+     * 标题这一行必须显式 push: 组内没 push 过行时 nk_label 会落到"零列"行上, 标题一个字
+     * 都画不出来 —— 这行以前就是这样, 只剩一个没头没尾的路径框。行高 22 是照着
+     * form_begin 预留的 lines+1 算的, 再高就把下面的说明挤出组外。
+     */
+    nk_layout_row_dynamic(context, 22, 1);
     bongo_cat_pref_form_label(context, label);
     nk_layout_row_dynamic(context, 36, 1);
     struct nk_rect row;
     nk_widget(&row, context);
 
     bool editing = cache_path_active(value);
-    const char *shown = editing ? value->cache_path.text :
-        value->app->settings.cache_root;
-    if (!shown[0]) shown = tr(value->app,
-        "pages.preference.general.hints.defaultCache", "Default (automatic)");
+    const char *shown = cache_path_shown(value);
     const char *browse_text = tr(value->app,
         "pages.preference.general.options.browse", "Browse");
     const char *clear_text = tr(value->app,
@@ -166,8 +184,10 @@ void bongo_cat_preferences_cache_path_draw(BongoCatPreferences *value,
     bool clicked = hover && nk_input_is_mouse_click_in_rect(
         &context->input, NK_BUTTON_LEFT, field);
     if (clicked && !editing) {
+        /* 编辑会话用"当前显示的那条路径"起头 (而不是 settings 里那个可能为空的覆盖值):
+           否则用户一点进输入框, 框里的真实路径会突然变空, 看上去像被清掉了。 */
         bongo_cat_preferences_text_session_begin(&value->cache_path,
-            "cache-path", value->app->settings.cache_root, field);
+            "cache-path", shown, field);
         SDL_StartTextInput(value->window);
         value->render_dirty = true;
     }

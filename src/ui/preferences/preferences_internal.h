@@ -79,6 +79,10 @@ void bongo_cat_preferences_cache_path_draw(BongoCatPreferences *value,
     struct nk_context *context);
 bool bongo_cat_preferences_cache_path_event(BongoCatPreferences *value,
     const SDL_Event *event);
+/* 便携模式 (BongoCatData) 那一行: 开关 + 迁移反馈。判定与搬迁都在 runtime 层
+   (portable_mode.c), 这里只做交互与多帧反馈。 */
+void bongo_cat_preferences_portable_draw(BongoCatPreferences *value,
+    struct nk_context *context);
 /* 异步文件夹对话框的结果是 SDL 用户事件, 没有窗口 ID, 必须在按窗口过滤之前处理 */
 bool bongo_cat_preferences_cache_path_dialog_event(BongoCatPreferences *value,
     const SDL_Event *event);

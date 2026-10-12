@@ -157,6 +157,17 @@ BongoCatResult bongo_cat_platform_set_autostart(bool enabled, BongoCatError *err
 BongoCatMenuAction bongo_cat_platform_context_menu(BongoCatPlatform *platform,
     const BongoCatMenuLabels *labels);
 BongoCatResult bongo_cat_platform_embedded_assets(const char *target, BongoCatError *error);
+/*
+ * 用同一份可执行文件重新启动本进程 (切换渲染后端 / 启停便携模式之后)。
+ * arguments 是附加的命令行参数 (可为 NULL 或空串), 调用方保证它安全。
+ * 调用方必须**先**把单实例互斥体还回去 (bongo_cat_platform_single_instance_end),
+ * 否则新进程会被判定成"已有实例在运行"而自己退出。
+ * 实现负责把提权状态原样带过去, 并给新进程打上"已经自动重启过一次"的标记 —— 不能出现
+ * "提权 -> 重启 -> 再提权"这种循环 (见 src/platform/common/application_restart.c)。
+ * 返回非 OK 时进程状态不变, 调用方应继续运行并提示用户手动重启。
+ */
+BongoCatResult bongo_cat_platform_restart_application(const char *arguments,
+    BongoCatError *error);
 
 #ifdef __APPLE__
 /* Read the permission macOS grants the app right now, without prompting.

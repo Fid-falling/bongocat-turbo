@@ -170,6 +170,12 @@ struct BongoCatPreferences {
     BongoCatPreferencesTextSession behavior_rename;
     BongoCatPreferencesTextSession model_rename;
     BongoCatPreferencesTextSession cache_path;
+    /*
+     * 便携模式开关的迁移状态机 (0 = 空闲, ±1..±3 = 进行中, 正数开启、负数关闭)。
+     * 是"跨窗口会话"而不是窗口级资源: 迁移跑到一半窗口被回收的话, 下一次开窗还得接着
+     * 把它走完 (见 preferences_portable.c 的状态机说明)。
+     */
+    int portable_migration_pending;
     bool native_drag;
     bool chrome_dragging;
     bool live_resize_active;

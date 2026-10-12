@@ -46,7 +46,8 @@
           "renderer": "Renderizador"
         },
         "hints": {
-        "rendererRestart": "A troca de renderizador passa a valer depois de reiniciar o BongoCat.",
+        "rendererRestart": "Configuração salva. Reinicie o BongoCat manualmente para aplicá-la.",
+        "rendererRestarting": "Reiniciando o BongoCat para aplicar o novo backend de renderização...",
         "supersample": "Ajusta-se ao tamanho da janela para economizar",
           "hoverUnavailable": "Ocultar ao passar o mouse não está disponível no ambiente de desktop atual.",
           "gameInput": "O mascote não responde ao jogar?",
@@ -73,7 +74,8 @@
           "permissionsSettings": "Configurações de Permissões",
           "inputMonitoringPermission": "Permissão de Monitoramento de Entrada",
           "administratorPermission": "Administrador",
-          "cacheDirectory": "Diretório de cache"
+          "cacheDirectory": "Diretório de cache",
+          "portableMode": "Modo portátil"
         },
         "options": {
           "auto": "Sistema",
@@ -89,8 +91,12 @@
           "inputMonitoringPermissionGuide": "O Monitoramento de Entrada permite que o BongoCat veja teclas pressionadas em outros aplicativos; o mouse continua funcionando sem ele. O BongoCat cria o monitoramento ao iniciar, então uma mudança de permissão exige reiniciar.\n\nPassos:\n1. Abra Ajustes do Sistema → Privacidade e Segurança → Monitoramento de Entrada.\n2. Ative a entrada do BongoCat que já está na lista; não remova entradas existentes.\n3. Se o BongoCat não estiver na lista, clique em \"+\" e adicione a cópia que você executa (confira o local do aplicativo).\n4. Encerre o BongoCat por completo e inicie de novo para recriar o monitoramento.\n\nSe o teclado continuar sem resposta, você pode remover e adicionar de novo a entrada do BongoCat.",
           "administratorPermission": "Executar o aplicativo como administrador ajuda a capturar algumas teclas e eventos de entrada em nível de sistema com mais confiabilidade.",
           "administratorPermissionGuide": "Para capturar algumas teclas e eventos de entrada em nível de sistema com mais confiabilidade, é recomendado executar o aplicativo como administrador.\n\nComo fazer:\n1. Feche o aplicativo primeiro.\n2. Encontre o exe do aplicativo ou o atalho no Explorador de Arquivos.\n3. Escolha como iniciar:\n   • Apenas desta vez: Clique com o botão direito e escolha \"Executar como administrador\".\n   • Sempre (padrão): Botão direito → Propriedades → aba Compatibilidade → marque \"Executar este programa como administrador\" → OK.",
-          "cacheDirectory": "Pasta usada para os caches de recursos e modelos. Deixe vazio para usar o padrão.",
-          "defaultCache": "Padrão (automático)",
+          "cacheDirectory": "A pasta realmente em uso agora. «Redefinir» volta ao local padrão.",
+          "portableMode": "Guarda tudo numa pasta BongoCatData ao lado do programa; copie o programa junto com essa pasta para migrar. Apenas configurações e modelos são copiados, os caches são recriados quando necessário.",
+          "portableMigrating": "Migrando configurações e modelos, aguarde...",
+          "portableRestarting": "Migração concluída. Reiniciando o BongoCat para usar o novo local...",
+          "portableManualRestart": "Migração concluída. Reinicie o BongoCat manualmente para usar o novo local.",
+          "portableFailed": "Não foi possível alternar o modo portátil; nada foi alterado.",
           "cacheApplied": "Diretório de cache atualizado",
           "cacheCancelled": "Seleção do diretório de cache cancelada",
           "cacheReset": "Diretório de cache restaurado para o padrão"
@@ -212,7 +218,11 @@
         "model": "Modelo",
         "addModel": "Adicionar modelo",
         "renderer": "Backend de renderização",
-        "rendererRestart": "Reinicie o BongoCat para aplicar o novo backend de renderização.",
+        "rendererRestart": "Reinicie o BongoCat manualmente para aplicar o novo backend de renderização.",
+        "rendererRestartConfirm": "Trocar o backend de renderização exige reiniciar o BongoCat. Reiniciar agora?",
+        "rendererRestartConfirmNow": "Reiniciar agora",
+        "rendererRestartConfirmLater": "Reiniciar depois",
+        "rendererRestartFailed": "O BongoCat não conseguiu reiniciar automaticamente. Reinicie manualmente.",
         "rendererUnavailable": "O Vulkan não está disponível nesta máquina.",
         "rendererOverrideNotice": "Observação: esta sessão foi iniciada com um argumento --renderer, que tem prioridade sobre a configuração salva. Inicie o BongoCat sem ele."
       }
