@@ -55,19 +55,52 @@ void log_message(const char *message) {
     if (message) std::fprintf(stderr, "[Cubism] %s\n", message);
 }
 
-/* 资源查找顺序: 当前工作目录 -> exe 目录 -> 内嵌资源根目录。SDK 传进来的都是相对路径,
- * 而进程的工作目录被 attach() 切到过着色器目录 (见 cubism_vulkan_bridge.cpp), 所以前两者
- * 都可能命中; 最后一个兜底"用户只复制了一个 exe"的发布形态。 */
+/*
+ * exe 所在目录。SDK 一次启动要读几百上千个着色器文件, 每次都去问一遍系统没必要 ——
+ * 进程运行期间这个值不会变, 所以只取一次 (SDL3 的返回值由 SDL 自己持有, 不要释放)。
+ * 注意它带结尾的分隔符, 拼接相对路径时不要再补。
+ */
+const std::string &executable_directory() {
+    static const std::string value = [] {
+        const char *path = SDL_GetBasePath();
+        return std::string(path ? path : "");
+    }();
+    return value;
+}
+
+/* 资源查找顺序: 已解析的 assets 根目录 -> exe 目录 -> 当前工作目录。
+ *
+ * SDK 传进来的都是相对路径 ("FrameworkShaders/VertShaderSrc.vert" 之类), 而发布形态
+ * 可能是"用户只复制了一个 exe 到桌面/任意目录": 那时 exe 旁边和工作目录里都没有着色器,
+ * 唯一可靠的一份在从 pak 解出来的 assets 根目录里 (见 cmake/CubismAssets.cmake 与
+ * src/runtime/lifecycle/assets.c), 所以它必须排第一。
+ *
+ * 工作目录留作最后的兜底, 只为开发期直接从源码树/构建目录跑时仍能找到 FrameworkShaders;
+ * 发布版从任意目录启动都不应该依赖它 —— 反过来把它排在最前, 还会让启动目录里另一份
+ * 版本不匹配的着色器把正确的那份盖掉。
+ */
 Csm::csmByte *load_file(const std::string path, Csm::csmSizeInt *size) {
     if (size) *size = 0;
-    FILE *file = bongo_cat_file_open(path.c_str(), "rb");
-    if (!file) {
-        const char *base = SDL_GetBasePath();
-        if (base) file = bongo_cat_file_open((std::string(base) + path).c_str(), "rb");
-    }
-    if (!file && !resource_root.empty())
+    FILE *file = nullptr;
+    if (!resource_root.empty())
         file = bongo_cat_file_open((resource_root + "/" + path).c_str(), "rb");
-    if (!file) return nullptr;
+    const std::string &base = executable_directory();
+    if (!file && !base.empty())
+        file = bongo_cat_file_open((base + path).c_str(), "rb");
+    if (!file) file = bongo_cat_file_open(path.c_str(), "rb");
+    if (!file) {
+        /* 只记一次: 缺着色器时 SDK 会对每套着色器各要一遍 (近千次), 每次一条日志
+         * 会把日志刷满, 而"在哪几个根目录下找过"才是排查时要看的信息。 */
+        static bool reported = false;
+        if (!reported) {
+            reported = true;
+            SDL_LogWarn(SDL_LOG_CATEGORY_VIDEO,
+                "[live2d] 找不到资源 %s: 已查找 assets 根=%s / exe 目录=%s / 工作目录",
+                path.c_str(), resource_root.empty() ? "<未设置>" : resource_root.c_str(),
+                base.empty() ? "<未知>" : base.c_str());
+        }
+        return nullptr;
+    }
     std::fseek(file, 0, SEEK_END);
     long length = std::ftell(file);
     std::rewind(file);
