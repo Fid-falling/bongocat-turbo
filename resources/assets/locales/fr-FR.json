@@ -210,7 +210,11 @@
         "wheelOpacityHint": "Ctrl+molette : opacité",
         "quitApp": "Quitter l'application",
         "model": "Modèle",
-        "addModel": "Ajouter un modèle"
+        "addModel": "Ajouter un modèle",
+        "renderer": "Moteur de rendu",
+        "rendererRestart": "Redémarrez BongoCat pour appliquer le nouveau moteur de rendu.",
+        "rendererUnavailable": "Vulkan n'est pas disponible sur cette machine.",
+        "rendererOverrideNotice": "Remarque : cette session a été lancée avec un argument --renderer, prioritaire sur le réglage enregistré. Relancez BongoCat sans cet argument."
       }
     }
   },

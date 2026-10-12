@@ -33,6 +33,10 @@
 #define DIAL_ROOTS 12
 #define DIAL_REVEAL_DELAY_MS 22
 #define DIAL_REVEAL_DURATION_MS 360
+/* 连续多少帧画不出来就认定这个菜单窗口端不出去了 (Vulkan 侧据此回退 OpenGL)。
+   取 3 而不是 1: 交换链过期/重建失败常常只影响一两帧, 一失败就换后端会把偶发抖动
+   放大成整窗重建。 */
+#define DIAL_PAINT_FAILURE_LIMIT 3
 #define DIAL_PATH_POINTS 160
 #define DIAL_CENTER_SEGMENTS 64
 #define DIAL_CENTER_RINGS 16
@@ -128,6 +132,18 @@ typedef struct Dial {
      * 改不了设置, 所以一份快照就够, 不必每帧回查。
      */
     bool gl_transparency;
+    /*
+     * 强制这个菜单窗口用 OpenGL。由"上一次用 Vulkan 开菜单失败"置位 (建窗/首帧/
+     * 连续提交失败), 见 dial_window.c 的 context_menu: 窗口的图形 API 标志在创建时
+     * 就定死了, 所以回退只能整窗重建。
+     */
+    bool force_opengl;
+    /*
+     * 这一次建窗**尝试过** Vulkan。与 force_opengl/vk 分开记: 上下文创建失败时
+     * d->vk 还是 NULL, 只看 d->vk 会把"试过但失败"误判成"本来就没走 Vulkan",
+     * 于是 OpenGL 回退永远不会触发 (dial_loop.c 的 menu_run 就靠这个字段)。
+     */
+    bool vk_attempted;
     SDL_Window *previous_window;
     SDL_WindowID window_id;
     const BongoCatMenuLabels *labels;
@@ -147,6 +163,12 @@ typedef struct Dial {
      * 这正是"别把 GL 拖成幻灯片"的关键, 出问题时靠这两个数分辨。
      */
     int frames, presents;
+    /*
+     * 连续绘制失败次数 (含 Vulkan 的 acquire/present 失败)。达到上限就退出模态循环,
+     * 而不是每 16ms 重试一次坏掉的交换链 —— 后者会让用户看着一个卡死的菜单却不知道
+     * 出了什么事。
+     */
+    int paint_failures;
     uint64_t input_after_ns;
     BongoCatMenuAction result, preview;
     int width, height, pixel_width, pixel_height;
@@ -168,6 +190,9 @@ typedef struct Dial {
  * 逻辑坐标里判定 —— 两者必须用同一套布局公式, 改一边就要改另一边。
  */
 void dial_items(Dial *d);
+/* 菜单窗口的建立 (dial_window.c) 与模态循环 (dial_loop.c) 之间的接口 */
+bool dial_window_create(Dial *d);
+bool SDLCALL dial_collect_event(void *userdata, SDL_Event *event);
 int dial_child_count(const Dial *d);
 float dial_child_angle(const Dial *d, int index);
 float dial_child_step(const Dial *d);

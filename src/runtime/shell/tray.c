@@ -8,47 +8,34 @@
  * 托盘是可选件: 设置里关掉、加载图标失败、原生托盘创建失败都只降级为"没有托盘"
  * (见 app.c 的警告), 因此这里所有对外函数都必须容忍 NULL。
  *
- * Windows 资源管理器重启会把托盘图标一起干掉: 平台层回调 on_tray_restore 只置
+ * Windows 资源管理器重启会把托盘图标一起干掉: 平台层回调 bongo_cat_tray_on_restore 只置
  * restore_requested, 由 tray_sync 销毁并重建整个托盘 (旧菜单项指针已全部失效, 不能复用),
  * 重建失败 1s 后重试。
  *
  * 每个菜单回调都要做齐三件事: 改 app 状态 -> 同步窗口 (可见性/穿透/置顶) -> tray_sync
  * (勾选态) -> preferences_invalidate (设置窗口正开着时跟着刷新)。少做一步就会出现
  * "界面显示的和实际状态不一致"。
+ *
+ * 本文件只管托盘的建/销毁/同步; "切换渲染后端"那一项在 tray_renderer.c, --ci-menu 的
+ * 自测在 tray_self_test.c (拆分理由见 tray_internal.h)。
  */
-#include "bongo_cat/tray.h"
-#include "bongo_cat/app.h"
-#include "bongo_cat/image.h"
+#include "runtime.h"
+#include "tray_internal.h"
+#include "ui_native_theme.h"
 #include "bongo_cat/i18n.h"
+#include "bongo_cat/log.h"
 #include "bongo_cat/path.h"
 #include "bongo_cat/preferences.h"
-#include "modal_frame.h"
-#include "runtime.h"
-#include "ui_native_theme.h"
+#include "bongo_cat/render.h"
 
 #include <SDL3/SDL.h>
+#include <stdio.h>
 #include <stdlib.h>
 
-struct BongoCatTray {
-    BongoCatApp *app;
-    SDL_Tray *handle;
-    SDL_TrayEntry *visible;
-    SDL_TrayEntry *pass_through;
-    SDL_TrayEntry *always_on_top;
-    SDL_TrayEntry *preferences;
-    SDL_TrayEntry *exit;
-    BongoCatImage icon;
-    BongoCatModalFrame modal_frame;
-    bool state_valid, restore_requested;
-    uint64_t restore_after_ns;
-    unsigned restore_count;
-    bool last_visible, last_pass_through, last_always_on_top;
-    BongoCatLanguage last_language;
-};
-
 /* 菜单动作。托盘菜单本身不存状态: 真相始终在 app->session / app->settings 里, 回调只负责
-   改它, 再由 tray_sync 把勾选态贴回去。 */
-static void on_visible(void *userdata, SDL_TrayEntry *entry) {
+   改它, 再由 tray_sync 把勾选态贴回去。这几个不是 static —— tray_self_test.c 要真实
+   调用它们 (见 tray_internal.h)。 */
+void bongo_cat_tray_on_visible(void *userdata, SDL_TrayEntry *entry) {
     (void)entry;
     BongoCatTray *tray = userdata;
     BongoCatApp *app = tray->app;
@@ -57,7 +44,7 @@ static void on_visible(void *userdata, SDL_TrayEntry *entry) {
     bongo_cat_preferences_invalidate(app->preferences);
 }
 
-static void on_pass_through(void *userdata, SDL_TrayEntry *entry) {
+void bongo_cat_tray_on_pass_through(void *userdata, SDL_TrayEntry *entry) {
     (void)entry;
     BongoCatTray *tray = userdata;
     tray->app->settings.window.pass_through = !tray->app->settings.window.pass_through;
@@ -67,7 +54,7 @@ static void on_pass_through(void *userdata, SDL_TrayEntry *entry) {
     bongo_cat_preferences_invalidate(tray->app->preferences);
 }
 
-static void on_always_on_top(void *userdata, SDL_TrayEntry *entry) {
+void bongo_cat_tray_on_always_on_top(void *userdata, SDL_TrayEntry *entry) {
     (void)entry;
     BongoCatTray *tray = userdata;
     tray->app->settings.window.always_on_top = !tray->app->settings.window.always_on_top;
@@ -79,7 +66,7 @@ static void on_always_on_top(void *userdata, SDL_TrayEntry *entry) {
     bongo_cat_preferences_invalidate(tray->app->preferences);
 }
 
-static void on_preferences(void *userdata, SDL_TrayEntry *entry) {
+void bongo_cat_tray_on_preferences(void *userdata, SDL_TrayEntry *entry) {
     (void)entry;
     BongoCatTray *tray = userdata;
     bongo_cat_preferences_show(tray->app->preferences);
@@ -96,12 +83,12 @@ static void on_tray_modal_frame(void *userdata) {
     if (tray) bongo_cat_modal_frame_tick(&tray->modal_frame);
 }
 
-static void on_exit(void *userdata, SDL_TrayEntry *entry) {
+void bongo_cat_tray_on_exit(void *userdata, SDL_TrayEntry *entry) {
     (void)entry;
     ((BongoCatTray *)userdata)->app->running = false;
 }
 
-static void on_tray_restore(void *userdata) {
+void bongo_cat_tray_on_restore(void *userdata) {
     BongoCatTray *tray = userdata;
     if (!tray) return;
     if (!tray->restore_requested)
@@ -125,7 +112,6 @@ static SDL_TrayEntry *add(SDL_TrayMenu *menu, const char *label,
     if (entry && callback) SDL_SetTrayEntryCallback(entry, callback, tray);
     return entry;
 }
-
 /* 先摘掉平台层回调再销毁: 否则销毁过程中到达的回调会拿到已经释放的 tray。 */
 static void destroy_native_tray(BongoCatTray *tray) {
     if (!tray || !tray->handle) return;
@@ -134,7 +120,7 @@ static void destroy_native_tray(BongoCatTray *tray) {
     SDL_DestroyTray(tray->handle);
     tray->handle = NULL;
     tray->visible = tray->pass_through = tray->always_on_top = NULL;
-    tray->preferences = tray->exit = NULL;
+    tray->preferences = tray->renderer = tray->exit = NULL;
     tray->state_valid = false;
 }
 
@@ -152,32 +138,35 @@ static bool create_native_tray(BongoCatTray *tray, BongoCatError *error) {
     if (menu) {
         tray->preferences = add(menu, bongo_cat_i18n_get(tray->app->i18n,
             "composables.useAppMenu.labels.preference", "Preferences"),
-            SDL_TRAYENTRY_BUTTON, on_preferences, tray);
+            SDL_TRAYENTRY_BUTTON, bongo_cat_tray_on_preferences, tray);
+        /* 紧跟在"设置"后面: 设置窗口打不开/画不出来时, 它是紧接着要试的那一项。 */
+        tray->renderer = add(menu, bongo_cat_tray_renderer_label(tray),
+            SDL_TRAYENTRY_BUTTON, bongo_cat_tray_on_renderer, tray);
         separator1 = add(menu, NULL, 0, NULL, tray);
         tray->visible = add(menu, bongo_cat_i18n_get(tray->app->i18n,
             "composables.useAppMenu.labels.showCat", "Show BongoCat"),
-            SDL_TRAYENTRY_CHECKBOX, on_visible, tray);
+            SDL_TRAYENTRY_CHECKBOX, bongo_cat_tray_on_visible, tray);
         tray->pass_through = add(menu, bongo_cat_i18n_get(tray->app->i18n,
             "composables.useAppMenu.labels.passThrough", "Mouse pass-through"),
-            SDL_TRAYENTRY_CHECKBOX, on_pass_through, tray);
+            SDL_TRAYENTRY_CHECKBOX, bongo_cat_tray_on_pass_through, tray);
         tray->always_on_top = add(menu, bongo_cat_i18n_get(tray->app->i18n,
             "composables.useAppMenu.labels.alwaysOnTop", "Always on top"),
-            SDL_TRAYENTRY_CHECKBOX, on_always_on_top, tray);
+            SDL_TRAYENTRY_CHECKBOX, bongo_cat_tray_on_always_on_top, tray);
         separator2 = add(menu, NULL, 0, NULL, tray);
         tray->exit = add(menu, bongo_cat_i18n_get(tray->app->i18n,
             "composables.useAppMenu.labels.quitApp", "Exit"),
-            SDL_TRAYENTRY_BUTTON, on_exit, tray);
+            SDL_TRAYENTRY_BUTTON, bongo_cat_tray_on_exit, tray);
     }
-    if (!menu || !tray->preferences || !separator1 || !tray->visible ||
-        !tray->pass_through || !tray->always_on_top || !separator2 ||
-        !tray->exit) {
+    if (!menu || !tray->preferences || !tray->renderer || !separator1 ||
+        !tray->visible || !tray->pass_through || !tray->always_on_top ||
+        !separator2 || !tray->exit) {
         bongo_cat_error_set(error, BONGO_CAT_ERROR_PLATFORM,
             "Tray menu creation failed: %s", SDL_GetError());
         destroy_native_tray(tray);
         return false;
     }
     bongo_cat_platform_set_tray_callbacks(tray->handle,
-        on_tray_left_click, on_tray_modal_frame, on_tray_restore, tray);
+        on_tray_left_click, on_tray_modal_frame, bongo_cat_tray_on_restore, tray);
     tray->state_valid = false;
     return true;
 }
@@ -227,20 +216,24 @@ static bool restore_native_tray(BongoCatTray *tray) {
     return true;
 }
 
-/* 幂等 + 便宜的脏检查: 只有四项状态 (可见/穿透/置顶/语言) 之一变了才真的改菜单, 因为
-   SDL_UpdateTrays 会让 shell 重画托盘。语言也算一项 —— 换语言必须重贴文案。 */
+/* 幂等 + 便宜的脏检查: 只有五项状态 (可见/穿透/置顶/语言/渲染后端) 之一变了才真的改
+   菜单, 因为 SDL_UpdateTrays 会让 shell 重画托盘。语言也算一项 —— 换语言必须重贴文案;
+   渲染后端也算 —— 那一项的文案里写着"当前 -> 目标", 不重贴就会一直显示旧状态。 */
 void bongo_cat_tray_sync(BongoCatTray *tray) {
     if (!tray || !restore_native_tray(tray)) return;
     BongoCatApp *app = tray->app;
+    const int renderer = (int)bongo_cat_renderer_active();
     if (tray->state_valid && tray->last_visible == app->session.window.visible &&
         tray->last_pass_through == app->settings.window.pass_through &&
         tray->last_always_on_top == app->settings.window.always_on_top &&
-        tray->last_language == app->settings.app.language) return;
+        tray->last_language == app->settings.app.language &&
+        tray->last_renderer == renderer) return;
     tray->state_valid = true;
     tray->last_visible = app->session.window.visible;
     tray->last_pass_through = app->settings.window.pass_through;
     tray->last_always_on_top = app->settings.window.always_on_top;
     tray->last_language = app->settings.app.language;
+    tray->last_renderer = renderer;
     SDL_SetTrayEntryChecked(tray->visible, tray->app->session.window.visible);
     SDL_SetTrayEntryChecked(tray->pass_through, tray->app->settings.window.pass_through);
     SDL_SetTrayEntryChecked(tray->always_on_top, tray->app->settings.window.always_on_top);
@@ -254,6 +247,7 @@ void bongo_cat_tray_sync(BongoCatTray *tray) {
         "composables.useAppMenu.labels.alwaysOnTop", "Always on top"));
     SDL_SetTrayEntryLabel(tray->preferences, bongo_cat_i18n_get(tray->app->i18n,
         "composables.useAppMenu.labels.preference", "Preferences"));
+    SDL_SetTrayEntryLabel(tray->renderer, bongo_cat_tray_renderer_label(tray));
     SDL_SetTrayEntryLabel(tray->exit, bongo_cat_i18n_get(tray->app->i18n,
         "composables.useAppMenu.labels.quitApp", "Exit"));
     SDL_UpdateTrays();
@@ -261,44 +255,6 @@ void bongo_cat_tray_sync(BongoCatTray *tray) {
 
 /* --ci-menu 用的自测: 走一遍真实回调并每项点两次 (验证改回去也能恢复), 最后检查状态与
    进入时一致; Windows 上还会先模拟一次 shell 重启。 */
-bool bongo_cat_tray_self_test(BongoCatTray *tray) {
-    if (!tray || !tray->handle || !tray->visible || !tray->pass_through ||
-        !tray->always_on_top || !tray->preferences || !tray->exit) return false;
-    SDL_Log("Tray self-test: entries ready");
-    int count = 0;
-    const SDL_TrayEntry **entries = SDL_GetTrayEntries(
-        SDL_GetTrayEntryParent(tray->preferences), &count);
-    if (!entries || count < 1 || entries[0] != tray->preferences) return false;
-#ifdef _WIN32
-    on_tray_restore(tray);
-    bongo_cat_tray_sync(tray);
-    if (tray->restore_requested || !tray->handle || !tray->preferences ||
-        !tray->visible || !tray->pass_through || !tray->always_on_top ||
-        !tray->exit) return false;
-    SDL_Log("Tray self-test: shell restart restored");
-#endif
-    BongoCatApp *app = tray->app;
-    bool visible = app->session.window.visible;
-    bool pass_through = app->settings.window.pass_through;
-    bool always_on_top = app->settings.window.always_on_top;
-    on_visible(tray, tray->visible); on_visible(tray, tray->visible);
-    on_pass_through(tray, tray->pass_through);
-    on_pass_through(tray, tray->pass_through);
-    on_always_on_top(tray, tray->always_on_top);
-    on_always_on_top(tray, tray->always_on_top);
-    SDL_Log("Tray self-test: state actions restored");
-    on_preferences(tray, tray->preferences);
-    bool preferences = bongo_cat_preferences_visible(app->preferences);
-    SDL_Log("Tray self-test: preferences visible=%d", preferences);
-    bongo_cat_preferences_close(app->preferences);
-    SDL_Log("Tray self-test: preferences closed");
-    bool result = preferences && bongo_cat_modal_frame_self_test() &&
-        app->session.window.visible == visible &&
-        app->settings.window.pass_through == pass_through &&
-        app->settings.window.always_on_top == always_on_top;
-    SDL_Log("Tray self-test: result=%d", result);
-    return result;
-}
 
 void bongo_cat_tray_destroy(BongoCatTray *tray) {
     if (!tray) return;

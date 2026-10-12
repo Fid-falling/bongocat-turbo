@@ -19,6 +19,7 @@
 #include "update_service.h"
 #include "window_snapshot.h"
 #include <SDL3/SDL.h>
+#include <stdio.h>
 
 /* --- 生命周期与窗口: 装配、主循环、模型目录扫描与热更新 --- */
 BongoCatResult bongo_cat_window_create(BongoCatApp *app, BongoCatError *error);
@@ -41,6 +42,9 @@ bool bongo_cat_startup_prepare(BongoCatApp *app, int argc, char **argv,
     BongoCatError *error);
 bool bongo_cat_startup_arguments(BongoCatApp *app, int argc, char **argv,
     BongoCatError *error);
+/* --help/-h: 打印用法并让进程以 0 退出, 不建窗口、不占单实例锁 */
+bool bongo_cat_cli_wants_help(int argc, char **argv);
+void bongo_cat_cli_print_usage(FILE *out);
 void bongo_cat_startup_stage(BongoCatApp *app, const char *stage);
 void bongo_cat_startup_ready(BongoCatApp *app);
 void bongo_cat_runtime_stage(BongoCatApp *app, const char *stage);

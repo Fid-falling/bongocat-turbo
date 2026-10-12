@@ -37,10 +37,14 @@ set(BONGO_CAT_RENDER_SOURCES
   # Vulkan 后端。文件内部按 BONGO_CAT_HAS_VULKAN 分叉: 未启用时只编出
   # vk_stub.c 里那组返回失败/空指针的桩, 让调用方不必到处写 #ifdef。
   src/render/vk/vk_core.c
+  # 上下文生命周期与查询 (vk_core.c 只留 Instance/Device 的创建销毁)
+  src/render/vk/vk_context.c
   src/render/vk/vk_stub.c
   src/render/vk/vk_swapchain.c
   src/render/vk/vk_swapchain_rebuild.c
   src/render/vk/vk_frame.c
+  # 帧同步对象 (信号量/栅栏/命令池) 的创建、重置与销毁
+  src/render/vk/vk_frame_sync.c
   src/render/vk/vk_readback.c
   src/render/vk/vk_texture.c
   src/render/vk/vk_pipeline.c
@@ -172,7 +176,10 @@ set(BONGO_CAT_RUNTIME_IMPORT_SOURCES
 
 set(BONGO_CAT_RUNTIME_SHELL_SOURCES
   src/runtime/shell/modal_frame.c
+  # 托盘拆成三份: 本体 (建/销毁/同步)、渲染后端逃生项、--ci-menu 自测。
   src/runtime/shell/tray.c
+  src/runtime/shell/tray_renderer.c
+  src/runtime/shell/tray_self_test.c
   src/runtime/shell/window.c
   src/runtime/shell/window_background.c
   src/runtime/shell/window_display.c
@@ -200,6 +207,8 @@ set(BONGO_CAT_UI_BACKEND_SOURCES
 
 set(BONGO_CAT_UI_RENDERING_SOURCES
   src/ui/dial/dial_window.c
+  # 模态循环 / 失败回退 (dial_window.c 只管建窗)
+  src/ui/dial/dial_loop.c
   src/ui/dial/dial_input.c
   src/ui/dial/dial_items.c
   src/ui/dial/dial_geometry.c

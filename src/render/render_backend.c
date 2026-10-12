@@ -113,6 +113,21 @@ void bongo_cat_renderer_select(BongoCatRenderer requested) {
         BONGO_CAT_VULKAN_BACKEND_IMPLEMENTED);
 }
 
+void bongo_cat_renderer_select_source(BongoCatRenderer requested,
+    BongoCatRenderer configured, bool command_line) {
+    bongo_cat_renderer_select(requested);
+    /*
+     * 来源单独一行: 命令行覆盖 (--renderer=/--opengl/--vulkan) 的优先级高于
+     * settings.json, 而且**不写回**配置。用户看到"设置里明明是 OpenGL 却在跑
+     * Vulkan"时, 这一行就是答案。
+     */
+    SDL_LogInfo(BONGO_CAT_LOG_LIFECYCLE,
+        "[render] 后端来源=%s 配置=%s 请求=%s",
+        command_line ? "命令行" : "settings.json",
+        bongo_cat_renderer_name(configured),
+        bongo_cat_renderer_name(requested));
+}
+
 void bongo_cat_renderer_fallback(BongoCatRenderer failed, const char *reason) {
     if (failed != BONGO_CAT_RENDERER_VULKAN) return;
     active_renderer = BONGO_CAT_RENDERER_OPENGL;

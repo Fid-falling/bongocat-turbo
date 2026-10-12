@@ -210,7 +210,11 @@
         "wheelOpacityHint": "Ctrl+滾輪調整透明度",
         "quitApp": "退出應用程式",
         "model": "模型",
-        "addModel": "新增模型"
+        "addModel": "新增模型",
+        "renderer": "渲染後端",
+        "rendererRestart": "重新啟動 BongoCat 後新的渲染後端才會生效。",
+        "rendererUnavailable": "這台機器上沒有可用的 Vulkan，無法切換。",
+        "rendererOverrideNotice": "注意：本次執行帶有 --renderer 參數，它的優先順序高於設定；移除該參數重新啟動才會套用新值。"
       }
     }
   },

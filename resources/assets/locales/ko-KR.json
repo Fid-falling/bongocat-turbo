@@ -210,7 +210,11 @@
         "wheelOpacityHint": "Ctrl+휠: 불투명도",
         "quitApp": "앱 종료",
         "model": "모델",
-        "addModel": "모델 추가"
+        "addModel": "모델 추가",
+        "renderer": "렌더링 백엔드",
+        "rendererRestart": "새 렌더링 백엔드를 적용하려면 BongoCat을 다시 시작하세요.",
+        "rendererUnavailable": "이 컴퓨터에서는 Vulkan을 사용할 수 없습니다.",
+        "rendererOverrideNotice": "참고: 이번 실행에는 --renderer 인수가 있어 저장된 설정보다 우선합니다. 인수를 빼고 다시 시작하세요."
       }
     }
   },

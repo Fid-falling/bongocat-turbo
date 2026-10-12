@@ -21,6 +21,15 @@
 #include "preferences_scrollbar.h"
 #include "preferences_text_session.h"
 #include "ui_backend.h"
+#include "bongo_cat/vk_backend.h"
+
+/*
+ * 设置窗口的 Vulkan 通路连续失败多少帧就回退 OpenGL。
+ *
+ * 取 3 而不是 1: 交换链过期/重建在拖窗口尺寸时是正常现象, 单帧失败不代表这个窗口
+ * 端不出去; 取 3 也不会让用户等太久 (事件驱动的设置窗口一秒钟就能攒够三帧)。
+ */
+#define BONGO_CAT_PREF_VK_FAILURE_LIMIT 3u
 
 /*
  * 模型加载动画的时长参数 (纳秒): 等待段的总时长、快速爬升段、结束补完段, 以及等待段
@@ -49,6 +58,24 @@ struct BongoCatPreferences {
     /* 设置窗口自己的 Vulkan 上下文 (renderer=vulkan 时非空) */
     BongoCatVk *vk;
     bool prefer_vulkan;
+    /*
+     * 本进程内"设置窗口的 Vulkan 通路已经被判定不可用"。
+     *
+     * 为什么需要它而不是复用 prefer_vulkan: prefer_vulkan 在每次
+     * bongo_cat_preferences_open_window 开头都会被重新按渲染后端算一遍, 所以它只能
+     * 表达"这一次开窗想用哪个后端"; 而"这个后端已经在这台机器上连续提交失败了"是
+     * 一条跨窗口的结论, 必须粘住 —— 否则回退到 OpenGL 之后下一次开窗又会回到
+     * Vulkan, 用户看到的就是"界面时好时坏"。
+     */
+    bool vk_disabled;
+    /* 置位表示"本帧结束后请把设置窗口重建成 OpenGL 窗口"(见 preferences_present.c) */
+    bool vk_fallback_requested;
+    /*
+     * Vulkan 帧失败记账: consecutive 用于判定回退阈值 (成功一帧即清零),
+     * total 只用于日志 —— 用户回传的日志里"失败了多少次"比"是否失败"更有说服力。
+     */
+    unsigned vk_consecutive_failures;
+    uint64_t vk_failures;
     bool transparent_window;
     bool visible;
     bool ui_initialized;
@@ -179,6 +206,12 @@ void bongo_cat_preferences_input_monitoring_refresh(BongoCatPreferences *value);
 int bongo_cat_preferences_resolved_theme(const BongoCatPreferences *value);
 void bongo_cat_preferences_apply_theme(BongoCatPreferences *value);
 bool bongo_cat_preferences_open_window(BongoCatPreferences *value);
+/*
+ * 把设置窗口从 Vulkan 换成 OpenGL 并重建。只在窗口"帧外"调用 (目前是 render 的开头),
+ * 因为它会销毁并重建窗口、UI 后端与全部纹理 —— 在绘制中途调用会留下一堆悬空句柄。
+ * 触发条件见 preferences_present.c: 初始化失败, 或连续 N 帧提交不出去。
+ */
+void bongo_cat_preferences_vulkan_fallback(BongoCatPreferences *value);
 void bongo_cat_preferences_release_idle_window(BongoCatPreferences *value);
 bool bongo_cat_preferences_scale_event(BongoCatPreferences *value,
     const SDL_Event *event);

@@ -126,7 +126,12 @@ bool bongo_cat_preferences_open_window(BongoCatPreferences *value) {
      * 注入的 RTSS / OBS graphics-hook / NVIDIA 叠加层普遍假定单设备。
      * 默认仍留 BONGO_CAT_PREFERENCES_OPENGL=1 这个退回开关。
      */
-    value->prefer_vulkan =
+    /*
+     * vk_disabled: 这个进程里设置窗口的 Vulkan 通路已经栽过了 (见 preferences_state.h
+     * 的说明)。它必须压过"渲染后端是 Vulkan"这个条件, 否则回退到 OpenGL 之后下一次
+     * 开窗又会切回 Vulkan。
+     */
+    value->prefer_vulkan = !value->vk_disabled &&
         bongo_cat_renderer_active() == BONGO_CAT_RENDERER_VULKAN &&
         SDL_getenv("BONGO_CAT_PREFERENCES_OPENGL") == NULL;
     SDL_WindowFlags backend_flag = value->prefer_vulkan ? SDL_WINDOW_VULKAN :
@@ -181,6 +186,8 @@ bool bongo_cat_preferences_open_window(BongoCatPreferences *value) {
         if (value->prefer_vulkan) {
             SDL_LogWarn(SDL_LOG_CATEGORY_VIDEO,
                 "Preferences Vulkan context unavailable; falling back to OpenGL");
+            /* 粘住这次结论: 否则下一次开窗又会按渲染后端切回 Vulkan。 */
+            value->vk_disabled = true;
             value->prefer_vulkan = false;
             discard_window(value);
             return bongo_cat_preferences_open_window(value);

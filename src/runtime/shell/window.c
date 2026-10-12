@@ -142,8 +142,16 @@ BongoCatResult bongo_cat_window_create(BongoCatApp *app, BongoCatError *error) {
         return BONGO_CAT_ERROR_PLATFORM;
     }
     /* 选定渲染后端。Vulkan 可用时按 SDL_WINDOW_VULKAN 建窗并初始化设备;
-       初始化失败 (驱动/设备被占用等) 会在下面回退到 OpenGL 重试一次。 */
-    bongo_cat_renderer_select(app->settings.model.renderer);
+       初始化失败 (驱动/设备被占用等) 会在下面回退到 OpenGL 重试一次。
+
+       命令行覆盖 (--renderer=/--opengl/--vulkan) 优先于 settings.json: 设置窗口
+       自己就是用选中的后端画的, 那个后端一旦画不出内容, 用户就没有 GUI 入口可以
+       切回来。覆盖值只作用于本次运行, 因此这里绝不能把它写回 app->settings —— 否则
+       config_store 会在 300ms 后把"临时逃生"变成用户的持久设置。 */
+    bongo_cat_renderer_select_source(
+        app->renderer_override >= 0 ? (BongoCatRenderer)app->renderer_override
+            : app->settings.model.renderer,
+        app->settings.model.renderer, app->renderer_override >= 0);
     if (bongo_cat_renderer_active() == BONGO_CAT_RENDERER_VULKAN) {
         BongoCatError vk_error = {0};
         if (try_vulkan_window(app, &vk_error)) return BONGO_CAT_OK;

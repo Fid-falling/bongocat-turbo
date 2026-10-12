@@ -33,6 +33,15 @@ BongoCatRenderer bongo_cat_renderer_resolve(BongoCatRenderer requested);
 
 /* 启动时选定一次, 之后渲染/平台层查询 bongo_cat_renderer_active() */
 void bongo_cat_renderer_select(BongoCatRenderer requested);
+/*
+ * 同 select, 但额外把"这个请求是从哪来的"记进日志:
+ * command_line 为真表示命令行覆盖压过了 configured (settings.json 里的值)。
+ *
+ * 排查"我明明在设置里选了 OpenGL, 日志却说在用 Vulkan"这类问题时, 光有
+ * "请求后端=… 实际使用=…" 是不够的 —— 必须能看出请求来自配置还是命令行。
+ */
+void bongo_cat_renderer_select_source(BongoCatRenderer requested,
+    BongoCatRenderer configured, bool command_line);
 BongoCatRenderer bongo_cat_renderer_active(void);
 
 /* 已选定的后端在初始化阶段失败: 记录原因并立刻切回 OpenGL */

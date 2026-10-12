@@ -18,6 +18,7 @@
 #include "ui_animation.h"
 #include "ui_paint.h"
 #include "bongo_cat/memory_policy.h"
+#include "bongo_cat/vk_backend.h"
 
 #include <SDL3/SDL_opengl.h>
 
@@ -40,6 +41,14 @@ static void stage_log(const char *stage) {
 void bongo_cat_preferences_render(BongoCatPreferences *value) {
     bongo_cat_preferences_release_idle_window(value);
     if (!value || !value->window || !value->visible) return;
+    /*
+     * 回退请求必须在这里处理: 这是"帧外"最早的位置, 上面刚做完空闲回收, 下面还没有
+     * 碰过 UI 上下文。在绘制中途重建窗口会留下一堆指向已销毁后端的纹理 id。
+     */
+    if (value->vk_fallback_requested) {
+        bongo_cat_preferences_vulkan_fallback(value);
+        return;
+    }
     bongo_cat_preferences_drag_tick(value);
     /* [性能]区: 关掉发光/阴影类特效 (浅色主题下这些全屏模糊是每帧最贵的一项) */
     bongo_cat_ui_set_effects_enabled(!value->app->settings.window.disable_effects);
@@ -107,7 +116,22 @@ void bongo_cat_preferences_render(BongoCatPreferences *value) {
         if (!bongo_cat_vk_begin_frame(value->vk, pixel_width, pixel_height)) {
             value->render_dirty = true;
             value->render_retry_ns = now + 1000000000ull;
-            SDL_LogWarn(SDL_LOG_CATEGORY_VIDEO, "Preferences Vulkan frame failed");
+            ++value->vk_consecutive_failures;
+            ++value->vk_failures;
+            SDL_LogWarn(SDL_LOG_CATEGORY_VIDEO,
+                "Preferences Vulkan frame failed (连续第 %u 次, 累计 %llu 次): "
+                "swapchain=%dx%d presented=%llu present_failures=%llu",
+                value->vk_consecutive_failures,
+                (unsigned long long)value->vk_failures, pixel_width, pixel_height,
+                (unsigned long long)bongo_cat_vk_presented_frames(value->vk),
+                (unsigned long long)bongo_cat_vk_present_failures(value->vk));
+            /*
+             * 初始化成功不代表这一帧画得出来: 交换链建好之后也可能每一帧都拿不到
+             * 图像。连续失败到阈值就把这个窗口换成 OpenGL —— 用户是为了改设置才
+             * 打开它的, 一个永远刷不新的窗口比一个"降级但能用"的窗口糟得多。
+             */
+            if (value->vk_consecutive_failures >= BONGO_CAT_PREF_VK_FAILURE_LIMIT)
+                value->vk_fallback_requested = true;
             return;
         }
     } else {
@@ -127,10 +151,24 @@ void bongo_cat_preferences_render(BongoCatPreferences *value) {
     bool presented = true;
     const uint64_t present_start_ns = SDL_GetTicksNS();
     if (vulkan) {
-    stage_log("present-begin");
+        stage_log("present-begin");
         presented = bongo_cat_vk_end_frame(value->vk);
-            if (!presented)
-            SDL_LogWarn(SDL_LOG_CATEGORY_VIDEO, "Preferences Vulkan present failed");
+        /*
+         * 呈现失败的失败码由 vk_frame.c 打 ([vulkan] 呈现失败 (VkResult=…)), 这里只
+         * 负责记账与升级: 连续失败到阈值就把整个窗口换成 OpenGL。
+         */
+        if (!presented) {
+            ++value->vk_consecutive_failures;
+            ++value->vk_failures;
+            SDL_LogWarn(SDL_LOG_CATEGORY_VIDEO,
+                "Preferences Vulkan present failed (连续第 %u 次, 累计 %llu 次, "
+                "presented=%llu)",
+                value->vk_consecutive_failures,
+                (unsigned long long)value->vk_failures,
+                (unsigned long long)bongo_cat_vk_presented_frames(value->vk));
+            if (value->vk_consecutive_failures >= BONGO_CAT_PREF_VK_FAILURE_LIMIT)
+                value->vk_fallback_requested = true;
+        } else value->vk_consecutive_failures = 0;
     } else if (!SDL_GL_SwapWindow(value->window)) {
         presented = false;
         SDL_LogWarn(SDL_LOG_CATEGORY_VIDEO,

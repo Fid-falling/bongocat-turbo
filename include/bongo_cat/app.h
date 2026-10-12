@@ -130,6 +130,21 @@ typedef struct BongoCatApp {
     int smoke_language;
     int smoke_theme;
     int smoke_preference_page;
+    /*
+     * 命令行 --renderer= / --opengl / --vulkan 的后端覆盖值 (BongoCatRenderer),
+     * -1 表示没有覆盖、按 settings.json 走。
+     *
+     * 为什么要有它: 设置窗口自己就是用当前后端画的, 那个后端一旦在这台机器上画不出
+     * 内容, 用户就没有任何 GUI 入口把后端切回去 —— 命令行是唯一不依赖界面的逃生
+     * 通道, 所以它的优先级必须高于配置。覆盖只作用于本次运行, 不写回配置。
+     */
+    int renderer_override;
+    /*
+     * 这次运行带了 --ci-* 参数 (无人值守/自测)。与 smoke 分开是因为 --ci-menu 这类
+     * 参数并不置 smoke: 它们照样会走真实菜单回调, 而模态弹窗 (SDL_ShowSimpleMessageBox)
+     * 在无人值守运行里会把进程挂住 —— 那些回调必须能看出"现在没有人在看屏幕"。
+     */
+    bool automated;
     int exit_code;
     bool dirty;
     /* 已经下发给后端的 max_fps (垂直同步跟随它变化), -1 表示还没下发过 */

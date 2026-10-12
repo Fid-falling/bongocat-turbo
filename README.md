@@ -363,6 +363,12 @@ the same upper layers as OpenGL and produce the same output.
 Pick a backend in Settings (`renderer`), or force it with the same key in
 `settings.json`. Things worth knowing:
 
+* If the Settings window itself does not draw correctly, you are not stuck:
+  `--renderer=opengl` (or the shorter `--opengl`) forces the whole app onto
+  OpenGL for that one run, and it **wins over `settings.json` without rewriting
+  it**. The tray menu has the same switch as "Render backend: <current> ->
+  <target>"; it saves the setting and asks for a restart. `--help` lists every
+  option and environment variable. Run `BongoCat --help` from a terminal.
 * The Vulkan renderer and the Cubism bridge share **one** `VkDevice` on purpose.
   A second device used to crash under overlays (RTSS / OBS / NVIDIA) that
   assume a single device per process.
@@ -374,6 +380,14 @@ Pick a backend in Settings (`renderer`), or force it with the same key in
   backend-agnostic.
 * The startup log always prints the requested vs. actual backend, so you never
   have to guess which one you got.
+* If a secondary window (Settings, radial menu) cannot draw with Vulkan at all
+  — the swapchain cannot be created, or frames stop being presented — it rebuilds
+  itself with OpenGL and says so in the log. The main window's backend is not
+  affected. Note that a GL Settings window on top of a Vulkan main window is
+  only partially composited on Windows, so `--renderer=opengl` (which switches
+  both) remains the better escape.
+* Set `BONGO_CAT_VULKAN_VALIDATION=1` to turn on the Vulkan validation layer
+  (needs the SDK layer on `PATH`; the log says so when it is missing).
 
 ## Project Status
 ![Alt](https://repobeats.axiom.co/api/embed/74334755a589dea40c5d31f8d2bcdc6c2bd39d87.svg "Repobeats analytics image")

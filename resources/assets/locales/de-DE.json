@@ -210,7 +210,11 @@
         "wheelOpacityHint": "Strg+Mausrad: Deckkraft",
         "quitApp": "Anwendung beenden",
         "model": "Modell",
-        "addModel": "Modell hinzufügen"
+        "addModel": "Modell hinzufügen",
+        "renderer": "Render-Backend",
+        "rendererRestart": "BongoCat neu starten, damit das neue Render-Backend wirkt.",
+        "rendererUnavailable": "Vulkan ist auf diesem Rechner nicht verfügbar.",
+        "rendererOverrideNotice": "Hinweis: Diese Sitzung wurde mit einem --renderer-Argument gestartet, das Vorrang vor der gespeicherten Einstellung hat. Starten Sie BongoCat ohne dieses Argument."
       }
     }
   },

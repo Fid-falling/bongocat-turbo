@@ -4,7 +4,8 @@
  *
  * 不变量与取舍:
  *   - image_available 用帧槽、present 信号量用图像索引: 同一张图像只有在上一次呈现
- *     完成之后才会被重新获取, 混用会撞上"信号量还在被等待";
+ *     完成之后才会被重新获取, 混用会撞上"信号量还在被等待" (同步对象的创建/重置/
+ *     销毁都在 vk_frame_sync.c);
  *   - end_frame 里刻意不加任何等待: 提交与呈现都是发出去就返回, 该等的在 begin 等。
  *     设置窗口 present 那十几毫秒是 DWM 的取帧节奏 (同一 API 的宠物窗口只要 0.4ms),
  *     在这里加同步只会更慢;
@@ -17,89 +18,6 @@
 #include <SDL3/SDL.h>
 
 #ifdef BONGO_CAT_HAS_VULKAN
-
-static bool create_command_pool(BongoCatVk *vk, BongoCatError *error) {
-    VkCommandPoolCreateInfo create = {0};
-    create.sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO;
-    create.flags = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT;
-    create.queueFamilyIndex = vk->queue_family;
-    if (vkCreateCommandPool(vk->device, &create, NULL, &vk->command_pool) != VK_SUCCESS) {
-        bongo_cat_error_set(error, BONGO_CAT_ERROR_PLATFORM, "Vulkan 命令池创建失败");
-        return false;
-    }
-    VkCommandBufferAllocateInfo allocate = {0};
-    allocate.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
-    allocate.commandPool = vk->command_pool;
-    allocate.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
-    allocate.commandBufferCount = BONGO_CAT_VK_FRAMES_IN_FLIGHT;
-    VkCommandBuffer buffers[BONGO_CAT_VK_FRAMES_IN_FLIGHT] = {0};
-    if (vkAllocateCommandBuffers(vk->device, &allocate, buffers) != VK_SUCCESS) {
-        bongo_cat_error_set(error, BONGO_CAT_ERROR_PLATFORM, "Vulkan 命令缓冲分配失败");
-        return false;
-    }
-    for (uint32_t i = 0; i < BONGO_CAT_VK_FRAMES_IN_FLIGHT; ++i)
-        vk->frames[i].command = buffers[i];
-    return true;
-}
-
-bool bongo_cat_vk_create_frame_sync(BongoCatVk *vk, BongoCatError *error) {
-    if (!create_command_pool(vk, error)) return false;
-    VkSemaphoreCreateInfo semaphore = {0};
-    semaphore.sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO;
-    VkFenceCreateInfo fence = {0};
-    fence.sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO;
-    /* 第一帧不必等待一个从未提交过的栅栏 */
-    fence.flags = VK_FENCE_CREATE_SIGNALED_BIT;
-    for (uint32_t i = 0; i < BONGO_CAT_VK_FRAMES_IN_FLIGHT; ++i) {
-        BongoCatVkFrame *frame = &vk->frames[i];
-        if (vkCreateSemaphore(vk->device, &semaphore, NULL, &frame->image_available) !=
-                VK_SUCCESS ||
-            vkCreateFence(vk->device, &fence, NULL, &frame->fence) != VK_SUCCESS) {
-            bongo_cat_error_set(error, BONGO_CAT_ERROR_PLATFORM, "Vulkan 同步对象创建失败");
-            return false;
-        }
-    }
-    vk->frame_index = 0;
-    return true;
-}
-
-/*
- * 重建各帧的 image_available 信号量。
- *
- * vkAcquireNextImageKHR 可能已经把信号量置为已触发, 但这一帧最终没有提交
- * (例如返回 OUT_OF_DATE 或拿到的下标失效)。未消费的信号量再次传给 acquire 是
- * 未定义行为, 驱动的表现就是偶发崩溃。调用前必须已经 vkDeviceWaitIdle。
- */
-bool bongo_cat_vk_reset_frame_semaphores(BongoCatVk *vk) {
-    if (!vk || vk->device == VK_NULL_HANDLE) return false;
-    VkSemaphoreCreateInfo semaphore = {0};
-    semaphore.sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO;
-    for (uint32_t i = 0; i < BONGO_CAT_VK_FRAMES_IN_FLIGHT; ++i) {
-        BongoCatVkFrame *frame = &vk->frames[i];
-        if (frame->image_available != VK_NULL_HANDLE)
-            vkDestroySemaphore(vk->device, frame->image_available, NULL);
-        frame->image_available = VK_NULL_HANDLE;
-        if (vkCreateSemaphore(vk->device, &semaphore, NULL,
-                &frame->image_available) != VK_SUCCESS) return false;
-    }
-    /* 所有帧都空闲了, 从第一个帧槽重新开始 */
-    vk->frame_index = 0;
-    return true;
-}
-
-void bongo_cat_vk_destroy_frame_sync(BongoCatVk *vk) {
-    if (!vk || vk->device == VK_NULL_HANDLE) return;
-    for (uint32_t i = 0; i < BONGO_CAT_VK_FRAMES_IN_FLIGHT; ++i) {
-        BongoCatVkFrame *frame = &vk->frames[i];
-        if (frame->image_available != VK_NULL_HANDLE)
-            vkDestroySemaphore(vk->device, frame->image_available, NULL);
-        if (frame->fence != VK_NULL_HANDLE)
-            vkDestroyFence(vk->device, frame->fence, NULL);
-        frame->image_available = VK_NULL_HANDLE;
-        frame->fence = VK_NULL_HANDLE;
-        frame->command = VK_NULL_HANDLE;
-    }
-}
 
 bool bongo_cat_vk_frame_active(const BongoCatVk *vk) {
     return vk && vk->frame_active;
@@ -151,8 +69,17 @@ bool bongo_cat_vk_begin_frame(BongoCatVk *vk, int width, int height) {
         if (!bongo_cat_vk_recreate_swapchain(vk, width, height)) return false;
     }
     BongoCatVkFrame *frame = &vk->frames[vk->frame_index];
-    if (vkWaitForFences(vk->device, 1, &frame->fence, VK_TRUE, UINT64_MAX) != VK_SUCCESS)
-        return false;
+    {
+        /* 栅栏等待失败以前是静默 return false: 表现就是"一帧都不出, 日志里没线索"。 */
+        VkResult waited = vkWaitForFences(vk->device, 1, &frame->fence, VK_TRUE,
+            UINT64_MAX);
+        if (waited != VK_SUCCESS) {
+            SDL_LogError(SDL_LOG_CATEGORY_VIDEO,
+                "[vulkan] 等待帧栅栏失败 (VkResult=%d) frame_index=%u device=%p",
+                (int)waited, vk->frame_index, (void *)vk->device);
+            return false;
+        }
+    }
     /* 栅栏已过: 上一轮用这个帧槽录制的回读数据现在是安全的 */
     bongo_cat_vk_collect_readback(vk);
     bongo_cat_vk_collect_retired(vk);
@@ -163,17 +90,47 @@ bool bongo_cat_vk_begin_frame(BongoCatVk *vk, int width, int height) {
         /*
          * 尺寸/表面变了。此时 image_available 的状态是未定义的, 不能拿它继续提交,
          * 所以重建交换链 (重建时会一并重建各帧的信号量) 并放弃这一帧。
+         *
+         * 这条以前是完全静默的: 交换链过期时用户只会看到"画面不动", 日志里一个字
+         * 都没有。现在按"连续第几次"升级为 WARN, 单次只记 INFO —— 拖窗口边缘时会
+         * 连续发生很多次, 每次一条 WARN 会把日志冲掉。
          */
+        vk->acquire_failures_total++;
+        vk->consecutive_acquire_failures++;
+        if (vk->consecutive_acquire_failures == 1 ||
+            vk->consecutive_acquire_failures % 30u == 0)
+            SDL_LogWarn(SDL_LOG_CATEGORY_VIDEO,
+                "[vulkan] 获取交换链图像失败 (VkResult=%d VK_ERROR_OUT_OF_DATE_KHR), "
+                "连续=%u 累计=%llu: 重建交换链并放弃这一帧",
+                (int)acquired, vk->consecutive_acquire_failures,
+                (unsigned long long)vk->acquire_failures_total);
+        else
+            SDL_LogInfo(BONGO_CAT_LOG_LIFECYCLE,
+                "[vulkan] 交换链过期 (VkResult=%d), 重建后重试 (连续=%u)",
+                (int)acquired, vk->consecutive_acquire_failures);
         bongo_cat_vk_recreate_swapchain(vk, width, height);
         return false;
     }
     if (acquired != VK_SUCCESS && acquired != VK_SUBOPTIMAL_KHR) {
+        vk->acquire_failures_total++;
+        vk->consecutive_acquire_failures++;
         SDL_LogError(SDL_LOG_CATEGORY_VIDEO,
-            "[vulkan] 获取交换链图像失败 (VkResult=%d)", (int)acquired);
+            "[vulkan] 获取交换链图像失败 (VkResult=%d), 连续=%u 累计=%llu "
+            "swapchain=%p device=%p",
+            (int)acquired, vk->consecutive_acquire_failures,
+            (unsigned long long)vk->acquire_failures_total,
+            (void *)vk->swapchain, (void *)vk->device);
         return false;
     }
+    if (acquired == VK_SUBOPTIMAL_KHR)
+        SDL_LogInfo(BONGO_CAT_LOG_LIFECYCLE,
+            "[vulkan] 交换链已次优 (VK_SUBOPTIMAL_KHR), 本帧照常呈现");
+    vk->consecutive_acquire_failures = 0;
     if (index >= vk->image_count) {
         /* 刚拿到的下标不属于当前交换链: 同样重建后跳过这一帧 */
+        SDL_LogWarn(SDL_LOG_CATEGORY_VIDEO,
+            "[vulkan] 获取到的图像下标越界 (index=%u images=%u), 重建交换链",
+            index, vk->image_count);
         bongo_cat_vk_recreate_swapchain(vk, width, height);
         return false;
     }
@@ -238,9 +195,16 @@ bool bongo_cat_vk_end_frame(BongoCatVk *vk) {
     submit.pSignalSemaphores = &present_semaphore;
     vk->frame_active = false;
     const uint64_t submit_start_ns = SDL_GetTicksNS();
-    if (vkQueueSubmit(vk->queue, 1, &submit, frame->fence) != VK_SUCCESS) {
-        SDL_LogError(SDL_LOG_CATEGORY_VIDEO, "[vulkan] 命令提交失败");
-        return false;
+    {
+        VkResult submitted = vkQueueSubmit(vk->queue, 1, &submit, frame->fence);
+        if (submitted != VK_SUCCESS) {
+            SDL_LogError(SDL_LOG_CATEGORY_VIDEO,
+                "[vulkan] 命令提交失败 (VkResult=%d) queue=%p image_index=%u "
+                "extent=%ux%u",
+                (int)submitted, (void *)vk->queue, vk->image_index,
+                (unsigned)vk->extent.width, (unsigned)vk->extent.height);
+            return false;
+        }
     }
     const uint64_t submit_end_ns = SDL_GetTicksNS();
     VkPresentInfoKHR present = {0};
@@ -262,14 +226,69 @@ bool bongo_cat_vk_end_frame(BongoCatVk *vk) {
     vk->frame_index = (vk->frame_index + 1) % BONGO_CAT_VK_FRAMES_IN_FLIGHT;
     vk->frame_counter++;
     if (result == VK_ERROR_OUT_OF_DATE_KHR || result == VK_SUBOPTIMAL_KHR) {
+        /*
+         * SUBOPTIMAL 仍然是一帧端出去了, 只是驱动建议重建; OUT_OF_DATE 则是真的
+         * 没端出去。两者必须分开计数, 否则"presented=0" 会把次优但当帧成功的情况
+         * 也一并算成失败, 掩盖真正的问题。
+         */
+        if (result == VK_SUBOPTIMAL_KHR) {
+            vk->presented_total++;
+            vk->consecutive_present_failures = 0;
+            if (!vk->present_success_logged) {
+                vk->present_success_logged = true;
+                SDL_LogInfo(BONGO_CAT_LOG_LIFECYCLE,
+                    "[vulkan] 首次呈现成功 (VkResult=VK_SUBOPTIMAL_KHR) "
+                    "swapchain=%ux%u present_mode=%d window=%p",
+                    (unsigned)vk->extent.width, (unsigned)vk->extent.height,
+                    (int)vk->present_mode, (void *)vk->window);
+            }
+        } else {
+            vk->present_failures_total++;
+            vk->consecutive_present_failures++;
+            SDL_LogWarn(SDL_LOG_CATEGORY_VIDEO,
+                "[vulkan] 呈现被驱动判为过期 (VkResult=%d VK_ERROR_OUT_OF_DATE_KHR), "
+                "连续=%u 累计=%llu: 下一帧 begin 时重建交换链",
+                (int)result, vk->consecutive_present_failures,
+                (unsigned long long)vk->present_failures_total);
+        }
         /* 尺寸变化或驱动要求重建: 下一帧 begin 时会按当前窗口尺寸重建。 */
         vk->extent_valid = false;
         return result == VK_SUBOPTIMAL_KHR;
     }
     if (result != VK_SUCCESS) {
+        /*
+         * 呈现失败以前只记一行 Error 就返回 false, 上层看到的只是"这一帧没成";
+         * 连续失败才是"窗口永远不会更新"的真正形态, 所以这里把连续次数与关键句柄
+         * 一起打出来, 并每 30 次升级一次提示 (逐帧打会把日志冲垮)。
+         */
+        vk->present_failures_total++;
+        vk->consecutive_present_failures++;
         SDL_LogError(SDL_LOG_CATEGORY_VIDEO,
-            "[vulkan] 呈现失败 (VkResult=%d)", (int)result);
+            "[vulkan] 呈现失败 (VkResult=%d) 连续=%u 累计=%llu swapchain=%p "
+            "device=%p queue=%p image_index=%u extent=%ux%u present_mode=%d",
+            (int)result, vk->consecutive_present_failures,
+            (unsigned long long)vk->present_failures_total, (void *)vk->swapchain,
+            (void *)vk->device, (void *)vk->queue, vk->image_index,
+            (unsigned)vk->extent.width, (unsigned)vk->extent.height,
+            (int)vk->present_mode);
+        if (vk->consecutive_present_failures % 30u == 0)
+            SDL_LogError(SDL_LOG_CATEGORY_VIDEO,
+                "[vulkan] 已连续 %u 次呈现失败, 画面不会再更新 (累计 %llu 次): "
+                "上层应回退 OpenGL",
+                vk->consecutive_present_failures,
+                (unsigned long long)vk->present_failures_total);
         return false;
+    }
+    vk->presented_total++;
+    vk->consecutive_present_failures = 0;
+    if (!vk->present_success_logged) {
+        vk->present_success_logged = true;
+        SDL_LogInfo(BONGO_CAT_LOG_LIFECYCLE,
+            "[vulkan] 首次呈现成功 swapchain=%ux%u images=%u present_mode=%d "
+            "composite_alpha=0x%x window=%p",
+            (unsigned)vk->extent.width, (unsigned)vk->extent.height,
+            vk->image_count, (int)vk->present_mode,
+            (unsigned)vk->composite_alpha, (void *)vk->window);
     }
     return true;
 }

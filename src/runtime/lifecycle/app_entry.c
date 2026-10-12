@@ -4,12 +4,19 @@
  *   - 单实例锁只有主进程参与 (副宠允许并存), 而且每一条 return 路径都必须 begin/end
  *     配对 —— 漏掉一次 end, 用户下次启动就会被误判成"已有实例"。
  *   - update-shutdown 参数是更新器要求"退出去装包"的信号, 直接返回 0, 不建窗口。
+ *   - --help 必须排在单实例锁之前: 用户往往是在"已经有一个实例在跑"或"配置坏掉"
+ *     的情况下才来查用法, 这两种情况都不该把帮助挡掉。
  */
 #include "runtime.h"
 
+#include <stdio.h>
 #include <stdlib.h>
 
 int bongo_cat_app_run(int argc, char **argv) {
+    if (bongo_cat_cli_wants_help(argc, argv)) {
+        bongo_cat_cli_print_usage(stdout);
+        return 0;
+    }
     if (bongo_cat_platform_update_shutdown_argument(argc, argv)) return 0;
     bool secondary = bongo_cat_multi_pet_secondary_argument(argc, argv);
     if (!secondary && !bongo_cat_platform_single_instance_begin()) return 0;

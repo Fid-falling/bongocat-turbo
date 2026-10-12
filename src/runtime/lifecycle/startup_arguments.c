@@ -1,13 +1,17 @@
 /*
- * 命令行解析, 分两类:
+ * 命令行解析, 分三类:
  *   - 用户/系统参数: --autostart, --storage-root=, --cache-root=, --nearby-root=,
  *     --secondary-pet= / --secondary-position= (多宠子进程由主进程拉起);
+ *   - 逃生参数: --renderer=auto|vulkan|opengl (简写 --vulkan / --opengl) 与 --help。
+ *     后端的覆盖值优先级高于 settings.json, 因为"设置窗口画不出来"恰恰会发生在
+ *     用户最需要切后端的时候 —— 那时 GUI 已经不是可用的入口了;
  *   - --ci-* 冒烟参数: 只影响这一次运行, 用来无人值守地驱动设置窗口、导入模型、跑
  *     自测; 它们不写回配置 (config_store 在 smoke 下不落盘)。
  * 不认识的参数静默忽略 —— Windows 会往命令行里塞一些系统注入的参数。
  */
 #include "runtime.h"
 #include "bongo_cat/i18n.h"
+#include "bongo_cat/render.h"
 
 #include <SDL3/SDL.h>
 #include <limits.h>
@@ -25,6 +29,58 @@ static bool store_argument(char *target, size_t capacity, const char *value,
     if (length >= 0 && (size_t)length < capacity) return true;
     bongo_cat_error_set(error, BONGO_CAT_ERROR_ARGUMENT,
         "%s path is too long", name);
+    return false;
+}
+
+/*
+ * 用法输出 (--help / -h)。写在这里而不是 app_entry.c: 参数的唯一真相就是本文件,
+ * 拆成两个地方迟早会对不上。
+ *
+ * 刻意用英文: 这段文字在 SDL/日志初始化之前就要打出来, 那时 i18n 表还没加载;
+ * 混排中英反而更难读。需要中文说明时看 docs/ 或 README。
+ */
+void bongo_cat_cli_print_usage(FILE *out) {
+    if (!out) out = stdout;
+    fprintf(out,
+        BONGO_CAT_NAME " " BONGO_CAT_VERSION "\n"
+        "\n"
+        "Usage: BongoCat [options]\n"
+        "\n"
+        "Renderer (highest priority: overrides settings.json, this run only):\n"
+        "  --renderer=auto|vulkan|opengl  Force the render backend.\n"
+        "  --vulkan                       Shorthand for --renderer=vulkan.\n"
+        "  --opengl                       Shorthand for --renderer=opengl (escape hatch\n"
+        "                                 when the Vulkan UI does not draw correctly).\n"
+        "\n"
+        "Paths:\n"
+        "  --storage-root=DIR   Root for settings/session/models/logs.\n"
+        "  --cache-root=DIR     Cache root override.\n"
+        "  --nearby-root=DIR    Extra directory to scan for models.\n"
+        "\n"
+        "Other:\n"
+        "  --autostart                  Mark this launch as an autostart launch.\n"
+        "  --secondary-pet=MODEL_ID     Run as an additional pet process.\n"
+        "  --secondary-position=X,Y     Initial position for the additional pet.\n"
+        "  --help, -h                   Show this help and exit.\n"
+        "\n"
+        "Environment:\n"
+        "  BONGO_CAT_VULKAN_VALIDATION=1 Enable the Vulkan validation layer\n"
+        "                               (needs the SDK layer installed; messages are\n"
+        "                               written to the application log).\n"
+        "  BONGO_CAT_PREFERENCES_OPENGL=1 Draw the settings window with OpenGL even when\n"
+        "                               the Vulkan backend is active.\n"
+        "  BONGO_CAT_PREFS_VSYNC=1      Use FIFO present mode for the settings window.\n");
+}
+
+/* 只扫参数、不建 app: --help 必须在单实例锁和存储路径之前就能回答, 否则用户在
+   配置坏掉/实例已运行时连用法都看不到。 */
+bool bongo_cat_cli_wants_help(int argc, char **argv) {
+    if (!argv) return false;
+    for (int i = 1; i < argc; ++i) {
+        if (!argv[i]) continue;
+        if (strcmp(argv[i], "--help") == 0 || strcmp(argv[i], "-h") == 0 ||
+            strcmp(argv[i], "/?") == 0) return true;
+    }
     return false;
 }
 
@@ -62,7 +118,26 @@ bool bongo_cat_startup_arguments(BongoCatApp *app, int argc, char **argv,
     if (!prepare_nearby_root(app, error)) return false;
     for (int i = 1; i < argc; ++i) {
         const char *arg = argv[i];
+        /* --ci-* 一律算无人值守运行: 模态弹窗在那种运行里会把进程挂死, 见 app.h。 */
+        if (strncmp(arg, "--ci-", 5) == 0) app->automated = true;
         if (strcmp(arg, "--autostart") == 0) app->autostart_launch = true;
+        /*
+         * 后端覆盖。三条写法同一个目标, 解析成功就置 app->renderer_override
+         * (int, -1 = 未覆盖)。识别不了的 --renderer= 值只 WARN 不失败: 启动失败
+         * 会把用户彻底挡在门外, 而"参数没生效"至少还能进主界面再改设置。
+         */
+        else if (strcmp(arg, "--opengl") == 0 || strcmp(arg, "--gl") == 0)
+            app->renderer_override = (int)BONGO_CAT_RENDERER_OPENGL;
+        else if (strcmp(arg, "--vulkan") == 0 || strcmp(arg, "--vk") == 0)
+            app->renderer_override = (int)BONGO_CAT_RENDERER_VULKAN;
+        else if (strncmp(arg, "--renderer=", 11) == 0) {
+            BongoCatRenderer parsed;
+            if (bongo_cat_renderer_parse(arg + 11, &parsed))
+                app->renderer_override = (int)parsed;
+            else
+                fprintf(stderr, "BongoCat: ignoring unknown --renderer=%s "
+                    "(expected auto, vulkan or opengl)\n", arg + 11);
+        }
         else if (strcmp(arg, "--ci-smoke") == 0) app->smoke = true;
         else if (strcmp(arg, "--ci-preferences") == 0) app->smoke_preferences = true;
         else if (strcmp(arg, "--ci-preference-shortcut") == 0)

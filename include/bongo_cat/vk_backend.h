@@ -66,6 +66,19 @@ void bongo_cat_vk_destroy(BongoCatVk *vk);
 
 bool bongo_cat_vk_info(const BongoCatVk *vk, BongoCatVkInfo *info);
 
+/*
+ * 连续呈现失败的次数 (成功一次即清零) 与累计失败次数。
+ *
+ * 上层用它做防御性回退: Vulkan 的初始化成功并不代表这一帧真的能端出去 —— 交换链
+ * 建好了却每次 vkQueuePresentKHR 都失败时, 窗口会一直停在空白画布上。设置窗口与
+ * 轮盘据此在连续 N 次失败后改用 OpenGL 重建自己, 避免把用户困在一个画不出来的
+ * 界面里 (见 preferences_gl.c / dial_window.c)。
+ */
+uint32_t bongo_cat_vk_consecutive_present_failures(const BongoCatVk *vk);
+uint64_t bongo_cat_vk_present_failures(const BongoCatVk *vk);
+/* 已经成功提交并呈现出去的帧数 (用于判断"画了却从没提交") */
+uint64_t bongo_cat_vk_presented_frames(const BongoCatVk *vk);
+
 /* 交换链尺寸变化, 由 WINDOW_RESIZED/PIXEL_SIZE_CHANGED 之后调用 */
 bool bongo_cat_vk_resize(BongoCatVk *vk, int width, int height);
 

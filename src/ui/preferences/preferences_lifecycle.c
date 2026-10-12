@@ -16,8 +16,10 @@
 #include "preferences_controls.h"
 #include "preferences_gl.h"
 #include "preferences_model_cover.h"
+#include "preferences_notice.h"
 #include "preferences_state.h"
 #include "ui_animation.h"
+#include "bongo_cat/i18n.h"
 #include "bongo_cat/memory.h"
 #include "bongo_cat/platform.h"
 #include "bongo_cat/preferences.h"
@@ -82,15 +84,76 @@ static void release_window(BongoCatPreferences *value) {
     value->raster_retry_ns = 0;
     value->render_retry_ns = 0;
     value->shown_ns = 0;
+    value->vk_consecutive_failures = 0;
     /*
      * 只有 GL 窗口才碰 GL: 主窗口是 Vulkan 时 app->gl_context 为 NULL, 这里的
      * SDL_GL_SetSwapInterval 会进 nvoglv64.dll 崩掉 (与 preferences_scale.c 里
      * 那处同一类问题)。
+     *
+     * app->gl_context 这条判据是后加的: 上面的 !prefer_vulkan 只说明"设置窗口这次
+     * 用的是 GL 通路", 而主窗口完全可能仍是 Vulkan (Vulkan 设置窗口失败后回退到
+     * GL 就是这个组合)。那时 app->gl_context 是 NULL, 调 SDL_GL_SetSwapInterval
+     * 等于让驱动去操作一个不存在的上下文。
      */
-    if (!value->prefer_vulkan) {
+    if (!value->prefer_vulkan && value->app->gl_context) {
         SDL_GL_MakeCurrent(value->app->window, value->app->gl_context);
         SDL_GL_SetSwapInterval(1);
     }
+}
+
+/*
+ * 防御性回退: 设置窗口的 Vulkan 通路初始化失败或连续提交不出去时, 把这个窗口整个
+ * 换成 OpenGL 再打开。
+ *
+ * 为什么值得这么做: 用户打开设置窗口是为了改设置, 而"渲染后端"这一项就在里面 ——
+ * 一个画不出来的设置窗口等于把用户锁死在坏后端上 (这正是用户反馈里的现场)。
+ *
+ * 三个不变量:
+ *   1. 只能在帧外调用 (render 的开头)。它会销毁窗口/UI 后端/全部纹理, 绘制中途调用
+ *      会留下一堆悬空 id;
+ *   2. vk_disabled 必须粘住, 否则下一次开窗又会按渲染后端切回 Vulkan, 用户看到的是
+ *      "界面时好时坏";
+ *   3. 回退只能整窗重建 —— SDL_WINDOW_VULKAN 的窗口不允许再建 GL 上下文。
+ */
+void bongo_cat_preferences_vulkan_fallback(BongoCatPreferences *value) {
+    if (!value) return;
+    value->vk_fallback_requested = false;
+    const unsigned consecutive = value->vk_consecutive_failures;
+    const uint64_t total = value->vk_failures;
+    if (!value->prefer_vulkan) return;
+    SDL_LogWarn(SDL_LOG_CATEGORY_VIDEO,
+        "[render] 设置窗口的 Vulkan 通路不可用 (连续失败 %u 次, 累计 %llu 次): "
+        "改用 OpenGL 重建这个窗口 (主窗口的后端不受影响)",
+        consecutive, (unsigned long long)total);
+    value->vk_disabled = true;
+    /* 顺序要紧: 先改标志再 release_window, 让它内部的 GL 复原分支不去碰 Vulkan 主窗口 */
+    value->prefer_vulkan = false;
+    bool was_shown = value->visible;
+    value->visible = false;
+    release_window(value);
+    if (value->app)
+        bongo_cat_preferences_notice_show(value->app,
+            bongo_cat_i18n_get(value->app->i18n,
+                "composables.useAppMenu.labels.rendererRestart",
+                "Restart BongoCat to apply the new render backend."), true);
+    if (!bongo_cat_preferences_open_window(value)) {
+        SDL_LogError(SDL_LOG_CATEGORY_APPLICATION,
+            "Preferences OpenGL fallback window could not be created: %s",
+            SDL_GetError());
+        return;
+    }
+    /* 用户本来就是开着它的: 回退后要立刻重新显示, 不能变成"设置窗口自己消失了"。 */
+    if (was_shown) {
+        value->visible = true;
+        value->shown_ns = SDL_GetTicksNS();
+        SDL_StartTextInput(value->window);
+        bongo_cat_preferences_live_resize_install(value);
+        value->render_dirty = true;
+        bongo_cat_preferences_render(value);
+        bongo_cat_platform_raise_window(value->window);
+    }
+    SDL_Log("[render] 设置窗口已回退到 OpenGL 并重建 (连续失败 %u 次, 累计 %llu 次)",
+        consecutive, (unsigned long long)total);
 }
 
 /*

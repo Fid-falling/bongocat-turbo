@@ -1,3 +1,8 @@
+/*
+ * 菜单窗口的建立与释放 (本文件) 与模态循环 (dial_loop.c) 分开, 一半是为了守住单文件
+ * 500 行 (cmake/CheckLines.cmake), 一半是因为两者的失败语义完全不同: 这里失败 =
+ * "这个窗口用不了" (可以换成 GL 重建), 循环里失败 = "这一帧没端出去" (可以先重试)。
+ */
 #include "dial_internal.h"
 #include "bongo_cat/render.h"
 #include "bongo_cat/vk_backend.h"
@@ -11,7 +16,7 @@
 #include "windows_layered.h"
 #endif
 
-static bool SDLCALL collect_event(void *userdata, SDL_Event *event) {
+bool SDLCALL dial_collect_event(void *userdata, SDL_Event *event) {
     Dial *d = userdata;
     if (event->type == SDL_EVENT_QUIT || event->type == SDL_EVENT_TERMINATING) {
         d->done = true; return true; /* Let the main application handle shutdown. */
@@ -42,7 +47,7 @@ static bool SDLCALL collect_event(void *userdata, SDL_Event *event) {
     if (owner_keys)
         SDL_LogInfo(BONGO_CAT_LOG_LIFECYCLE,
             "[probe] 轮盘收到宿主窗口的按键: key=0x%x down=%d (代理模式下键盘焦点在宠物"
-            "窗口, 见 collect_event 的说明)",
+            "窗口, 见 dial_collect_event 的说明)",
             (unsigned)event->key.key, event->key.down);
     d->events[d->event_count++] = *event;
     return false;
@@ -58,30 +63,9 @@ void dial_preview(Dial *d, BongoCatMenuAction action) {
     d->labels->preview(d->labels->preview_userdata,action);
     if (!d->vk && !SDL_GL_MakeCurrent(d->window,d->context)) d->done = true;
 }
-
-static void animate(Dial *d, uint64_t now) {
-    float elapsed = fminf(.1f,(float)(now-d->animation_at)/1000);
-    d->animation_at = now;
-    float t = fminf(1,(float)(now-d->opened_at)/700);
-    float opening = .85f+.15f*(1-powf(1-t,4));
-    if (opening != d->opening) { d->opening = opening; d->dirty = true; }
-    float response = 1-expf(-17*elapsed);
-    for (int i = 0; i < d->count; ++i) {
-        if (d->child_focus && i != d->active) { d->lift[i] = 0; continue; }
-        float target = d->active == i ? 1.0f : 0.0f;
-        float next = d->lift[i]+(target-d->lift[i])*response;
-        if (fabsf(next-target) < .002f) next = target;
-        if (next != d->lift[i]) { d->lift[i] = next; d->dirty = true; }
-    }
-    if (dial_child_count(d) && now-d->changed_at <=
-        (uint64_t)(DIAL_REVEAL_DURATION_MS +
-            (dial_child_count(d)-1)*DIAL_REVEAL_DELAY_MS + 16))
-        d->dirty = true;
-    if (now-d->opened_at <= (uint64_t)(DIAL_REVEAL_DURATION_MS +
-        (d->count-1)*DIAL_REVEAL_DELAY_MS + 16)) d->dirty = true;
-}
-
-static bool create(Dial *d) {
+/* 建菜单窗口。返回 false 表示"这个窗口用不了": 调用方 (dial_loop.c) 在 Vulkan 模式下
+   会换 OpenGL 整窗重建, 所以这里失败前必须把自己建了一半的东西留成可释放的状态。 */
+bool dial_window_create(Dial *d) {
     float layout = 1;
     bongo_cat_ui_query_window_scale(d->owner,&layout,NULL);
     SDL_Rect bounds;
@@ -99,9 +83,13 @@ static bool create(Dial *d) {
     /*
      * 菜单窗口的 Vulkan 通路: 纹理表、绘制、封面、字体图集与窗口生命周期都已
      * 落地, 所以在 renderer=vulkan 时启用。施工图: docs/vulkan-dial-port-recipe.md
+     *
+     * force_opengl 是回退开关: 上一次用 Vulkan 开这个菜单失败了 (建窗/首帧/连续提交
+     * 失败), 这一次直接用 GL —— 窗口的图形 API 标志在创建时就定死了, 所以"换后端"
+     * 只能换窗口, 不能换上下文。
      */
     const bool dial_vulkan_enabled = true;
-    const bool dial_vulkan = dial_vulkan_enabled &&
+    const bool dial_vulkan = dial_vulkan_enabled && !d->force_opengl &&
         bongo_cat_renderer_active() == BONGO_CAT_RENDERER_VULKAN;
     SDL_WindowFlags flags = (dial_vulkan ? SDL_WINDOW_VULKAN : SDL_WINDOW_OPENGL) |
         SDL_WINDOW_TRANSPARENT | SDL_WINDOW_HIGH_PIXEL_DENSITY | SDL_WINDOW_HIDDEN;
@@ -141,9 +129,16 @@ static bool create(Dial *d) {
          */
         BongoCatError error = {0};
         BongoCatVk *owner = bongo_cat_vk_current();
+        d->vk_attempted = true;
         d->vk = owner ? bongo_cat_vk_create_shared(d->window, owner, &error)
                       : bongo_cat_vk_create(d->window, &error);
-        if (!d->vk) return false;
+        if (!d->vk) {
+            /* 失败原因塞进 SDL 错误串: 上层那条 "Radial menu initialization failed: %s"
+               否则会打出一个空的冒号 (SDL_GetError 在纯 Vulkan 失败路径上是空的)。 */
+            SDL_SetError("Radial menu Vulkan context: %s",
+                error.message[0] ? error.message : "unknown Vulkan error");
+            return false;
+        }
         /* 菜单是模态的: 呈现不等垂直回扫, 展开/收起的动画更顺 (同设置窗口) */
         bongo_cat_vk_set_vsync(d->vk, false);
     } else {
@@ -201,96 +196,4 @@ static bool create(Dial *d) {
         "Radial menu opened: driver=%s window=%u size=%dx%d popup=%d",
         driver ? driver : "unknown",(unsigned)d->window_id,d->width,d->height,d->popup);
     return true;
-}
-
-BongoCatMenuAction bongo_cat_platform_context_menu(BongoCatPlatform *platform,
-    const BongoCatMenuLabels *labels) {
-    if (!platform || !platform->window || !labels) return BONGO_CAT_MENU_NONE;
-    SDL_LogInfo(BONGO_CAT_LOG_LIFECYCLE,"Radial menu requested: owner=%u",
-        (unsigned)SDL_GetWindowID(platform->window));
-    Dial *d = calloc(1,sizeof(*d));
-    if (!d) return BONGO_CAT_MENU_NONE;
-    d->owner = platform->window; d->labels = labels; d->dark = labels->dark_theme;
-    /* 设置项的快照: 菜单是模态的, 打开期间设置不会变, 所以取一次就够(见 dial_internal.h)。 */
-    d->gl_transparency = platform->gl_transparency;
-    d->previous_window = SDL_GL_GetCurrentWindow();
-    d->previous_context = SDL_GL_GetCurrentContext();
-    d->active = d->child = d->pressed = -1;
-    dial_items(d);
-    bool ready = create(d);
-    if (!ready) SDL_LogError(SDL_LOG_CATEGORY_APPLICATION,"Radial menu initialization failed: %s",SDL_GetError());
-    while (ready && !d->done) {
-        uint64_t start = SDL_GetTicks();
-        ++d->frames;
-        SDL_PumpEvents();
-        if (!SDL_GetWindowFromID(d->window_id)) { d->done = true; break; }
-        d->event_count = 0;
-        SDL_FilterEvents(collect_event,d);
-        for (int i = 0; i < d->event_count && !d->done; ++i) {
-            dial_event(d,&d->events[i]);
-            if (d->done) SDL_LogInfo(BONGO_CAT_LOG_LIFECYCLE,
-                "Radial menu dismissed: event=0x%x action=%d elapsed_ms=%llu",
-                (unsigned)d->events[i].type,(int)d->result,
-                (unsigned long long)(SDL_GetTicks()-d->opened_at));
-        }
-        if (d->done) break;
-        if (labels->preview_tick) {
-            if (!d->vk && d->previous_window && d->previous_context)
-                SDL_GL_MakeCurrent(d->previous_window,d->previous_context);
-            labels->preview_tick(labels->preview_userdata);
-        }
-        if (!d->vk && !SDL_GL_MakeCurrent(d->window,d->context)) {
-            SDL_LogError(SDL_LOG_CATEGORY_VIDEO,"Radial menu context activation failed: %s",SDL_GetError());
-            break;
-        }
-        dial_covers_tick(d);
-        animate(d,SDL_GetTicks());
-        if (d->dirty) {
-            d->dirty = false;
-            if (!dial_paint_frame(d)) {
-                SDL_LogError(SDL_LOG_CATEGORY_VIDEO,"Radial menu rendering failed: %s",SDL_GetError());
-                break;
-            }
-        }
-        uint64_t elapsed = SDL_GetTicks()-start;
-        if (elapsed < 16) SDL_Delay((Uint32)(16-elapsed));
-    }
-    /*
-     * 帧率诊断。frames 是模态循环的迭代率, presents 才是真正回读整窗并提交给 DWM 的次数
-     * —— 代理分层呈现下这两个数会明显分离(静止的菜单 presents 不再增长), 这正是帧率问题
-     * 的第一手证据, 出问题时先看这一行。
-     */
-    if (ready) {
-        uint64_t total = SDL_GetTicks()-d->opened_at;
-        SDL_LogInfo(BONGO_CAT_LOG_LIFECYCLE,
-            "Radial menu loop: frames=%d presents=%d elapsed_ms=%llu fps=%.1f",
-            d->frames,d->presents,(unsigned long long)total,
-            total ? 1000.0*(double)d->frames/(double)total : 0.0);
-    }
-    if (d->vk || !d->context || (SDL_GetWindowFromID(d->window_id) &&
-        SDL_GL_MakeCurrent(d->window,d->context))) dial_paint_free(d);
-    else {
-        /* A destroyed window cannot safely own GL deletion calls. Its context
-           releases GPU allocations; release only CPU allocations here. */
-        if (d->paint.atlas.permanent.alloc) nk_font_atlas_clear(&d->paint.atlas);
-        for (int i = 0; i < 4; ++i) free(d->paint.ranges[i]);
-        free(d->paint.vertices);
-    }
-    /* 交换链/表面必须在窗口销毁之前释放。 */
-    if (d->vk) bongo_cat_vk_destroy(d->vk);
-#ifdef _WIN32
-    /* 同理, 呈现器也要在窗口销毁之前拆: 代理窗口是菜单窗口的 owned window, 会跟着
-       owner 一起消失, 之后就没人能恢复真实窗口的样式与属性了。 */
-    if (d->layered) bongo_cat_windows_layered_destroy(d->layered);
-#endif
-    if (d->context) SDL_GL_DestroyContext(d->context);
-    if (d->window_id && SDL_GetWindowFromID(d->window_id)) SDL_DestroyWindow(d->window);
-    if (d->previous_window && d->previous_context)
-        SDL_GL_MakeCurrent(d->previous_window,d->previous_context);
-    if (labels->restore) labels->restore(labels->preview_userdata,d->result);
-    BongoCatMenuAction result = d->result;
-    free(d);
-    /* Trim only after GL/CPU teardown and preview restoration have finished. */
-    bongo_cat_platform_trim_memory();
-    return result;
 }

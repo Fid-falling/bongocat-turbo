@@ -209,6 +209,20 @@ struct BongoCatVk {
     BongoCatVkRetired retired[BONGO_CAT_VK_RETIRE_CAP];
     uint32_t retired_count;
     uint64_t frame_counter;
+    /*
+     * 呈现/获取诊断计数。"画了很多帧但一次都没端出去"是这类故障最难查的形态:
+     * 以前 vkAcquireNextImageKHR 的 OUT_OF_DATE 与 vkQueuePresentKHR 的失败都只是
+     * 悄悄重试, 日志里只剩一个 presents=0。这两个计数器把"连续失败"变成一条明确的
+     * 日志 (见 vk_frame.c), 并让上层 (设置窗口/轮盘) 能据此回退 OpenGL。
+     */
+    uint32_t consecutive_present_failures;
+    uint32_t consecutive_acquire_failures;
+    uint64_t present_failures_total;
+    uint64_t acquire_failures_total;
+    /* 真正被 vkQueuePresentKHR 接受并端出去的帧数 ("画了却没提交"要靠它证伪) */
+    uint64_t presented_total;
+    /* 第一次成功呈现打一条日志, 之后降噪 (帧日志在逐帧路径上, 每帧打会淹掉别的) */
+    bool present_success_logged;
 
     BongoCatVkInfo info;
 };

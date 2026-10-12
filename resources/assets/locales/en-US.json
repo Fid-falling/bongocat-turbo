@@ -210,7 +210,11 @@
         "wheelOpacityHint": "Ctrl+Wheel: opacity",
         "quitApp": "Quit App",
         "model": "Model",
-        "addModel": "Add Model"
+        "addModel": "Add Model",
+        "renderer": "Render Backend",
+        "rendererRestart": "Restart BongoCat to apply the new render backend.",
+        "rendererUnavailable": "Vulkan is not available on this machine.",
+        "rendererOverrideNotice": "Note: this session was started with a --renderer argument, which always wins over the saved setting. Start BongoCat without it to use the new value."
       }
     }
   },

@@ -126,6 +126,12 @@ bool dial_paint_frame(Dial *d) {
         }
         if (!bongo_cat_vk_end_frame(d->vk))
             return SDL_SetError("Radial menu Vulkan present failed");
+        /*
+         * Vulkan 这条分支以前直接 return, 漏掉了 ++presents —— 于是日志里出现
+         * "frames=48 presents=0", 看起来像"画了 48 帧、一次都没提交", 实际只是计数
+         * 没走这条分支。这张日志是排查帧率问题的第一手证据, 不能让它说谎。
+         */
+        ++d->presents;
         return true;
     }
 

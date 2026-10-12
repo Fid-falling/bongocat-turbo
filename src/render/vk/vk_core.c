@@ -126,9 +126,19 @@ bool bongo_cat_vk_create_instance(BongoCatVk *vk, BongoCatError *error) {
         for (uint32_t i = 0; i < sdl_count && extension_count < 6; ++i)
             extensions[extension_count++] = sdl_extensions[i];
     }
-    vk->validation = validation_requested() && layer_available(k_validation_layer);
+    /*
+     * 校验层: BONGO_CAT_VULKAN_VALIDATION=1 才会请求它, 而且必须真的装了那一层才启得
+     * 起来 (装 Vulkan SDK 后它的 Bin 目录要在 PATH 上)。启不起来时必须留一条日志 ——
+     * 用户照着 --help 打开开关却什么都没变, 是最难查的一类"诊断设施自己没生效"。
+     */
+    const bool want_validation = validation_requested();
+    vk->validation = want_validation && layer_available(k_validation_layer);
+    if (want_validation && !vk->validation)
+        SDL_LogWarn(SDL_LOG_CATEGORY_VIDEO,
+            "[vulkan] BONGO_CAT_VULKAN_VALIDATION 已设置, 但实例上没有 %s: "
+            "本次不启用校验层 (装 Vulkan SDK 并让它在 PATH 上之后重试)",
+            k_validation_layer);
     if (vk->validation) extensions[extension_count++] = VK_EXT_DEBUG_UTILS_EXTENSION_NAME;
-    if (vk->validation && !layer_available(k_validation_layer)) vk->validation = false;
 
     VkApplicationInfo application = {0};
     application.sType = VK_STRUCTURE_TYPE_APPLICATION_INFO;
@@ -291,140 +301,7 @@ void bongo_cat_vk_destroy_device(BongoCatVk *vk) {
     }
 }
 
-bool bongo_cat_vk_compiled(void) { return true; }
-
-static BongoCatVk *current_context;
-
-BongoCatVk *bongo_cat_vk_current(void) { return current_context; }
-
-bool bongo_cat_vk_probe(BongoCatError *error) {
-    static int cached = -1;
-    if (cached >= 0) return cached == 1;
-    BongoCatVk probe = {0};
-    BongoCatError local = {0};
-    BongoCatError *failure = error ? error : &local;
-    bool usable = bongo_cat_vk_create_instance(&probe, failure) &&
-        bongo_cat_vk_create_device(&probe, failure);
-    bongo_cat_vk_destroy_device(&probe);
-    cached = usable ? 1 : 0;
-    return usable;
-}
-
-static BongoCatVk *create_context(SDL_Window *window, const BongoCatVk *owner,
-    BongoCatError *error) {
-    if (!window) {
-        bongo_cat_error_set(error, BONGO_CAT_ERROR_ARGUMENT, "Vulkan 后端缺少窗口");
-        return NULL;
-    }
-    if (owner && owner->device == VK_NULL_HANDLE) {
-        bongo_cat_error_set(error, BONGO_CAT_ERROR_ARGUMENT,
-            "Vulkan 共享上下文的主设备无效");
-        return NULL;
-    }
-    BongoCatVk *vk = calloc(1, sizeof(*vk));
-    if (!vk) {
-        bongo_cat_error_set(error, BONGO_CAT_ERROR_MEMORY, "Vulkan 后端状态分配失败");
-        return NULL;
-    }
-    vk->window = window;
-    /* 默认跟着 OpenGL 路径的老行为 (垂直同步开); 运行时再按最大帧率设置更新 */
-    vk->vsync = true;
-    if (owner) {
-        /* 复用主窗口的 instance/device/queue: 只借句柄, 不接管所有权 */
-        vk->instance = owner->instance;
-        vk->physical = owner->physical;
-        vk->device = owner->device;
-        vk->queue = owner->queue;
-        vk->queue_family = owner->queue_family;
-        vk->owns_device = false;
-        /* 校验层消息由主上下文的 messenger 负责, 这里不重复安装 */
-        vk->validation = false;
-    } else {
-        vk->owns_device = true;
-    }
-    if (!owner && !bongo_cat_vk_create_instance(vk, error)) {
-        bongo_cat_vk_destroy(vk);
-        return NULL;
-    }
-    int width = 0, height = 0;
-    SDL_GetWindowSizeInPixels(window, &width, &height);
-    if (width <= 0 || height <= 0) { width = 1; height = 1; }
-    if (!SDL_Vulkan_CreateSurface(window, vk->instance, NULL, &vk->surface)) {
-        bongo_cat_error_set(error, BONGO_CAT_ERROR_PLATFORM, "Vulkan 表面创建失败: %s",
-            SDL_GetError());
-        bongo_cat_vk_destroy(vk);
-        return NULL;
-    }
-    if (!owner && !bongo_cat_vk_create_device(vk, error)) {
-        bongo_cat_vk_destroy(vk);
-        return NULL;
-    }
-    /* 顺序有依赖: 命令池 (帧同步) 要早于纹理上传, 管线要晚于渲染通道。 */
-    if (!bongo_cat_vk_create_frame_sync(vk, error) ||
-        !bongo_cat_vk_create_texture_resources(vk, error) ||
-        !bongo_cat_vk_create_swapchain(vk, width, height, error) ||
-        !bongo_cat_vk_create_draw_resources(vk, error)) {
-        bongo_cat_vk_destroy(vk);
-        return NULL;
-    }
-    vk->info.width = (int)vk->extent.width;
-    vk->info.height = (int)vk->extent.height;
-    /* 单例只登记主上下文: 叠加层绘制走 bongo_cat_vk_current(), 不能拿到设置窗口的 */
-    if (!owner) current_context = vk;
-    SDL_LogInfo(BONGO_CAT_LOG_LIFECYCLE,
-        "[vulkan] 设备就绪 device=%s driver=%s api=%s swapchain=%ux%u format=%d "
-        "present_mode=%d validation=%d shared=%d",
-        vk->info.device, vk->info.driver, vk->info.api,
-        (unsigned)vk->extent.width, (unsigned)vk->extent.height,
-        (int)vk->format, (int)vk->present_mode, vk->validation ? 1 : 0,
-        owner ? 1 : 0);
-    return vk;
-}
-
-BongoCatVk *bongo_cat_vk_create(SDL_Window *window, BongoCatError *error) {
-    return create_context(window, NULL, error);
-}
-
-BongoCatVk *bongo_cat_vk_create_shared(SDL_Window *window, const BongoCatVk *owner,
-    BongoCatError *error) {
-    if (!owner) return bongo_cat_vk_create(window, error);
-    return create_context(window, owner, error);
-}
-
-void bongo_cat_vk_destroy(BongoCatVk *vk) {
-    if (!vk) return;
-    if (current_context == vk) current_context = NULL;
-    if (vk->device != VK_NULL_HANDLE) {
-        if (!vk->owns_device) vkDeviceWaitIdle(vk->device);
-        /* 管线先于渲染通道销毁, 纹理后于使用它们的帧同步销毁 */
-        bongo_cat_vk_destroy_draw_resources(vk);
-        bongo_cat_vk_destroy_swapchain(vk);
-        bongo_cat_vk_destroy_texture_resources(vk);
-        bongo_cat_vk_destroy_frame_sync(vk);
-    }
-    if (vk->owns_device) {
-        bongo_cat_vk_destroy_device(vk);
-    } else if (vk->surface != VK_NULL_HANDLE && vk->instance != VK_NULL_HANDLE) {
-        /* 表面是自己建的, 用借来的 instance 销毁; device/queue 归主上下文 */
-        vkDestroySurfaceKHR(vk->instance, vk->surface, NULL);
-        vk->surface = VK_NULL_HANDLE;
-    }
-    free(vk);
-}
-
-bool bongo_cat_vk_info(const BongoCatVk *vk, BongoCatVkInfo *info) {
-    if (!vk || !info) return false;
-    *info = vk->info;
-    return true;
-}
-
-void bongo_cat_vk_set_clear_color(BongoCatVk *vk, float red, float green,
-    float blue, float alpha) {
-    if (!vk) return;
-    vk->clear.float32[0] = red;
-    vk->clear.float32[1] = green;
-    vk->clear.float32[2] = blue;
-    vk->clear.float32[3] = alpha;
-}
+/* bongo_cat_vk_compiled / _probe / _current / _create* / _destroy / _info 以及全部
+   查询接口都在 vk_context.c —— 本文件只负责 Instance 与 Device 的创建销毁。 */
 
 #endif /* BONGO_CAT_HAS_VULKAN */
