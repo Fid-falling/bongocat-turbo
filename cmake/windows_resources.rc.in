@@ -24,9 +24,9 @@ BEGIN
       VALUE "CompanyName", "vladelaina\0"
       VALUE "FileDescription", "@PROJECT_DESCRIPTION@\0"
       VALUE "FileVersion", "@PROJECT_VERSION@\0"
-      VALUE "InternalName", "BongoCat\0"
-      VALUE "OriginalFilename", "BongoCat.exe\0"
-      VALUE "ProductName", "BongoCat\0"
+      VALUE "InternalName", "BongoCatTurbo\0"
+      VALUE "OriginalFilename", "BongoCatTurbo.exe\0"
+      VALUE "ProductName", "BongoCat Turbo\0"
       VALUE "ProductVersion", "@PROJECT_VERSION@\0"
     END
   END

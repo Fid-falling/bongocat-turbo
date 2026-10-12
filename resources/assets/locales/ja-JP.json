@@ -237,6 +237,7 @@
       "experimentalNotice": "本プログラムは機能テスト用の実験版であり、最終製品ではありません",
       "title": "このアプリについて",
       "website": "公式サイト: bongocat.pet",
+      "forkNotice": "BongoCat をベースにした性能最適化版：メモリ消費とカクつきを抑え、Vulkan バックエンドと OpenGL の透明背景に対応。",
       "heroText": "ご支援ありがとうございます。利用や共有の一つひとつがBongoCatの成長につながります。",
       "version": "アプリのバージョン",
       "checkUpdate": "更新を確認",

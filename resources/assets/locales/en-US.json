@@ -237,6 +237,7 @@
       "experimentalNotice": "This program is a functional-test experimental build and does not represent the final product.",
       "title": "About",
       "website": "Website: bongocat.pet",
+      "forkNotice": "A performance-focused fork of BongoCat: less memory, fewer stutters, plus a Vulkan backend and a transparent OpenGL background.",
       "heroText": "Thank you for your support. Every use and share helps BongoCat continue to grow.",
       "version": "App version",
       "checkUpdate": "Check for updates",

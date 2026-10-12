@@ -238,9 +238,9 @@ if ($buildStatus -ne 0) {
 }
 
 if ($Target -contains 'bongo_cat') {
-    $output = Join-Path (Join-Path $BuildDir $Configuration) 'BongoCat.exe'
+    $output = Join-Path (Join-Path $BuildDir $Configuration) 'BongoCatTurbo.exe'
     if (-not (Test-Path -LiteralPath $output)) {
-        Write-BuildProgress 95 'BongoCat.exe was not produced.' -NewLine
+        Write-BuildProgress 95 'BongoCatTurbo.exe was not produced.' -NewLine
         exit 1
     }
 }

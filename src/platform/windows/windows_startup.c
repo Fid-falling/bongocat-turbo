@@ -253,7 +253,7 @@ BongoCatResult bongo_cat_platform_set_autostart(bool enabled,
     wchar_t shortcut[BONGO_CAT_PATH_CAP];
     int written = SUCCEEDED(result) && startup
         ? swprintf(shortcut, BONGO_CAT_PATH_CAP, L"%ls\\%ls.lnk", startup,
-            BONGO_CAT_NAME_W) : -1;
+            BONGO_CAT_STARTUP_SHORTCUT_W) : -1;
     CoTaskMemFree(startup);
     if (FAILED(result) || written < 0 || written >= BONGO_CAT_PATH_CAP) {
         bongo_cat_error_set(error, BONGO_CAT_ERROR_PLATFORM,

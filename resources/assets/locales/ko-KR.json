@@ -237,6 +237,7 @@
       "experimentalNotice": "이 프로그램은 기능 테스트용 실험 버전이며 최종 제품이 아닙니다",
       "title": "정보",
       "website": "공식 웹사이트: bongocat.pet",
+      "forkNotice": "BongoCat 기반 성능 최적화 포크: 메모리를 덜 쓰고 끊김이 적으며, Vulkan 백엔드와 OpenGL 투명 배경을 지원합니다.",
       "heroText": "지원해 주셔서 감사합니다. 사용할 때마다, 공유할 때마다 BongoCat이 계속 성장하는 데 도움이 됩니다.",
       "version": "앱 버전",
       "checkUpdate": "업데이트 확인",

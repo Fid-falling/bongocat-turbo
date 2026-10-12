@@ -154,7 +154,7 @@ jobs:
           "$portableHash  $([IO.Path]::GetFileName($portable))" |
             Set-Content -LiteralPath $portableChecksum -Encoding ascii
           $setupHash = (Get-FileHash -LiteralPath $setup -Algorithm SHA256).Hash.ToLowerInvariant()
-          $app = "build-release/Release/BongoCat.exe"
+          $app = "build-release/Release/BongoCatTurbo.exe"
           $appHash = (Get-FileHash -LiteralPath $app -Algorithm SHA256).Hash.ToLowerInvariant()
           $cubismArch = if ('${{ matrix.cmake_arch }}' -eq 'Win32') { 'x86' } else { 'x86_64' }
           $cubismCore = "vendor/CubismSdkForNative/Core/lib/windows/$cubismArch/143/Live2DCubismCore_MT.lib"
@@ -172,7 +172,7 @@ jobs:
           | CMake | ``$cmakeVersion`` |
           | Inno Setup | ``$innoVersion`` at ``$($innoInfo.Path)`` |
           | Cubism Core SHA-256 | ``$cubismHash`` |
-          | BongoCat.exe SHA-256 | ``$appHash`` |
+          | BongoCatTurbo.exe SHA-256 | ``$appHash`` |
           | Portable SHA-256 | ``$portableHash`` |
           | Installer SHA-256 | ``$setupHash`` |
 

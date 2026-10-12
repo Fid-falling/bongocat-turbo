@@ -237,6 +237,7 @@
       "experimentalNotice": "本程式僅為功能測試實驗版，不代表最終成品",
       "title": "關於",
       "website": "官網: bongocat.pet",
+      "forkNotice": "基於 BongoCat 的效能最佳化分支：更省記憶體、更少卡頓，並提供 Vulkan 後端與 OpenGL 透明背景。",
       "heroText": "感謝你的支持。每一次使用與分享，都讓 BongoCat 持續成長。",
       "version": "應用程式版本",
       "checkUpdate": "檢查更新",

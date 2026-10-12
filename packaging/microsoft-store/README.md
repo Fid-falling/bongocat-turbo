@@ -77,7 +77,7 @@ cmake -S . -B build-cubism -G "Visual Studio 17 2022" -A x64 `
 cmake --build build-cubism --config Release --target bongo_cat --parallel 2
 
 .\packaging\microsoft-store\build-store-package.ps1 `
-  -ExecutablePath .\build-cubism\Release\BongoCat.exe
+  -ExecutablePath .\build-cubism\Release\BongoCatTurbo.exe
 ```
 
 The script writes the unsigned Store submission package to
@@ -102,7 +102,7 @@ self-signed package:
 $projectVersion = .\packaging\get-project-version.ps1
 $localBase = ".\output\microsoft-store\bongocat_$($projectVersion.AppVersion)_x64-local-test"
 .\packaging\microsoft-store\build-store-package.ps1 `
-  -ExecutablePath .\build-cubism\Release\BongoCat.exe `
+  -ExecutablePath .\build-cubism\Release\BongoCatTurbo.exe `
   -SignForLocalTesting
 
 # Run these certificate/deployment commands from an elevated PowerShell.

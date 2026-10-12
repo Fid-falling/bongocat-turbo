@@ -1,4 +1,4 @@
-BongoCat diagnostic build
+BongoCat Turbo diagnostic build
 
 This package was built without the Live2D Cubism SDK. Live2D rendering,
 animation, pointer tracking, imported-model rendering, and cover generation

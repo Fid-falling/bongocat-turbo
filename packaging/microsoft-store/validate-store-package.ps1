@@ -105,7 +105,7 @@ try {
 
     $application = $manifest.Package.Applications.Application
     if ($application.Id -ne 'BongoCat' -or
-        $application.Executable -ne 'BongoCat.exe' -or
+        $application.Executable -ne 'BongoCatTurbo.exe' -or
         $application.EntryPoint -ne 'Windows.FullTrustApplication') {
         throw 'Manifest application entry does not describe the BongoCat full-trust executable.'
     }
@@ -125,16 +125,16 @@ try {
         $null
     }
     if (-not $shortcutExtension -or
-        $shortcutExtension.Executable -ne 'BongoCat.exe' -or
+        $shortcutExtension.Executable -ne 'BongoCatTurbo.exe' -or
         $shortcutExtension.EntryPoint -ne 'Windows.FullTrustApplication' -or
         -not $shortcut -or
         $shortcut.File -ne '$(Desktop)\BongoCat.lnk' -or
-        $shortcut.Icon -ne 'BongoCat.exe') {
+        $shortcut.Icon -ne 'BongoCatTurbo.exe') {
         throw 'Manifest does not declare the expected system-managed desktop shortcut.'
     }
 
     $requiredFiles = @(
-        'BongoCat.exe',
+        'BongoCatTurbo.exe',
         'Assets\StoreLogo.png',
         'Assets\Square44x44Logo.png',
         'Assets\Square150x150Logo.png'
@@ -148,7 +148,7 @@ try {
         throw 'Unsigned Store submission package unexpectedly contains AppxSignature.p7x.'
     }
 
-    $executablePath = Join-Path $temporaryRoot 'BongoCat.exe'
+    $executablePath = Join-Path $temporaryRoot 'BongoCatTurbo.exe'
     $versionInfo = (Get-Item -LiteralPath $executablePath).VersionInfo
     $packagedAppVersion = '{0}.{1}.{2}' -f $versionInfo.FileMajorPart,
         $versionInfo.FileMinorPart, $versionInfo.FileBuildPart

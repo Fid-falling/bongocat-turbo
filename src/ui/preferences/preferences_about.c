@@ -1,5 +1,5 @@
 /*
- * "关于 / 支持开发者"页 (page 3): 实验版声明 + logo + 作者 + 网页链接 + 致谢,
+ * "关于 / 支持开发者"页 (page 3): 实验版声明 + 性能分支定位说明 + logo + 作者 + 网页链接 + 致谢,
  * 以及下面两张推广卡片 (Catime / vlaina)。
  *
  * 这一页的排版全是手算坐标: 每个块先用 nk_layout_row_dynamic + nk_widget 领一块矩形,
@@ -8,7 +8,8 @@
  * 226/254/300 依次排下来的), 单独挪一个就会叠在一起。
  *
  * 三条这里特有的约定:
- * - 实验版声明必须是这一页的第一行: 它是产品定位说明, 要第一眼可见;
+ * - 实验版声明必须是这一页的第一行: 它是产品定位说明, 要第一眼可见; 紧跟其后的一行是
+ *   "基于 BongoCat 的性能分支"定位说明, 两行都在首屏顶部, 顺序不要调换;
  * - logo 不再套一层卡片 (素材本身就是完整品牌标识), 免得和侧栏的 logo 观感不一致;
  * - 两张推广卡片的图片来自 support assets (关于页专有), 离开这一页时会被
  * page_cache_clear 释放掉, 所以本页绘制时必须假设它们可能为 0 (image_contain 会跳过)。
@@ -161,7 +162,7 @@ static void star_button(BongoCatPreferences *value,
 static void hero_title(BongoCatPreferences *value, struct nk_context *context,
     struct nk_command_buffer *canvas, struct nk_rect bounds,
     BongoCatUIPalette p) {
-    const char *title = "BongoCat";
+    const char *title = "BongoCat Turbo";
     const char *by = tr(value, "native.support.by", "by ");
     const char *developer = "vladelaina & Fid_falling";
     float gap = 8, title_width = width(value->ui.hero_font, title);
@@ -202,6 +203,20 @@ void bongo_cat_preferences_about_hero(BongoCatPreferences *value,
             "This program is a functional-test experimental build and does not "
             "represent the final product."),
             value->ui.caption_font, notice_palette.accent);
+    }
+    /*
+     * 定位说明 (这是基于 BongoCat 的性能分支): 紧跟在实验版声明之后, 仍在首屏内。
+     * 高度按两行给 —— centered_wrapped 最多折两行, 而它是按 (h - 2*行高)/2 垂直居中的,
+     * 只给一行高度时第二行会往上溢出到上一个块上。
+     */
+    nk_layout_row_dynamic(context, notice_height * 2.0f, 1);
+    struct nk_rect fork_bounds;
+    if (nk_widget(&fork_bounds, context) != NK_WIDGET_INVALID) {
+        centered_wrapped(nk_window_get_canvas(context), fork_bounds,
+            tr(value, "native.support.forkNotice",
+            "A performance-focused fork of BongoCat: less memory, fewer stutters, "
+            "plus a Vulkan backend and a transparent OpenGL background."),
+            value->ui.caption_font, notice_palette.muted);
     }
     struct nk_rect bounds;
     nk_layout_row_dynamic(context, 340, 1);

@@ -18,7 +18,7 @@ mkdir -p "$build_dir/dist"
 
 # A private staging tree keeps repeated builds free of stale dependencies.
 # Keep assets next to the executable, as expected by the runtime.
-appdir="$work/BongoCat.AppDir"
+appdir="$work/BongoCatTurbo.AppDir"
 cmake --install "$build_dir" --component Runtime --prefix "$appdir/usr/bin"
 
 tool="$work/linuxdeploy.AppImage"
@@ -32,7 +32,7 @@ export OUTPUT="$build_dir/dist/$name.AppImage"
 export APPIMAGE_EXTRACT_AND_RUN=1
 pushd "$build_dir" >/dev/null
 "$tool" --appdir "$appdir" \
-  --executable "$appdir/usr/bin/BongoCat" \
+  --executable "$appdir/usr/bin/BongoCatTurbo" \
   --desktop-file "$source_dir/packaging/linux/bongocat.desktop" \
   --icon-file "$source_dir/resources/assets/bongocat.png" \
   --output appimage

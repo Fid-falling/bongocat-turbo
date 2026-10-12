@@ -6,6 +6,10 @@ if(WIN32)
   install(FILES resources/assets/models/LICENSE DESTINATION assets/models COMPONENT Runtime)
 endif()
 set(BONGO_CAT_PACKAGE_PRODUCT "BongoCat")
+# 安装器/卸载列表里给人看的名字, 刻意与 BONGO_CAT_PACKAGE_PRODUCT 分开: 后者是发布包
+# 文件名的一段 (BongoCat-1.16.0-windows-x64-...), 属于 CI 打包脚本与客户端
+# update_release.c 的 read_assets() 之间的跨仓库契约, 改了老客户端就找不到更新资源。
+set(BONGO_CAT_DISPLAY_NAME "BongoCat Turbo")
 if(NOT BONGO_CAT_CUBISM_ENABLED)
   set(BONGO_CAT_PACKAGE_PRODUCT "BongoCat-Diagnostic")
   install(FILES cmake/DiagnosticBuildNotice.txt DESTINATION .

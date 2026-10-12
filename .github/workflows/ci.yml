@@ -380,7 +380,7 @@ jobs:
           }
           $portableHash = (Get-FileHash -LiteralPath $portable -Algorithm SHA256).Hash.ToLowerInvariant()
           $setupHash = (Get-FileHash -LiteralPath $setup -Algorithm SHA256).Hash.ToLowerInvariant()
-          $app = "build-store/Release/BongoCat.exe"
+          $app = "build-store/Release/BongoCatTurbo.exe"
           $appHash = (Get-FileHash -LiteralPath $app -Algorithm SHA256).Hash.ToLowerInvariant()
           $cubismArch = if ('${{ matrix.cmake_arch }}' -eq 'Win32') { 'x86' } else { 'x86_64' }
           $cubismCore = "vendor/CubismSdkForNative/Core/lib/windows/$cubismArch/143/Live2DCubismCore_MT.lib"
@@ -398,7 +398,7 @@ jobs:
           | CMake | ``$cmakeVersion`` |
           | Inno Setup | ``$innoVersion`` at ``$($innoInfo.Path)`` |
           | Cubism Core SHA-256 | ``$cubismHash`` |
-          | BongoCat.exe SHA-256 | ``$appHash`` |
+          | BongoCatTurbo.exe SHA-256 | ``$appHash`` |
           | Portable SHA-256 | ``$portableHash`` |
           | Installer SHA-256 | ``$setupHash`` |
 
@@ -419,7 +419,7 @@ jobs:
         shell: pwsh
         run: |
           ./packaging/microsoft-store/build-store-package.ps1 `
-            -ExecutablePath "./build-store/Release/BongoCat.exe" `
+            -ExecutablePath "./build-store/Release/BongoCatTurbo.exe" `
             -Architecture "${{ matrix.store_arch }}" `
             -OutputDirectory "./store-output"
           $msix = Get-Item "store-output/bongocat_${{ steps.version.outputs.version }}_${{ matrix.store_arch }}.msix"

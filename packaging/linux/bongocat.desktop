@@ -1,8 +1,8 @@
 [Desktop Entry]
 Type=Application
-Name=BongoCat
+Name=BongoCat Turbo
 Comment=An animated desktop cat that reacts to your input
-Exec=BongoCat
+Exec=BongoCatTurbo
 Icon=bongocat
 Terminal=false
 Categories=Utility;

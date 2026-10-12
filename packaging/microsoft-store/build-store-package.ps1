@@ -115,7 +115,7 @@ try {
     New-Item -ItemType Directory -Force -Path $OutputDirectory, $stagingDirectory, $assetsDirectory | Out-Null
     Remove-Item $msixPath -Force -ErrorAction SilentlyContinue
 
-    Copy-Item $ExecutablePath (Join-Path $stagingDirectory "BongoCat.exe")
+    Copy-Item $ExecutablePath (Join-Path $stagingDirectory "BongoCatTurbo.exe")
 
     $manifestTemplate = Get-Content (Join-Path $scriptDirectory "AppxManifest.xml.in") -Raw
     $manifest = $manifestTemplate.Replace("@PACKAGE_VERSION@", $PackageVersion)

@@ -16,6 +16,20 @@ begin
   Result := ComparePackedVersion(LeftVersion, RightVersion);
 end;
 
+{ 已安装版本的可执行文件全路径, 优先新名字。
+
+  改名坑: 1.16.0 起产物是 BongoCatTurbo.exe, 但所有老安装目录里只有 BongoCat.exe。
+  两个名字都要认, 否则老用户升级时会被当成全新安装 —— 装到并排的新目录、丢掉原安装
+  目录, 还会多出一条"应用和功能"记录。老名字在能预见的将来都不能删。 }
+function ExistingExecutable(Dir: String): String;
+begin
+  Result := Dir + '\BongoCatTurbo.exe';
+  if not FileExists(Result) then begin
+    Result := Dir + '\BongoCat.exe';
+    if not FileExists(Result) then Result := '';
+  end;
+end;
+
 function RegisteredDir(Root: Integer; Key: String): String;
 begin
   Result := '';
@@ -23,7 +37,7 @@ begin
   if (Result = '') and (Key = 'BongoCat') then
     RegQueryStringValue(Root, 'Software\BongoCat\BongoCat', '', Result);
   Result := RemoveBackslashUnlessRoot(RemoveQuotes(Result));
-  if not FileExists(Result + '\BongoCat.exe') then Result := '';
+  if ExistingExecutable(Result) = '' then Result := '';
 end;
 
 function FindExistingDir: String;
@@ -35,11 +49,11 @@ begin
   if (Result = '') and IsWin64 then Result := RegisteredDir(HKCU64, 'BongoCat');
   if Result = '' then begin
     Result := ExpandConstant('{localappdata}\Programs\BongoCat');
-    if not FileExists(Result + '\BongoCat.exe') then Result := '';
+    if ExistingExecutable(Result) = '' then Result := '';
   end;
   if Result = '' then begin
     Result := ExpandConstant('{localappdata}\..\LocalPrograms\BongoCat');
-    if not FileExists(Result + '\BongoCat.exe') then Result := '';
+    if ExistingExecutable(Result) = '' then Result := '';
   end;
 end;
 
@@ -58,9 +72,9 @@ begin
   { Equal versions must be allowed: a same-version NSIS -> Inno migration
     still has to replace the installer registration. Never downgrade. }
   if (ExistingDir <> '') and
-     GetVersionNumbersString(ExistingDir + '\BongoCat.exe', Version) then
+     GetVersionNumbersString(ExistingExecutable(ExistingDir), Version) then
     if CompareVersions(Version, '@PROJECT_VERSION@') > 0 then begin
-      SuppressibleMsgBox('A newer version of BongoCat is already installed.', mbError, MB_OK, IDOK);
+      SuppressibleMsgBox('A newer version of BongoCat Turbo is already installed.', mbError, MB_OK, IDOK);
       Result := False;
     end;
 end;
@@ -91,10 +105,10 @@ begin
     Result := 'An upgrade must use the existing BongoCat installation directory.';
     Exit;
   end;
-  App := ExpandConstant('{app}\BongoCat.exe');
-  if GetVersionNumbersString(App, Version) then begin
+  App := ExistingExecutable(ExpandConstant('{app}'));
+  if (App <> '') and GetVersionNumbersString(App, Version) then begin
     if CompareVersions(Version, '@PROJECT_VERSION@') > 0 then begin
-      Result := 'A newer version of BongoCat is already installed in this directory.';
+      Result := 'A newer version of BongoCat Turbo is already installed in this directory.';
       Exit;
     end;
     { 0.1.0 treats unknown switches as a normal launch and would wait forever.
@@ -127,7 +141,13 @@ begin
     RemoveLegacyRegistration(HKCU32);
     if IsWin64 then RemoveLegacyRegistration(HKCU64);
     DeleteFile(ExpandConstant('{app}\Uninstall.exe'));
+    { 老快捷方式 (NSIS 时代和 1.15.x 都叫 BongoCat, 且指向已改名的 BongoCat.exe) 必须
+      删掉: 新版把快捷方式建在 "BongoCat Turbo" 分组下, 不删就会留下两个开始菜单项,
+      其中一个还是坏的。桌面同理。分组目录用 RemoveDir, 非空时它不会删任何东西。 }
+    DeleteFile(ExpandConstant('{userprograms}\BongoCat\BongoCat.lnk'));
     DeleteFile(ExpandConstant('{userprograms}\BongoCat\Uninstall BongoCat.lnk'));
+    RemoveDir(ExpandConstant('{userprograms}\BongoCat'));
+    DeleteFile(ExpandConstant('{userdesktop}\BongoCat.lnk'));
   end;
 end;
 

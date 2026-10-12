@@ -23,10 +23,10 @@ try {
         }
         $root = $roots[0].FullName
         if ($Platform.StartsWith('macos-')) {
-            $executable = Join-Path $root 'BongoCat.app/Contents/MacOS/BongoCat'
-            $assets = Join-Path $root 'BongoCat.app/Contents/Resources/assets'
+            $executable = Join-Path $root 'BongoCatTurbo.app/Contents/MacOS/BongoCatTurbo'
+            $assets = Join-Path $root 'BongoCatTurbo.app/Contents/Resources/assets'
         } else {
-            $executable = Join-Path $root 'BongoCat'
+            $executable = Join-Path $root 'BongoCatTurbo'
             $assets = Join-Path $root 'assets'
         }
         $required = @($executable) + @(

@@ -88,7 +88,7 @@ Vulkan 下更是连 GL 前缓冲都没有，代理永远拿不到新帧。
 
 ## 六、单独复制 exe 导致 Vulkan 画坏（用户报告）
 
-用户报告：把 `BongoCat.exe` 单独复制到桌面后打开，Vulkan 下渲染不正常。
+用户报告：把 `BongoCatTurbo.exe` 单独复制到桌面后打开，Vulkan 下渲染不正常。
 
 原因：Cubism 的 Vulkan 渲染器按**相对路径** `FrameworkShaders/*.spv` 打开 510 个
 编译好的着色器，它们本来是随发布包放在 exe 旁边的。只复制一个 exe 时这些文件

@@ -9,7 +9,7 @@ cd "$work"
 chmod +x "$appimage"
 "$appimage" --appimage-extract > /dev/null
 root="$work/squashfs-root"
-for file in AppRun bongocat.desktop bongocat.png usr/bin/BongoCat \
+for file in AppRun bongocat.desktop bongocat.png usr/bin/BongoCatTurbo \
   usr/bin/assets/bongocat.png usr/bin/assets/locales/en-US.json \
   usr/bin/assets/models/standard/cat.model3.json \
   usr/bin/assets/models/standard/demomodel.moc3 \

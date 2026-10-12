@@ -76,7 +76,7 @@
 
 ```
 构建:  cmake --build build-cubism --config Release --target bongo_cat --parallel 8
-运行:  build-cubism\Release\BongoCat.exe --storage-root=<存储>
+运行:  build-cubism\Release\BongoCatTurbo.exe --storage-root=<存储>
 校验:  设 BONGO_CAT_VULKAN_VALIDATION=1（并抓 stderr, 校验信息走 stderr）
 抓图:  build-vulkan\.test\shot.ps1 -Exe <exe> -Storage <存储> -Renderer vulkan -Out <png> -W 700 -H 420
 探针:  build-vulkan\.test\probe-cub.ps1 -Storage <存储> -Tag <标签>（量指针/按键响应）
