@@ -2,18 +2,19 @@
   <a href="https://bongocat.pet" target="_blank">
     <img src="https://github.com/user-attachments/assets/dd693432-8342-440b-8a92-c9f57a96ffb4" alt="BongoCat" width="249">
   </a>
-  <h1><a href="https://bongocat.pet" target="_blank">BongoCat</a></h1>
+  <h1><a href="https://bongocat.pet" target="_blank">BongoCat Turbo</a></h1>
 </div>
 
 <p align="center">💘 C/C++ × SDL3 × OpenGL, mézclalo todo, ¡a tocar! ¡Bong~ Bongo Cat!!!</p>
+<p align="center">Un fork de BongoCat optimizado para el rendimiento: menos memoria, menos tirones, con backend Vulkan y fondo transparente en OpenGL.</p>
 <p align="center">
-  Elige el idioma ❯ <a href="https://github.com/Fid-falling/bongocat-vulkan/blob/main/README.md">English</a> • <a href="https://github.com/Fid-falling/bongocat-vulkan/blob/main/docs/README.zh-CN.md">简体中文</a> • <a href="https://github.com/Fid-falling/bongocat-vulkan/blob/main/docs/README.zh-Hant.md">繁體中文</a> • <a href="https://github.com/Fid-falling/bongocat-vulkan/blob/main/docs/README.fr-FR.md">Français</a> • <a href="https://github.com/Fid-falling/bongocat-vulkan/blob/main/docs/README.de-DE.md">Deutsch</a> • <a href="https://github.com/Fid-falling/bongocat-vulkan/blob/main/docs/README.ja-JP.md">日本語</a> • <a href="https://github.com/Fid-falling/bongocat-vulkan/blob/main/docs/README.ko-KR.md">한국어</a> • <a href="https://github.com/Fid-falling/bongocat-vulkan/blob/main/docs/README.pt-BR.md">Português</a> • <a href="https://github.com/Fid-falling/bongocat-vulkan/blob/main/docs/README.ru-RU.md">Русский</a> • <strong>Español</strong> • <a href="https://github.com/Fid-falling/bongocat-vulkan/blob/main/docs/README.id-ID.md">Bahasa Indonesia</a>
+  Elige el idioma ❯ <a href="https://github.com/Fid-falling/bongocat-turbo/blob/main/README.md">English</a> • <a href="https://github.com/Fid-falling/bongocat-turbo/blob/main/docs/README.zh-CN.md">简体中文</a> • <a href="https://github.com/Fid-falling/bongocat-turbo/blob/main/docs/README.zh-Hant.md">繁體中文</a> • <a href="https://github.com/Fid-falling/bongocat-turbo/blob/main/docs/README.fr-FR.md">Français</a> • <a href="https://github.com/Fid-falling/bongocat-turbo/blob/main/docs/README.de-DE.md">Deutsch</a> • <a href="https://github.com/Fid-falling/bongocat-turbo/blob/main/docs/README.ja-JP.md">日本語</a> • <a href="https://github.com/Fid-falling/bongocat-turbo/blob/main/docs/README.ko-KR.md">한국어</a> • <a href="https://github.com/Fid-falling/bongocat-turbo/blob/main/docs/README.pt-BR.md">Português</a> • <a href="https://github.com/Fid-falling/bongocat-turbo/blob/main/docs/README.ru-RU.md">Русский</a> • <strong>Español</strong> • <a href="https://github.com/Fid-falling/bongocat-turbo/blob/main/docs/README.id-ID.md">Bahasa Indonesia</a>
 </p>
 <p align="center">
-  <a href="https://github.com/Fid-falling/bongocat-vulkan/blob/main/LICENSE"><img src="https://img.shields.io/badge/AGPL--3.0-1fa669?style=flat&logo=gnu&logoColor=white"></a>
-  <a href="https://github.com/Fid-falling/bongocat-vulkan"><img src="https://img.shields.io/badge/C-A8B9CC?style=flat&logo=c&logoColor=white"></a>
+  <a href="https://github.com/Fid-falling/bongocat-turbo/blob/main/LICENSE"><img src="https://img.shields.io/badge/AGPL--3.0-1fa669?style=flat&logo=gnu&logoColor=white"></a>
+  <a href="https://github.com/Fid-falling/bongocat-turbo"><img src="https://img.shields.io/badge/C-A8B9CC?style=flat&logo=c&logoColor=white"></a>
   <a href="https://discord.gg/vf8jqnattk"><img src="https://img.shields.io/badge/dynamic/json?url=https%3A%2F%2Fdiscord.com%2Fapi%2Finvites%2Fvf8jqnattk%3Fwith_counts%3Dtrue&query=%24.approximate_member_count&suffix=%20members&logo=discord&logoColor=white&label=%20&color=7389D8&labelColor=6A7EC2"></a>
-  <a href="https://github.com/Fid-falling/bongocat-vulkan/blob/main/docs/wechat.png"><img src="https://img.shields.io/badge/WeChat-%2307C160?logo=wechat&logoColor=%2307C160&labelColor=FFFFFF"></a>
+  <a href="https://github.com/Fid-falling/bongocat-turbo/blob/main/docs/wechat.png"><img src="https://img.shields.io/badge/WeChat-%2307C160?logo=wechat&logoColor=%2307C160&labelColor=FFFFFF"></a>
   <a href="https://qm.qq.com/q/cYlRBbvuda"><img src="https://img.shields.io/badge/QQ-%2312B7F5?logo=qq&labelColor=FFFFFF"></a>
 </p>
 
@@ -38,7 +39,7 @@
 
 - GitHub Releases
 
-  Descarga la última versión desde [GitHub Releases](https://github.com/Fid-falling/bongocat-vulkan/releases/latest).
+  Descarga la última versión desde [GitHub Releases](https://github.com/Fid-falling/bongocat-turbo/releases/latest).
 
 ## 🛠️ Compilar desde el código fuente
 
@@ -77,7 +78,7 @@ cmake -S . -B build -G "Visual Studio 17 2022" -A x64 `
 cmake --build build --config Release --parallel
 ```
 
-El ejecutable se encuentra en `build/BongoCat` en Linux, en `build/BongoCat.app/Contents/MacOS/BongoCat` en macOS y en `build/Release/BongoCat.exe` para las compilaciones de Visual Studio en Windows.
+El ejecutable se encuentra en `build/BongoCatTurbo` en Linux, en `build/BongoCatTurbo.app/Contents/MacOS/BongoCatTurbo` en macOS y en `build/Release/BongoCatTurbo.exe` para las compilaciones de Visual Studio en Windows.
 
 ### 🧪 Pruebas
 

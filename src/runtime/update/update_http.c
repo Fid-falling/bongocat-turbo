@@ -111,7 +111,7 @@ static char *read_response(BongoCatUpdateService *service,
     return NULL;
 }
 
-/* 拉取 https://api.github.com/repos/Fid-falling/bongocat-vulkan/releases/latest。
+/* 拉取 https://api.github.com/repos/Fid-falling/bongocat-turbo/releases/latest。
  * 前提: service 与其 http_mutex 有效, error 与 error_capacity 可用 (本实现不做空指针兜底)。
  * 超时 5s 解析 / 5s 连接 / 10s 发送 / 10s 接收: 目标是离线时尽早失败, 不让用户干等。
  * 只有 HTTP 200 算成功; 404 单独给"没有已发布版本"的文案, 其余状态码拼进 error ——
@@ -133,7 +133,7 @@ BongoCatUpdateFetchResult bongo_cat_update_http_fetch(
     bool connected = connection && track_handle(service,
         &service->http_connection, connection);
     HINTERNET request = connected ? WinHttpOpenRequest(connection, L"GET",
-        L"/repos/Fid-falling/bongocat-vulkan/releases/latest", NULL,
+        L"/repos/Fid-falling/bongocat-turbo/releases/latest", NULL,
         WINHTTP_NO_REFERER, WINHTTP_DEFAULT_ACCEPT_TYPES,
         WINHTTP_FLAG_SECURE) : NULL;
     bool requested = request && track_handle(service,

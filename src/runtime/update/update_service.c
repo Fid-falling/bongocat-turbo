@@ -17,7 +17,7 @@
 #include <string.h>
 
 #define RELEASES_URL \
-    "https://github.com/Fid-falling/bongocat-vulkan/releases/latest"
+    "https://github.com/Fid-falling/bongocat-turbo/releases/latest"
 #define STORE_URI "ms-windows-store://pdp/?ProductId=9P41MLSX72XW"
 #define STORE_WEB_URL "https://apps.microsoft.com/detail/9P41MLSX72XW"
 

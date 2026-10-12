@@ -1,6 +1,6 @@
 # Vulkan 渲染后端
 
-`G:\bongocat-vulkan` 在 BongoCat 之上新增的独立渲染后端。它和原有的 OpenGL 后端
+`bongocat-turbo` 在 BongoCat 之上新增的独立渲染后端。它和原有的 OpenGL 后端
 并存，由设置里的「渲染后端」决定这次运行走哪条路；两条路不共享任何 GPU 资源。
 
 ## 怎么用
