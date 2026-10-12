@@ -249,7 +249,7 @@
       "updateAvailable": "Nouvelle version disponible :",
       "updateFailed": "Impossible de vérifier les mises à jour",
       "updateHttpFailed": "GitHub n'a pas répondu normalement. Réessayez plus tard ou ouvrez la page des versions.",
-      "updateRateLimited": "L'API GitHub est temporairement limitée. Réessayez plus tard ou ouvrez la page des versions.",
+      "updateRateLimited": "L'API GitHub est limitée. Réessayez plus tard ou ouvrez la page des versions.",
       "downloadUpdate": "Mettre à jour vers v%s",
       "openStore": "Ouvrir Microsoft Store",
       "viewReleases": "Voir les versions",
