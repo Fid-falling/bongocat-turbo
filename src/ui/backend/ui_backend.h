@@ -146,6 +146,12 @@ void bongo_cat_ui_query_window_scale(SDL_Window *window,
     float *layout_scale, float *raster_scale);
 void bongo_cat_ui_logical_size(const BongoCatUIBackend *ui,
     float *width, float *height);
+/*
+ * 诊断: 一行打全 "逻辑尺寸 / 像素尺寸 / 窗口尺寸 / 缩放因子"。窗口建立与缩放变化时
+ * 各调用一次, 不进每帧循环。缩放值内部取自 bongo_cat_ui_query_window_scale, 与业务
+ * 代码同源, 免得日志和实际用的值对不上。
+ */
+void bongo_cat_ui_log_scale(const char *tag, SDL_Window *window);
 const struct nk_user_font *bongo_cat_ui_caption_font(
     const struct nk_context *context);
 const struct nk_user_font *bongo_cat_ui_body_font(

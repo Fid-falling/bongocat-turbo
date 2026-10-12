@@ -22,6 +22,7 @@
 #include "bongo_cat/overlay.h"
 #include "bongo_cat/preferences.h"
 #include "bongo_cat/tray.h"
+#include "ui_backend.h"
 #include <SDL3/SDL_opengl.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -149,6 +150,8 @@ bool bongo_cat_app_initialize(BongoCatApp *app, int argc, char **argv,
     bongo_cat_startup_stage(app, "window-ready");
     if (bongo_cat_platform_init(&app->platform, app->window, &app->input, error) != BONGO_CAT_OK) return false;
     bongo_cat_window_apply(app);
+    /* 桌宠窗口的缩放诊断: 高 DPI 下逻辑与像素尺寸会分叉, 用户回传时先看这一行 */
+    bongo_cat_ui_log_scale("宠物窗口", app->window);
     bongo_cat_startup_stage(app, "platform-ready");
     app->live2d = bongo_cat_live2d_create(app->asset_root, error);
     if (!app->live2d) return false;

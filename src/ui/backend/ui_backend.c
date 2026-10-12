@@ -289,16 +289,20 @@ static void render_vulkan(BongoCatUIBackend *ui) {
         return;
     convert(ui);
     /*
-     * 两套缩放不能混用:
-     *  - 裁剪矩形是像素坐标, 要乘 "像素/逻辑像素";
-     *  - 顶点着色器的投影是 2/像素尺寸 (见 shaders/ui.vert 的 Push 注释)。
-     * 以前这里把前者也当成投影传了下去, 于是整块界面被映射到裁剪空间之外 ——
-     * 设置窗口在 Vulkan 下只剩背景和圆角, 一个字都看不见。
+     * 两个空间别混: 顶点是逻辑坐标 (布局与输入都在逻辑空间, 见 ui_input.c), 所以投影
+     * 必须是 2/逻辑尺寸, 与 OpenGL 路径一致; 裁剪矩形是像素坐标, 才要乘像素/逻辑。
+     * 除数不同才对 —— 投影把逻辑映射到整块视口 (视口是交换链的像素 extent),
+     * 裁剪把逻辑矩形换算成像素矩形。
+     *
+     * 坑: 这里曾传 2/像素尺寸。position 乘它再经整块视口还原, 恰好是"1 逻辑单位 =
+     * 1 设备像素"; 100% 缩放下逻辑等于像素, 看不出问题, 125%/150% 下界面只铺满窗口
+     * 左上角逻辑大小的一块, 右边下边空白, 而裁剪矩形仍放大 1.25 倍, 越靠右下的图标
+     * 与开关被裁得越狠。这就是用户报的"Vulkan 设置窗口大面积空白、开关只剩细条"。
      */
     const float scissor_scale_x = pixel_width / width;
     const float scissor_scale_y = pixel_height / height;
-    const float projection_scale_x = 2.0f / (float)pixel_width;
-    const float projection_scale_y = 2.0f / (float)pixel_height;
+    const float projection_scale_x = 2.0f / width;
+    const float projection_scale_y = 2.0f / height;
     const size_t vertex_count = ui->last_vertex_bytes / sizeof(UIVertex);
     if (!bongo_cat_vk_ui_upload_vertices(ui->vk, ui->vertices,
             (unsigned int)vertex_count)) return;

@@ -217,6 +217,8 @@ bool bongo_cat_preferences_open_window(BongoCatPreferences *value) {
         value->owns_gl_context, value->transparent_window,
         pixel_width, pixel_height,
         layout_scale, raster_scale);
+    /* 高 DPI 下逻辑与像素尺寸分叉, 报"界面缺一块/大片空白"时看这一行 */
+    bongo_cat_ui_log_scale("设置窗口", value->window);
     /*
      * 只有 GL 窗口才碰 GL。设置窗口在 Vulkan 模式下没有 GL 上下文, 直接调用会进
      * nvoglv64.dll 崩掉 (WER: Faulting module nvoglv64.dll, 0xc0000005) —— 这正是
@@ -279,5 +281,6 @@ bool bongo_cat_preferences_scale_event(BongoCatPreferences *value,
     SDL_Log("Preferences scale changed: layout %.2f->%.2f raster %.2f->%.2f logical=%.0fx%.0f",
         old_layout, layout_scale, old_raster, raster_scale,
         logical_width, logical_height);
+    bongo_cat_ui_log_scale("设置窗口(缩放变化)", value->window);
     return true;
 }

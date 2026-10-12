@@ -165,6 +165,8 @@ bool dial_window_create(Dial *d) {
         d->width < 1 || d->height < 1) return false;
     d->scale = (float)SDL_min(d->width,d->height)/608;
     d->raster_scale = (float)d->pixel_width/(float)d->width;
+    /* 轮盘按窗口坐标布局, 这一行把逻辑/像素/窗口尺寸一起打出来好对账 */
+    bongo_cat_ui_log_scale("轮盘", d->window);
 #ifdef _WIN32
     /*
      * GL 模式下的逐像素透明: 轮盘是独立窗口、没有自己的 BongoCatPlatform, 拿不到主窗口
