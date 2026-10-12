@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.24)
-set(BONGO_CAT_VERSION "1.15.1")
-project(BongoCat VERSION ${BONGO_CAT_VERSION} DESCRIPTION "BongoCat" HOMEPAGE_URL "https://github.com/vladelaina/BongoCat" LANGUAGES C CXX)
+set(BONGO_CAT_VERSION "1.16.0")
+project(BongoCat VERSION ${BONGO_CAT_VERSION} DESCRIPTION "BongoCat Turbo" HOMEPAGE_URL "https://github.com/Fid-falling/bongocat-turbo" LANGUAGES C CXX)
 include(cmake/Version.cmake)
 include(FetchContent)
 include(CTest)
@@ -134,7 +134,7 @@ include(cmake/PlatformRuntime.cmake)
 
 add_executable(bongo_cat src/main.c)
 target_link_libraries(bongo_cat PRIVATE bongo_cat_runtime bongo_cat_warnings)
-set_target_properties(bongo_cat PROPERTIES OUTPUT_NAME "BongoCat")
+set_target_properties(bongo_cat PROPERTIES OUTPUT_NAME "BongoCatTurbo")
 bongo_cat_enable_release_ipo(Framework bongo_cat_core bongo_cat_runtime bongo_cat)
 
 include(cmake/ValidationTools.cmake)
