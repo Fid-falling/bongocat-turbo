@@ -69,9 +69,13 @@ bool bongo_cat_ui_native_chrome(void) {
 
 /*
  * 画窗口底板。非原生边框时用两遍绘制 + scissor 造出"整块毛玻璃 + 侧边栏实色":
- * 先按整窗圆角铺 surface_glass, 再把裁剪框压到侧边栏区域重铺一次 surface —— 这样
- * 侧边栏右侧是一条干净的直边, 而外层圆角仍然完整。native_frame 时系统自己在画边框,
- * 圆角必须为 0, 否则 DWM 的方角会和我们的圆角打架。
+ * 先按整窗尺寸铺 surface_glass, 再把裁剪框压到侧边栏区域重铺一次 surface —— 这样
+ * 侧边栏右侧是一条干净的直边。
+ * 圆角恒为 0: 设置窗口的四角必须是直角。它同时由两处决定, 缺一不可 ——
+ *   - 系统合成的圆角: 见 windows.c 的 bongo_cat_platform_configure_preferences_window
+ *     (DWM 的 DWMWA_WINDOW_CORNER_PREFERENCE = DWMWCP_DONOTROUND);
+ *   - 这里自绘的底板圆角: 透明窗口上它就是可见的那一圈, DWM 那条设置根本管不到。
+ * 宠物窗口的"窗口圆角 (%)"是另一条路径 (window_background.c 的 mask_corners), 不受影响。
  * 侧边栏发光只在浅色主题、开了特效、且不在实时缩放时烘焙 (见 live_resize_fast)。
  */
 void bongo_cat_ui_shell_draw(struct nk_context *context, float width,
@@ -79,7 +83,7 @@ void bongo_cat_ui_shell_draw(struct nk_context *context, float width,
     BongoCatUIPalette p = bongo_cat_ui_palette(dark);
     struct nk_command_buffer *canvas = nk_window_get_canvas(context);
     float side = bongo_cat_ui_sidebar_width(width);
-    float rounding = native_frame ? 0.0f : 24.0f;
+    const float rounding = 0.0f;
     float sidebar_right = BONGO_CAT_UI_MARGIN + side;
     struct nk_rect surface = nk_rect(0, 0, width, height);
     BongoCatUIBackend *backend = bongo_cat_ui_backend_for_context(context);

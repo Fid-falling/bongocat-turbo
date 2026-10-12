@@ -113,13 +113,15 @@ void bongo_cat_ui_native_theme_apply(SDL_Window *window, bool dark) {
         sizeof(enabled));
     bool transparent = (SDL_GetWindowFlags(window) &
         SDL_WINDOW_TRANSPARENT) != 0;
-    /* Transparent windows rely on a per-pixel GL mask (bongo_cat_ui_paint_
-       rounded_surface) whose four corners are geometrically symmetric. The
-       DWM system corner preference (DWMWCP_ROUND) is unreliable on borderless
-       windows and frequently fails to clip the right edge, leaving a stray
-       opaque corner there. Disable DWM rounding entirely for transparent
-       windows so the GL mask is the sole, symmetric source of the rounding. */
-    int corner = transparent ? 0 : 2;
+    /*
+     * 这个函数只服务设置窗口 (唯一调用点在 preferences.c), 而设置窗口的四角要求是
+     * 直角 —— 不论它是透明窗口还是回退出来的不透明窗口。
+     * 以前这里按"透明就交给 GL 遮罩、不透明就用 DWM 圆角"分叉: 透明窗口那一圈圆角其实
+     * 来自自绘底板 (现已在 ui_catime.c 去掉), 而不透明回退时又会被 DWM 圆回来。两条路
+     * 都要堵死, 所以恒为 DWMWCP_DONOTROUND。
+     * 宠物窗口的"窗口圆角 (%)"不受影响: 它不走这个函数。
+     */
+    const int corner = 1; /* DWMWCP_DONOTROUND */
     DwmSetWindowAttribute(handle, 33, &corner, sizeof(corner));
     if (transparent) {
         DWORD border = 0xfffffffeu;

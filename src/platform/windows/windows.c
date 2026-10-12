@@ -16,6 +16,7 @@
 #include <SDL3/SDL.h>
 #include <SDL3/SDL_properties.h>
 #include <SDL3/SDL_video.h>
+#include <dwmapi.h>
 #include <string.h>
 #include <windows.h>
 static HWND native_window(BongoCatPlatform *platform) {
@@ -34,6 +35,19 @@ static bool SDLCALL windows_message_hook(void *userdata, MSG *message) {
         message->message, message->wParam);
 }
 
+/* 设置窗口必须是直角。Win11 的 DWM 默认会给窗口加圆角, SDL 建窗时也会显式设回
+   DWMWCP_DEFAULT ("让 DWM 决定") —— 只有对**这个**窗口写 DONOTROUND 才能压住它。
+   为什么不靠 SDL 的边框设置: 设置窗口是 WS_POPUP 无边框窗口, 系统仍然会按默认偏好
+   圆角化, 而它自绘的底板 (ui_catime.c 的 shell) 也一样必须是直角, 两处缺一不可。
+   宠物窗口不在这里处理: 它有用户可调的"窗口圆角 (%)", 走 window_background.c 的
+   mask_corners 那条路, 不能被这里连坐。属性号写死 33 是因为
+   DWMWA_WINDOW_CORNER_PREFERENCE 在旧 SDK 的头文件里还没有名字。 */
+static void disable_window_corner_rounding(HWND window) {
+    if (!window) return;
+    const int donotround = 1; /* DWMWCP_DONOTROUND */
+    DwmSetWindowAttribute(window, 33, &donotround, sizeof(donotround));
+}
+
 /* 设置窗口也走透明路径, 但必须先显式登记(mark_transparent): 采集模块靠这个标记
    决定要不要对它做样式事务。透明窗口还要装自己的窗口过程并立刻修复一次合成,
    否则第一帧会闪出不透明的底。 */
@@ -41,6 +55,7 @@ void bongo_cat_platform_configure_preferences_window(SDL_Window *window) {
     if (!window) return;
     HWND handle = (HWND)SDL_GetPointerProperty(SDL_GetWindowProperties(window),
         SDL_PROP_WINDOW_WIN32_HWND_POINTER, NULL);
+    disable_window_corner_rounding(handle);
     bool transparent = (SDL_GetWindowFlags(window) &
         SDL_WINDOW_TRANSPARENT) != 0;
     bongo_cat_windows_capture_mark_transparent(handle, transparent);
