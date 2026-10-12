@@ -1,12 +1,14 @@
 /*
- * 关于页底部信息条: 版本号 + 更新按钮 + 反馈链接 + 打开日志目录。
+ * 关于页底部信息条: 版本号 + 更新按钮 + (失败时的)查看发布版本 + 反馈链接 + 打开日志目录。
  *
- * 两条是本文件的核心逻辑:
+ * 三条是本文件的核心逻辑:
  * 1. 布局是"能并排就并排, 放不下就换两行"(stacked)。所有宽度都是先把各段量出来
  * 再累加得到的, 加一项就要把它算进 total/actions_width, 否则窄窗口下会被裁掉;
  * 2. 更新按钮是一个多态按钮, 文案和点击行为都由 update_snapshot 的 status 决定
  * (检查中/有新版/商店版/不支持自更新/普通检查)。文案由 update_label 统一给出,
  * 状态判断在这里重复了一次 —— 改动状态语义时两处要一起改。
+ * 3. "查看发布版本"只在 ERROR 时出现: 检查失败后按钮只会重试, 得给用户一条不经过
+ * GitHub API 的出路 (限流时 API 打不通, 发布页本身仍能打开)。
  * 版本号用 BONGO_CAT_VERSION_DISPLAY (带构建渠道信息), 不要再拼别的字符串。
  */
 #include "preferences_about_footer.h"
@@ -91,6 +93,20 @@ static void open_logs(BongoCatPreferences *value) {
 }
 
 /*
+ * 打开更新/发布页面, 失败时统一提示。两处入口(更新按钮、"查看发布版本"链接)共用:
+ * 带上 SDL_GetError 是因为打开失败多半是系统拒绝了 URL, 只说"无法打开"没法排查。
+ */
+static void open_update_page(BongoCatPreferences *value) {
+    if (bongo_cat_update_open(value->app->update)) return;
+    char detail[384];
+    const char *reason = SDL_GetError();
+    snprintf(detail, sizeof(detail), "%s: %s", tr(value,
+        "native.support.openUpdateFailed", "Unable to open the update page"),
+        reason && reason[0] ? reason : "system rejected the URL");
+    bongo_cat_preferences_notice_show(value->app, detail, true);
+}
+
+/*
  * 更新按钮。右上角那个小红点是"真有可下载的新版本"的标记 —— 它和按钮文案是两套
  * 判断: 文案可能只写"检查更新", 但有红点就说明点下去会去下载。
  * CHECKING 状态下点击直接返回 (不发第二次请求); 打开商店/发布页失败时把
@@ -128,22 +144,29 @@ static void draw_update(BongoCatPreferences *value,
                     "Unable to check for updates"), true);
         } else if (snapshot->status == BONGO_CAT_UPDATE_STORE ||
             snapshot->status == BONGO_CAT_UPDATE_UNSUPPORTED) {
-            if (!bongo_cat_update_open(value->app->update))
-                {
-                    char detail[384];
-                    const char *reason = SDL_GetError();
-                    snprintf(detail, sizeof(detail), "%s: %s", tr(value,
-                        "native.support.openUpdateFailed",
-                        "Unable to open the update page"),
-                        reason && reason[0] ? reason : "system rejected the URL");
-                    bongo_cat_preferences_notice_show(value->app, detail, true);
-                }
+            open_update_page(value);
         } else if (!bongo_cat_update_check(value->app->update, true)) {
             bongo_cat_preferences_notice_show(value->app, tr(value,
                 "native.support.updateFailed",
                 "Unable to check for updates"), true);
         } else value->render_dirty = true;
     }
+}
+
+/*
+ * 检查失败时才出现的"查看发布版本"链接 (见 update_label 之外的这条分支)。
+ * 失败时更新按钮只会重新发起请求, 而限流恰恰是 GitHub API 打不通的时候 ——
+ * 这条链接走的是发布页本身, 不经过 API, 让用户至少有一条查到最新版本的路。
+ * 与 update_label 里 UNSUPPORTED 的按钮文案不同: 那是整条通道不可用, 这里是"这次没查成"。
+ */
+static void draw_releases(BongoCatPreferences *value,
+    struct nk_context *context, struct nk_command_buffer *canvas,
+    struct nk_rect bounds, const char *label, BongoCatUIPalette p) {
+    struct nk_color color = link_color(context, bounds,
+        "support-releases-hover", p);
+    centered(canvas, bounds, label, value->ui.caption_font, color);
+    link_cursor(context, bounds);
+    if (hit(context, bounds)) open_update_page(value);
 }
 
 /* 更新按钮的文案表。buffer 由调用方提供, 因为"更新到 vX.Y.Z"要拼接版本号 */
@@ -209,7 +232,7 @@ static void draw_links(BongoCatPreferences *value,
 /*
  * 底部信息条。所有子宽度先量后排, 最后用一个 total 判断要不要折行:
  * info 段 = "App version" + 版本号
- * actions 段 = 更新按钮 + 反馈 + 日志
+ * actions 段 = 更新按钮 + (只有失败时的)查看发布版本 + 反馈 + 日志
  * 折行时两段各自居中, 并让 info 行上移 8px / actions 行下移 22px —— 这两个偏移量
  * 是配合 34px 行高调出来的, 改行高要一起改。
  */
@@ -225,8 +248,13 @@ void bongo_cat_preferences_about_footer(BongoCatPreferences *value,
         update_buffer, sizeof(update_buffer));
     const char *feedback = tr(value, "native.support.feedback", "Feedback");
     const char *logs = tr(value, "native.support.openLogs", "Open logs");
+    const char *releases = tr(value, "native.support.viewReleases",
+        "View releases");
     const struct nk_user_font *small_font = logs_font(value);
     const char *version = BONGO_CAT_VERSION_DISPLAY;
+    /* 只有检查失败(限流、网络不通等)才多出这一个入口, 所以宽度也要一起算进
+       actions_width, 否则窄窗口下它会被右边裁掉。 */
+    bool show_releases = update_snapshot.status == BONGO_CAT_UPDATE_ERROR;
     float label_width = width(value->ui.caption_font, version_label) + 2;
     float version_width = width(value->ui.label_font, version) + 2;
     float update_text_width = width(value->ui.caption_font, update);
@@ -235,8 +263,11 @@ void bongo_cat_preferences_about_footer(BongoCatPreferences *value,
     float feedback_width = NK_MAX(56.0f,
         width(value->ui.caption_font, feedback) + 4.0f);
     float logs_width = logs_content_width(small_font, logs) + 4.0f;
+    float releases_width = show_releases ? NK_MAX(56.0f,
+        width(value->ui.caption_font, releases) + 4.0f) : 0.0f;
     float links_width = feedback_width + 20.0f + logs_width;
-    float actions_width = update_width + 14.0f + links_width;
+    float actions_width = update_width + 14.0f + links_width +
+        (show_releases ? releases_width + 14.0f : 0.0f);
     float info_width = label_width + version_width + 8.0f;
     float total = info_width + actions_width + 14.0f;
     bool stacked = total > bounds.w;
@@ -255,7 +286,13 @@ void bongo_cat_preferences_about_footer(BongoCatPreferences *value,
         update_width, 36);
     draw_update(value, context, canvas, update_button, update,
         update_content_width, p, &update_snapshot);
-    struct nk_rect feedback_link = nk_rect(actions_x + update_width + 14,
+    float link_x = actions_x + update_width + 14;
+    if (show_releases) {
+        draw_releases(value, context, canvas, nk_rect(link_x, actions_y,
+            releases_width, 36), releases, p);
+        link_x += releases_width + 14;
+    }
+    struct nk_rect feedback_link = nk_rect(link_x,
         actions_y, feedback_width, 36);
     struct nk_rect logs_link = nk_rect(feedback_link.x + feedback_width + 20,
         actions_y, logs_width, 36);

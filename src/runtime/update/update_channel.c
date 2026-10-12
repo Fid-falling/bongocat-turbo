@@ -11,7 +11,6 @@
 #include "preferences_notice.h"
 
 #include <stdio.h>
-#include <stdlib.h>
 #include <string.h>
 
 #ifdef _WIN32
@@ -130,9 +129,9 @@ static const char *tr(BongoCatUpdateService *service, const char *key,
 
 /* 手动检查完成后的回执: 只有 manual 检查会走到这里 (自动检查静默, 免得每次启动
  * 都弹提示), 而且 app->preferences 为空时底层直接丢弃, 不会崩。
- * ERROR 分支特意去解析 update_http.c / update_http_unix.c 写出的
- * "GitHub returned HTTP status N" 前缀, 把它换成本地化模板 —— 改那两处文案时必须
- * 同步改这里, 否则前缀对不上, 提示会退化成英文原文。
+ * ERROR 分支把人话交给 core/update_error.c: 那里认识 update_http*.c 写出的
+ * "GitHub returned HTTP status N", 403/429 给"接口限流, 稍后重试或直接看发布页",
+ * 其余状态码给通用文案 —— 界面不出现状态码, 原文仍由 update_service.c 记进日志。
  * message/detail 都是固定栈缓冲, 超长只截断不报错。 */
 void bongo_cat_update_show_completion(BongoCatUpdateService *service) {
     BongoCatUpdateSnapshot snapshot;
@@ -148,20 +147,8 @@ void bongo_cat_update_show_completion(BongoCatUpdateService *service) {
             snapshot.release.version);
         bongo_cat_preferences_notice_show(service->app, message, false);
     } else if (snapshot.status == BONGO_CAT_UPDATE_ERROR) {
-        char detail[384], status_text[16];
-        static const char prefix[] = "GitHub returned HTTP status ";
-        const char *value = snapshot.error + sizeof(prefix) - 1;
-        char *end = NULL;
-        unsigned long status = strncmp(snapshot.error, prefix,
-            sizeof(prefix) - 1) == 0 ? strtoul(value, &end, 10) : 0;
-        if (status && end && !*end) {
-            snprintf(status_text, sizeof(status_text), "%lu", status);
-            snprintf(detail, sizeof(detail), tr(service,
-                "native.support.updateHttpFailed",
-                "GitHub returned HTTP status %s"), status_text);
-        } else snprintf(detail, sizeof(detail), "%s", snapshot.error[0] ?
-            snapshot.error : tr(service, "native.support.updateFailed",
-                "Unable to check for updates"));
-        bongo_cat_preferences_notice_show(service->app, detail, true);
+        bongo_cat_preferences_notice_show(service->app,
+            bongo_cat_update_error_text(service->app->i18n, snapshot.error),
+            true);
     }
 }

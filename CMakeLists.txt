@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.24)
-set(BONGO_CAT_VERSION "1.16.0")
+set(BONGO_CAT_VERSION "1.16.1")
 project(BongoCat VERSION ${BONGO_CAT_VERSION} DESCRIPTION "BongoCat Turbo" HOMEPAGE_URL "https://github.com/Fid-falling/bongocat-turbo" LANGUAGES C CXX)
 include(cmake/Version.cmake)
 include(FetchContent)
@@ -90,7 +90,8 @@ add_library(bongo_cat_core STATIC
   src/core/model_behavior.c src/core/model_json.c
   src/core/path.c src/core/path_io.c src/core/json.c src/core/shortcut.c
   src/core/sound_shortcut.c
-  src/core/update_release.c src/core/update_version.c)
+  src/core/update_release.c src/core/update_version.c
+  src/core/update_error.c)
 target_include_directories(bongo_cat_core PUBLIC "${BONGO_CAT_GENERATED_INCLUDE_DIR}" include)
 target_link_libraries(bongo_cat_core PUBLIC yyjson PRIVATE bongo_cat_warnings)
 include(cmake/CubismAssets.cmake)

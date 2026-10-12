@@ -2,6 +2,7 @@
 #define BONGO_CAT_UPDATE_H
 
 #include "bongo_cat/common.h"
+#include "bongo_cat/i18n.h"
 
 #define BONGO_CAT_UPDATE_URL_CAP 512
 #define BONGO_CAT_UPDATE_NOTES_CAP 8192
@@ -22,6 +23,8 @@ int bongo_cat_update_compare_versions(const char *left, const char *right);
 bool bongo_cat_update_version_valid(const char *version);
 bool bongo_cat_update_parse_release(const char *json, const char *platform,
     BongoCatUpdateRelease *release, BongoCatError *error);
+const char *bongo_cat_update_error_text(const BongoCatI18n *i18n,
+    const char *raw);
 
 #ifdef __cplusplus
 }
