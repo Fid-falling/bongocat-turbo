@@ -32,7 +32,7 @@
           "hideFadeSeconds": "Durée du fondu (s)",
           "maxFPS": "Fréquence d'images maximale",
           "disableElevation": "Sans administrateur",
-          "disableElevationHint": "Ne demande plus les droits administrateur au démarrage ; le lancement auto reste possible",
+          "disableElevationHint": "Ne demande plus les droits administrateur au démarrage ; le lancement auto reste possible ; en administrateur, le glisser-déposer peut être bloqué",
           "disableUiEffects": "Désactiver les effets des réglages",
           "disableUiEffectsHint": "Sans lueurs ni ombres, la fenêtre de réglages est plus fluide",
           "fontRasterCapHint": "Netteté presque identique, moins de mémoire",
@@ -138,6 +138,8 @@
           "importFailed": "Échec de l'importation du modèle. Vérifiez les fichiers sélectionnés et réessayez",
           "clickOrDragToImport": "Cliquez ou déposez un dossier",
           "supportedImportFormats": "Formats Mver et Tauri pris en charge",
+          "dropBlockedTitle": "Impossible de déposer un modèle ?",
+          "dropBlocked": "Lancé en administrateur, Windows peut bloquer le glisser-déposer de l'Explorateur ; utilisez le bouton d'import ci-dessus.",
           "openDirectoryFailed": "Impossible d'ouvrir le dossier du modèle"
         },
         "tooltips": {

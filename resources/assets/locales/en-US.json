@@ -32,7 +32,7 @@
           "hideFadeSeconds": "Fade Duration (s)",
           "maxFPS": "Max Frame Rate",
           "disableElevation": "Run without administrator",
-          "disableElevationHint": "Stops asking for administrator rights at startup; auto-start keeps working",
+          "disableElevationHint": "Stops asking for administrator rights at startup; auto-start keeps working; Explorer drag and drop may be blocked while running as administrator",
           "disableUiEffects": "Disable settings UI effects",
           "disableUiEffectsHint": "Turns off glows and shadows to make the settings window smoother",
           "fontRasterCapHint": "About the same clarity, but uses less memory",
@@ -138,6 +138,8 @@
           "importFailed": "Model import failed. Check the selected files and try again",
           "clickOrDragToImport": "Click or drag a model folder",
           "supportedImportFormats": "Supports Mver and Tauri formats",
+          "dropBlockedTitle": "Cannot drop a model?",
+          "dropBlocked": "Running as administrator can make Windows block Explorer drag and drop; use the import button above instead.",
           "openDirectoryFailed": "Unable to open model directory"
         },
         "tooltips": {

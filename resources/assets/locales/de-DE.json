@@ -32,7 +32,7 @@
           "hideFadeSeconds": "Ausblendedauer (s)",
           "maxFPS": "Maximale Bildrate",
           "disableElevation": "Ohne Administrator starten",
-          "disableElevationHint": "Fragt beim Start keine Administratorrechte mehr ab; Autostart funktioniert",
+          "disableElevationHint": "Fragt beim Start keine Administratorrechte mehr ab; Autostart funktioniert; als Administrator kann das Ablegen blockiert sein",
           "disableUiEffects": "Effekte im Einstellungsfenster aus",
           "disableUiEffectsHint": "Ohne Leuchten und Schatten läuft das Einstellungsfenster flüssiger",
           "fontRasterCapHint": "Fast gleiche Schärfe, aber weniger Speicher",
@@ -138,6 +138,8 @@
           "importFailed": "Der Modellimport ist fehlgeschlagen. Prüfen Sie die ausgewählten Dateien und versuchen Sie es erneut",
           "clickOrDragToImport": "Modellordner wählen oder ziehen",
           "supportedImportFormats": "Unterstützt Mver und Tauri",
+          "dropBlockedTitle": "Modell lässt sich nicht ablegen?",
+          "dropBlocked": "Als Administrator kann Windows das Ziehen aus dem Explorer blockieren; nutzen Sie die Import-Schaltfläche oben.",
           "openDirectoryFailed": "Modellordner konnte nicht geöffnet werden"
         },
         "tooltips": {

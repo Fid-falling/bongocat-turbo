@@ -50,6 +50,7 @@ static bool try_vulkan_window(BongoCatApp *app, BongoCatError *error) {
             "Vulkan 窗口创建失败: %s", SDL_GetError());
         return false;
     }
+    bongo_cat_platform_allow_file_drop(app->window);
     app->vk = bongo_cat_vk_create(app->window, error);
     if (!app->vk) {
         if (!error->message[0])
@@ -116,6 +117,7 @@ static bool try_window(BongoCatApp *app, bool transparent, int samples,
     if (!app->window) {
         snprintf(failure, capacity, "Window creation: %s", SDL_GetError()); return false;
     }
+    bongo_cat_platform_allow_file_drop(app->window);
     app->gl_context = SDL_GL_CreateContext(app->window);
     if (!app->gl_context || !SDL_GL_MakeCurrent(app->window, app->gl_context)) {
         snprintf(failure, capacity, "OpenGL context: %s", SDL_GetError());

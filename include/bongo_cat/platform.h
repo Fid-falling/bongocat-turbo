@@ -127,6 +127,9 @@ bool bongo_cat_platform_capture_only_supported(void);
 bool bongo_cat_platform_is_elevated(void);
 bool bongo_cat_platform_relaunch_elevated(void);
 bool bongo_cat_platform_relaunch_elevated_if_needed(void);
+/* 建窗之后调一次: 提权进程要显式放行拖放相关的窗口消息, 否则 UIPI 会把资源管理器的
+   拖放整个挡在门外 (详见 windows_elevate.c 的实现注释)。非 Windows 平台是空操作。 */
+void bongo_cat_platform_allow_file_drop(SDL_Window *window);
 bool bongo_cat_platform_pointer_local(BongoCatPlatform *platform, double screen_x,
     double screen_y, float *local_x, float *local_y);
 /* Reports a foreground application's fixed/locked system cursor state. */

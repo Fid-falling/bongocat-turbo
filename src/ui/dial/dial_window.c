@@ -116,6 +116,7 @@ bool dial_window_create(Dial *d) {
         }
     }
     if (!d->window) return false;
+    bongo_cat_platform_allow_file_drop(d->window);
     d->window_id = SDL_GetWindowID(d->window);
     if (dial_vulkan) {
         /*

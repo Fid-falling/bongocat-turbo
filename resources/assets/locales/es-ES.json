@@ -32,7 +32,7 @@
           "hideFadeSeconds": "Duración del fundido (s)",
           "maxFPS": "Frecuencia máxima de fotogramas",
           "disableElevation": "Sin administrador",
-          "disableElevationHint": "Ya no pide permisos de administrador al iniciar; el inicio automático sigue funcionando",
+          "disableElevationHint": "Ya no pide permisos de administrador al iniciar; el inicio automático sigue funcionando; como administrador, arrastrar puede quedar bloqueado",
           "disableUiEffects": "Desactivar efectos de los ajustes",
           "disableUiEffectsHint": "Sin brillos ni sombras, la ventana de ajustes va más fluida",
           "fontRasterCapHint": "Casi la misma nitidez, pero menos memoria",
@@ -138,6 +138,8 @@
           "importFailed": "Error al importar el modelo. Compruebe los archivos seleccionados e inténtelo de nuevo",
           "clickOrDragToImport": "Haz clic o arrastra una carpeta",
           "supportedImportFormats": "Compatible con Mver y Tauri",
+          "dropBlockedTitle": "¿No puedes soltar un modelo?",
+          "dropBlocked": "Al ejecutarse como administrador, Windows puede bloquear el arrastre desde el Explorador; usa el botón de importar de arriba.",
           "openDirectoryFailed": "No se pudo abrir la carpeta del modelo"
         },
         "tooltips": {

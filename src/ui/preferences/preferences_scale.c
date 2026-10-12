@@ -106,6 +106,7 @@ static bool create_window(BongoCatPreferences *value, int width, int height,
     value->window = SDL_CreateWindow(title,
         width, height,
         flags | (transparent ? SDL_WINDOW_TRANSPARENT : 0));
+    bongo_cat_platform_allow_file_drop(value->window);
     value->transparent_window = value->window && transparent &&
         (SDL_GetWindowFlags(value->window) & SDL_WINDOW_TRANSPARENT) != 0;
     return value->window != NULL;

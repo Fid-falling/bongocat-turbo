@@ -32,7 +32,7 @@
           "hideFadeSeconds": "鼠标移入淡出时长（秒）",
           "maxFPS": "最大帧率",
           "disableElevation": "不以管理员运行",
-          "disableElevationHint": "关掉后启动不再询问管理员权限, 开机自启也能用",
+          "disableElevationHint": "关掉后启动不再询问管理员权限, 开机自启也能用；管理员模式下拖放会被系统拦截",
           "disableUiEffects": "关闭设置界面特效",
           "disableUiEffectsHint": "关掉发光与阴影，设置界面更流畅",
           "fontRasterCapHint": "清晰度基本不变, 但更省内存",
@@ -138,6 +138,8 @@
           "importFailed": "模型导入失败，请检查所选文件后重试",
           "clickOrDragToImport": "点击或拖入模型文件夹",
           "supportedImportFormats": "同时支持 Mver 和 Tauri 格式",
+          "dropBlockedTitle": "拖不进模型？",
+          "dropBlocked": "以管理员身份运行时，Windows 可能拦截资源管理器的拖放；可以改用上面的导入按钮选择 zip。",
           "openDirectoryFailed": "无法打开模型目录"
         },
         "tooltips": {

@@ -32,7 +32,7 @@
           "hideFadeSeconds": "フェード時間 (秒)",
           "maxFPS": "最大フレームレート",
           "disableElevation": "管理者として実行しない",
-          "disableElevationHint": "起動時に管理者権限を求めなくなります (自動起動も使えます)",
+          "disableElevationHint": "起動時に管理者権限を求めなくなります (自動起動も使えます) (管理者権限ではドラッグ&ドロップが遮断されることがあります)",
           "disableUiEffects": "設定画面の効果を無効化",
           "disableUiEffectsHint": "光と影を消して、設定画面をなめらかにします",
           "fontRasterCapHint": "見た目はほぼ変わらず、メモリを節約できます",
@@ -138,6 +138,8 @@
           "importFailed": "モデルのインポートに失敗しました。選択したファイルを確認して、もう一度お試しください",
           "clickOrDragToImport": "モデルフォルダーをクリックまたはドラッグ",
           "supportedImportFormats": "Mver・Tauri形式に対応",
+          "dropBlockedTitle": "ドラッグで取り込めない？",
+          "dropBlocked": "管理者として実行すると Windows がエクスプローラーのドラッグ&ドロップを遮断することがあります。上のインポートボタンをお使いください。",
           "openDirectoryFailed": "モデルフォルダーを開けません"
         },
         "tooltips": {

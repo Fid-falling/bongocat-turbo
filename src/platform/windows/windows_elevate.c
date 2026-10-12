@@ -68,10 +68,63 @@ bool bongo_cat_platform_relaunch_elevated_if_needed(void) {
     return bongo_cat_platform_relaunch_elevated();
 }
 
+/*
+ * 提权后放行拖放消息 (UIPI)。
+ *
+ * 为什么必须做: 资源管理器 (explorer.exe) 跑在中等完整性级别, 而提权后的本进程是高
+ * 完整性级别。UIPI 默认禁止低完整性进程向高完整性窗口投递消息, 于是从资源管理器拖一个
+ * zip 到窗口上**完全没反应** —— 消息根本到不了 SDL 的消息循环, 也就没有 SDL_EVENT_DROP_*。
+ * 表现非常有迷惑性: 同一份程序不提权就一切正常, 一提权就"拖不动"。
+ *
+ * 放行三条:
+ *   - WM_DROPFILES: SDL 在没初始化 OLE 时的拖放回退通路, 消息里带一个 HDROP;
+ *   - WM_COPYDATA: 经典的自定义跨进程数据搬运, 拖放源可能用它;
+ *   - WM_COPYGLOBALDATA(0x0049): **未文档化**的内部消息, OLE 在跨进程传递 IDataObject
+ *     时要靠它把 HGLOBAL 搬进目标进程。SDL3 在 Windows 上默认 OleInitialize 成功, 走的
+ *     正是 OLE 的 IDropTarget 通路 —— 只放行 WM_DROPFILES 是不够的, 这一条才是关键。
+ *     旧的 Windows SDK 头里没有这个宏, 所以自己定义。
+ *
+ * 只在已提权时动过滤表: 没提权时 UIPI 本来就不拦, 改了反而白白放宽本进程的窗口过滤。
+ *
+ * 覆盖范围: 传进来的窗口 + 本线程所有顶层窗口。后者是为了顺带覆盖 OLE 自己建的中转窗口
+ * (OleInitialize 在 SDL 初始化视频时就已经建好, 属于同一个线程), 以及以后新增的窗口创建
+ * 路径 —— 漏掉任何一个, 那个窗口上的拖放就仍然是"没反应"。
+ */
+#ifndef WM_COPYGLOBALDATA
+#define WM_COPYGLOBALDATA 0x0049
+#endif
+
+static const UINT drop_messages[] = {
+    WM_DROPFILES, WM_COPYGLOBALDATA, WM_COPYDATA
+};
+
+static void allow_drop_messages(HWND hwnd) {
+    if (!hwnd) return;
+    for (size_t i = 0; i < sizeof(drop_messages) / sizeof(drop_messages[0]); ++i)
+        ChangeWindowMessageFilterEx(hwnd, drop_messages[i], MSGFLT_ALLOW, NULL);
+}
+
+static BOOL CALLBACK allow_drop_messages_for_window(HWND hwnd, LPARAM unused) {
+    (void)unused;
+    allow_drop_messages(hwnd);
+    return TRUE;
+}
+
+void bongo_cat_platform_allow_file_drop(SDL_Window *window) {
+    if (!bongo_cat_platform_is_elevated()) return;
+    HWND hwnd = window ? (HWND)SDL_GetPointerProperty(SDL_GetWindowProperties(window),
+        SDL_PROP_WINDOW_WIN32_HWND_POINTER, NULL) : NULL;
+    allow_drop_messages(hwnd);
+    EnumThreadWindows(GetCurrentThreadId(), allow_drop_messages_for_window, 0);
+    SDL_LogInfo(BONGO_CAT_LOG_LIFECYCLE,
+        "[runtime] 已放行拖放消息 (UIPI): hwnd=%p", (void *)hwnd);
+}
+
 #else /* 非 Windows: 没有 UAC 这一套, 直接当作"无需提权" */
 
 bool bongo_cat_platform_is_elevated(void) { return false; }
 bool bongo_cat_platform_relaunch_elevated(void) { return false; }
 bool bongo_cat_platform_relaunch_elevated_if_needed(void) { return false; }
+void bongo_cat_platform_allow_file_drop(SDL_Window *window) { (void)window; }
 
 #endif

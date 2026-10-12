@@ -32,7 +32,7 @@
           "hideFadeSeconds": "Duração do fade (s)",
           "maxFPS": "Taxa Máxima de Quadros",
           "disableElevation": "Sem administrador",
-          "disableElevationHint": "Não pede mais permissão de administrador ao iniciar; a inicialização automática continua",
+          "disableElevationHint": "Não pede mais permissão de administrador ao iniciar; a inicialização automática continua; como administrador, arrastar pode ser bloqueado",
           "disableUiEffects": "Desativar efeitos das configurações",
           "disableUiEffectsHint": "Sem brilhos e sombras, a janela de ajustes fica mais fluida",
           "fontRasterCapHint": "Quase a mesma nitidez, mas menos memória",
@@ -138,6 +138,8 @@
           "importFailed": "Falha ao importar o modelo. Verifique os arquivos selecionados e tente novamente",
           "clickOrDragToImport": "Clique ou arraste uma pasta",
           "supportedImportFormats": "Compatível com Mver e Tauri",
+          "dropBlockedTitle": "Não consegue soltar um modelo?",
+          "dropBlocked": "Executando como administrador, o Windows pode bloquear o arrastar do Explorer; use o botão de importar acima.",
           "openDirectoryFailed": "Não foi possível abrir a pasta do modelo"
         },
         "tooltips": {
