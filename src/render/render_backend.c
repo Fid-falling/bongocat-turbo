@@ -53,17 +53,19 @@ const char *bongo_cat_renderer_unavailable_reason(BongoCatRenderer value) {
             return "此构建未启用 Vulkan (需要 -DBONGO_CAT_ENABLE_VULKAN=ON)";
 #if !BONGO_CAT_VULKAN_BACKEND_IMPLEMENTED
         return "Vulkan 后端尚未实现, 目前只有 OpenGL 可用";
-#elif defined(BONGO_CAT_HAS_CUBISM)
-        /* Cubism 模型的渲染器仍然是 OpenGL 实现, 在它移植完成之前, 让带
-           Cubism 的构建明确地留在 OpenGL 上, 而不是画出一个没有模型的窗口。 */
-        /*
-         * 带 Cubism 的构建现在也能用 Vulkan: Live2D 走 SDK 自带的
-         * CubismRenderer_Vulkan, 先渲染到离屏纹理, 再由 Vulkan 后端的合成
-         * 路径画进宠物窗口 (src/live2d/cubism_vulkan_bridge.cpp)。
-         * 返回 NULL = 没有不可用原因, 即允许选择这个后端。
-         */
-        return NULL;
 #else
+        /*
+         * 可用性问的是"这台机器 + 这次构建能不能跑起来", **不是**"现在是不是已经在用
+         * Vulkan" —— 所以这里必须无条件探测, 与当前后端无关, 也不能因为"Live2D 的
+         * Cubism 渲染器以前只有 OpenGL 版"就跳过探测:
+         *   - 跳过探测 (以前带 Cubism 的构建就是直接 return NULL) 会让一台没有 Vulkan
+         *     驱动的机器也把 Vulkan 段画成可选, 用户点了、写进配置、重启, 结果只是
+         *     一次"回退到 OpenGL"的日志和一个没变化的界面;
+         *   - 反过来, 探测里依赖"当前已有 Vulkan 实例/设备"的实现会把自己挡在门外
+         *     (OpenGL 模式下永远探测失败), 那正是"设置里点了没反应"的来源。
+         * 带 Cubism 的构建早就能走 Vulkan (CubismRenderer_Vulkan + 离屏合成, 见
+         * src/live2d/cubism_vulkan_bridge.cpp), 所以探测结果就是唯一判据。
+         */
         {
             BongoCatError probe = {0};
             if (bongo_cat_vk_probe(&probe)) return NULL;

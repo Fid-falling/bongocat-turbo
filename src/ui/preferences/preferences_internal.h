@@ -91,6 +91,11 @@ bool bongo_cat_preferences_cache_path_dialog_event(BongoCatPreferences *value,
    #ifdef _WIN32 包起来。 */
 void bongo_cat_preferences_window_transparency(BongoCatApp *app,
     struct nk_context *context);
+/* [模型] 区的"渲染后端"分段选择器 (Auto/OpenGL/Vulkan)。定义在
+   preferences_renderer_row.c: 它把点击翻译成一次共享的后端切换请求
+   (runtime/lifecycle/renderer_switch.c, 与托盘菜单同一个实现)。 */
+void bongo_cat_preferences_renderer_row(BongoCatApp *app,
+    struct nk_context *context);
 void bongo_cat_preferences_cache_path_browse(BongoCatPreferences *value);
 void bongo_cat_preferences_cache_path_cancel(BongoCatPreferences *value);
 

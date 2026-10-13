@@ -103,15 +103,27 @@ static void report_manual_restart(BongoCatApp *app, const BongoCatError *error) 
  *
  * 无人值守运行 (--ci-* / 冒烟 / BONGO_CAT_TEST_NO_DIALOG) 一律不弹窗, 直接按"稍后"
  * 处理: 模态框会把脚本挂死, 而"稍后手动重启"本来就是安全的那条路 (配置照写)。
+ * 例外是 BONGO_CAT_TEST_ALLOW_RESTART=1: 无人值守下改按"立即重启"处理, 见下面。
  */
 bool bongo_cat_app_confirm_restart(BongoCatApp *app) {
     if (!app) return false;
     if (app->smoke || app->automated || SDL_getenv("BONGO_CAT_TEST_NO_DIALOG")) {
+        /*
+         * BONGO_CAT_TEST_ALLOW_RESTART 在无人值守运行里"按立即重启处理"。
+         * 这个开关的注释一直写着"需要真实验证时用环境变量显式放行", 但调用方是
+         * `confirm_restart() && request_restart()` 的短路写法: confirm 返回 false 时
+         * request_restart 根本不会被调用, 于是那个环境变量实际上从来没生效过 ——
+         * 自动化里永远只能测到"稍后手动重启"这一半。这里把它补齐, 让脚本也能跑完整的
+         * "落盘 -> 重启 -> 新实例用上新后端"链路。
+         */
+        const bool allow_restart =
+            SDL_getenv(BONGO_CAT_TEST_ALLOW_RESTART_ENV) != NULL;
         SDL_LogInfo(BONGO_CAT_LOG_LIFECYCLE,
-            "[runtime] 无人值守运行 (%s): 不弹重启确认框, 按\"稍后手动重启\"处理",
+            "[runtime] 无人值守运行 (%s): 不弹重启确认框, 按\"%s\"处理",
             app->smoke ? "冒烟" : app->automated ? "--ci-* 参数"
-                : "BONGO_CAT_TEST_NO_DIALOG");
-        return false;
+                : "BONGO_CAT_TEST_NO_DIALOG",
+            allow_restart ? "立即重启" : "稍后手动重启");
+        return allow_restart;
     }
     const SDL_MessageBoxButtonData buttons[] = {
         {SDL_MESSAGEBOX_BUTTON_RETURNKEY_DEFAULT, 1,

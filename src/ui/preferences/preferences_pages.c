@@ -238,32 +238,9 @@ static void page_display(BongoCatApp *app, struct nk_context *context) {
     model->max_fps = bongo_cat_pref_fps(context, "max-fps", tr(app,
         "pages.preference.cat.labels.maxFPS", "Max Frame Rate"), model->max_fps,
         tr(app, "pages.preference.cat.labels.unlimitedFps", "Unlimited"));
-    bongo_cat_pref_row_icon(context, BONGO_CAT_PREF_ICON_RENDERER);
-    BongoCatRenderer previous_renderer = model->renderer;
-    model->renderer = (BongoCatRenderer)bongo_cat_pref_renderer(context,
-        "renderer", tr(app, "pages.preference.cat.labels.renderer", "Renderer"),
-        (int)model->renderer,
-        bongo_cat_renderer_available(BONGO_CAT_RENDERER_VULKAN));
-    if (model->renderer != previous_renderer) {
-        /* 后端在宠物窗口创建时一次性选定, 运行中换不了, 所以先弹确认框问用户"现在重启
-           还是稍后手动重启" (application_restart.c); 只有他选了立即重启才安排重启。
-           返回值 false = 用户选了稍后, 或者本次运行不能弹框 (无人值守运行), 那就只写
-           配置 + 提示。
-           在绘制中途弹模态框是安全的: 这一帧此时只是在录制 nuklear 绘制命令, 还没碰
-           GL; 弹框期间窗口冻住, 关掉后这一帧照常画完, 下一帧按新值重画。 */
-        bool restarting = bongo_cat_app_confirm_restart(app) &&
-            bongo_cat_app_request_restart(app);
-        bongo_cat_preferences_notice_show(app, restarting
-            ? tr(app, "pages.preference.cat.hints.rendererRestarting",
-                "Restarting BongoCat to apply the new render backend...")
-            : tr(app, "pages.preference.cat.hints.rendererRestart",
-                "Setting saved. Restart BongoCat manually to apply it."),
-            false);
-        SDL_LogInfo(BONGO_CAT_LOG_LIFECYCLE,
-            "[render] 渲染后端偏好改为 %s, %s",
-            bongo_cat_renderer_name(model->renderer),
-            restarting ? "将立即重启" : "已保存, 稍后手动重启生效");
-    }
+    /* 渲染后端: 实现在 preferences_renderer_row.c (它要同时管"写配置 -> 确认框 ->
+       重启"和"被拒也要留痕", 与托盘那一项共用 runtime 里的同一份实现)。 */
+    bongo_cat_preferences_renderer_row(app, context);
 }
 
 static void update_autostart(BongoCatApp *app, bool old_value) {

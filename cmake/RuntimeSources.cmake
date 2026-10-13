@@ -66,6 +66,8 @@ set(BONGO_CAT_RUNTIME_LIFECYCLE_SOURCES
   src/runtime/lifecycle/portable_mode.c
   # 搬迁用的复制/删除原语 (单独一份, 免得 portable_mode.c 撞上单文件行数上限)
   src/runtime/lifecycle/portable_transfer.c
+  # "切换渲染后端"的唯一实现: 设置页分段选择器与托盘菜单共用同一条路径
+  src/runtime/lifecycle/renderer_switch.c
   src/runtime/lifecycle/runtime_flow.c
   src/runtime/lifecycle/runtime_state.c
   src/runtime/lifecycle/shutdown.c
@@ -290,7 +292,10 @@ set(BONGO_CAT_UI_PREFERENCES_SOURCES
   src/ui/preferences/preferences_scale.c
   src/ui/preferences/preferences_scrollbar.c
   src/ui/preferences/preferences_section_icons.c
+  # 分段选择器的叶子实现: 手绘图标 + 按控件去重的点击判定 (从 preferences_theme.c 拆出)
+  src/ui/preferences/preferences_segment.c
   src/ui/preferences/preferences_shortcut_clear.c
+  src/ui/preferences/preferences_renderer_row.c
   src/ui/preferences/preferences_shortcuts.c
   src/ui/preferences/preferences_smoke.c
   src/ui/preferences/preferences_text_edit.c
