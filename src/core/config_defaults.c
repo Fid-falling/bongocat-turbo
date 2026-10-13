@@ -224,6 +224,7 @@ void bongo_cat_settings_defaults(BongoCatSettings *config) {
     config->model.renderer = BONGO_CAT_RENDERER_OPENGL;
     config->window.always_on_top = true;
     config->window.keep_in_screen = false;
+    config->window.edge_snap = false;
     config->window.obs_background_color = BONGO_CAT_OBS_BACKGROUND_GREEN;
     config->window.corner_radius_percent = BONGO_CAT_DEFAULT_WINDOW_CORNER_PERCENT;
     config->window.hide_fade_seconds = BONGO_CAT_DEFAULT_HIDE_FADE_SECONDS;

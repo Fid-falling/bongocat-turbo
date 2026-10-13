@@ -79,6 +79,12 @@ static void page_display(BongoCatApp *app, struct nk_context *context) {
         "pages.preference.cat.labels.keepInScreen", "Keep on Screen"), "",
         &window->keep_in_screen) && window->keep_in_screen)
         bongo_cat_window_clamp_to_display(app);
+    bongo_cat_pref_row_icon(context, BONGO_CAT_PREF_ICON_FRAME_BOUNDS);
+    if (bongo_cat_pref_toggle(context, "edge-snap", tr(app,
+        "pages.preference.cat.labels.edgeSnap", "Edge Snapping"), tr(app,
+        "pages.preference.cat.hints.edgeSnap",
+        "Snap to a screen edge when dragging near it."),
+        &window->edge_snap)) app->dirty = true;
     /* 只在录屏/直播软件里显示: 仅 Windows 有等价机制 (DWM 隐藏), 其它平台不显示
        这一项, 免得给用户一个点了没反应的开关。 */
     if (bongo_cat_platform_capture_only_supported()) {

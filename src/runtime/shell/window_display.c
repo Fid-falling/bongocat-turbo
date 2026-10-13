@@ -214,12 +214,51 @@ void bongo_cat_window_clamp_to_display(BongoCatApp *app) {
 
 /* 拖动落点, 入参是屏幕逻辑坐标: 越界时按目标显示器夹取, 坐标没变就直接返回 (拖动中
    大量重复事件)。有交互快照时同步预览几何, rect 为 NULL 表示跟随原生窗口矩形。 */
+
+/* 吸附阈值: 拖动中窗口某条边距显示器边缘不超过这个像素数时, 贴平到该边缘。 */
+#define BONGO_CAT_EDGE_SNAP_PX 20
+
+/* 边缘吸附: 拖动中把窗口贴到最近且在对向维度重叠的显示器边缘。方向维度 (x 或 y)
+   overlap_* 要求窗口与显示器在另一维度有重叠, 避免隔着一条边时被远处边缘误吸附。 */
+static void snap_to_screen_edges(BongoCatApp *app, SDL_Point *next,
+    int width, int height) {
+    const SDL_Rect *bounds = app->drag_display_bounds;
+    int count = app->drag_display_count;
+    int snap_x = 0, snap_y = 0;
+    int best_x = BONGO_CAT_EDGE_SNAP_PX, best_y = BONGO_CAT_EDGE_SNAP_PX;
+    bool found_x = false, found_y = false;
+    if (!app->settings.window.edge_snap || !bounds || count < 1) return;
+    for (int i = 0; i < count; ++i) {
+        bool overlap_y = next->y < bounds[i].y + bounds[i].h &&
+            (int64_t)next->y + height > bounds[i].y;
+        bool overlap_x = next->x < bounds[i].x + bounds[i].w &&
+            (int64_t)next->x + width > bounds[i].x;
+        const int xs[2] = { bounds[i].x,
+            bounds[i].x + bounds[i].w - width };
+        const int ys[2] = { bounds[i].y,
+            bounds[i].y + bounds[i].h - height };
+        for (int c = 0; c < 2; ++c) {
+            double dx = SDL_fabs((double)xs[c] - next->x);
+            double dy = SDL_fabs((double)ys[c] - next->y);
+            if (overlap_y && dx < best_x) {
+                best_x = (int)dx; snap_x = xs[c]; found_x = true;
+            }
+            if (overlap_x && dy < best_y) {
+                best_y = (int)dy; snap_y = ys[c]; found_y = true;
+            }
+        }
+    }
+    if (found_x) next->x = snap_x;
+    if (found_y) next->y = snap_y;
+}
+
 void bongo_cat_window_drag_to(BongoCatApp *app, int x, int y) {
     int width = 0, height = 0, current_x = 0, current_y = 0;
     if (!app || !app->window || !SDL_GetWindowSize(app->window, &width, &height) ||
         width <= 0 || height <= 0) return;
     SDL_Rect requested = {x, y, width, height};
     SDL_Point next = {x, y};
+    snap_to_screen_edges(app, &next, width, height);
     if (app->settings.window.keep_in_screen &&
         !available_displays_cover(app, &requested)) {
         SDL_Rect bounds; SDL_DisplayID display = target_display(app, &requested);
