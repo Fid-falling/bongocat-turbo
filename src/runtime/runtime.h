@@ -154,6 +154,19 @@ void bongo_cat_window_clear_background(BongoCatApp *app);
 void bongo_cat_window_mask_corners(BongoCatApp *app, int width, int height);
 void bongo_cat_window_destroy_corner_mask(void);
 void bongo_cat_app_render_now(BongoCatApp *app);
+/*
+ * 切换渲染后端的唯一入口 (设置页的分段选择器与托盘菜单共用)。
+ * 顺序: 校验可用性 -> 写配置 -> **立刻落盘** -> 记日志 -> 确认框 -> 按选择重启或只提示;
+ * 目标后端不可用时只记日志 + 给用户可见提示, 绝不写入配置。
+ * entry 只影响日志与提示的写法 (排查时要能分辨用户点的是哪一个入口)。
+ * 返回 true = 这次点击被处理了 (不等于"已经切过去了": 那要等重启)。
+ */
+typedef enum BongoCatRendererEntry {
+    BONGO_CAT_RENDERER_ENTRY_SETTINGS = 0,
+    BONGO_CAT_RENDERER_ENTRY_TRAY
+} BongoCatRendererEntry;
+bool bongo_cat_app_switch_renderer(BongoCatApp *app, BongoCatRenderer target,
+    BongoCatRendererEntry entry);
 bool bongo_cat_app_capture_pending_model_cover(BongoCatApp *app);
 /* --- 运行时策略: 流程脚本、系统语言、配置落盘、多宠协同 --- */
 void bongo_cat_runtime_flow_update(BongoCatApp *app, uint64_t now);

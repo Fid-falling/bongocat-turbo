@@ -50,20 +50,26 @@ bool bongo_cat_tray_self_test(BongoCatTray *tray) {
      * 渲染后端那一项: 回调只写配置, 运行中不切后端。断言的是"配置变成了这一个窗口
      * 该切到的目标", 而不是"配置值变了" —— 配置本来就等于目标时 (例如命令行
      * --renderer=opengl 压着一个 renderer=vulkan 的配置) 后者永远是假的。
+     * 目标后端不可用时 (这台机器上没有 Vulkan) 必须**原样不动**: 把一个跑不起来的
+     * 后端写进配置, 用户重启后只会得到一次回退日志。可用性由探测决定
+     * (render_backend.c), 所以这里的期望值也跟着可用性走。
      * 点完必须自己恢复, 否则冒烟运行会留下一个用户从没选过的后端设置。
      */
     const BongoCatRenderer target = bongo_cat_tray_renderer_target(tray);
+    const bool target_available = bongo_cat_renderer_available(target);
     bongo_cat_tray_on_renderer(tray, tray->renderer);
-    bool renderer_switched = app->settings.model.renderer == target;
+    bool renderer_switched = target_available
+        ? app->settings.model.renderer == target
+        : app->settings.model.renderer == renderer;
     app->settings.model.renderer = renderer;
-    /* 那一项还会安排一次自动重启 (见 tray_renderer.c)。自测把配置改回去了, 排着的
+    /* 那一项还会安排一次自动重启 (见 renderer_switch.c)。自测把配置改回去了, 排着的
        重启请求也必须一起撤掉, 否则一次 --ci-menu 会带着"用户从没选过的后端"重启。 */
     app->restart_requested = false;
     tray->state_valid = false;
     bongo_cat_tray_sync(tray);
-    SDL_Log("Tray self-test: renderer entry applied=%d target=%s restored=%s",
-        renderer_switched, bongo_cat_renderer_name(target),
-        bongo_cat_renderer_name(renderer));
+    SDL_Log("Tray self-test: renderer entry applied=%d target=%s available=%d "
+        "restored=%s", renderer_switched, bongo_cat_renderer_name(target),
+        target_available, bongo_cat_renderer_name(renderer));
     bongo_cat_tray_on_preferences(tray, tray->preferences);
     bool preferences = bongo_cat_preferences_visible(app->preferences);
     SDL_Log("Tray self-test: preferences visible=%d", preferences);

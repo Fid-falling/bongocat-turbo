@@ -5,7 +5,8 @@
  * 无边框、13/11 内边距"来画一行表单, 画完还原。之所以要清掉底色, 是因为行本身画在
  * 页面背景上, 再叠一层窗口底色会脏。
  * 三个特效区都是手绘的 (电脑/太阳/月亮), 不走图标图集: 它们要跟随选中动画改颜色,
- * 而图集是按固定贴图着色画的, 做不到"图标底色随滑块一起渐变"。
+ * 而图集是按固定贴图着色画的, 做不到"图标底色随滑块一起渐变"。手绘与"这段被点了吗"
+ * 的判定都在 preferences_segment.c (本文件贴着 500 行上限, 见 cmake/CheckLines.cmake)。
  * 动画 id 全都带 id 参数前缀 —— 同一个窗口里有多个分段控件, 不区分会互相带动画。
  */
 #include "preferences_theme.h"
@@ -72,50 +73,6 @@ static void form_end(struct nk_context *context, const ThemeFormStyle *saved) {
     context->style.window.group_border = saved->border;
 }
 
-static void draw_computer(struct nk_command_buffer *canvas,
-    struct nk_rect bounds, struct nk_color color) {
-    float x = bounds.x + bounds.w * .5f, y = bounds.y + bounds.h * .5f;
-    nk_stroke_rect(canvas, nk_rect(x - 8, y - 7, 16, 11), 2, 1.7f, color);
-    nk_stroke_line(canvas, x, y + 4, x, y + 7, 1.7f, color);
-    nk_stroke_line(canvas, x - 5, y + 7, x + 5, y + 7, 1.7f, color);
-}
-
-static void draw_sun(struct nk_command_buffer *canvas,
-    struct nk_rect bounds, struct nk_color color) {
-    float x = bounds.x + bounds.w * .5f, y = bounds.y + bounds.h * .5f;
-    nk_stroke_circle(canvas, nk_rect(x - 4, y - 4, 8, 8), 1.7f, color);
-    const float rays[][4] = {
-        {0, -9, 0, -7}, {0, 7, 0, 9}, {-9, 0, -7, 0}, {7, 0, 9, 0},
-        {-6.4f, -6.4f, -5, -5}, {5, 5, 6.4f, 6.4f},
-        {-6.4f, 6.4f, -5, 5}, {5, -5, 6.4f, -6.4f}
-    };
-    for (size_t i = 0; i < sizeof(rays) / sizeof(rays[0]); ++i)
-        nk_stroke_line(canvas, x + rays[i][0], y + rays[i][1],
-            x + rays[i][2], y + rays[i][3], 1.7f, color);
-}
-
-/*
- * 月亮是用"画一个圆, 再用背景色盖掉一个偏移的圆"抠出来的: 这样不用贝塞尔也能得到
- * 干净的月牙, 所以必须把背景色传进来 —— 换主题背景色变了, 传错了月牙就是花的。
- */
-static void draw_moon(struct nk_command_buffer *canvas,
-    struct nk_rect bounds, struct nk_color color,
-    struct nk_color background) {
-    float x = bounds.x + bounds.w * .5f;
-    float y = bounds.y + bounds.h * .5f;
-    nk_fill_circle(canvas, nk_rect(x - 7.5f, y - 7.5f, 15, 15), color);
-    nk_fill_circle(canvas, nk_rect(x - 3.4f, y - 8.3f, 12.4f, 12.4f),
-        background);
-}
-
-static void draw_icon(struct nk_command_buffer *canvas, int icon,
-    struct nk_rect bounds, struct nk_color color,
-    struct nk_color background) {
-    if (icon == 0) draw_computer(canvas, bounds, color);
-    else if (icon == 1) draw_sun(canvas, bounds, color);
-    else draw_moon(canvas, bounds, color, background);
-}
-
 /*
  * 分段选择器 (胶囊控件)。icons 为真时画图标, 否则画文字。
  * 三个动画层次的配合要看清:
@@ -127,10 +84,19 @@ static void draw_icon(struct nk_command_buffer *canvas, int icon,
  * 这样滑块移动过程中途经的段会有一次淡淡的提亮, 而不是硬切。
  * disabled 段 (比如不可用的 Vulkan) 连悬停高亮都不给 —— 只禁用点击但保留高亮,
  * 会让人以为点得动。
+ *
+ * clicked 是"用户实际点在哪一段上"的出口参数 (可以是 NULL), 它**包含禁用段**。
+ * 为什么要单独上报: 禁用段不改选中值, 调用方只看返回值就永远不知道用户点过它, 于是
+ * "点了没反应"的路径连一条日志、一句提示都留不下来 —— 设置页的渲染后端那一行必须能
+ * 对不可用的后端说明原因 (见 preferences_renderer_row.c)。
+ *
+ * 图标与"这一段被点了吗"的判定都在 preferences_segment.c (本文件贴着 500 行上限)。
+ * 点击判定必须按控件去重, 判据和踩过的坑见那里的注释 —— 共用一份状态会让一帧里排在
+ * 后面的分段控件永远收不到点击。
  */
 static int capsule(struct nk_context *context, const char *id,
     const char *const *labels, int count, bool icons, int selected,
-    float width, int disabled) {
+    float width, int disabled, int *clicked) {
     struct nk_rect widget;
     if (nk_widget(&widget, context) == NK_WIDGET_INVALID) return selected;
     selected = NK_CLAMP(0, selected, count - 1);
@@ -138,12 +104,14 @@ static int capsule(struct nk_context *context, const char *id,
         widget.w - width - 6.0f), widget.y - 1, NK_MIN(width, widget.w), 38);
     float segment = bounds.w / count;
     bool hover = nk_input_is_mouse_hovering_rect(&context->input, bounds);
-    int hovered = hover ? NK_CLAMP(0, (int)((context->input.mouse.pos.x -
+    int raw_hovered = hover ? NK_CLAMP(0, (int)((context->input.mouse.pos.x -
         bounds.x) / segment), count - 1) : -1;
-    /* 禁用段既不亮也不可点, 连悬停高亮一起掐掉 */
-    if (hovered == disabled) hovered = -1;
-    if (hover && hovered >= 0 && nk_input_is_mouse_click_in_rect(&context->input,
-        NK_BUTTON_LEFT, bounds)) selected = hovered;
+    /* 禁用段既不亮也不可点, 连悬停高亮一起掐掉; 但点击要上报 (见函数头注释) */
+    int hovered = raw_hovered == disabled ? -1 : raw_hovered;
+    if (bongo_cat_pref_segment_click(context, id, hover) && raw_hovered >= 0) {
+        if (clicked) *clicked = raw_hovered;
+        if (raw_hovered != disabled) selected = raw_hovered;
+    }
 
     char animation_id[96];
     snprintf(animation_id, sizeof(animation_id), "theme-selection-%s", id);
@@ -188,7 +156,8 @@ static int capsule(struct nk_context *context, const char *id,
         float size = 20.0f + amount;
         struct nk_rect icon = nk_rect(bounds.x + segment * (i + .5f) - size * .5f,
             bounds.y + (bounds.h - size) * .5f, size, size);
-        if (icons) draw_icon(canvas, i, icon, color, segment_background);
+        if (icons) bongo_cat_pref_segment_icon(canvas, i, icon, color,
+            segment_background);
         else {
             const struct nk_user_font *font = context->style.font;
             int length = nk_strlen(labels[i]);
@@ -214,7 +183,7 @@ static int capsule(struct nk_context *context, const char *id,
  */
 static int choice_row(struct nk_context *context, const char *id,
     const char *title, const char *const *labels, int count, bool icons,
-    int selected, float control_width, int disabled) {
+    int selected, float control_width, int disabled, int *clicked) {
     ThemeFormStyle saved;
     if (!form_begin(context, id, &saved)) return selected;
     float available = nk_window_get_content_region(context).w;
@@ -224,7 +193,7 @@ static int choice_row(struct nk_context *context, const char *id,
     bongo_cat_pref_form_label(context, title);
     nk_layout_row_push(context, NK_MAX(control_width + 20.0f, available - left - 8.0f));
     selected = capsule(context, id, labels, count, icons, selected,
-        control_width, disabled);
+        control_width, disabled, clicked);
     nk_layout_row_end(context);
     form_end(context, &saved);
     return selected;
@@ -233,20 +202,24 @@ static int choice_row(struct nk_context *context, const char *id,
 /* disabled 传 -1 表示没有禁用段 */
 int bongo_cat_pref_theme(struct nk_context *context, const char *id,
     const char *title, const char *const *labels, int selected) {
-    return choice_row(context, id, title, labels, 3, true, selected, 156.0f, -1);
+    return choice_row(context, id, title, labels, 3, true, selected, 156.0f, -1,
+        NULL);
 }
 
 /*
  * Vulkan 不可用的机器上把 Vulkan 段画成禁用; 越界的 renderer 值一律退回 Auto,
  * 免得旧配置里存了一个现在已经不存在的序号导致三个段全都不选中。
+ *
+ * clicked (可以是 NULL) 回报"用户点在哪一段上", 含被禁用的 Vulkan 段 —— 调用方要靠
+ * 它给"点了没反应"留一条日志和一句用户可见的提示。
  */
 int bongo_cat_pref_renderer(struct nk_context *context, const char *id,
-    const char *title, int renderer, bool vulkan_selectable) {
+    const char *title, int renderer, bool vulkan_selectable, int *clicked) {
     static const char *labels[] = {"Auto", "OpenGL", "Vulkan"};
     int selected = renderer >= 0 && renderer < BONGO_CAT_RENDERER_COUNT ?
         renderer : (int)BONGO_CAT_RENDERER_AUTO;
     return choice_row(context, id, title, labels, 3, false, selected, 192.0f,
-        vulkan_selectable ? -1 : (int)BONGO_CAT_RENDERER_VULKAN);
+        vulkan_selectable ? -1 : (int)BONGO_CAT_RENDERER_VULKAN, clicked);
 }
 
 /*
@@ -259,7 +232,8 @@ int bongo_cat_pref_fps(struct nk_context *context, const char *id,
     const char *labels[] = {"30 FPS", "60 FPS",
         unlimited_label && unlimited_label[0] ? unlimited_label : "Unlimited"};
     int selected = fps == 30 ? 0 : (fps == BONGO_CAT_DEFAULT_MAX_FPS ? 1 : 2);
-    int picked = choice_row(context, id, title, labels, 3, false, selected, 192.0f, -1);
+    int picked = choice_row(context, id, title, labels, 3, false, selected, 192.0f,
+        -1, NULL);
     return picked == 0 ? 30 : (picked == 1 ? BONGO_CAT_DEFAULT_MAX_FPS
         : BONGO_CAT_MAX_FPS_UNLIMITED);
 }

@@ -211,6 +211,14 @@ bool bongo_cat_app_initialize(BongoCatApp *app, int argc, char **argv,
      */
     if (SDL_getenv("BONGO_CAT_TEST_TRAY_RENDERER"))
         bongo_cat_tray_renderer_action(app->tray);
+    /*
+     * 测试钩子: BONGO_CAT_TEST_PREFS_WINDOW=1 时启动就打开设置窗口。存在的理由与上面
+     * 那个托盘钩子相同, 但方向相反: --ci-preferences 也能打开设置窗口, 可它同时把这次
+     * 运行标成无人值守, 于是"点分段控件 -> 确认框 -> 重启"这一段永远测不到。
+     * 本钩子只负责把窗口打开 (真实点击仍由外部合成输入完成), 不改任何运行语义。
+     */
+    if (SDL_getenv("BONGO_CAT_TEST_PREFS_WINDOW"))
+        bongo_cat_preferences_show(app->preferences);
     if (app->smoke_shortcuts && !bongo_cat_app_shortcuts_self_test(app)) {
         BongoCatError shortcut_error = {0};
         bongo_cat_error_set(&shortcut_error, BONGO_CAT_ERROR_PLATFORM, "Shortcut action self-test failed");

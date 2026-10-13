@@ -20,6 +20,14 @@
 
 #ifdef BONGO_CAT_HAS_VULKAN
 
+/*
+ * 探测失败后的重试窗口。见 bongo_cat_vk_probe: 失败不能被永久缓存 (瞬时状态会被误判成
+ * "这台机器没有 Vulkan"), 但设置界面每帧都会问一次可用性, 所以也不能每次真去探测。
+ * 3 秒足够让"驱动刚起来/设备刚被释放"这类情况自愈, 又不会让每帧都付出一次实例创建的
+ * 代价。
+ */
+#define BONGO_CAT_VK_PROBE_RETRY_NS 3000000000ull
+
 bool bongo_cat_vk_compiled(void) { return true; }
 
 static BongoCatVk *current_context;
@@ -27,16 +35,43 @@ static BongoCatVk *current_context;
 BongoCatVk *bongo_cat_vk_current(void) { return current_context; }
 
 bool bongo_cat_vk_probe(BongoCatError *error) {
-    static int cached = -1;
-    if (cached >= 0) return cached == 1;
+    /*
+     * 测试钩子: 让"这台机器上 Vulkan 不可用"变成可复现的。拒绝路径 (日志 + 用户可见
+     * 提示 + 绝不写配置) 只在探测失败时才走得到, 而开发机上几乎永远探测成功 ——
+     * 与 BONGO_CAT_TEST_VULKAN_FALLBACK / BONGO_CAT_TEST_SHARED_VK_FAILURE 同一套路。
+     * 默认不存在这个变量, 不影响正常运行。
+     */
+    if (SDL_getenv("BONGO_CAT_TEST_VULKAN_UNAVAILABLE")) {
+        bongo_cat_error_set(error, BONGO_CAT_ERROR_PLATFORM,
+            "test hook BONGO_CAT_TEST_VULKAN_UNAVAILABLE");
+        return false;
+    }
+    /*
+     * 缓存策略: 成功永久缓存, **失败只缓存一小会儿**。
+     * 为什么不能把失败也永久缓存: 第一次探测可能撞上"驱动还在初始化/设备被别的进程
+     * 独占/远程会话刚切换"这类瞬时状态, 一旦永久记成"不可用", 设置界面里那一段就会
+     * 一直画成禁用、点了没反应, 直到用户重启程序 —— 用户报告的现象就是这个。
+     * 也不能每次调用都重新探测: 设置界面每帧都会问一次可用性, 每次都去建一个
+     * VkInstance 太贵 (失败路径上尤其贵)。所以给失败设一个很短的重试窗口。
+     */
+    static int cached;            /* 0 = 还没成功过, 1 = 这台机器确实有 Vulkan */
+    static uint64_t failed_ns;    /* 上次失败的时刻, 只在失败窗口内有意义 */
+    uint64_t now = SDL_GetTicksNS();
+    if (cached == 1) return true;
+    if (failed_ns && now - failed_ns < BONGO_CAT_VK_PROBE_RETRY_NS) return false;
     BongoCatVk probe = {0};
     BongoCatError local = {0};
     BongoCatError *failure = error ? error : &local;
     bool usable = bongo_cat_vk_create_instance(&probe, failure) &&
         bongo_cat_vk_create_device(&probe, failure);
     bongo_cat_vk_destroy_device(&probe);
-    cached = usable ? 1 : 0;
-    return usable;
+    if (usable) {
+        cached = 1;
+        failed_ns = 0;
+        return true;
+    }
+    failed_ns = now ? now : 1;
+    return false;
 }
 
 static BongoCatVk *create_context(SDL_Window *window, const BongoCatVk *owner,
