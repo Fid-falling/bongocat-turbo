@@ -221,11 +221,10 @@ typedef struct BongoCatApp {
     bool window_drag_active;
     float drag_start_x, drag_start_y;
     int drag_window_x, drag_window_y;
-    /* 拖动惯性: 拖动中滚动记录最近 8 个指针位移快照, 松手时算初速。 */
-    uint64_t drag_samples_ns[8];
-    int drag_samples_x[8], drag_samples_y[8];
-    int drag_sample_ring;
-    int drag_sample_count;
+    /* 拖动惯性: 快照存窗口原点, 3 槽 + 100ms 桶轮转。 */
+    uint64_t drag_snap_tick_ns[3];
+    int drag_snap_x[3], drag_snap_y[3];
+    int drag_snap_slot[3]; /* 存储槽排布: [0] 最新, [1]/[2] 更老; -1 表示空槽 */
     /* 滑行态: 由 bongo_cat_window_update_inertia 每帧驱动, 沿初速方向衰减移动。 */
     bool slide_active;
     double slide_velocity_x, slide_velocity_y;

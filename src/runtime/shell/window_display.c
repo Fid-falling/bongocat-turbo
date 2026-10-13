@@ -10,12 +10,11 @@
 
 #define DISPLAY_RECOVERY_DELAY_NS 750000000ull
 #define DISPLAY_RECT_CAP 32
-/* 滑行公开成员: 每帧衰减乘数按"winhawk 标称 15.6ms 一拍"折算成指数, 帧率无关。 */
+/* 滑行: 每个渲染帧算作一个 15.6ms 标称拍, 位移与衰减都按这一拍推进。 */
 #define SLIDE_NOMINAL_FRAME_S 0.0156
 #define SLIDE_MAX_FRAME 50
-#define SLIDE_STOP_SPEED_PPS_SQ 100.0
-/* 撞边反弹: 法向速度反向, 保留该比例能量 (镜面反射感); 配合每帧衰减最终会停下来。 */
-#define SLIDE_BOUNCE_RESTITUTION 0.5
+/* 撞边反弹: 法向速度反向, 只保留 5% 速度。 */
+#define SLIDE_BOUNCE_RESTITUTION 0.05
 
 /* 取窗口当前的位置与逻辑尺寸; 任一 SDL 调用失败或尺寸非正都返回 false, 调用方据此
    跳过后续几何处理 (窗口还没建好, 或正在被销毁)。 */
@@ -341,8 +340,8 @@ static void slide_bounce(BongoCatApp *app, int *x, int *y,
 }
 
 /* 主循环每帧调用: 拖着 window 沿惯性方向衰减移动。初速在松手时由 window_drag.c 算好。
-   衰减用指数 (按 dt 折算到 SLIDE_NOMINAL_FRAME_S 一拍), 帧率无关; 撞到屏幕边缘会弹回;
-   速度过低/超帧数/窗口不可见就停下并夹回显示器。 */
+   每个渲染帧按一个 15.6ms 标称拍推进 (x += v*0.0156) 且每拍乘一次衰减; 撞到
+   屏幕边缘会弹回; 位移停滞 (整数像素不再前进)/超帧数/窗口不可见就停下并夹回显示器。 */
 void bongo_cat_window_update_inertia(BongoCatApp *app, uint64_t now) {
     if (!app || !app->slide_active) return;
     if (!app->window || !app->session.window.visible ||
@@ -354,15 +353,17 @@ void bongo_cat_window_update_inertia(BongoCatApp *app, uint64_t now) {
     app->slide_last_ns = now;
     if (dt <= 0.0 || dt > 0.25) return;
     int slowdown = app->settings.window.slide_slowdown_percent;
-    if (slowdown < 1) slowdown = 1;
+    if (slowdown < 0) slowdown = 0;
     else if (slowdown > BONGO_CAT_MAX_SLIDE_SLOWDOWN_PERCENT)
         slowdown = BONGO_CAT_MAX_SLIDE_SLOWDOWN_PERCENT;
     double mult = (100.0 - slowdown) / 100.0;
-    double decay = pow(mult, dt / SLIDE_NOMINAL_FRAME_S);
-    app->slide_velocity_x *= decay;
-    app->slide_velocity_y *= decay;
-    app->slide_x += app->slide_velocity_x * dt;
-    app->slide_y += app->slide_velocity_y * dt;
+    /* 每帧顶一个 15.6ms 标称拍: 位移固定按 v*0.0156 推进 (不是 v*真实dt), 衰减也是每拍
+       只乘一次 —— 这样"整数像素判停"的阈值与刷新率无关; 代价是刷新率越高滑行越快。 */
+    double decay = mult;
+    int prev_x = (int)lround(app->slide_x);
+    int prev_y = (int)lround(app->slide_y);
+    app->slide_x += app->slide_velocity_x * SLIDE_NOMINAL_FRAME_S;
+    app->slide_y += app->slide_velocity_y * SLIDE_NOMINAL_FRAME_S;
     int width = 0, height = 0, x = 0, y = 0;
     if (!SDL_GetWindowSize(app->window, &width, &height) ||
         width <= 0 || height <= 0) {
@@ -371,10 +372,20 @@ void bongo_cat_window_update_inertia(BongoCatApp *app, uint64_t now) {
     }
     x = (int)lround(app->slide_x);
     y = (int)lround(app->slide_y);
+    /* 判停比较"位移": 整数像素没变就停, 不用速度阈值。亚像素阶段整数位置
+       每几帧才跳 1px, 速度门槛会在滑行还没走完时把它提前掐断。 */
+    if (x == prev_x && y == prev_y) {
+        app->slide_active = false;
+        if (app->settings.window.keep_in_screen) bongo_cat_window_clamp_to_display(app);
+        return;
+    }
     slide_bounce(app, &x, &y, width, height,
         &app->slide_velocity_x, &app->slide_velocity_y);
     app->slide_x = (double)x;
     app->slide_y = (double)y;
+    /* 反弹之后才按本拍衰减: 先移动 -> 撞边反弹 -> 再衰减。 */
+    app->slide_velocity_x *= decay;
+    app->slide_velocity_y *= decay;
     if (!SDL_SetWindowPosition(app->window, x, y)) {
         app->slide_active = false;
         return;
@@ -388,9 +399,7 @@ void bongo_cat_window_update_inertia(BongoCatApp *app, uint64_t now) {
         app->dirty = true;
     }
     app->slide_frame++;
-    double speed_sq = app->slide_velocity_x * app->slide_velocity_x +
-        app->slide_velocity_y * app->slide_velocity_y;
-    if (speed_sq < SLIDE_STOP_SPEED_PPS_SQ || app->slide_frame >= SLIDE_MAX_FRAME) {
+    if (app->slide_frame >= SLIDE_MAX_FRAME) {
         app->slide_active = false;
         if (app->settings.window.keep_in_screen) bongo_cat_window_clamp_to_display(app);
     }

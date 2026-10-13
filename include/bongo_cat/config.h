@@ -14,7 +14,8 @@
 #define BONGO_CAT_MAX_HIDE_FADE_SECONDS 3.0f
 #define BONGO_CAT_DEFAULT_EDGE_SNAP_PX 20
 #define BONGO_CAT_MAX_EDGE_SNAP_PX 64
-#define BONGO_CAT_DEFAULT_SLIDE_SLOWDOWN_PERCENT 50
+/* 0 = 每拍不衰减, 松手后近似恒速滑行。 */
+#define BONGO_CAT_DEFAULT_SLIDE_SLOWDOWN_PERCENT 0
 #define BONGO_CAT_MAX_SLIDE_SLOWDOWN_PERCENT 99
 
 typedef enum BongoCatTheme { BONGO_CAT_THEME_AUTO, BONGO_CAT_THEME_LIGHT, BONGO_CAT_THEME_DARK } BongoCatTheme;
@@ -72,8 +73,7 @@ typedef struct BongoCatWindowPreferences {
     bool edge_snap;
     /* edge_snap 开启时: 窗口某条边距显示器边缘不超过这个像素数就贴平吸附。 */
     int edge_snap_threshold;
-    /* 拖动惯性: 松手后沿着拖动方向继续滑行一段 (参考 Winhawk "slick window
-       arrangement")。关闭则拖动结束立即停在原地。 */
+    /* 拖动惯性: 松手后沿着拖动方向继续滑行一段。关闭则拖动结束立即停在原地。 */
     bool slide_animation;
     /* 惯性衰减档位 0-99: 数值越大约快停下; 0 表示几乎匀速滑到超时为止。 */
     int slide_slowdown_percent;
