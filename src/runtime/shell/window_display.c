@@ -14,6 +14,8 @@
 #define SLIDE_NOMINAL_FRAME_S 0.0156
 #define SLIDE_MAX_FRAME 50
 #define SLIDE_STOP_SPEED_PPS_SQ 100.0
+/* 撞边反弹: 法向速度反向, 保留该比例能量 (镜面反射感); 配合每帧衰减最终会停下来。 */
+#define SLIDE_BOUNCE_RESTITUTION 0.5
 
 /* 取窗口当前的位置与逻辑尺寸; 任一 SDL 调用失败或尺寸非正都返回 false, 调用方据此
    跳过后续几何处理 (窗口还没建好, 或正在被销毁)。 */
@@ -317,21 +319,25 @@ void bongo_cat_window_update_display_recovery(BongoCatApp *app, uint64_t now) {
     else bongo_cat_window_recover_to_display(app);
 }
 
-/* 滑行遇到屏幕边缘: 贴着可用区边界反向弹回一点点 (×0.05, 同 winhawk), 并刹住越界方向
-   的速度, 让惯性看起来像"被屏幕挡住弹了一下"而不是飞出桌面。 */
+/* 滑行遇到屏幕边缘: 贴到目标显示器可用区边界, 法向速度反向并保留 SLIDE_BOUNCE_RESTITUTION
+   能量 (镜面反射), 让桌宠像球撞墙一样弹回屏幕内, 而不是一路飞出桌面。 */
 static void slide_bounce(BongoCatApp *app, int *x, int *y,
     int width, int height, double *vx, double *vy) {
     SDL_Rect requested = {*x, *y, width, height};
     SDL_DisplayID display = target_display(app, &requested);
     if (!display) display = SDL_GetPrimaryDisplay();
     SDL_Rect bounds;
-    if (SDL_GetDisplayUsableBounds(display, &bounds)) return;
+    /* 注意: SDL_GetDisplayUsableBounds 成功返回 true, 失败返回 false —— 必须取反, 否则
+       正常取到边界时会提前 return, 让下面的贴边/反弹变成死代码, 桌宠直接飞出屏幕。 */
+    if (!display || !SDL_GetDisplayUsableBounds(display, &bounds)) return;
     int min_x = bounds.x, min_y = bounds.y;
     int max_x = bounds.x + bounds.w - width, max_y = bounds.y + bounds.h - height;
-    if (*x < min_x) { *x = min_x; *vx = fabs(*vx) * 0.05; }
-    else if (*x > max_x) { *x = max_x; *vx = -fabs(*vx) * 0.05; }
-    if (*y < min_y) { *y = min_y; *vy = fabs(*vy) * 0.05; }
-    else if (*y > max_y) { *y = max_y; *vy = -fabs(*vy) * 0.05; }
+    /* 镜面反射: 撞哪条边就把对应方向的速度翻向, 并保留 SLIDE_BOUNCE_RESTITUTION 能量;
+       切向速度不动, 撞墙角时两条边各自弹一次。 */
+    if (*x < min_x) { *x = min_x; *vx = fabs(*vx) * SLIDE_BOUNCE_RESTITUTION; }
+    else if (*x > max_x) { *x = max_x; *vx = -fabs(*vx) * SLIDE_BOUNCE_RESTITUTION; }
+    if (*y < min_y) { *y = min_y; *vy = fabs(*vy) * SLIDE_BOUNCE_RESTITUTION; }
+    else if (*y > max_y) { *y = max_y; *vy = -fabs(*vy) * SLIDE_BOUNCE_RESTITUTION; }
 }
 
 /* 主循环每帧调用: 拖着 window 沿惯性方向衰减移动。初速在松手时由 window_drag.c 算好。
