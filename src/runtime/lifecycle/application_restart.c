@@ -11,9 +11,15 @@
  * 失败回退: 新进程没起来时把互斥体重新抢回来、清掉请求、弹一条"请手动重启", 本进程
  * 继续照常运行。绝不能停在"旧进程已经关了、新进程又没起来"的空档上。
  *
- * 防重启循环: 环境变量 BONGO_CAT_RESTARTED=1 会跟着新进程走 (见平台层的实现), 带这个
- * 标记的实例不再自动重启, 只提示手动重启。没有这道闸, 任何"启动时就会改设置"的路径
- * 都会变成无限重启。
+ * 无防循环标记 (方案 B): 系统里**不存在**"启动时自动改设置"的路径 —— 所有会改写配置
+ * 并请求重启的入口 (切渲染后端、启停便携模式、提权重启) 都只能由用户主动操作触发,
+ * 重启之后必须用户再点一次才会再次触发, 因此不会陷入"重启 -> 又改设置 -> 再重启"的
+ * 无限循环。早期为防这种循环而设的 BONGO_CAT_RESTARTED 环境变量已随本方案彻底移除。
+ *
+ * 这不变量靠命名与注释强制, 不是运行时守卫: 未来任何新增的"自动改设置并重启"来源
+ * (初始化、命令行、周期任务) 都必须先回来逐字读这段 —— 它一旦出现, 这里就必须重新
+ * 引入防循环, 否则就是无限的自我重启。真到那天, 首选方案是在会自我触发的**唯一**那
+ * 个来源处加幂等/一次性守卫, 而不是给全局重启请求加闸。
  */
 #include "runtime.h"
 #include "portable_mode.h"
@@ -28,18 +34,24 @@
 #include <stdio.h>
 #include <string.h>
 
-#define BONGO_CAT_RESTARTED_ENV "BONGO_CAT_RESTARTED"
 /* 自动化运行里默认不重启 (冒烟/CI 拉起一个新进程会让脚本挂住), 需要真实验证时用这个
    环境变量显式放行。 */
 #define BONGO_CAT_TEST_ALLOW_RESTART_ENV "BONGO_CAT_TEST_ALLOW_RESTART"
 #define BONGO_CAT_RESTART_ARGUMENT_CAP 1400
 
-static const char *tr(BongoCatApp *app, const char *key, const char *fallback) {
+static const char *tr(const BongoCatApp *app, const char *key,
+    const char *fallback) {
     return bongo_cat_i18n_get(app->i18n, key, fallback);
 }
 
+/*
+ * 只有无人值守运行 (--ci-* / 冒烟) 需要拦自动重启: 那种运行里拉起一个新进程会让脚本
+ * 挂住, 而且配置照写、重启留给手动是安全的那条路。交互运行永远放行 —— 见文件头的
+ * "无防循环标记"一段: 重启只由用户主动操作触发, 不存在需要防的自我循环。
+ * BONGO_CAT_TEST_ALLOW_RESTART=1 供 CI 真实验证"落盘 -> 重启 -> 新实例用上新设置"
+ * 的链路时显式放行。
+ */
 static bool restart_blocked(const BongoCatApp *app) {
-    if (SDL_getenv(BONGO_CAT_RESTARTED_ENV)) return true;
     if (!app->smoke && !app->automated) return false;
     return SDL_getenv(BONGO_CAT_TEST_ALLOW_RESTART_ENV) == NULL;
 }
@@ -96,66 +108,10 @@ static void report_manual_restart(BongoCatApp *app, const BongoCatError *error) 
 }
 
 /*
- * 问一次"现在重启还是稍后手动重启"。返回 true = 用户选了立即重启。
- *
- * 为什么要问: 切换渲染后端必须重启才生效, 而重启会关掉正在跑的窗口 (桌宠也会闪一下)。
- * 用户点了分段控件不代表他同意现在就重启, 所以这一步不能替他决定。
- *
- * 无人值守运行 (--ci-* / 冒烟 / BONGO_CAT_TEST_NO_DIALOG) 一律不弹窗, 直接按"稍后"
- * 处理: 模态框会把脚本挂死, 而"稍后手动重启"本来就是安全的那条路 (配置照写)。
- * 例外是 BONGO_CAT_TEST_ALLOW_RESTART=1: 无人值守下改按"立即重启"处理, 见下面。
+ * 切换渲染后端不再问"现在重启还是稍后", 直接自动重启: 用户点分段控件即代表同意立即
+ * 重启。request_restart 内部只会在无人值守运行下拒绝 (见 restart_blocked), 不能自动
+ * 重启时由调用方只给提示。
  */
-bool bongo_cat_app_confirm_restart(BongoCatApp *app) {
-    if (!app) return false;
-    if (app->smoke || app->automated || SDL_getenv("BONGO_CAT_TEST_NO_DIALOG")) {
-        /*
-         * BONGO_CAT_TEST_ALLOW_RESTART 在无人值守运行里"按立即重启处理"。
-         * 这个开关的注释一直写着"需要真实验证时用环境变量显式放行", 但调用方是
-         * `confirm_restart() && request_restart()` 的短路写法: confirm 返回 false 时
-         * request_restart 根本不会被调用, 于是那个环境变量实际上从来没生效过 ——
-         * 自动化里永远只能测到"稍后手动重启"这一半。这里把它补齐, 让脚本也能跑完整的
-         * "落盘 -> 重启 -> 新实例用上新后端"链路。
-         */
-        const bool allow_restart =
-            SDL_getenv(BONGO_CAT_TEST_ALLOW_RESTART_ENV) != NULL;
-        SDL_LogInfo(BONGO_CAT_LOG_LIFECYCLE,
-            "[runtime] 无人值守运行 (%s): 不弹重启确认框, 按\"%s\"处理",
-            app->smoke ? "冒烟" : app->automated ? "--ci-* 参数"
-                : "BONGO_CAT_TEST_NO_DIALOG",
-            allow_restart ? "立即重启" : "稍后手动重启");
-        return allow_restart;
-    }
-    const SDL_MessageBoxButtonData buttons[] = {
-        {SDL_MESSAGEBOX_BUTTON_RETURNKEY_DEFAULT, 1,
-            tr(app, "composables.useAppMenu.labels.rendererRestartConfirmNow",
-                "Restart now")},
-        {SDL_MESSAGEBOX_BUTTON_ESCAPEKEY_DEFAULT, 0,
-            tr(app, "composables.useAppMenu.labels.rendererRestartConfirmLater",
-                "I will restart later")},
-    };
-    SDL_MessageBoxData data = {0};
-    data.flags = SDL_MESSAGEBOX_INFORMATION;
-    data.window = app->window;
-    data.title = BONGO_CAT_NAME;
-    data.message = tr(app,
-        "composables.useAppMenu.labels.rendererRestartConfirm",
-        "Switching the render backend needs a restart of BongoCat to take "
-        "effect. Restart now?");
-    data.numbuttons = 2;
-    data.buttons = buttons;
-    int button = -1;
-    if (!SDL_ShowMessageBox(&data, &button)) {
-        SDL_LogWarn(SDL_LOG_CATEGORY_APPLICATION,
-            "[runtime] 重启确认框打不开 (%s), 按\"稍后手动重启\"处理",
-            SDL_GetError());
-        return false;
-    }
-    SDL_LogInfo(BONGO_CAT_LOG_LIFECYCLE,
-        "[runtime] 重启确认框: 用户选择 %s",
-        button == 1 ? "立即重启" : "稍后手动重启");
-    return button == 1;
-}
-
 bool bongo_cat_app_request_restart(BongoCatApp *app) {
     return bongo_cat_app_request_restart_elevated(app, false);
 }
@@ -169,13 +125,15 @@ bool bongo_cat_app_request_restart_elevated(BongoCatApp *app,
         return true;
     }
     if (app->restart_requested) return true;
+    /*
+     * 只有无人值守运行会被拦 (见 restart_blocked): 交互运行永远放行 —— 重启只由用户
+     * 主动操作触发, 无防循环标记需要绕开 (见文件头)。
+     */
     if (restart_blocked(app)) {
-        /* 这里不是错误: 带了防循环标记说明本次运行就是"刚刚被重启出来的", 再重启一次
-           只会套娃; 自动化运行同理。两种情况都要求手动重启, 由调用方提示。 */
+        /* 无人值守运行 (--ci-* / 冒烟) 下不自动重启, 只能手动, 由调用方提示。 */
         SDL_LogInfo(BONGO_CAT_LOG_LIFECYCLE,
-            "[runtime] 本次运行不再自动重启 (%s), 设置已保存, 请手动重启后生效",
-            SDL_getenv(BONGO_CAT_RESTARTED_ENV) ? "已经自动重启过一次"
-                : "自动化运行");
+            "[runtime] 无人值守运行 (%s): 不自动重启, 设置已保存, 请手动重启后生效",
+            app->smoke ? "冒烟" : "自动化");
         return false;
     }
     app->restart_requested = true;

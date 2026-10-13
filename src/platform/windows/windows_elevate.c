@@ -23,7 +23,6 @@
  * 不会再次尝试 (用户拒绝 UAC 时也不会在同一台机器上无限重试)。
  */
 #define BONGO_CAT_ELEVATION_TRIED "BONGO_CAT_ELEVATION_TRIED"
-#define BONGO_CAT_RESTARTED "BONGO_CAT_RESTARTED"
 #define BONGO_CAT_ELEVATED_COMMAND_CAP 2048
 
 bool bongo_cat_platform_is_elevated(void) {
@@ -174,10 +173,9 @@ BongoCatResult bongo_cat_platform_restart_application_elevated(
             "Elevated restart command line is not valid UTF-8");
         return BONGO_CAT_ERROR_PLATFORM;
     }
-    /* 两个标记都要带上: 新进程不再弹 UAC (ELEVATION_TRIED), 也不再被当成"首次启动"
-       而把它自己报告成异常退出 / 允许再次自动重启 (RESTARTED)。 */
+    /* 标记带上: 新进程不再弹 UAC (ELEVATION_TRIED 幂等)。已不再设置 RESTARTED 防循环
+       标记 (方案 B), 见 runtime/lifecycle/application_restart.c 文件头。 */
     SetEnvironmentVariableA(BONGO_CAT_ELEVATION_TRIED, "1");
-    SetEnvironmentVariableA(BONGO_CAT_RESTARTED, "1");
     SHELLEXECUTEINFOW info = {0};
     info.cbSize = sizeof(info);
     info.fMask = SEE_MASK_NOCLOSEPROCESS | SEE_MASK_FLAG_NO_UI;
@@ -190,9 +188,8 @@ BongoCatResult bongo_cat_platform_restart_application_elevated(
     if (info.hProcess) CloseHandle(info.hProcess);
     free(wide);
     if (!launched) {
-        /* 没起来就把"已重启"标记撤掉 (记录留在 ELEVATION_TRIED 上, 本进程不再重复
-           弹窗), 由调用方继续运行并提示。 */
-        SetEnvironmentVariableA(BONGO_CAT_RESTARTED, NULL);
+        /* 没起来就原样返回: ELEVATION_TRIED 留在本进程不再重复弹窗, 由调用方继续
+           运行并提示。 */
         bongo_cat_error_set(error, BONGO_CAT_ERROR_PLATFORM,
             "Cannot relaunch BongoCat as administrator (Windows error %lu)",
             (unsigned long)failure);

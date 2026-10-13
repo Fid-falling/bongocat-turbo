@@ -269,8 +269,11 @@ void bongo_cat_app_request_nearby_model_refresh(BongoCatApp *app);
 void bongo_cat_config_store_flush(BongoCatApp *app);
 /*
  * 请求"改完设置后自动重启本程序"(切换渲染后端、启停便携模式)。
- * 返回 true = 已经排上, 主循环末尾会执行; false = 本次运行不允许自动重启 (刚刚就是被
- * 自动重启出来的, 或者处于 --ci-* 无人值守运行), 调用方应当提示用户手动重启。
+ * 返回 true = 已经排上, 主循环末尾会执行; false = 本次运行不允许自动重启 (处于
+ * --ci-* 无人值守运行), 调用方应当提示用户手动重启。
+ * 本函数**只能**由用户主动操作调用 (初始化、命令行、周期任务等任意自动来源都不得
+ * 调用, 见 runtime/lifecycle/application_restart.c 文件头的"无防循环标记"一段):
+ * 这条不变量靠代码审查强制, 不设运行时守卫。
  * 参数与互斥体的处理都在 runtime/lifecycle/application_restart.c。
  */
 bool bongo_cat_app_request_restart(BongoCatApp *app);
@@ -280,12 +283,5 @@ bool bongo_cat_app_request_restart(BongoCatApp *app);
  * 排上的普通重启可被后续的提权重启升级。
  */
 bool bongo_cat_app_request_restart_elevated(BongoCatApp *app, bool elevated);
-/*
- * 重启前的确认框: "现在重启" / "稍后手动重启"。返回 true = 用户选了现在重启。
- * 无人值守运行 (--ci-* / 冒烟 / BONGO_CAT_TEST_NO_DIALOG) 不弹窗并返回 false —— 模态框
- * 会把脚本挂死, 而"稍后手动重启"是安全的那条路 (配置照写)。
- * 调用方拿到 false 时只写配置并提示, 绝不能自己重启。
- */
-bool bongo_cat_app_confirm_restart(BongoCatApp *app);
 
 #endif

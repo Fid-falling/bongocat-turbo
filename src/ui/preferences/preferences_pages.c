@@ -302,7 +302,7 @@ static void update_run_as_admin(BongoCatApp *app) {
             "BongoCat is already running as administrator."), false);
         return;
     }
-    /* 开 + 普通权限: 立即以管理员身份重启。被防循环标记 / 自动化挡下时提示手动重启。 */
+    /* 开 + 普通权限: 立即以管理员身份重启。被无人值守 (--ci-* / 冒烟) 挡下时提示手动重启。 */
     if (bongo_cat_app_request_restart_elevated(app, true)) {
         bongo_cat_preferences_notice_show(app, tr(app,
             "pages.preference.cat.hints.rendererRestarting",
