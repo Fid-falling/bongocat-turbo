@@ -215,17 +215,16 @@ void bongo_cat_window_clamp_to_display(BongoCatApp *app) {
 /* 拖动落点, 入参是屏幕逻辑坐标: 越界时按目标显示器夹取, 坐标没变就直接返回 (拖动中
    大量重复事件)。有交互快照时同步预览几何, rect 为 NULL 表示跟随原生窗口矩形。 */
 
-/* 吸附阈值: 拖动中窗口某条边距显示器边缘不超过这个像素数时, 贴平到该边缘。 */
-#define BONGO_CAT_EDGE_SNAP_PX 20
-
 /* 边缘吸附: 拖动中把窗口贴到最近且在对向维度重叠的显示器边缘。方向维度 (x 或 y)
-   overlap_* 要求窗口与显示器在另一维度有重叠, 避免隔着一条边时被远处边缘误吸附。 */
+   overlap_* 要求窗口与显示器在另一维度有重叠, 避免隔着一条边时被远处边缘误吸附。
+   吸附阈值 = 设置项 window.edge_snap_threshold, 可调 (0-64px, 见 config.h)。 */
 static void snap_to_screen_edges(BongoCatApp *app, SDL_Point *next,
     int width, int height) {
     const SDL_Rect *bounds = app->drag_display_bounds;
     int count = app->drag_display_count;
     int snap_x = 0, snap_y = 0;
-    int best_x = BONGO_CAT_EDGE_SNAP_PX, best_y = BONGO_CAT_EDGE_SNAP_PX;
+    int threshold = app->settings.window.edge_snap_threshold;
+    int best_x = threshold, best_y = threshold;
     bool found_x = false, found_y = false;
     if (!app->settings.window.edge_snap || !bounds || count < 1) return;
     for (int i = 0; i < count; ++i) {

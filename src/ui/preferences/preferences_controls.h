@@ -21,7 +21,7 @@ bool bongo_cat_pref_control_int(struct nk_context *context, const char *id,
     int minimum, int *value, int maximum, int step, int default_value);
 bool bongo_cat_pref_control_slider(struct nk_context *context, const char *id,
     float minimum, float *value, float maximum, float step,
-    float default_value);
+    float default_value, const char *suffix);
 bool bongo_cat_pref_control_toggle(struct nk_context *context,
     const char *id, bool *value);
 bool bongo_cat_pref_control_obs_background(struct nk_context *context,

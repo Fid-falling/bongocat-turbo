@@ -91,6 +91,8 @@ static bool read_window(yyjson_val *object, BongoCatWindowPreferences *value,
         !read_bool(object, "hideOnPointerOver", &value->hide_on_hover, error) ||
         !read_bool(object, "keepOnScreen", &value->keep_in_screen, error) ||
         !read_bool(object, "edgeSnap", &value->edge_snap, error) ||
+        !read_int(object, "edgeSnapThreshold", &value->edge_snap_threshold,
+            error) ||
         !read_bool(object, "captureOnly", &value->capture_only, error) ||
         !read_int(object, "supersample", &value->supersample, error) ||
         !read_int(object, "fontRasterCap", &value->font_raster_cap, error) ||
