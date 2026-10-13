@@ -268,12 +268,74 @@ static void page_display(BongoCatApp *app, struct nk_context *context) {
 
 static void update_autostart(BongoCatApp *app, bool old_value) {
     BongoCatError error = {0};
-    if (bongo_cat_platform_set_autostart(app->settings.app.autostart, &error) == BONGO_CAT_OK) return;
+    if (bongo_cat_platform_set_autostart(app->settings.app.autostart,
+            app->settings.app.run_as_admin, &error) == BONGO_CAT_OK) return;
     app->settings.app.autostart = old_value;
     SDL_LogError(SDL_LOG_CATEGORY_APPLICATION, "%s", error.message);
     bongo_cat_preferences_notice_show(app, tr(app,
         "pages.preference.general.hints.autostartFailed",
         "Unable to update launch-on-startup settings"), true);
+}
+
+/*
+ * "以管理员身份运行" (run_as_admin) 切换后的处理:
+ *   - 冒烟/副宠是被自动化或主进程拉起来的, 既不能提权也不能重启, 直接拒绝并恢复原值;
+ *   - 开启且当前不是管理员: 立刻以管理员身份重启 (新值已由 config_store 的延迟保存 +
+ *     重启前的 flush 落盘), 旧进程退出;
+ *   - 开启且已经是管理员 / 关闭: 无需重启, 只提示。
+ * 设置本身走 app->dirty 的延迟落盘, 和本页其它开关一致。
+ */
+static void update_run_as_admin(BongoCatApp *app) {
+    if (app->smoke || app->secondary_pet) {
+        app->settings.app.run_as_admin = !app->settings.app.run_as_admin;
+        app->dirty = true;
+        bongo_cat_preferences_notice_show(app, tr(app,
+            "pages.preference.general.hints.runAsAdminUnavailable",
+            "Changing administrator settings is unavailable in this session."),
+            true);
+        return;
+    }
+    app->dirty = true;
+    if (!app->settings.app.run_as_admin) {
+        /* 关掉: 只影响下一次启动, 正在运行的进程不必动。若开着开机自启, 要同时把自启
+           从最高权限计划任务降回普通快捷方式(提权会话内是静默的)。 */
+        if (app->settings.app.autostart) {
+            BongoCatError sync_error = {0};
+            if (bongo_cat_platform_set_autostart(true, false, &sync_error) != BONGO_CAT_OK)
+                SDL_LogError(SDL_LOG_CATEGORY_APPLICATION,
+                    "[autostart] 降级自启失败: %s", sync_error.message);
+        }
+        bongo_cat_preferences_notice_show(app, tr(app,
+            "pages.preference.general.hints.runAsAdminOff",
+            "Settings saved. BongoCat will run without administrator next time."),
+            false);
+        return;
+    }
+    /* 开 + 当前已是管理员: 已经在提权状态, 无需再重启; 若开着自启, 顺手把自启升级成
+       计划任务(静默, 下次开机免 UAC)。 */
+    if (bongo_cat_platform_is_elevated()) {
+        if (app->settings.app.autostart) {
+            BongoCatError sync_error = {0};
+            if (bongo_cat_platform_set_autostart(true, true, &sync_error) != BONGO_CAT_OK)
+                SDL_LogError(SDL_LOG_CATEGORY_APPLICATION,
+                    "[autostart] 升级自启失败: %s", sync_error.message);
+        }
+        bongo_cat_preferences_notice_show(app, tr(app,
+            "pages.preference.general.hints.runAsAdminAlready",
+            "BongoCat is already running as administrator."), false);
+        return;
+    }
+    /* 开 + 普通权限: 立即以管理员身份重启。被防循环标记 / 自动化挡下时提示手动重启。 */
+    if (bongo_cat_app_request_restart_elevated(app, true)) {
+        bongo_cat_preferences_notice_show(app, tr(app,
+            "pages.preference.cat.hints.rendererRestarting",
+            "Restarting BongoCat to apply the new render backend..."), false);
+    } else {
+        bongo_cat_preferences_notice_show(app, tr(app,
+            "pages.preference.general.hints.runAsAdminRestart",
+            "Settings saved. Restart BongoCat manually as administrator to apply it."),
+            false);
+    }
 }
 
 #ifdef __APPLE__
@@ -358,23 +420,15 @@ static void page_general(BongoCatApp *app, struct nk_context *context) {
         BONGO_CAT_PREF_ICON_SECTION_APPLICATION);
     bool old_autostart = options->autostart;
     bongo_cat_pref_row_icon(context, BONGO_CAT_PREF_ICON_AUTOSTART);
-    {
-        /* 不勾选就以管理员身份运行 (启动时请求提权); 勾上完全跳过, 开机自启才可用 */
-        bool no_admin = app->settings.window.disable_elevation != 0;
-        bongo_cat_pref_row_icon(context, BONGO_CAT_PREF_ICON_RENDERER);
-        if (bongo_cat_pref_toggle(context, "disable-elevation", tr(app,
-                "pages.preference.cat.labels.disableElevation",
-                "Run without administrator"),
-                tr(app, "pages.preference.cat.labels.disableElevationHint",
-                    "Stops asking for administrator rights at startup; auto-start keeps working"),
-                &no_admin)) {
-            app->settings.window.disable_elevation = no_admin ? 1 : 0;
-            app->dirty = true;
-        }
-    }
     if (bongo_cat_pref_toggle(context, "autostart", tr(app,
         "pages.preference.general.labels.launchOnStartup", "Launch on Startup"), "",
         &options->autostart)) update_autostart(app, old_autostart);
+    bongo_cat_pref_row_icon(context, BONGO_CAT_PREF_ICON_RENDERER);
+    if (bongo_cat_pref_toggle(context, "run-as-admin", tr(app,
+        "pages.preference.general.labels.runAsAdmin", "Run as Administrator"),
+        tr(app, "pages.preference.general.labels.runAsAdminHint",
+            "Requests administrator rights at startup. While enabled, a UAC prompt appears every launch, including auto-start."),
+        &options->run_as_admin)) update_run_as_admin(app);
     section_gap(context, 7);
     bongo_cat_pref_section_icon(context, tr(app,
         "pages.preference.general.labels.appearanceSettings", "Appearance"),

@@ -145,7 +145,17 @@ bool bongo_cat_app_confirm_restart(BongoCatApp *app) {
 }
 
 bool bongo_cat_app_request_restart(BongoCatApp *app) {
+    return bongo_cat_app_request_restart_elevated(app, false);
+}
+
+bool bongo_cat_app_request_restart_elevated(BongoCatApp *app,
+    bool elevated) {
     if (!app) return false;
+    if (elevated && !app->restart_elevated && app->restart_requested) {
+        /* 普通重启已经排上了, 但用户随后又要求提权重启: 升级为提权重启。 */
+        app->restart_elevated = true;
+        return true;
+    }
     if (app->restart_requested) return true;
     if (restart_blocked(app)) {
         /* 这里不是错误: 带了防循环标记说明本次运行就是"刚刚被重启出来的", 再重启一次
@@ -157,8 +167,10 @@ bool bongo_cat_app_request_restart(BongoCatApp *app) {
         return false;
     }
     app->restart_requested = true;
+    app->restart_elevated = elevated;
     SDL_LogInfo(BONGO_CAT_LOG_LIFECYCLE,
-        "[runtime] 已安排自动重启: 新设置先落盘, 主循环末尾重启本程序");
+        "[runtime] 已安排自动重启%s: 新设置先落盘, 主循环末尾重启本程序",
+        elevated ? "(提权)" : "");
     return true;
 }
 
@@ -181,8 +193,10 @@ void bongo_cat_app_update_restart(BongoCatApp *app) {
     /* 先把单实例锁还回去, 新进程才拿得到它。 */
     bongo_cat_platform_single_instance_end();
     BongoCatError error = {0};
-    if (bongo_cat_platform_restart_application(arguments, &error) ==
-        BONGO_CAT_OK) {
+    BongoCatResult result = app->restart_elevated
+        ? bongo_cat_platform_restart_application_elevated(arguments, &error)
+        : bongo_cat_platform_restart_application(arguments, &error);
+    if (result == BONGO_CAT_OK) {
         SDL_LogInfo(BONGO_CAT_LOG_LIFECYCLE,
             "[runtime] 自动重启已发起 (参数: %s), 本进程退出",
             arguments[0] ? arguments : "无");
@@ -191,6 +205,7 @@ void bongo_cat_app_update_restart(BongoCatApp *app) {
     }
     /* 失败: 请求位清掉 (让用户之后还能再试), 把锁抢回来并保持原样继续运行。 */
     app->restart_requested = false;
+    app->restart_elevated = false;
     if (!bongo_cat_platform_single_instance_begin())
         SDL_LogWarn(SDL_LOG_CATEGORY_APPLICATION,
             "[runtime] 自动重启失败后未能重新取得单实例锁");

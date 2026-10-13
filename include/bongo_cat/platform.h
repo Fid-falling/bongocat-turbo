@@ -156,7 +156,12 @@ bool bongo_cat_platform_single_instance_take_wake(void);
 bool bongo_cat_platform_update_shutdown_argument(int argc, char **argv);
 bool bongo_cat_platform_single_instance_take_update_shutdown(void);
 void bongo_cat_platform_single_instance_end(void);
-BongoCatResult bongo_cat_platform_set_autostart(bool enabled, BongoCatError *error);
+BongoCatResult bongo_cat_platform_set_autostart(bool enabled, bool elevated,
+    BongoCatError *error);
+/* 已提权会话的"开机自启收口": 当前进程已是管理员且开好了 run_as_admin + autostart 时,
+   把自启从普通快捷方式升级/刷新为 Task Scheduler 最高权限任务, 让下次开机免 UAC。
+   普通权限下不会弹 UAC (它假定调用方已经在提权状态)。 */
+BongoCatResult bongo_cat_platform_autostart_enforce_elevated(void);
 BongoCatMenuAction bongo_cat_platform_context_menu(BongoCatPlatform *platform,
     const BongoCatMenuLabels *labels);
 BongoCatResult bongo_cat_platform_embedded_assets(const char *target, BongoCatError *error);
@@ -171,6 +176,17 @@ BongoCatResult bongo_cat_platform_embedded_assets(const char *target, BongoCatEr
  */
 BongoCatResult bongo_cat_platform_restart_application(const char *arguments,
     BongoCatError *error);
+
+/*
+ * 以管理员身份重启当前程序 (Windows: ShellExecuteExW 的 runas, 会弹一次 UAC)。
+ * 用于"开启以管理员身份运行" (run_as_admin) 时从普通权限进程立刻提权重启。
+ * 与 bongo_cat_platform_restart_application 一样: 调用方必须先还回单实例互斥体,
+ * 传 arguments 时新进程已带 BONGO_CAT_RESTARTED=1 / BONGO_CAT_ELEVATION_TRIED=1,
+ * 返回非 OK 时进程状态不变。
+ * 非 Windows 平台不支持, 恒返回 BONGO_CAT_ERROR_PLATFORM。
+ */
+BongoCatResult bongo_cat_platform_restart_application_elevated(
+    const char *arguments, BongoCatError *error);
 
 #ifdef __APPLE__
 /* Read the permission macOS grants the app right now, without prompting.

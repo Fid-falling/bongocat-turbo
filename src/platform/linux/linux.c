@@ -305,7 +305,8 @@ void bongo_cat_platform_single_instance_end(void) {
 /* 开机自启 = 在 $XDG_CONFIG_HOME/autostart(默认 ~/.config/autostart)下写一个 .desktop
    文件, 这是 XDG 桌面环境的标准做法。Exec 里的路径用引号包住, 所以路径含双引号时必须
    拒绝 —— 否则能拼出一条非法甚至有害的 Exec 行。写失败要删掉半成品, 免得留下坏条目。 */
-BongoCatResult bongo_cat_platform_set_autostart(bool enabled, BongoCatError *error) {
+BongoCatResult bongo_cat_platform_set_autostart(bool enabled, bool elevated, BongoCatError *error) {
+    (void)elevated;
     const char *base = getenv("XDG_CONFIG_HOME"), *home = getenv("HOME");
     char config[BONGO_CAT_PATH_CAP], directory[BONGO_CAT_PATH_CAP], path[BONGO_CAT_PATH_CAP];
     if (base && base[0]) snprintf(config, sizeof(config), "%s", base);
@@ -333,6 +334,10 @@ BongoCatResult bongo_cat_platform_set_autostart(bool enabled, BongoCatError *err
     if (written) return BONGO_CAT_OK;
     remove(path); bongo_cat_error_set(error, BONGO_CAT_ERROR_IO, "Cannot write Linux autostart entry");
     return BONGO_CAT_ERROR_IO;
+}
+BongoCatResult bongo_cat_platform_autostart_enforce_elevated(void) {
+    /* Linux 以套件提权(不会像 Windows 那样换个用户令牌), 正常会话即可写自启。 */
+    return BONGO_CAT_OK;
 }
 /* Linux 侧没有内嵌资源(资源随包放在磁盘上), 所以恒定失败, 由调用方走普通目录逻辑。 */
 BongoCatResult bongo_cat_platform_embedded_assets(const char *target, BongoCatError *error) {

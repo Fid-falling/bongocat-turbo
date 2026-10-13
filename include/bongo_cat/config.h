@@ -80,8 +80,6 @@ typedef struct BongoCatWindowPreferences {
     int font_raster_cap;
     /* 1 = 关掉界面发光/阴影 (浅色主题每帧省约 5ms) */
     int disable_effects;
-    /* 1 = 启动时不检查/不请求管理员权限 (默认 0 = 自动提权) */
-    int disable_elevation;
     /*
      * 1 = 让宠物背景在桌面上真正透明 (默认 0 = 关闭)。
      *
@@ -121,6 +119,12 @@ typedef struct BongoCatWindowState {
 
 typedef struct BongoCatApplicationPreferences {
     bool autostart;
+    /*
+     * 1 = 以管理员身份运行 (启动时请求提权, 与 BongoCat-X 的 run_as_admin 对齐)。
+     * 默认 0 = 普通权限。开启且当前未提权时切换会立即以管理员身份重启; 关掉只影响
+     * 下一次启动, 不影响正在运行的进程。开机自启 + 开启本项 = 每次登录弹一次 UAC。
+     */
+    bool run_as_admin;
     bool tray_visible;
     BongoCatTheme theme;
     BongoCatLanguage language;

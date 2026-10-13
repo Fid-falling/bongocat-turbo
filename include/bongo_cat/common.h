@@ -25,10 +25,14 @@
  * (BONGO_CAT_APP_ID 与 BONGO_CAT_SLUG 同理, 分别是 macOS 偏好/通知标识与 XDG/Linux 目录名。)
  */
 #define BONGO_CAT_STORAGE_DIR "BongoCat"
-#define BONGO_CAT_STORAGE_DIR_W L"BongoCat"
+#define BONGO_CAT_STORAGE_DIR_W L"BongoCat Turbo"
 /* 启动文件夹里的快捷方式文件名保持不变: 改名后用户原来的自启项仍然有效, 关闭自启时
    删的也还是同一个文件, 不会留下指向已不存在 exe 的孤儿快捷方式。 */
-#define BONGO_CAT_STARTUP_SHORTCUT_W L"BongoCat"
+/* 开机自启的统一名称(唯一来源): 计划任务名与启动文件夹快捷方式名共用它, 改一个别的
+   都会跟着变, 不会出现两处名字悄悄分叉。注意: 快捷方式文件名改动会破坏老用户已存在的
+   自启项(见下), 改名要慎重。 */
+#define BONGO_CAT_STARTUP_NAME_W L"BongoCat Turbo"
+#define BONGO_CAT_STARTUP_SHORTCUT_W BONGO_CAT_STARTUP_NAME_W
 #define BONGO_CAT_PATH_CAP 1024
 #define BONGO_CAT_ID_CAP 128
 #define BONGO_CAT_SHORTCUT_CAP 128

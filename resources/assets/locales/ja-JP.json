@@ -31,8 +31,6 @@
           "hideOnHover": "ホバー時に非表示",
           "hideFadeSeconds": "フェード時間 (秒)",
           "maxFPS": "最大フレームレート",
-          "disableElevation": "管理者として実行しない",
-          "disableElevationHint": "起動時に管理者権限を求めなくなります (自動起動も使えます) (管理者権限ではドラッグ&ドロップが遮断されることがあります)",
           "disableUiEffects": "設定画面の効果を無効化",
           "disableUiEffectsHint": "光と影を消して、設定画面をなめらかにします",
           "fontRasterCapHint": "見た目はほぼ変わらず、メモリを節約できます",
@@ -67,6 +65,8 @@
         "labels": {
           "appSettings": "アプリ",
           "launchOnStartup": "起動時に実行",
+          "runAsAdmin": "管理者として実行",
+          "runAsAdminHint": "起動時に管理者権限を要求します。有効な間は、自動起動を含め起動のたびに UAC が表示されます",
           "showTrayIcon": "トレイアイコンを表示",
           "appearanceSettings": "外観",
           "themeMode": "テーマ",
@@ -87,6 +87,10 @@
         "hints": {
           "showTrayIcon": "有効にすると、システムトレイにアプリアイコンを表示します。",
           "autostartFailed": "起動時に実行する設定を更新できません",
+          "runAsAdminUnavailable": "このセッションでは管理者設定を変更できません",
+          "runAsAdminOff": "設定を保存しました。次回は管理者権限なしで実行されます。",
+          "runAsAdminAlready": "BongoCat はすでに管理者として実行されています。",
+          "runAsAdminRestart": "設定を保存しました。適用するには BongoCat を管理者として手動で再起動してください。",
           "inputMonitoringPermission": "許可したら再起動してください。",
           "inputMonitoringPermissionGuide": "入力監視の権限があると、BongoCat は他のアプリでのキー入力を取得できます。マウスは権限なしでも動作します。BongoCat は起動時に監視を構築するため、権限を変更した場合は再起動が必要です。\n\n手順：\n1. 「システム設定」→「プライバシーとセキュリティ」→「入力監視」を開きます。\n2. 一覧にすでにある BongoCat の項目をオンにします。既存の項目は削除しないでください。\n3. 一覧に BongoCat がない場合は「+」をクリックし、現在実行しているアプリを追加します（アプリの場所を確認してください）。\n4. BongoCat を完全に終了してから再起動し、監視を再構築させます。\n\nキーボードが反応しないままの場合は、ご自身で BongoCat の項目を削除して再追加して確認できます。",
           "administratorPermission": "管理者として実行すると、一部のシステムキーや入力イベントをより確実に取得できます。",

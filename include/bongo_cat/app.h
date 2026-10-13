@@ -153,6 +153,10 @@ typedef struct BongoCatApp {
      * runtime/lifecycle/application_restart.c。
      */
     bool restart_requested;
+    /* restart_requested 开启时, 置位表示这次重启要**提权** (开启 run_as_admin 且
+       当前未提权)。走 bongo_cat_platform_restart_application_elevated 拉起新进程;
+       否则按普通重启保持当前权限。 */
+    bool restart_elevated;
     int exit_code;
     bool dirty;
     /* 已经下发给后端的 max_fps (垂直同步跟随它变化), -1 表示还没下发过 */
@@ -270,6 +274,12 @@ void bongo_cat_config_store_flush(BongoCatApp *app);
  * 参数与互斥体的处理都在 runtime/lifecycle/application_restart.c。
  */
 bool bongo_cat_app_request_restart(BongoCatApp *app);
+/*
+ * 同 bongo_cat_app_request_restart, 但 elevated=true 时这次重启会**以管理员身份**
+ * 拉起新进程 (用于给"开启以管理员身份运行"立即生效)。仅在 Windows 上有实际差别;
+ * 排上的普通重启可被后续的提权重启升级。
+ */
+bool bongo_cat_app_request_restart_elevated(BongoCatApp *app, bool elevated);
 /*
  * 重启前的确认框: "现在重启" / "稍后手动重启"。返回 true = 用户选了现在重启。
  * 无人值守运行 (--ci-* / 冒烟 / BONGO_CAT_TEST_NO_DIALOG) 不弹窗并返回 false —— 模态框

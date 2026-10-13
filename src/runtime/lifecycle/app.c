@@ -134,13 +134,24 @@ bool bongo_cat_app_initialize(BongoCatApp *app, int argc, char **argv,
     app->startup_visibility_pending = app->session.window.visible;
     bongo_cat_startup_stage(app, "configuration-ready");
     /*
-     * 不是管理员就以管理员身份重启自己 (ShellExecuteExW 的 runas), 旧进程退出。
-     * 放在这里是因为要先读配置: 设置里的"不以管理员运行"可以让它整条跳过
-     * (开机自启就得靠这个开关)。用户取消 UAC 或提权失败时返回 false, 照常运行。
+     * "以管理员身份运行"开启、且当前不是管理员时以管理员身份重启自己
+     * (ShellExecuteExW 的 runas), 旧进程退出。放在这里是因为要先读配置。
+     * 副宠/冒烟不主动提权 (它们是被主进程/自动化拉起来的)。用户取消 UAC 或
+     * 提权失败时返回 false, 照常运行。
      */
-    if (!app->settings.window.disable_elevation &&
+    if (!app->secondary_pet && !app->smoke &&
+        app->settings.app.run_as_admin &&
         bongo_cat_platform_relaunch_elevated_if_needed())
         return true;
+    /*
+     * 自启升级收口: 走到这里说明本条进程已经是管理员(提权重启要么发生在上面的分支、
+     * 要么本来就以管理员启动)。当"开机自启 + 管理员"同时开着时, 把自启从普通快捷
+     * 方式升格为 Task Scheduler 最高权限任务 —— 这样下次开机由调度器直接拉起, 不再
+     * 弹 UAC; 本会话是管理员, 部署全程静默。
+     */
+    if (!app->secondary_pet && !app->smoke && app->settings.app.autostart &&
+        app->settings.app.run_as_admin && bongo_cat_platform_is_elevated())
+        bongo_cat_platform_autostart_enforce_elevated();
     if (bongo_cat_app_locate_assets(app, error) != BONGO_CAT_OK) return false;
     bongo_cat_startup_stage(app, "assets-ready");
     BongoCatError optional = {0};

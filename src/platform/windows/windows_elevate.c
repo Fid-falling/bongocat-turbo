@@ -1,7 +1,10 @@
 #include "bongo_cat/platform.h"
 #include "bongo_cat/log.h"
+#include "bongo_cat/common.h"
+#include "windows_utf8.h"
 
 #ifdef _WIN32
+#include <stdio.h>
 #include <SDL3/SDL.h>
 #include <windows.h>
 #include <shellapi.h>
@@ -20,6 +23,8 @@
  * 不会再次尝试 (用户拒绝 UAC 时也不会在同一台机器上无限重试)。
  */
 #define BONGO_CAT_ELEVATION_TRIED "BONGO_CAT_ELEVATION_TRIED"
+#define BONGO_CAT_RESTARTED "BONGO_CAT_RESTARTED"
+#define BONGO_CAT_ELEVATED_COMMAND_CAP 2048
 
 bool bongo_cat_platform_is_elevated(void) {
     HANDLE token = NULL;
@@ -32,6 +37,29 @@ bool bongo_cat_platform_is_elevated(void) {
     return elevated;
 }
 
+/*
+ * 取原始命令行里"程序名之后"的参数部分, 供提权重启用。不能直接把 GetCommandLineW()
+ * 的整个结果塞进 lpParameters: ShellExecute 会把子进程命令行拼成 "<lpFile> <参数>",
+ * 而 GetCommandLineW() 已经带了程序名, 结果 argv[1] 会多出一个旧的 exe 路径 —— 目前
+ * 命令行解析会静默忽略未知参数(见 startup_arguments.c), 所以暂时没炸, 但这是一条脆弱
+ * 的暗线: 将来一旦接受位置参数就会把参数整体错位。这里按引号规则跳过第一个 token。
+ * 返回的指针指向进程常驻命令行缓冲, 无需释放。
+ */
+static const wchar_t *command_arguments(void) {
+    const wchar_t *cursor = GetCommandLineW();
+    bool quoted = false;
+    while (*cursor == L' ' || *cursor == L'\t') ++cursor;
+    for (;;) {
+        wchar_t ch = *cursor++;
+        if (ch == L'"') quoted = !quoted;
+        else if (ch == L'\0') return L"";
+        else if ((ch == L' ' || ch == L'\t') && !quoted) {
+            while (*cursor == L' ' || *cursor == L'\t') ++cursor;
+            return cursor;
+        }
+    }
+}
+
 bool bongo_cat_platform_relaunch_elevated(void) {
     wchar_t path[MAX_PATH * 2];
     DWORD length = GetModuleFileNameW(NULL, path,
@@ -42,7 +70,7 @@ bool bongo_cat_platform_relaunch_elevated(void) {
     info.fMask = SEE_MASK_NOCLOSEPROCESS | SEE_MASK_FLAG_NO_UI;
     info.lpVerb = L"runas";
     info.lpFile = path;
-    info.lpParameters = GetCommandLineW();
+    info.lpParameters = command_arguments();
     info.nShow = SW_SHOWNORMAL;
     SetEnvironmentVariableA(BONGO_CAT_ELEVATION_TRIED, "1");
     if (!ShellExecuteExW(&info)) {
@@ -120,11 +148,74 @@ void bongo_cat_platform_allow_file_drop(SDL_Window *window) {
         "[runtime] 已放行拖放消息 (UIPI): hwnd=%p", (void *)hwnd);
 }
 
+BongoCatResult bongo_cat_platform_restart_application_elevated(
+    const char *arguments, BongoCatError *error) {
+    wchar_t executable[MAX_PATH * 2];
+    DWORD length = GetModuleFileNameW(NULL, executable,
+        (DWORD)(sizeof(executable) / sizeof(executable[0])));
+    if (length == 0 || length >= sizeof(executable) / sizeof(executable[0])) {
+        bongo_cat_error_set(error, BONGO_CAT_ERROR_PLATFORM,
+            "Cannot determine the executable path for an elevated restart");
+        return BONGO_CAT_ERROR_PLATFORM;
+    }
+    const char *extra = arguments ? arguments : "";
+    char command[BONGO_CAT_ELEVATED_COMMAND_CAP];
+    /* 路径必须带引号: Program Files 里的路径不带引号会被拆成两个参数。 */
+    int written = snprintf(command, sizeof(command), "\"%ls\"%s%s",
+        executable, extra[0] ? " " : "", extra);
+    if (written < 0 || (size_t)written >= sizeof(command)) {
+        bongo_cat_error_set(error, BONGO_CAT_ERROR_PLATFORM,
+            "Elevated restart arguments do not fit (%d bytes)", written);
+        return BONGO_CAT_ERROR_PLATFORM;
+    }
+    wchar_t *wide = bongo_cat_windows_wide(command);
+    if (!wide) {
+        bongo_cat_error_set(error, BONGO_CAT_ERROR_PLATFORM,
+            "Elevated restart command line is not valid UTF-8");
+        return BONGO_CAT_ERROR_PLATFORM;
+    }
+    /* 两个标记都要带上: 新进程不再弹 UAC (ELEVATION_TRIED), 也不再被当成"首次启动"
+       而把它自己报告成异常退出 / 允许再次自动重启 (RESTARTED)。 */
+    SetEnvironmentVariableA(BONGO_CAT_ELEVATION_TRIED, "1");
+    SetEnvironmentVariableA(BONGO_CAT_RESTARTED, "1");
+    SHELLEXECUTEINFOW info = {0};
+    info.cbSize = sizeof(info);
+    info.fMask = SEE_MASK_NOCLOSEPROCESS | SEE_MASK_FLAG_NO_UI;
+    info.lpVerb = L"runas";
+    info.lpFile = executable;
+    info.lpParameters = wide;
+    info.nShow = SW_SHOWNORMAL;
+    bool launched = ShellExecuteExW(&info) != FALSE;
+    DWORD failure = launched ? 0 : GetLastError();
+    if (info.hProcess) CloseHandle(info.hProcess);
+    free(wide);
+    if (!launched) {
+        /* 没起来就把"已重启"标记撤掉 (记录留在 ELEVATION_TRIED 上, 本进程不再重复
+           弹窗), 由调用方继续运行并提示。 */
+        SetEnvironmentVariableA(BONGO_CAT_RESTARTED, NULL);
+        bongo_cat_error_set(error, BONGO_CAT_ERROR_PLATFORM,
+            "Cannot relaunch BongoCat as administrator (Windows error %lu)",
+            (unsigned long)failure);
+        return BONGO_CAT_ERROR_PLATFORM;
+    }
+    SDL_LogInfo(BONGO_CAT_LOG_LIFECYCLE,
+        "[runtime] 已以管理员身份重新启动 (参数: %s)",
+        extra[0] ? extra : "无");
+    return BONGO_CAT_OK;
+}
+
 #else /* 非 Windows: 没有 UAC 这一套, 直接当作"无需提权" */
 
 bool bongo_cat_platform_is_elevated(void) { return false; }
 bool bongo_cat_platform_relaunch_elevated(void) { return false; }
 bool bongo_cat_platform_relaunch_elevated_if_needed(void) { return false; }
 void bongo_cat_platform_allow_file_drop(SDL_Window *window) { (void)window; }
+BongoCatResult bongo_cat_platform_restart_application_elevated(
+    const char *arguments, BongoCatError *error) {
+    (void)arguments;
+    bongo_cat_error_set(error, BONGO_CAT_ERROR_PLATFORM,
+        "BongoCat cannot relaunch elevated on this platform");
+    return BONGO_CAT_ERROR_PLATFORM;
+}
 
 #endif

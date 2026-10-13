@@ -31,8 +31,6 @@
           "hideOnHover": "鼠标移入隐藏",
           "hideFadeSeconds": "鼠标移入淡出时长（秒）",
           "maxFPS": "最大帧率",
-          "disableElevation": "不以管理员运行",
-          "disableElevationHint": "关掉后启动不再询问管理员权限, 开机自启也能用；管理员模式下拖放会被系统拦截",
           "disableUiEffects": "关闭设置界面特效",
           "disableUiEffectsHint": "关掉发光与阴影，设置界面更流畅",
           "fontRasterCapHint": "清晰度基本不变, 但更省内存",
@@ -67,6 +65,8 @@
         "labels": {
           "appSettings": "应用",
           "launchOnStartup": "开机自启动",
+          "runAsAdmin": "以管理员身份运行",
+          "runAsAdminHint": "启动时请求管理员权限；开启后每次启动（含开机自启）都会弹一次 UAC 确认",
           "showTrayIcon": "显示托盘图标",
           "appearanceSettings": "外观",
           "themeMode": "主题",
@@ -87,6 +87,10 @@
         "hints": {
           "showTrayIcon": "启用后，在系统托盘中显示应用图标。",
           "autostartFailed": "无法更新开机启动设置",
+          "runAsAdminUnavailable": "当前会话（自动化或副宠）中无法修改管理员设置",
+          "runAsAdminOff": "设置已保存，下次启动将以非管理员身份运行",
+          "runAsAdminAlready": "BongoCat 已经以管理员身份运行",
+          "runAsAdminRestart": "设置已保存，请手动以管理员身份重启 BongoCat 后生效",
           "inputMonitoringPermission": "授权后请重启",
           "inputMonitoringPermissionGuide": "输入监控权限让 BongoCat 能接收其他应用中的按键；鼠标移动和点击无需该权限。BongoCat 在启动时建立监听，因此权限变更后需要重启。\n\n操作方式：\n1. 打开「系统设置」→「隐私与安全性」→「输入监控」。\n2. 直接开启列表中已有的 BongoCat 条目，不要删除现有条目。\n3. 若列表中没有 BongoCat，点击「+」按钮，添加你当前运行的那份应用（注意确认应用位置）。\n4. 完全退出 BongoCat 后重新启动，让它重建监听。\n\n若键盘仍然无响应，可由你自行删除并重新添加 BongoCat 条目来排障。",
           "administratorPermission": "以管理员身份运行应用，可以更稳定地捕获部分系统级按键与输入事件。",

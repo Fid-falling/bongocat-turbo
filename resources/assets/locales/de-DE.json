@@ -31,8 +31,6 @@
           "hideOnHover": "Beim Darüberfahren ausblenden",
           "hideFadeSeconds": "Ausblendedauer (s)",
           "maxFPS": "Maximale Bildrate",
-          "disableElevation": "Ohne Administrator starten",
-          "disableElevationHint": "Fragt beim Start keine Administratorrechte mehr ab; Autostart funktioniert; als Administrator kann das Ablegen blockiert sein",
           "disableUiEffects": "Effekte im Einstellungsfenster aus",
           "disableUiEffectsHint": "Ohne Leuchten und Schatten läuft das Einstellungsfenster flüssiger",
           "fontRasterCapHint": "Fast gleiche Schärfe, aber weniger Speicher",
@@ -67,6 +65,8 @@
         "labels": {
           "appSettings": "Anwendung",
           "launchOnStartup": "Beim Systemstart ausführen",
+          "runAsAdmin": "Als Administrator ausführen",
+          "runAsAdminHint": "Fordert beim Start Administratorrechte an. Solange aktiv, erscheint bei jedem Start – auch beim Autostart – eine UAC-Aufforderung",
           "showTrayIcon": "Infobereichssymbol anzeigen",
           "appearanceSettings": "Erscheinungsbild",
           "themeMode": "Design",
@@ -87,6 +87,10 @@
         "hints": {
           "showTrayIcon": "Wenn aktiviert, wird das Anwendungssymbol im Infobereich angezeigt.",
           "autostartFailed": "Die Einstellung für den automatischen Start konnte nicht aktualisiert werden",
+          "runAsAdminUnavailable": "Die Änderung der Administrator-Einstellungen ist in dieser Sitzung nicht verfügbar",
+          "runAsAdminOff": "Einstellungen gespeichert. BongoCat wird beim nächsten Mal ohne Administrator gestartet.",
+          "runAsAdminAlready": "BongoCat wird bereits als Administrator ausgeführt.",
+          "runAsAdminRestart": "Einstellungen gespeichert. Starten Sie BongoCat manuell als Administrator neu, um sie anzuwenden.",
           "inputMonitoringPermission": "Nach dem Erlauben neu starten.",
           "inputMonitoringPermissionGuide": "Die Eingabeüberwachung erlaubt BongoCat, in anderen Apps gedrückte Tasten zu sehen; die Maus funktioniert auch ohne sie. BongoCat baut die Überwachung beim Start auf, eine Berechtigungsänderung erfordert daher einen Neustart.\n\nSchritte:\n1. Öffnen Sie Systemeinstellungen → Datenschutz & Sicherheit → Eingabeüberwachung.\n2. Schalten Sie den bereits gelisteten BongoCat-Eintrag ein; entfernen Sie keine vorhandenen Einträge.\n3. Falls BongoCat fehlt, klicken Sie auf \"+\" und fügen Sie die laufende Kopie hinzu (prüfen Sie den Speicherort).\n4. Beenden Sie BongoCat vollständig und starten Sie es erneut, damit es die Überwachung neu aufbaut.\n\nWenn die Tastatur weiterhin nicht reagiert, können Sie den BongoCat-Eintrag selbst entfernen und neu hinzufügen.",
           "administratorPermission": "Als Administrator kann die Anwendung bestimmte Systemtasten und Eingabeereignisse zuverlässiger erfassen.",

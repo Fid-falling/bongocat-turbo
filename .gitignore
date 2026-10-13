@@ -30,7 +30,7 @@
 
 # Local licensed dependency; install it separately on each machine
 /vendor/CubismSdkForNative/
-
+/vendor
 # IDE and editor-local state
 /.vs/
 /.vscode/

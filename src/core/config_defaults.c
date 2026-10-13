@@ -230,6 +230,9 @@ void bongo_cat_settings_defaults(BongoCatSettings *config) {
     config->window.random_expression_interval_seconds =
         BONGO_CAT_DEFAULT_RANDOM_EXPRESSION_SECONDS;
     config->app.tray_visible = true;
+    /* 默认以管理员身份运行 (与 BongoCat-X 一致, 但 turbo 的默认值是开): 启动时
+       请求提权。因此每次启动 (含开机自启) 都会弹一次 UAC, 用户可在设置里关掉。 */
+    config->app.run_as_admin = true;
     config->app.theme = BONGO_CAT_THEME_AUTO;
     config->app.language = BONGO_CAT_LANG_EN_US;
     config->cache_root[0] = '\0';

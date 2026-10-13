@@ -31,8 +31,6 @@
           "hideOnHover": "Ocultar ao Passar o Mouse",
           "hideFadeSeconds": "Duração do fade (s)",
           "maxFPS": "Taxa Máxima de Quadros",
-          "disableElevation": "Sem administrador",
-          "disableElevationHint": "Não pede mais permissão de administrador ao iniciar; a inicialização automática continua; como administrador, arrastar pode ser bloqueado",
           "disableUiEffects": "Desativar efeitos das configurações",
           "disableUiEffectsHint": "Sem brilhos e sombras, a janela de ajustes fica mais fluida",
           "fontRasterCapHint": "Quase a mesma nitidez, mas menos memória",
@@ -67,6 +65,8 @@
         "labels": {
           "appSettings": "Aplicativo",
           "launchOnStartup": "Iniciar na inicialização",
+          "runAsAdmin": "Executar como administrador",
+          "runAsAdminHint": "Solicita permissão de administrador na inicialização; enquanto ativo, o UAC aparece a cada inicialização, inclusive na inicialização automática",
           "showTrayIcon": "Mostrar ícone na bandeja",
           "appearanceSettings": "Aparência",
           "themeMode": "Tema",
@@ -87,6 +87,10 @@
         "hints": {
           "showTrayIcon": "Quando ativado, o ícone do aplicativo é exibido na bandeja do sistema.",
           "autostartFailed": "Não foi possível atualizar a inicialização automática",
+          "runAsAdminUnavailable": "Alterar as configurações de administrador não está disponível nesta sessão",
+          "runAsAdminOff": "Configurações salvas. O BongoCat será executado sem administrador na próxima vez.",
+          "runAsAdminAlready": "O BongoCat já está sendo executado como administrador.",
+          "runAsAdminRestart": "Configurações salvas. Reinicie o BongoCat manualmente como administrador para aplicar.",
           "inputMonitoringPermission": "Reinicie após autorizar.",
           "inputMonitoringPermissionGuide": "O Monitoramento de Entrada permite que o BongoCat veja teclas pressionadas em outros aplicativos; o mouse continua funcionando sem ele. O BongoCat cria o monitoramento ao iniciar, então uma mudança de permissão exige reiniciar.\n\nPassos:\n1. Abra Ajustes do Sistema → Privacidade e Segurança → Monitoramento de Entrada.\n2. Ative a entrada do BongoCat que já está na lista; não remova entradas existentes.\n3. Se o BongoCat não estiver na lista, clique em \"+\" e adicione a cópia que você executa (confira o local do aplicativo).\n4. Encerre o BongoCat por completo e inicie de novo para recriar o monitoramento.\n\nSe o teclado continuar sem resposta, você pode remover e adicionar de novo a entrada do BongoCat.",
           "administratorPermission": "Executar o aplicativo como administrador ajuda a capturar algumas teclas e eventos de entrada em nível de sistema com mais confiabilidade.",
