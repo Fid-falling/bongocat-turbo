@@ -94,6 +94,21 @@ static void page_display(BongoCatApp *app, struct nk_context *context) {
             app->dirty = true;
         }
     }
+    bongo_cat_pref_row_icon(context, BONGO_CAT_PREF_ICON_FRAME_BOUNDS);
+    {
+        /* 惯性: 开关 + 衰减档位滑杆 (0-99, 越大停得越快)。 */
+        float slow = (float)window->slide_slowdown_percent;
+        if (bongo_cat_pref_toggle_slider(context, "slide-animation", tr(app,
+            "pages.preference.cat.labels.slideAnimation", "Sliding Animation"),
+            tr(app, "pages.preference.cat.hints.slideAnimation",
+                "Keep gliding a short distance after you release a drag."),
+            &window->slide_animation, 0.0f, &slow,
+            BONGO_CAT_MAX_SLIDE_SLOWDOWN_PERCENT, 1.0f,
+            BONGO_CAT_DEFAULT_SLIDE_SLOWDOWN_PERCENT, "")) {
+            window->slide_slowdown_percent = (int)slow;
+            app->dirty = true;
+        }
+    }
     /* 只在录屏/直播软件里显示: 仅 Windows 有等价机制 (DWM 隐藏), 其它平台不显示
        这一项, 免得给用户一个点了没反应的开关。 */
     if (bongo_cat_platform_capture_only_supported()) {

@@ -28,6 +28,11 @@ if(BONGO_CAT_FETCH_DEPS)
   # SDL_VULKAN 跟随 BONGO_CAT_ENABLE_VULKAN: 打开后才会编出 SDL_Vulkan_* 与
   # SDL_WINDOW_VULKAN, 否则 Vulkan 后端连创建 surface 的能力都没有。
   set(SDL_OPENGLES OFF CACHE BOOL "" FORCE)
+  # SDL 默认按优化级别决定断言开关, 导致 debug 构建下 SDL 内部窗口驱动的防御性断言
+  # (如 WIN_SetWindowOpacity 在窗口句柄重建期为 style!=0) 会弹出对话框打断调试。
+  # 这些断言对 bongo_cat 运行无实际影响, 统一降到 release 级别: 保留 SDL 真正关键的
+  # 检查, 但去掉窗口生命周期边界上的噪音弹窗。
+  set(SDL_ASSERTIONS "release" CACHE STRING "" FORCE)
   set(SDL_VULKAN ${BONGO_CAT_ENABLE_VULKAN} CACHE BOOL "" FORCE)
   set(SDL_METAL OFF CACHE BOOL "" FORCE)
   set(SDL_OFFSCREEN OFF CACHE BOOL "" FORCE)

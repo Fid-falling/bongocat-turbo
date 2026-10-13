@@ -6,9 +6,14 @@
  * 易改错: DISPLAY_RECT_CAP 是栈数组的容量约定, 枚举结果超出就放弃判断 —— 宁愿不动。
  */
 #include "runtime.h"
+#include <math.h>
 
 #define DISPLAY_RECOVERY_DELAY_NS 750000000ull
 #define DISPLAY_RECT_CAP 32
+/* 滑行公开成员: 每帧衰减乘数按"winhawk 标称 15.6ms 一拍"折算成指数, 帧率无关。 */
+#define SLIDE_NOMINAL_FRAME_S 0.0156
+#define SLIDE_MAX_FRAME 50
+#define SLIDE_STOP_SPEED_PPS_SQ 100.0
 
 /* 取窗口当前的位置与逻辑尺寸; 任一 SDL 调用失败或尺寸非正都返回 false, 调用方据此
    跳过后续几何处理 (窗口还没建好, 或正在被销毁)。 */
@@ -294,6 +299,7 @@ void bongo_cat_window_display_event(BongoCatApp *app, const SDL_Event *event) {
     if (!app || !event) return;
     if (event->type < SDL_EVENT_DISPLAY_FIRST ||
         event->type > SDL_EVENT_DISPLAY_LAST) return;
+    app->slide_active = false;
     bongo_cat_window_snapshot_end(app);
     if (app->window_drag_active && app->settings.window.keep_in_screen)
         bongo_cat_window_drag_bounds_refresh(app);
@@ -309,6 +315,79 @@ void bongo_cat_window_update_display_recovery(BongoCatApp *app, uint64_t now) {
     app->display_recovery_due_ns = 0;
     if (app->settings.window.keep_in_screen) bongo_cat_window_clamp_to_display(app);
     else bongo_cat_window_recover_to_display(app);
+}
+
+/* 滑行遇到屏幕边缘: 贴着可用区边界反向弹回一点点 (×0.05, 同 winhawk), 并刹住越界方向
+   的速度, 让惯性看起来像"被屏幕挡住弹了一下"而不是飞出桌面。 */
+static void slide_bounce(BongoCatApp *app, int *x, int *y,
+    int width, int height, double *vx, double *vy) {
+    SDL_Rect requested = {*x, *y, width, height};
+    SDL_DisplayID display = target_display(app, &requested);
+    if (!display) display = SDL_GetPrimaryDisplay();
+    SDL_Rect bounds;
+    if (SDL_GetDisplayUsableBounds(display, &bounds)) return;
+    int min_x = bounds.x, min_y = bounds.y;
+    int max_x = bounds.x + bounds.w - width, max_y = bounds.y + bounds.h - height;
+    if (*x < min_x) { *x = min_x; *vx = fabs(*vx) * 0.05; }
+    else if (*x > max_x) { *x = max_x; *vx = -fabs(*vx) * 0.05; }
+    if (*y < min_y) { *y = min_y; *vy = fabs(*vy) * 0.05; }
+    else if (*y > max_y) { *y = max_y; *vy = -fabs(*vy) * 0.05; }
+}
+
+/* 主循环每帧调用: 拖着 window 沿惯性方向衰减移动。初速在松手时由 window_drag.c 算好。
+   衰减用指数 (按 dt 折算到 SLIDE_NOMINAL_FRAME_S 一拍), 帧率无关; 撞到屏幕边缘会弹回;
+   速度过低/超帧数/窗口不可见就停下并夹回显示器。 */
+void bongo_cat_window_update_inertia(BongoCatApp *app, uint64_t now) {
+    if (!app || !app->slide_active) return;
+    if (!app->window || !app->session.window.visible ||
+        app->window_minimized || app->hover_hidden) {
+        app->slide_active = false;
+        return;
+    }
+    double dt = (double)(now - app->slide_last_ns) / 1.0e9;
+    app->slide_last_ns = now;
+    if (dt <= 0.0 || dt > 0.25) return;
+    int slowdown = app->settings.window.slide_slowdown_percent;
+    if (slowdown < 1) slowdown = 1;
+    else if (slowdown > BONGO_CAT_MAX_SLIDE_SLOWDOWN_PERCENT)
+        slowdown = BONGO_CAT_MAX_SLIDE_SLOWDOWN_PERCENT;
+    double mult = (100.0 - slowdown) / 100.0;
+    double decay = pow(mult, dt / SLIDE_NOMINAL_FRAME_S);
+    app->slide_velocity_x *= decay;
+    app->slide_velocity_y *= decay;
+    app->slide_x += app->slide_velocity_x * dt;
+    app->slide_y += app->slide_velocity_y * dt;
+    int width = 0, height = 0, x = 0, y = 0;
+    if (!SDL_GetWindowSize(app->window, &width, &height) ||
+        width <= 0 || height <= 0) {
+        app->slide_active = false;
+        return;
+    }
+    x = (int)lround(app->slide_x);
+    y = (int)lround(app->slide_y);
+    slide_bounce(app, &x, &y, width, height,
+        &app->slide_velocity_x, &app->slide_velocity_y);
+    app->slide_x = (double)x;
+    app->slide_y = (double)y;
+    if (!SDL_SetWindowPosition(app->window, x, y)) {
+        app->slide_active = false;
+        return;
+    }
+    app->session.window.x = x;
+    app->session.window.y = y;
+    app->session.window.position_known = true;
+    bongo_cat_window_mark_hit_dirty(app);
+    if (app->window_snapshot) {
+        bongo_cat_window_snapshot_geometry(app, NULL);
+        app->dirty = true;
+    }
+    app->slide_frame++;
+    double speed_sq = app->slide_velocity_x * app->slide_velocity_x +
+        app->slide_velocity_y * app->slide_velocity_y;
+    if (speed_sq < SLIDE_STOP_SPEED_PPS_SQ || app->slide_frame >= SLIDE_MAX_FRAME) {
+        app->slide_active = false;
+        if (app->settings.window.keep_in_screen) bongo_cat_window_clamp_to_display(app);
+    }
 }
 
 /* 纯逻辑自检, 不创建也不移动真实窗口: 用构造出来的显示器布局覆盖拼接、负坐标、纵向堆叠、

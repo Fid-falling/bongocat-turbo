@@ -47,6 +47,10 @@ static bool write_window(yyjson_mut_doc *doc, yyjson_mut_val *object,
             value->edge_snap) &&
         yyjson_mut_obj_add_int(doc, object, "edgeSnapThreshold",
             value->edge_snap_threshold) &&
+        yyjson_mut_obj_add_bool(doc, object, "slideAnimation",
+            value->slide_animation) &&
+        yyjson_mut_obj_add_int(doc, object, "slideSlowdownPercent",
+            value->slide_slowdown_percent) &&
         yyjson_mut_obj_add_bool(doc, object, "captureOnly",
             value->capture_only) &&
         yyjson_mut_obj_add_int(doc, object, "supersample",

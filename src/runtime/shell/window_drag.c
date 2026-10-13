@@ -6,6 +6,9 @@
 #include "runtime.h"
 #include "modal_frame.h"
 
+/* 惯性触发下限: 松手速度低于这个数 (px/s) 就直接停, 不做小幅度滑行。 */
+#define BONGO_CAT_SLIDE_MIN_SPEED_PPS 150
+
 static int rounded_delta(float value) {
     return value < 0.0f ? (int)(value - 0.5f) : (int)(value + 0.5f);
 }
@@ -27,6 +30,42 @@ static void move_with_pointer(BongoCatApp *app, float x, float y) {
     int next_x = app->drag_window_x + rounded_delta(x - app->drag_start_x);
     int next_y = app->drag_window_y + rounded_delta(y - app->drag_start_y);
     bongo_cat_window_drag_to(app, next_x, next_y);
+    /* 滚动记录指针绝对位移快照, 供松手时算惯性初速 (参考 winhawk)。 */
+    app->drag_samples_ns[app->drag_sample_ring] = SDL_GetTicksNS();
+    app->drag_samples_x[app->drag_sample_ring] = (int)x;
+    app->drag_samples_y[app->drag_sample_ring] = (int)y;
+    app->drag_sample_ring = (app->drag_sample_ring + 1) % 8;
+    if (app->drag_sample_count < 8) app->drag_sample_count++;
+}
+
+/* 从位移快照里挑"最近且相隔 >=60ms 的两个点"算 px/s 初速; 快照不够或为 0 时返回
+   false。相隔太近的点会算出瞬时尖峰, 所以优先选有间隔的那对, 没有再退到相邻两点。
+   只遍历已写入的快照 (written), 跳过还没写入的槽位 (ns == 0) 与最新点本身。 */
+static bool drag_velocity(BongoCatApp *app, double *vx, double *vy) {
+    if (app->drag_sample_count < 2) return false;
+    int newest_idx = (app->drag_sample_ring + 7) % 8;
+    uint64_t newest_ns = app->drag_samples_ns[newest_idx];
+    int nx = app->drag_samples_x[newest_idx], ny = app->drag_samples_y[newest_idx];
+    int best = -1, fallback = -1;
+    uint64_t best_dt = 0;
+    for (int i = 2; i <= app->drag_sample_count; ++i) {
+        int idx = (app->drag_sample_ring + 8 - i) % 8;
+        uint64_t ns = app->drag_samples_ns[idx];
+        if (ns == 0 || ns >= newest_ns) continue;
+        uint64_t dt = newest_ns - ns;
+        if (i == 2 && fallback < 0) fallback = idx;
+        if (dt >= 60000000ull && dt > best_dt) { best_dt = dt; best = idx; }
+    }
+    if (best < 0) {
+        best = fallback;
+        if (best < 0) return false;
+        best_dt = newest_ns - app->drag_samples_ns[best];
+    }
+    if (best_dt == 0) return false;
+    double scale = 1e9 / (double)best_dt;
+    *vx = (double)(nx - app->drag_samples_x[best]) * scale;
+    *vy = (double)(ny - app->drag_samples_y[best]) * scale;
+    return true;
 }
 
 /* 只有按在模型不透明的像素上才算拖动候选 (透明区域留给桌面点击); 同时记下窗口原点与按下
@@ -34,6 +73,10 @@ static void move_with_pointer(BongoCatApp *app, float x, float y) {
 void bongo_cat_window_drag_begin(BongoCatApp *app,
     const SDL_MouseButtonEvent *event) {
     if (!app || !event) return;
+    /* 新拖动会覆盖之前的惯性态与位移快照。 */
+    app->slide_active = false;
+    app->drag_sample_count = 0;
+    app->drag_sample_ring = 0;
     bongo_cat_window_cancel_wheel_animation(app);
     app->drag_candidate = bongo_cat_window_visible_at_pointer(
         app, event->x, event->y);
@@ -138,6 +181,28 @@ void bongo_cat_window_drag_end(BongoCatApp *app) {
     app->window_drag_active = false;
     bongo_cat_window_snapshot_end(app);
     bongo_cat_window_drag_bounds_clear(app);
+    /* 惯性: 松手瞬间用位移快照算初速, 开启且甩动够快才进入滑行。
+       注意: drag_end 会被隐藏/最小化/快照/退出等路径幂等地反复调用, 不能在这里无条件清掉
+       slide_active —— 否则松手后第二次调用 (was_active 为 false) 会把刚武装好的滑行立刻掐死,
+       表现为"完全没有惯性"。所以只在真正结束一次拖动 (was_active) 时才进入滑行分支; 新拖动
+       由 drag_begin 负责中止正在进行的滑行。 */
+    if (was_active && app->settings.window.slide_animation) {
+        double vx = 0.0, vy = 0.0;
+        if (drag_velocity(app, &vx, &vy) &&
+            vx * vx + vy * vy >= BONGO_CAT_SLIDE_MIN_SPEED_PPS *
+                BONGO_CAT_SLIDE_MIN_SPEED_PPS) {
+            int wx = 0, wy = 0;
+            if (SDL_GetWindowPosition(app->window, &wx, &wy)) {
+                app->slide_active = true;
+                app->slide_velocity_x = vx;
+                app->slide_velocity_y = vy;
+                app->slide_x = (double)wx;
+                app->slide_y = (double)wy;
+                app->slide_last_ns = SDL_GetTicksNS();
+                app->slide_frame = 0;
+            }
+        }
+    }
     if (was_active && app->settings.model.mouse_centered) {
         float pointer_x = 0.0f, pointer_y = 0.0f;
         SDL_GetGlobalMouseState(&pointer_x, &pointer_y);

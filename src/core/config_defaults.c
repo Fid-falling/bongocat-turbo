@@ -226,6 +226,8 @@ void bongo_cat_settings_defaults(BongoCatSettings *config) {
     config->window.keep_in_screen = false;
     config->window.edge_snap = false;
     config->window.edge_snap_threshold = BONGO_CAT_DEFAULT_EDGE_SNAP_PX;
+    config->window.slide_animation = true;
+    config->window.slide_slowdown_percent = BONGO_CAT_DEFAULT_SLIDE_SLOWDOWN_PERCENT;
     config->window.obs_background_color = BONGO_CAT_OBS_BACKGROUND_GREEN;
     config->window.corner_radius_percent = BONGO_CAT_DEFAULT_WINDOW_CORNER_PERCENT;
     config->window.hide_fade_seconds = BONGO_CAT_DEFAULT_HIDE_FADE_SECONDS;
@@ -266,6 +268,9 @@ void bongo_cat_settings_validate(BongoCatSettings *config) {
     if (config->window.edge_snap_threshold < 0 ||
         config->window.edge_snap_threshold > BONGO_CAT_MAX_EDGE_SNAP_PX)
         config->window.edge_snap_threshold = BONGO_CAT_DEFAULT_EDGE_SNAP_PX;
+    if (config->window.slide_slowdown_percent < 0 ||
+        config->window.slide_slowdown_percent > BONGO_CAT_MAX_SLIDE_SLOWDOWN_PERCENT)
+        config->window.slide_slowdown_percent = BONGO_CAT_DEFAULT_SLIDE_SLOWDOWN_PERCENT;
     config->window.random_expression_interval_seconds = clampf_or(
         config->window.random_expression_interval_seconds, 1.0f, 3600.0f,
         BONGO_CAT_DEFAULT_RANDOM_EXPRESSION_SECONDS);

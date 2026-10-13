@@ -248,6 +248,7 @@ void bongo_cat_app_loop(BongoCatApp *app) {
         bongo_cat_random_expression_update(app, now);
         bongo_cat_audio_update(app->audio);
         bongo_cat_window_update_display_recovery(app, now);
+        bongo_cat_window_update_inertia(app, now);
         bongo_cat_runtime_flow_update(app, now);
         bongo_cat_window_apply_pending_resize(app);
         bongo_cat_app_drain_input(app, true);
