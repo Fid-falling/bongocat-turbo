@@ -30,6 +30,41 @@ static unsigned long http_status(const char *raw) {
     return end && *end == '\0' ? status : 0;
 }
 
+/*
+ * 一键更新 (下载/校验/替换) 各阶段的原文 -> 本地化人话。
+ * 原文由 update.h 的 BONGO_CAT_UPDATE_ERROR_* 宏给出, 所以这里只需要一张表;
+ * 表里查不到就继续走下面的 HTTP 状态码逻辑。
+ * 这些文案必须让用户明白三件事: 没装成、当前版本还在、下一步能做什么。
+ */
+typedef struct UpdateStageMessage {
+    const char *raw;
+    const char *key;
+    const char *fallback;
+} UpdateStageMessage;
+
+static const UpdateStageMessage stage_messages[] = {
+    {BONGO_CAT_UPDATE_ERROR_NO_CHECKSUM, "native.support.updateUnverifiable",
+        "This release has no checksum, so the update was cancelled to keep you "
+        "safe. Your current version is unchanged."},
+    {BONGO_CAT_UPDATE_ERROR_HASH_MISMATCH, "native.support.updateHashMismatch",
+        "The downloaded file did not match its checksum. It was deleted and "
+        "your current version is unchanged."},
+    {BONGO_CAT_UPDATE_ERROR_UNREADABLE, "native.support.updateDownloadFailed",
+        "The downloaded update could not be read. The update was cancelled."},
+    {BONGO_CAT_UPDATE_ERROR_SOURCES_EXHAUSTED,
+        "native.support.updateDownloadFailed",
+        "The update could not be downloaded from any source. Please try again "
+        "later."},
+    {BONGO_CAT_UPDATE_ERROR_NOT_WRITABLE,
+        "native.support.updateDownloadFailed",
+        "The update could not be installed automatically. Please try again "
+        "later."},
+    {BONGO_CAT_UPDATE_ERROR_REPLACE_FAILED,
+        "native.support.updateDownloadFailed",
+        "The update could not be installed automatically. Please try again "
+        "later."},
+};
+
 /* 把 raw 翻成可直接显示的本地化文案, 返回 i18n 内部的借用指针或 raw 本身, 不要 free。
  * 403 与 429 对用户是同一件事(接口被限流), 共用一句文案; 其余状态码走通用文案。
  * 两个键都不带占位符: 状态码只留在日志里, 界面只显示人话。
@@ -37,6 +72,11 @@ static unsigned long http_status(const char *raw) {
  * "无法检查更新", 调用方不必再判空。 */
 const char *bongo_cat_update_error_text(const BongoCatI18n *i18n,
     const char *raw) {
+    for (size_t index = 0; index < sizeof(stage_messages) /
+            sizeof(stage_messages[0]); ++index)
+        if (raw && strcmp(raw, stage_messages[index].raw) == 0)
+            return bongo_cat_i18n_get(i18n, stage_messages[index].key,
+                stage_messages[index].fallback);
     unsigned long status = http_status(raw);
     if (!status)
         return raw && raw[0] ? raw : bongo_cat_i18n_get(i18n,

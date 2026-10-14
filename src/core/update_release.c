@@ -12,6 +12,12 @@
  * 仓库的 releases 域名, 并要求资源名与拼出来的名字完全一致。
  * platform 串决定期望的资源名格式, 由调用方按当前构建传入; 命名规则同时被 CI
  * 的打包脚本依赖, 属于跨仓库契约, 改一边就要改另一边。
+ *
+ * 期望哈希 (update.h 的 BongoCatUpdateChecksum) 也在这里解析, 三级回退:
+ *   1. 资源对象自己的 digest ("sha256:<hex>") —— GitHub 直接给的, 首选;
+ *   2. release 说明里的 "SHA256 (<资源名>) = <hex>" 行;
+ *   3. 同一个 release 里的 <资源名>.sha256 资产, 只抄地址, 内容由运行时**从官方源**抓。
+ * 三级都拿不到时 checksum 保持 NONE, 运行时据此拒绝下载/替换 —— 绝不装没校验过的二进制。
  */
 #define RELEASE_PREFIX \
     "https://github.com/Fid-falling/bongocat-turbo/releases/tag/"
@@ -65,40 +71,89 @@ static bool copy_asset_url(yyjson_val *asset, const char *expected,
     return true;
 }
 
-/* 按平台拼出期望的安装包 / 便携包文件名。找不到对应资源不算错误, 只是对应字段
-   保持为空, 由 UI 决定提示哪一种更新方式。 */
-static bool read_assets(yyjson_val *root, const char *platform,
-    BongoCatUpdateRelease *release) {
-    yyjson_val *assets = yyjson_obj_get(root, "assets");
-    if (!yyjson_is_arr(assets)) return false;
-    char installer[128] = {0}, portable[128] = {0};
-    int installer_length = 0, portable_length = 0;
-    if (strncmp(platform, "windows-", 8) == 0) {
-        installer_length = snprintf(installer, sizeof(installer),
-            "BongoCat-%s-%s-setup.exe", release->version, platform);
-        portable_length = snprintf(portable, sizeof(portable),
-            "BongoCat-%s-%s-portable.exe", release->version, platform);
-    } else if (strcmp(platform, "linux-x64") == 0) {
-        portable_length = snprintf(portable, sizeof(portable),
-            "BongoCat-%s-%s.tar.gz", release->version, platform);
-    } else if (strcmp(platform, "macos-x64") == 0 ||
-        strcmp(platform, "macos-arm64") == 0) {
-        portable_length = snprintf(portable, sizeof(portable),
-            "BongoCat-%s-%s.zip", release->version, platform);
-    } else return false;
-    if (installer_length < 0 || (size_t)installer_length >= sizeof(installer) ||
-        portable_length < 0 || (size_t)portable_length >= sizeof(portable))
-        return false;
+/* 在 assets 里找名字正好等于 expected 的资源并抄下文件名/下载地址; 顺手取它的 digest
+   (与资源在同一个 JSON 对象里, 不用再遍历一次)。找不到返回 false, 此时 out 不变。 */
+static bool find_asset(yyjson_val *assets, const char *expected,
+    BongoCatUpdateAsset *out) {
     size_t index, count;
     yyjson_val *asset;
     yyjson_arr_foreach(assets, index, count, asset) {
         if (!yyjson_is_obj(asset)) continue;
-        if (installer[0] && !release->installer_url[0])
-            copy_asset_url(asset, installer, release->installer_url,
-                sizeof(release->installer_url));
-        if (!release->portable_url[0]) copy_asset_url(asset, portable,
-            release->portable_url, sizeof(release->portable_url));
+        if (!copy_asset_url(asset, expected, out->url, sizeof(out->url)))
+            continue;
+        snprintf(out->name, sizeof(out->name), "%s", expected);
+        yyjson_val *digest = yyjson_obj_get(asset, "digest");
+        if (yyjson_is_str(digest))
+            bongo_cat_update_sha256_text(yyjson_get_str(digest), out->sha256);
+        return true;
     }
+    return false;
+}
+
+/*
+ * 期望哈希的三级回退 (顺序即信任优先级, 见文件头)。
+ * 只在前一级拿不到时才看下一级: digest 存在就不再理会说明, 免得"说明写错了"把好端端的
+ * digest 覆盖掉。第三级只抄地址, 不在检查阶段抓取 —— 检查更新不该额外联网。
+ */
+static void resolve_checksum(yyjson_val *assets, const char *notes,
+    BongoCatUpdateAsset *out) {
+    if (!out->name[0]) return;
+    if (out->sha256[0]) {
+        out->checksum = BONGO_CAT_UPDATE_CHECKSUM_DIGEST;
+        return;
+    }
+    if (notes && bongo_cat_update_notes_sha256(notes, out->name, out->sha256)) {
+        out->checksum = BONGO_CAT_UPDATE_CHECKSUM_NOTES;
+        return;
+    }
+    char checksum_name[BONGO_CAT_UPDATE_ASSET_CAP + 16];
+    int written = snprintf(checksum_name, sizeof(checksum_name), "%s.sha256",
+        out->name);
+    if (written < 0 || (size_t)written >= sizeof(checksum_name)) return;
+    BongoCatUpdateAsset checksum_asset;
+    memset(&checksum_asset, 0, sizeof(checksum_asset));
+    if (find_asset(assets, checksum_name, &checksum_asset) &&
+        checksum_asset.url[0]) {
+        snprintf(out->checksum_url, sizeof(out->checksum_url), "%s",
+            checksum_asset.url);
+        out->checksum = BONGO_CAT_UPDATE_CHECKSUM_ASSET;
+    }
+}
+
+/* 按平台拼出期望的安装包 / 便携包文件名。找不到对应资源不算错误, 只是对应字段
+   保持为空, 由 UI 决定提示哪一种更新方式。
+   便携包还有一个备选名 (BongoCat-<版本>-<平台>.exe): 万一发布流程以后只产出单文件 exe,
+   老客户端仍然能匹配上; 主名存在时永远优先主名。 */
+static bool read_assets(yyjson_val *root, const char *platform,
+    BongoCatUpdateRelease *release) {
+    yyjson_val *assets = yyjson_obj_get(root, "assets");
+    if (!yyjson_is_arr(assets)) return false;
+    char installer[128] = {0}, portable[128] = {0}, portable_alt[128] = {0};
+    int lengths[3] = {0, 0, 0};
+    if (strncmp(platform, "windows-", 8) == 0) {
+        lengths[0] = snprintf(installer, sizeof(installer),
+            "BongoCat-%s-%s-setup.exe", release->version, platform);
+        lengths[1] = snprintf(portable, sizeof(portable),
+            "BongoCat-%s-%s-portable.exe", release->version, platform);
+        lengths[2] = snprintf(portable_alt, sizeof(portable_alt),
+            "BongoCat-%s-%s.exe", release->version, platform);
+    } else if (strcmp(platform, "linux-x64") == 0) {
+        lengths[1] = snprintf(portable, sizeof(portable),
+            "BongoCat-%s-%s.tar.gz", release->version, platform);
+    } else if (strcmp(platform, "macos-x64") == 0 ||
+        strcmp(platform, "macos-arm64") == 0) {
+        lengths[1] = snprintf(portable, sizeof(portable),
+            "BongoCat-%s-%s.zip", release->version, platform);
+    } else return false;
+    if (lengths[0] < 0 || (size_t)lengths[0] >= sizeof(installer) ||
+        lengths[1] < 0 || (size_t)lengths[1] >= sizeof(portable) ||
+        lengths[2] < 0 || (size_t)lengths[2] >= sizeof(portable_alt))
+        return false;
+    if (installer[0]) find_asset(assets, installer, &release->installer);
+    if (portable[0] && !find_asset(assets, portable, &release->portable) &&
+        portable_alt[0]) find_asset(assets, portable_alt, &release->portable);
+    resolve_checksum(assets, release->notes, &release->installer);
+    resolve_checksum(assets, release->notes, &release->portable);
     return true;
 }
 
@@ -128,6 +183,7 @@ bool bongo_cat_update_parse_release(const char *json, const char *platform,
         sizeof(release->release_url), yyjson_obj_get(root, "html_url"), true,
         false) &&
         safe_url(release->release_url, RELEASE_PREFIX);
+    /* 说明必须在资源之前解析: 它是期望哈希的第二来源, read_assets 会用到。 */
     if (valid) {
         yyjson_val *body = yyjson_obj_get(root, "body");
         if (body && !copy_text(release->notes, sizeof(release->notes),
