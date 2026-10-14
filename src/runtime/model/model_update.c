@@ -180,7 +180,17 @@ void bongo_cat_sequential_model_update(BongoCatApp *app, uint64_t now) {
     }
     if (!next) next = first;
     if (!next || !strcmp(next->id, active)) return;
-    if (bongo_cat_app_select_model(app, next->id)) app->dirty = true;
+    /* 走异步队列而不是同步切换: 到点自动换模型时用户往往正在看别的窗口, 同步加载会让整个
+     * 程序 (含设置界面) 卡住好几秒 —— 这正是"切换桌宠时阻塞"那条反馈里最刺眼的一种表现。
+     * 请求可能被后来的手动选择顶掉, 那正是期望行为。 */
+    BongoCatError error = {0};
+    if (bongo_cat_app_request_model_switch(app, next->id, &error)) {
+        app->dirty = true;
+        return;
+    }
+    SDL_LogWarn(SDL_LOG_CATEGORY_APPLICATION,
+        "Sequential model rotation could not request %s: %s", next->id,
+        error.message[0] ? error.message : "unknown error");
 }
 
 void bongo_cat_sequential_model_reset(BongoCatApp *app) {

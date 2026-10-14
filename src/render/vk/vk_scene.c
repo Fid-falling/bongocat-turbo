@@ -196,5 +196,8 @@ bool bongo_cat_vk_render_main(BongoCatApp *app, bool present) {
     bongo_cat_window_schedule_hit_check(app);
     /* 与 OpenGL 路径同一处: 冒烟时统计首帧/帧序列并落盘 (app->smoke 门控) */
     bongo_cat_frame_audit(app, width, height);
+    /* 帧节奏探针: 每端出一帧记一次。放在这里而不是 app_loop 里, 是因为这条 Vulkan 帧
+     * 路径也会被离屏截帧 (模型封面) 之外的调用点触发, 只有在这里才"真的端出去了一帧"。 */
+    bongo_cat_frame_interval_probe(app, "vulkan-present");
     return true;
 }

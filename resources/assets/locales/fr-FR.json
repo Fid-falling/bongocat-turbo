@@ -264,6 +264,7 @@
     "multiplePetsLimit": "Jusqu'à 8 mascottes peuvent être affichées à la fois",
     "removeDesktopPet": "Fermer cette mascotte de bureau",
     "modelLoadFailed": "Impossible d'afficher ce modèle",
+    "modelSwitchFailed": "Échec du changement ; le modèle précédent est conservé",
     "noBehaviors": "Aucun élément",
     "preferencesWindowTitle": "BongoCat - Settings",
     "startup": {

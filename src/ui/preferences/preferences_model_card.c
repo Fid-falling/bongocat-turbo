@@ -125,6 +125,9 @@ static void action_icon(BongoCatPreferences *value,
 void bongo_cat_preferences_model_select(BongoCatPreferences *value,
     const BongoCatModelEntry *entry) {
     if (!value || !entry) return;
+    /* 同一个模型正在加载时忽略重复点击; 点**别的**模型必须继续受理 —— 切换队列会用最后
+     * 一次点击顶掉前一个 (见 runtime/model/model_switch.c), 这正是"连点多个模型最终只应用
+     * 最后一次选择"的实现方式。 */
     if (value->model_loading && !strcmp(entry->id, value->loading_model_id))
         return;
     bool multiple = value->app->settings.model.multiple_pets;
@@ -260,8 +263,19 @@ void bongo_cat_preferences_model_card(BongoCatPreferences *value,
     BongoCatApp *app = value->app;
     bool selected = bongo_cat_app_model_active(app, entry->id);
     bool primary = !strcmp(entry->id, app->session.active_model_id);
-    bool visual_target = value->model_load_visual_active &&
-        !strcmp(entry->id, value->model_load_visual_id);
+    /*
+     * 哪张卡片显示"正在切换"的进度环。
+     * 修复后切换是异步的, 所以这里要覆盖三种情况: 正在加载的那张、用户在加载期间改点的那张
+     * (queued), 以及"点了还没开始加载"的那张 (切换请求已登记但主循环还没推进到它)。少了后
+     * 两种, 用户连点两个模型时进度环会留在第一张上, 看起来像点空了。
+     */
+    const char *visual_id = value->loading_model_id[0] ?
+        value->loading_model_id :
+        (value->queued_model_id[0] ? value->queued_model_id :
+            (value->pending_model_id[0] ? value->pending_model_id :
+                value->model_load_visual_id));
+    bool visual_target = value->model_load_visual_active && visual_id[0] &&
+        !strcmp(entry->id, visual_id);
     bool selected_visual = selected && !visual_target;
     struct nk_rect bounds;
     if (nk_widget(&bounds, context) == NK_WIDGET_INVALID) return;

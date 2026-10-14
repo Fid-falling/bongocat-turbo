@@ -264,6 +264,7 @@
     "multiplePetsLimit": "Bis zu 8 Desktop-Begleiter können gleichzeitig angezeigt werden",
     "removeDesktopPet": "Diesen Desktop-Begleiter schließen",
     "modelLoadFailed": "Dieses Modell kann nicht angezeigt werden",
+    "modelSwitchFailed": "Wechsel fehlgeschlagen; das vorherige Modell bleibt aktiv",
     "noBehaviors": "Keine Einträge",
     "preferencesWindowTitle": "BongoCat - Settings",
     "startup": {

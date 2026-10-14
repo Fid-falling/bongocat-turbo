@@ -8,6 +8,7 @@
  * 断开连接时系统不会补发"抬起", 所以必须先 bongo_cat_app_reset_gamepad 清状态。
  */
 #include "runtime.h"
+#include "bongo_cat/log.h"
 
 #include <stdio.h>
 #include <string.h>
@@ -82,9 +83,40 @@ static bool select_first_gamepad(BongoCatApp *app) {
     return selected != 0;
 }
 
+/*
+ * 预热手柄子系统 (幂等, 由启动阶段调用一次)。
+ *
+ * 为什么要在启动时做: SDL_InitSubSystem(SDL_INIT_GAMEPAD) 在 Windows 上要枚举 HID 设备,
+ * 实测第一次超过 600ms。它过去是"第一次切到手柄模型"时才发生 —— 也就是挂在那一次切换的
+ * 收尾里, 表现成"换模型换到最后一刻画面冻住 600ms"。启动时窗口还没显示, 这 600ms 用户
+ * 看不到。
+ *
+ * 为什么不改变输入行为: 这里只是让子系统就绪, 真正把手柄事件喂给模型仍然要求
+ * loaded_mode == BONGO_CAT_MODE_GAMEPAD (见 bongo_cat_gamepad_event 与 select_model_state)。
+ * 子系统在"切回键鼠模型"时会被 set_enabled(false) 关掉, 于是下一次切到手柄模型仍要付这
+ * 一次初始化 —— 那是既有行为, 不在本次修复范围内。
+ *
+ * 注意 SDL_INIT_GAMEPAD 这个 token 只允许出现在本文件 (见
+ * cmake/CheckPlatformRuntimeSafety.cmake 的"所有权"规则), 所以别的模块需要预热时必须调
+ * 这个函数, 而不是自己写 SDL_InitSubSystem。
+ */
+void bongo_cat_gamepads_prewarm(BongoCatApp *app) {
+    if (!app) return;
+    if (SDL_WasInit(SDL_INIT_GAMEPAD) & SDL_INIT_GAMEPAD) return;
+    SDL_SetHint(SDL_HINT_JOYSTICK_ALLOW_BACKGROUND_EVENTS, "1");
+    if (!SDL_InitSubSystem(SDL_INIT_GAMEPAD)) {
+        SDL_LogWarn(SDL_LOG_CATEGORY_INPUT,
+            "Gamepad prewarm failed (keyboard and mouse input still work): %s",
+            SDL_GetError());
+        return;
+    }
+    SDL_LogInfo(BONGO_CAT_LOG_INPUT,
+        "[input] 手柄子系统已预热 (首次初始化约数百毫秒, 放在启动阶段执行)");
+}
+
 /* 手柄开关的统一入口 (切到手柄模式 / 切回键鼠模式 / 退出时关闭)。enabled 为真时初始化
    手柄子系统并保证有一台活动设备; 为假时关闭全部句柄、清掉"按住"状态并退出子系统。
-   可重复调用: 子系统已经初始化过时不会再初始化一次。 */
+    可重复调用: 子系统已经初始化过时不会再初始化一次。 */
 void bongo_cat_gamepads_set_enabled(BongoCatApp *app, bool enabled) {
     if (!app) return;
     bool initialized = (SDL_WasInit(SDL_INIT_GAMEPAD) & SDL_INIT_GAMEPAD) != 0;

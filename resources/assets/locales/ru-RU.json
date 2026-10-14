@@ -264,6 +264,7 @@
     "multiplePetsLimit": "Одновременно можно отобразить до 8 питомцев",
     "removeDesktopPet": "Закрыть этого питомца",
     "modelLoadFailed": "Не удалось отобразить эту модель",
+    "modelSwitchFailed": "Не удалось переключиться; сохранена прежняя модель",
     "noBehaviors": "Нет элементов",
     "preferencesWindowTitle": "BongoCat - Settings",
     "startup": {

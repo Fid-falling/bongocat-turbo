@@ -131,6 +131,11 @@ void bongo_cat_window_resize_by_pointer(BongoCatApp *app, const SDL_Event *event
 const char *bongo_cat_gamepad_axis_name(Uint8 axis);
 const char *bongo_cat_gamepad_button_name(Uint8 button);
 void bongo_cat_gamepads_set_enabled(BongoCatApp *app, bool enabled);
+/* 预热手柄子系统: 首次初始化要枚举 HID 设备 (Windows 上 600ms 级), 放在启动阶段做, 免得
+ * 那笔开销落在"第一次切到手柄模型"的收尾上。幂等。手柄子系统的初始化只允许由
+ * runtime/input/gamepad.c 发起 (见 cmake/CheckPlatformRuntimeSafety.cmake 的所有权规则),
+ * 别处要预热必须调这个函数。 */
+void bongo_cat_gamepads_prewarm(BongoCatApp *app);
 void bongo_cat_app_reset_gamepad(BongoCatApp *app);
 void bongo_cat_app_apply_mouse(BongoCatApp *app);
 void bongo_cat_app_reset_pointer_tracking(BongoCatApp *app);
@@ -158,6 +163,17 @@ void bongo_cat_frame_audit(BongoCatApp *app, int width, int height);
 void bongo_cat_frame_presentation_prepare(BongoCatApp *app,
     const unsigned char *pixels, int width, int height, bool visible);
 void bongo_cat_frame_presented_audit(BongoCatApp *app);
+/*
+ * "主循环有没有在出帧"的量化探针 (只在 --ci-frame-series 下真的工作)。
+ * 每画完一帧调一次, 内部统计相邻帧间隔, 把最大间隔写成一条 WARN 日志, 并在退出前把
+ * 分位数落到 state_root/frame-interval.txt。
+ * 为什么需要它: OpenGL 的代理分层呈现路径下后台缓冲不逐帧提交, frame-series.csv 里看不到
+ * 帧, 用那个口径会把"一直在正常出帧"误报成"整段没有帧" —— 而那正是本次要量的事情。
+ * 返回值是本次间隔 (纳秒), 首帧为 0。
+ */
+uint64_t bongo_cat_frame_interval_probe(BongoCatApp *app, const char *stage);
+/* 退出前落盘最终统计 (幂等; 没有采样过就不写文件)。 */
+void bongo_cat_frame_interval_report(BongoCatApp *app);
 void bongo_cat_window_clear_background(BongoCatApp *app);
 void bongo_cat_window_mask_corners(BongoCatApp *app, int width, int height);
 void bongo_cat_window_destroy_corner_mask(void);
@@ -178,6 +194,15 @@ bool bongo_cat_app_switch_renderer(BongoCatApp *app, BongoCatRenderer target,
 bool bongo_cat_app_capture_pending_model_cover(BongoCatApp *app);
 /* --- 运行时策略: 流程脚本、系统语言、配置落盘、多宠协同 --- */
 void bongo_cat_runtime_flow_update(BongoCatApp *app, uint64_t now);
+/* --- 模型切换的异步队列 (实现见 model/model_switch.c) ---
+ * 换模型必须走这条异步路径: 加载要 1~5 秒, 同步做会让主循环一帧不出、设置窗口也点不动。
+ * 调用方只登记请求, 由主循环每轮调一次 step 按帧预算推进; 失败时当前模型保持不变。 */
+bool bongo_cat_app_request_model_switch(BongoCatApp *app, const char *id,
+    BongoCatError *error);
+bool bongo_cat_app_model_switch_step(BongoCatApp *app, uint64_t now,
+    uint64_t budget_ns);
+bool bongo_cat_app_model_switch_active(const BongoCatApp *app);
+const char *bongo_cat_app_model_switch_target(const BongoCatApp *app);
 void bongo_cat_random_expression_update(BongoCatApp *app, uint64_t now);
 void bongo_cat_random_expression_reset(BongoCatApp *app);
 void bongo_cat_random_motion_update(BongoCatApp *app, uint64_t now);

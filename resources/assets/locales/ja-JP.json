@@ -264,6 +264,7 @@
     "multiplePetsLimit": "一度に表示できるデスクトップペットは 8 体までです",
     "removeDesktopPet": "このデスクトップペットを閉じる",
     "modelLoadFailed": "このモデルを表示できません",
+    "modelSwitchFailed": "切り替えに失敗しました。前のモデルを維持します",
     "noBehaviors": "項目がありません",
     "preferencesWindowTitle": "BongoCat - Settings",
     "startup": {

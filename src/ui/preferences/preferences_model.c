@@ -23,6 +23,7 @@
 #include "bongo_cat/i18n.h"
 #include "bongo_cat/preferences.h"
 
+#include <SDL3/SDL_log.h>
 #include <stdio.h>
 #include <string.h>
 
@@ -158,8 +159,7 @@ void bongo_cat_preferences_process_model_hidden(BongoCatPreferences *value) {
 }
 
 void bongo_cat_preferences_process_model_selection(BongoCatPreferences *value) {
-    if (!value || !value->model_selection_pending || value->model_loading)
-        return;
+    if (!value || !value->model_selection_pending) return;
     char id[BONGO_CAT_ID_CAP];
     snprintf(id, sizeof(id), "%s", value->pending_model_id);
     bool multiple = value->pending_model_multiple;
@@ -167,6 +167,13 @@ void bongo_cat_preferences_process_model_selection(BongoCatPreferences *value) {
     value->pending_model_id[0] = '\0';
     value->model_selection_pending = false;
     value->pending_model_multiple = false;
+    /* 用户在加载期间又点了一个: 不排队等前一个结束, 直接登记成"最后的选择" —— 切换队列
+     * 会把正在跑的那个顶掉 (见 model_switch.c), 所以最终只会应用最后一次点击。
+     * 中间态用 queued_model_id 表达, 卡片据此继续显示"正在切换", 不会闪回未选中。 */
+    if (value->model_loading && strcmp(value->queued_model_id, id) != 0) {
+        snprintf(value->queued_model_id, sizeof(value->queued_model_id), "%s", id);
+        SDL_Log("Preferences model selection superseded while loading: id=%s", id);
+    }
     value->model_loading = true;
     value->model_load_progress = 0.0f;
     value->model_load_render_progress = 0.0f;
@@ -175,23 +182,77 @@ void bongo_cat_preferences_process_model_selection(BongoCatPreferences *value) {
         bongo_cat_preferences_model_visual_begin(value, id);
     snprintf(value->loading_model_id, sizeof(value->loading_model_id), "%s", id);
     BongoCatError error = {0};
-    bool selected = multiple ? bongo_cat_app_set_model_active(
-        value->app, id, active, &error) :
-        bongo_cat_app_select_model_with_error(value->app, id, &error);
-    if (selected) finish_model_load_progress(value);
-    else {
+    /*
+     * 两条路都必须**不阻塞**: 换主模型走异步队列 (主循环按帧预算推进), 多宠勾选只改会话
+     * 列表 (不加载模型)。修复前这里是同步调用 bongo_cat_app_select_model_with_error,
+     * 于是这一帧会把整个加载跑完 —— 主循环一帧不出、设置窗口也点不动。
+     */
+    bool accepted = multiple ? bongo_cat_app_set_model_active(value->app, id,
+        active, &error) :
+        bongo_cat_app_request_model_switch(value->app, id, &error);
+    if (!accepted) {
         value->model_load_progress = 0.0f;
         value->model_load_visual_active = false;
         value->model_load_visual_id[0] = '\0';
+        value->loading_model_id[0] = '\0';
+        value->queued_model_id[0] = '\0';
+        value->model_loading = false;
+        SDL_LogError(SDL_LOG_CATEGORY_APPLICATION,
+            "Model selection failed: id=%s error=%s", id,
+            error.message[0] ? error.message : "Unable to display this model");
+        bongo_cat_preferences_notice_show(value->app,
+            error.message[0] ? error.message : tr(value->app,
+                "native.modelLoadFailed", "Unable to display this model"), true);
     }
-    value->model_loading = false;
-    value->loading_model_id[0] = '\0';
-    if (!selected) SDL_LogError(SDL_LOG_CATEGORY_APPLICATION,
-        "Model selection failed: id=%s error=%s", id,
-        error.message[0] ? error.message : "Unable to display this model");
+    /* 多宠勾选是同步完成的; 换主模型要等异步队列回调 switch_finished/_failed。 */
+    if (accepted && multiple) {
+        value->model_loading = false;
+        value->loading_model_id[0] = '\0';
+        finish_model_load_progress(value);
+    }
     bongo_cat_preferences_invalidate(value);
     /* Render on the next input frame. A nested render here would replay the
        card click that queued this selection and immediately toggle it back. */
+}
+
+/*
+ * 异步切换的结果回调 (由 runtime/model/model_switch.c 调用)。
+ * 成功: 结束加载动画并让卡片按新模型重画 (模型列表/行为页都跟着变)。
+ * 失败: 结束加载动画 + 弹出失败提示条 (文案 10 种语言), 界面回到原模型 —— 后者不需要这里
+ * 做任何事, 因为切换在提交之前根本没改过 active_model_id。
+ */
+void bongo_cat_preferences_model_switch_finished(BongoCatPreferences *value,
+    const char *model_id) {
+    if (!value) return;
+    value->model_loading = false;
+    value->loading_model_id[0] = '\0';
+    value->queued_model_id[0] = '\0';
+    finish_model_load_progress(value);
+    if (model_id) SDL_Log("Preferences model switch finished: id=%s", model_id);
+    bongo_cat_preferences_invalidate(value);
+}
+
+void bongo_cat_preferences_model_switch_failed(BongoCatPreferences *value,
+    const char *model_id, const char *reason) {
+    if (!value) return;
+    value->model_loading = false;
+    value->loading_model_id[0] = '\0';
+    value->queued_model_id[0] = '\0';
+    /* 失败时也要让进度环收尾 (否则它会停在半路): 直接把视觉动画判为结束并推到 100%。 */
+    value->model_load_visual_active = false;
+    value->model_load_visual_completion_ns = 0;
+    value->model_load_progress = 1.0f;
+    char message[512];
+    snprintf(message, sizeof(message), "%s%s%s",
+        bongo_cat_i18n_get(value->app->i18n, "native.modelSwitchFailed",
+            "Switch failed; keeping the previous model"),
+        (reason && reason[0]) ? ": " : "",
+        (reason && reason[0]) ? reason : "");
+    bongo_cat_preferences_notice_show(value->app, message, true);
+    SDL_LogError(SDL_LOG_CATEGORY_APPLICATION,
+        "Preferences model switch failed: id=%s reason=%s",
+        model_id ? model_id : "", (reason && reason[0]) ? reason : "unknown");
+    bongo_cat_preferences_invalidate(value);
 }
 
 /*

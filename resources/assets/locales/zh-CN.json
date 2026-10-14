@@ -264,6 +264,7 @@
     "multiplePetsLimit": "最多可同时显示 8 个桌宠",
     "removeDesktopPet": "关闭此桌宠",
     "modelLoadFailed": "模型无法显示",
+    "modelSwitchFailed": "切换失败，已保留原模型",
     "noBehaviors": "暂无可用项目",
     "preferencesWindowTitle": "BongoCat - Settings",
     "startup": {

@@ -6,10 +6,8 @@
 
 #include "runtime.h"
 
-typedef struct BongoCatModelContentAnchor {
-    int x, y;
-    bool valid;
-} BongoCatModelContentAnchor;
+/* BongoCatModelContentAnchor 定义在 bongo_cat/app.h 里: 它是模型切换影子状态的一部分, 而
+ * 影子状态要跨帧存活。这里不再重复定义, 否则同一类型会有两份声明。 */
 
 BongoCatModelContentAnchor bongo_cat_model_content_anchor(BongoCatApp *app);
 bool bongo_cat_model_apply_aspect(BongoCatApp *app,

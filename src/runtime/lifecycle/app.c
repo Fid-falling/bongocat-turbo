@@ -166,6 +166,14 @@ bool bongo_cat_app_initialize(BongoCatApp *app, int argc, char **argv,
     bongo_cat_startup_stage(app, "platform-ready");
     app->live2d = bongo_cat_live2d_create(app->asset_root, error);
     if (!app->live2d) return false;
+    /*
+     * 手柄子系统的首次初始化要枚举 HID 设备, 实测在 Windows 上超过 600ms。它过去是"第一次
+     * 切到手柄模型"时才做的, 于是那一次切换的收尾会整段卡住 —— 用户看到的是"换模型换到
+     * 一半画面冻住"。这里在启动阶段就预热掉: 启动时窗口还没显示, 这 600ms 用户看不到。
+     * 预热不改变输入行为, 失败也只降级 (手柄不可用时键鼠照常), 详见
+     * bongo_cat_gamepads_prewarm 的说明。
+     */
+    bongo_cat_gamepads_prewarm(app);
     optional = (BongoCatError){0}; app->overlay = bongo_cat_overlay_create(&optional);
     if (!app->overlay) SDL_LogWarn(SDL_LOG_CATEGORY_APPLICATION,
         "Overlay disabled: %s", optional.message);

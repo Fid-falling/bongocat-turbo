@@ -27,6 +27,8 @@ void bongo_cat_app_shutdown(BongoCatApp *app, const char *stage,
 /* 先落盘再拆组件: 行为状态要写回 session, 而 session 的 flush 必须发生在这里, 之后不再
    有机会保存。 */
     bongo_cat_app_capture_behavior_state(app);
+    /* 帧节奏统计落盘: 它必须在 state_root 与日志都还在的时候做 (后面会拆掉平台与日志)。 */
+    bongo_cat_frame_interval_report(app);
     bongo_cat_window_snapshot_discard(app);
     bongo_cat_config_store_flush(app);
     bongo_cat_multi_pet_shutdown(app);

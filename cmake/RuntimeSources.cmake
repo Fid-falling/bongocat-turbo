@@ -90,6 +90,9 @@ set(BONGO_CAT_RUNTIME_UPDATE_SOURCES
 
 set(BONGO_CAT_RUNTIME_DIAGNOSTIC_SOURCES
   src/runtime/diagnostics/frame_audit.c
+  # "主循环有没有在出帧"的量化探针 (帧间隔最大值/分位数): 与 frame_audit 的帧内容口径互补,
+  # 也是透明背景走代理分层呈现时唯一能用的帧节奏口径 (那条路径下后台缓冲不逐帧提交)。
+  src/runtime/diagnostics/frame_interval_probe.c
   src/runtime/diagnostics/frame_presentation_audit.c
   src/runtime/diagnostics/live2d_audit.c
   src/runtime/diagnostics/live2d_mouse_mapping_audit.c
@@ -122,6 +125,10 @@ set(BONGO_CAT_RUNTIME_MODEL_SOURCES
   src/runtime/model/model_cover_queue.c
   src/runtime/model/model_files.c
   src/runtime/model/model_geometry.c
+  # 换桌宠的异步队列: 影子准备 + 逐帧预算推进 + 失败回退 (见 model_switch.h 的说明)。
+  # 拆成两份是为了让 model_files.c 不撞上单文件行数上限, 也为了让"准备/提交"与"调度"分开。
+  src/runtime/model/model_switch.c
+  src/runtime/model/model_switch_shadow.c
   src/runtime/model/multi_pet.c
   src/runtime/model/multi_pet_selection.c
   src/runtime/model/multi_pet_process.c

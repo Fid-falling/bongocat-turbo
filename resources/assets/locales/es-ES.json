@@ -264,6 +264,7 @@
     "multiplePetsLimit": "Se pueden mostrar hasta 8 mascotas a la vez",
     "removeDesktopPet": "Cerrar esta mascota de escritorio",
     "modelLoadFailed": "No se puede mostrar este modelo",
+    "modelSwitchFailed": "No se pudo cambiar; se mantiene el modelo anterior",
     "noBehaviors": "No hay elementos",
     "preferencesWindowTitle": "BongoCat - Settings",
     "startup": {

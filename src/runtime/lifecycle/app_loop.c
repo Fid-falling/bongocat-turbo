@@ -153,6 +153,8 @@ static bool render(BongoCatApp *app, bool present) {
     }
     if (reveal_startup) app->startup_visibility_pending = false;
     bongo_cat_frame_presented_audit(app);
+    /* 帧节奏探针: 每真的端出一帧记一次 (放在 present 之后, 失败路径不算)。 */
+    bongo_cat_frame_interval_probe(app, "gl-present");
     app->input_diagnostics.presented_frames++;
     bongo_cat_startup_ready(app);
     bongo_cat_memory_policy_frame_presented();
@@ -283,6 +285,14 @@ void bongo_cat_app_loop(BongoCatApp *app) {
         now = SDL_GetTicksNS();
         bongo_cat_app_update_hover(app, now);
         bongo_cat_app_update_hover_fade(app, now);
+        /*
+         * 模型切换的推进点。位置是有讲究的:
+         *   - 必须在上一帧的呈现与回读之后 (Vulkan 的贴图上传/离屏目标重建会做队列级等空,
+         *     撞上在飞的帧就会破坏它的同步假设);
+         *   - 又必须在下面这次渲染之前, 这样"正在切换"的中间态能跟着这一帧一起画出去;
+         *   - 它自带时间预算, 到点就返回, 所以不会把这一帧吃掉 (见 model_switch.c)。
+         */
+        bongo_cat_app_model_switch_step(app, now, 0);
         if (bongo_cat_model_frame_due(app, now)) update_model(app, now);
         else if (!app->session.window.visible || app->window_minimized) {
             app->last_frame_ns = now;
@@ -297,14 +307,19 @@ void bongo_cat_app_loop(BongoCatApp *app) {
         bongo_cat_preferences_process_model_selection(app->preferences);
         bongo_cat_preferences_process_model_hidden(app->preferences);
         bongo_cat_preferences_process_behavior_toggle(app->preferences);
-        if (app->session.window.visible && !app->window_minimized && app->dirty)
+        if (app->session.window.visible && !app->window_minimized && app->dirty) {
             render(app, true);
+        }
         bongo_cat_tray_sync(app->tray);
         bongo_cat_window_raise_when_due(app, now);
         bongo_cat_config_store_update(app, now);
         /* 自动重启排在 config_store 之后: 新设置必须先落盘, 新进程才读得到。 */
         bongo_cat_app_update_restart(app);
-        if (app->smoke_deadline_ns && now >= app->smoke_deadline_ns)
+        if (app->smoke_deadline_ns && now >= app->smoke_deadline_ns) {
             app->running = false;
+            /* 帧节奏统计在这里就落盘, 而不是等 shutdown: 退出清理路径上任何一步出问题
+             * (例如驱动在销毁设备时崩) 都不会把这份量化结果带走。落盘是幂等的。 */
+            bongo_cat_frame_interval_report(app);
+        }
     }
 }

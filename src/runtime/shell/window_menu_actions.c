@@ -21,18 +21,25 @@ static const char *tr(BongoCatApp *app, const char *key,
 }
 
 /* 切换模型并处理失败: 失败时按"设置窗口是否可见"选择就地提示条或系统消息框, 并记日志。
- * 返回是否成功; 成功会重建模型相关状态 (动作/表情表随模型变)。 */
+ * 成功会重建模型相关状态 (动作/表情表随模型变)。
+ *
+ * 注意它现在**不阻塞**: 只是把请求登记进切换队列, 由主循环按帧预算推进 (见
+ * model_switch.c)。菜单弹出期间主循环本来就被模态循环挡着, 所以这里立刻返回反而是对的 ——
+ * 加载会在菜单关掉之后的那几帧里继续, 期间画面照常出。失败提示改由队列在结果出来时发
+ * (bongo_cat_preferences_model_switch_failed), 因为那时才知道成败。 */
 static bool select_model(BongoCatApp *app, const char *id) {
     BongoCatError error = {0};
-    if (bongo_cat_app_select_model_with_error(app, id, &error)) return true;
-    SDL_LogError(SDL_LOG_CATEGORY_APPLICATION, "Model switch failed: %s",
+    if (bongo_cat_app_request_model_switch(app, id, &error)) return true;
+    SDL_LogError(SDL_LOG_CATEGORY_APPLICATION, "Model switch request failed: %s",
         error.message[0] ? error.message : "unknown error");
     const char *message = tr(app, "native.modelLoadFailed",
         "Unable to display this model");
     if (app->preferences && bongo_cat_preferences_visible(app->preferences))
         bongo_cat_preferences_notice_show(app, message, true);
-    else SDL_ShowSimpleMessageBox(SDL_MESSAGEBOX_ERROR, BONGO_CAT_NAME,
-        message, app->window);
+    else if (!app->automated)
+        /* 无人值守运行 (--ci-*) 不弹模态框: 那会把脚本挂死。 */
+        SDL_ShowSimpleMessageBox(SDL_MESSAGEBOX_ERROR, BONGO_CAT_NAME,
+            message, app->window);
     return false;
 }
 

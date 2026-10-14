@@ -264,6 +264,7 @@
     "multiplePetsLimit": "Up to 8 desktop pets can be displayed at once",
     "removeDesktopPet": "Close this desktop pet",
     "modelLoadFailed": "Unable to display this model",
+    "modelSwitchFailed": "Switch failed; the previous model is kept",
     "noBehaviors": "No items",
     "preferencesWindowTitle": "BongoCat - Settings",
     "startup": {

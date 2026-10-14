@@ -162,6 +162,14 @@ struct BongoCatPreferences {
     uint64_t model_load_visual_completion_ns;
     char pending_model_id[BONGO_CAT_ID_CAP];
     char loading_model_id[BONGO_CAT_ID_CAP];
+    /*
+     * 用户在"正在切换"期间又点了的那个模型 (没有就是空串)。
+     *
+     * 为什么需要它: 切换改成异步之后, 加载中的卡片要保持"正在切换"的外观, 同时还要能接受
+     * 用户改主意 —— 而 model_loading 只能表达"有一个切换在跑"。切换队列会用最后一次点击顶掉
+     * 前一个, 所以这个字段就是给界面看的"当前意图"。
+     */
+    char queued_model_id[BONGO_CAT_ID_CAP];
     char pending_behavior_id[BONGO_CAT_BEHAVIOR_ID_CAP];
     char model_load_visual_id[BONGO_CAT_ID_CAP];
     uint64_t last_render_ns;
@@ -270,6 +278,11 @@ void bongo_cat_preferences_assets_load(BongoCatPreferences *value);
 void bongo_cat_preferences_support_assets_load(BongoCatPreferences *value);
 void bongo_cat_preferences_support_assets_clear(BongoCatPreferences *value);
 void bongo_cat_preferences_process_model_selection(BongoCatPreferences *value);
+/* 异步模型切换的结果: 成功结束加载动画, 失败弹提示条并结束动画 (界面回到原模型)。 */
+void bongo_cat_preferences_model_switch_finished(BongoCatPreferences *value,
+    const char *model_id);
+void bongo_cat_preferences_model_switch_failed(BongoCatPreferences *value,
+    const char *model_id, const char *reason);
 void bongo_cat_preferences_process_model_hidden(BongoCatPreferences *value);
 void bongo_cat_preferences_process_behavior_toggle(BongoCatPreferences *value);
 void bongo_cat_preferences_model_visual_begin(BongoCatPreferences *value,
