@@ -23,14 +23,15 @@ static void section_gap(struct nk_context *context, float pixels) {
     context->current->layout->at_y += pixels;
 }
 
-static void page_display(BongoCatApp *app, struct nk_context *context) {
+static void page_display(BongoCatPreferences *value, struct nk_context *context) {
+    BongoCatApp *app = value->app;
     BongoCatModelPreferences *model = &app->settings.model;
     BongoCatWindowPreferences *window = &app->settings.window;
     BongoCatWindowState *window_state = &app->session.window;
-    bongo_cat_pref_section_icon(context, tr(app,
-        "pages.preference.cat.labels.windowSettings",
-        "Window"),
-        BONGO_CAT_PREF_ICON_SECTION_WINDOW);
+    if (bongo_cat_preferences_options_begin(value, context,
+        BONGO_CAT_OPTIONS_WINDOW,
+        tr(app, "pages.preference.cat.labels.windowSettings", "Window"),
+        BONGO_CAT_PREF_ICON_SECTION_WINDOW)) {
     bongo_cat_ui_question_tooltip(context, tr(app,
         "pages.preference.cat.hints.gameInput", "Pet not responding in games?"),
         tr(app, "pages.preference.cat.hints.gameInputHelp",
@@ -182,9 +183,12 @@ static void page_display(BongoCatApp *app, struct nk_context *context) {
         BONGO_CAT_DEFAULT_RANDOM_EXPRESSION_SECONDS);
 
     section_gap(context, 10);
-    bongo_cat_pref_section_icon(context, tr(app,
-        "pages.preference.cat.labels.performanceSettings", "Performance"),
-        BONGO_CAT_PREF_ICON_SECTION_APPEARANCE);
+    bongo_cat_preferences_options_end(value, context);
+    }
+    if (bongo_cat_preferences_options_begin(value, context,
+        BONGO_CAT_OPTIONS_PERFORMANCE,
+        tr(app, "pages.preference.cat.labels.performanceSettings", "Performance"),
+        BONGO_CAT_PREF_ICON_SECTION_APPEARANCE)) {
     {
         /* 超采样: 质量档 2x 边缘更干净; 2x 是 4 倍面积, 大窗口很吃显存 */
         const char *const labels[] = {
@@ -234,9 +238,12 @@ static void page_display(BongoCatApp *app, struct nk_context *context) {
             app->dirty = true;
         }
     }    section_gap(context, 10);
-    bongo_cat_pref_section_icon(context, tr(app,
-        "pages.preference.cat.labels.modelSettings", "Model"),
-        BONGO_CAT_PREF_ICON_SECTION_MODEL);
+    bongo_cat_preferences_options_end(value, context);
+    }
+    if (bongo_cat_preferences_options_begin(value, context,
+        BONGO_CAT_OPTIONS_MODEL,
+        tr(app, "pages.preference.cat.labels.modelSettings", "Model"),
+        BONGO_CAT_PREF_ICON_SECTION_MODEL)) {
     bongo_cat_pref_row_icon(context, BONGO_CAT_PREF_ICON_MIRROR);
     if (bongo_cat_pref_toggle(context, "mirror", tr(app,
         "pages.preference.cat.labels.mirrorMode", "Mirror Mode"), "",
@@ -271,6 +278,8 @@ static void page_display(BongoCatApp *app, struct nk_context *context) {
     /* 渲染后端: 实现在 preferences_renderer_row.c (它要同时管"写配置 -> 确认框 ->
        重启"和"被拒也要留痕", 与托盘那一项共用 runtime 里的同一份实现)。 */
     bongo_cat_preferences_renderer_row(app, context);
+    bongo_cat_preferences_options_end(value, context);
+    }
 }
 
 static void update_autostart(BongoCatApp *app, bool old_value) {
@@ -415,16 +424,18 @@ static void input_monitoring_section(BongoCatApp *app,
 }
 #endif
 
-static void page_general(BongoCatApp *app, struct nk_context *context) {
+static void page_general(BongoCatPreferences *value, struct nk_context *context) {
+    BongoCatApp *app = value->app;
     BongoCatApplicationPreferences *options = &app->settings.app;
     // Keep each option in its own native language so the list is recognizable
     // regardless of the language currently used by the settings window.
     const char *ui_languages[] = {"简体中文", "繁體中文", "English",
         "Français", "Deutsch", "日本語", "한국어", "Português",
         "Русский", "Español"};
-    bongo_cat_pref_section_icon(context, tr(app,
-        "pages.preference.general.labels.appSettings", "Application"),
-        BONGO_CAT_PREF_ICON_SECTION_APPLICATION);
+    if (bongo_cat_preferences_options_begin(value, context,
+        BONGO_CAT_OPTIONS_APPLICATION,
+        tr(app, "pages.preference.general.labels.appSettings", "Application"),
+        BONGO_CAT_PREF_ICON_SECTION_APPLICATION)) {
     bool old_autostart = options->autostart;
     bongo_cat_pref_row_icon(context, BONGO_CAT_PREF_ICON_AUTOSTART);
     if (bongo_cat_pref_toggle(context, "autostart", tr(app,
@@ -437,9 +448,14 @@ static void page_general(BongoCatApp *app, struct nk_context *context) {
             "Requests administrator rights at startup. While enabled, a UAC prompt appears every launch, including auto-start."),
         &options->run_as_admin)) update_run_as_admin(app);
     section_gap(context, 7);
-    bongo_cat_pref_section_icon(context, tr(app,
-        "pages.preference.general.labels.appearanceSettings", "Appearance"),
-        BONGO_CAT_PREF_ICON_SECTION_APPEARANCE);
+    bongo_cat_preferences_portable_draw(value, context);
+    bongo_cat_preferences_cache_path_draw(value, context);
+    bongo_cat_preferences_options_end(value, context);
+    }    section_gap(context, 7);
+    if (bongo_cat_preferences_options_begin(value, context,
+        BONGO_CAT_OPTIONS_APPEARANCE,
+        tr(app, "pages.preference.general.labels.appearanceSettings", "Appearance"),
+        BONGO_CAT_PREF_ICON_SECTION_APPEARANCE)) {
     section_gap(context, 6);
     const int language_to_ui[] = {2, 0, 1, 3, 4, 5, 6, 7, 8, 9};
     const BongoCatLanguage ui_to_language[] = {
@@ -462,6 +478,8 @@ static void page_general(BongoCatApp *app, struct nk_context *context) {
     options->theme = (BongoCatTheme)bongo_cat_pref_theme(context,
         "theme", tr(app, "pages.preference.general.labels.themeMode",
         "Theme"), themes, options->theme);
+    bongo_cat_preferences_options_end(value, context);
+    }
 #ifdef __APPLE__
     section_gap(context, 7);
     input_monitoring_section(app, context);
@@ -470,13 +488,7 @@ static void page_general(BongoCatApp *app, struct nk_context *context) {
 
 void bongo_cat_preferences_page_settings(BongoCatPreferences *value,
     struct nk_context *context) {
-    BongoCatApp *app = value->app;
-    page_display(app, context);
+    page_display(value, context);
     section_gap(context, 10);
-    page_general(app, context);
-    section_gap(context, 10);
-    bongo_cat_preferences_cache_path_draw(value, context);
-    section_gap(context, 7);
-    /* 便携模式紧挨着上面那行路径: 它们说的是同一件事 (数据放在哪), 用户应该连着看。 */
-    bongo_cat_preferences_portable_draw(value, context);
+    page_general(value, context);
 }

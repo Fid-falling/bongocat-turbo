@@ -66,6 +66,8 @@ BongoCatPreferences *bongo_cat_preferences_create(BongoCatApp *app) {
     if (!app) return NULL;
     BongoCatPreferences *value = calloc(1, sizeof(*value));
     if (value) { value->app = app;
+        for (int i = 0; i < BONGO_CAT_OPTIONS_SECTION_COUNT; ++i)
+            value->options_sections[i] = true;
         value->import_dialog = bongo_cat_preferences_import_create();
         if (!value->import_dialog) { free(value); return NULL; } }
     if (value && app->smoke_preference_page >= 0)

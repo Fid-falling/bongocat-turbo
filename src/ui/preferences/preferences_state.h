@@ -18,6 +18,7 @@
 #define BONGO_CAT_PREFERENCES_STATE_H
 
 #include "preferences_internal.h"
+#include "preferences_icons.h"
 #include "preferences_scrollbar.h"
 #include "preferences_text_session.h"
 #include "ui_backend.h"
@@ -42,6 +43,19 @@
 #include "bongo_cat/i18n.h"
 #include "bongo_cat/preferences.h"
 #include "modal_frame.h"
+
+/*
+ * 偏好页的可折叠分区。each section maps to one collapsible header drawn by
+ * bongo_cat_preferences_options_begin/end; 单击分区头在展开/折叠间切换 (照 X)。
+ */
+enum BongoCatOptionsSection {
+    BONGO_CAT_OPTIONS_WINDOW,
+    BONGO_CAT_OPTIONS_PERFORMANCE,
+    BONGO_CAT_OPTIONS_MODEL,
+    BONGO_CAT_OPTIONS_APPLICATION,
+    BONGO_CAT_OPTIONS_APPEARANCE,
+    BONGO_CAT_OPTIONS_SECTION_COUNT
+};
 
 typedef struct BongoCatPreferenceNotice {
     char message[384];
@@ -102,6 +116,8 @@ struct BongoCatPreferences {
     bool import_render_active;
     BongoCatImportDialog *import_dialog;
     bool frame_checked;
+    /* 偏好页可折叠分区是否展开 (true = 展开); 跨窗口会话保留 */
+    bool options_sections[BONGO_CAT_OPTIONS_SECTION_COUNT];
     /*
      * 事件驱动渲染的总开关: 为真才画这一帧, render 一开始就把它清掉, 帧末再按
      * "还有动画在跑吗"决定要不要重新置真。所有输入/状态变化都必须经过标脏,
@@ -211,6 +227,12 @@ void bongo_cat_preferences_input_monitoring_refresh(BongoCatPreferences *value);
 
 int bongo_cat_preferences_resolved_theme(const BongoCatPreferences *value);
 void bongo_cat_preferences_apply_theme(BongoCatPreferences *value);
+/* 偏好页可折叠分区: begin 单击分区头切换展开/折叠, 返回 true 表示展开 (应画内容) */
+bool bongo_cat_preferences_options_begin(BongoCatPreferences *value,
+    struct nk_context *context, enum BongoCatOptionsSection section,
+    const char *title, BongoCatPrefIcon icon);
+void bongo_cat_preferences_options_end(BongoCatPreferences *value,
+    struct nk_context *context);
 bool bongo_cat_preferences_open_window(BongoCatPreferences *value);
 /*
  * 把设置窗口从 Vulkan 换成 OpenGL 并重建。只在窗口"帧外"调用 (目前是 render 的开头),

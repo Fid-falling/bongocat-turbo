@@ -140,7 +140,7 @@ void bongo_cat_preferences_cache_path_draw(BongoCatPreferences *value,
         "pages.preference.general.labels.cacheDirectory", "Cache directory");
     const char *detail = tr(value->app,
         "pages.preference.general.hints.cacheDirectory",
-        "Folder actually in use right now.");
+        "Folder currently in use; Reset restores the default.");
     BongoCatUIPalette p = bongo_cat_ui_palette(bongo_cat_ui_dark(context));
     const struct nk_user_font *font = bongo_cat_ui_label_font(context);
     FormStyle saved;

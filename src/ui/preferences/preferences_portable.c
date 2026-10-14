@@ -103,9 +103,8 @@ void bongo_cat_preferences_portable_draw(BongoCatPreferences *value,
         ? tr(app, "pages.preference.general.hints.portableMigrating",
             "Migrating settings and models, please wait...")
         : tr(app, "pages.preference.general.hints.portableMode",
-            "Keep every file in a BongoCatData folder next to the executable; "
-            "copy the program together with that folder to migrate. Settings "
-            "and models are copied, caches are rebuilt on demand.");
+            "Keep everything in a BongoCatData folder beside the app; "
+            "copy the folder with the program to migrate.");
     bongo_cat_pref_row_icon(context, BONGO_CAT_PREF_ICON_RENDERER);
     bool target = enabled;
     /* 迁移进行中也要照常画这一行 (它占着表单的一列, 少画一次整页布局会错位),
