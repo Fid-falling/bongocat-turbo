@@ -105,6 +105,10 @@ bool bongo_cat_window_apply_scale_centered(BongoCatApp *app, float scale,
     int base_width, int base_height, float base_scale,
     float center_x, float center_y);
 void bongo_cat_window_clamp_to_display(BongoCatApp *app);
+/* 该按哪块显示器算边界: 拖动/缩放中看指针所在的那块, 其余按窗口、矩形、主显示器逐级回退。
+   夹取 (clamp_to_display) 与滑行撞边 (window_inertia.c) 共用这一份实现。 */
+SDL_DisplayID bongo_cat_window_target_display(BongoCatApp *app,
+    const SDL_Rect *rect);
 void bongo_cat_window_drag_to(BongoCatApp *app, int x, int y);
 void bongo_cat_window_drag_bounds_refresh(BongoCatApp *app);
 void bongo_cat_window_drag_bounds_clear(BongoCatApp *app);
@@ -112,6 +116,9 @@ bool bongo_cat_window_recover_to_display(BongoCatApp *app);
 void bongo_cat_window_display_event(BongoCatApp *app, const SDL_Event *event);
 void bongo_cat_window_update_display_recovery(BongoCatApp *app, uint64_t now);
 void bongo_cat_window_update_inertia(BongoCatApp *app, uint64_t now);
+/* 立刻结束松手滑行 (幂等): 抓住宠物、关掉"拖动惯性"或"关闭动量衰减"、窗口隐藏/最小化、
+   程序退出都要调。"关闭动量衰减"的滑行不会自己停下, 这些停止条件必须显式收口。 */
+void bongo_cat_window_stop_inertia(BongoCatApp *app);
 bool bongo_cat_window_display_self_test(BongoCatApp *app);
 void bongo_cat_window_drag_begin(BongoCatApp *app,
     const SDL_MouseButtonEvent *event);

@@ -193,6 +193,8 @@ set(BONGO_CAT_RUNTIME_SHELL_SOURCES
   src/runtime/shell/window_display.c
   # 显示器几何的纯计算 + 自检 (window_display.c 只留"什么时候该动窗口")。
   src/runtime/shell/window_display_geometry.c
+  # 松手后的惯性滑行 (含"关闭动量衰减"的永不停止模式): 逐帧状态机, 与窗口几何分开。
+  src/runtime/shell/window_inertia.c
   src/runtime/shell/window_drag.c
   src/runtime/shell/window_geometry.c
   src/runtime/shell/window_hit.c

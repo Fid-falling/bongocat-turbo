@@ -97,6 +97,8 @@ static bool read_window(yyjson_val *object, BongoCatWindowPreferences *value,
             error) ||
         !read_int(object, "slideSlowdownPercent",
             &value->slide_slowdown_percent, error) ||
+        /* 可选读: 老配置里没有 slideNoDecay 时保留默认值 false, 即仍是"会衰减"的旧行为。 */
+        !read_bool(object, "slideNoDecay", &value->slide_no_decay, error) ||
         !read_bool(object, "captureOnly", &value->capture_only, error) ||
         !read_int(object, "supersample", &value->supersample, error) ||
         !read_int(object, "fontRasterCap", &value->font_raster_cap, error) ||

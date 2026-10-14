@@ -12,12 +12,8 @@
 
 #include <math.h>
 
+/* 显示器事件之后等多久再落地恢复 (见 update_display_recovery)。 */
 #define DISPLAY_RECOVERY_DELAY_NS 750000000ull
-/* 滑行: 每个渲染帧算作一个 15.6ms 标称拍, 位移与衰减都按这一拍推进。 */
-#define SLIDE_NOMINAL_FRAME_S 0.0156
-#define SLIDE_MAX_FRAME 50
-/* 撞边反弹: 法向速度反向, 只保留 5% 速度。 */
-#define SLIDE_BOUNCE_RESTITUTION 0.05
 
 /* 取窗口当前的位置与逻辑尺寸; 任一 SDL 调用失败或尺寸非正都返回 false, 调用方据此
    跳过后续几何处理 (窗口还没建好, 或正在被销毁)。 */
@@ -80,8 +76,10 @@ void bongo_cat_window_drag_bounds_clear(BongoCatApp *app) {
 }
 
 /* 拖动/缩放时以指针所在显示器为准 (窗口还停在旧显示器上); 其余情况按窗口、再按矩形、
-   最后落到主显示器逐级回退。 */
-static SDL_DisplayID target_display(BongoCatApp *app, const SDL_Rect *rect) {
+   最后落到主显示器逐级回退。跨文件: 滑行撞边 (window_inertia.c) 也用它挑边界, 于是
+   "窗口该贴哪块屏"只有这一份实现。 */
+SDL_DisplayID bongo_cat_window_target_display(BongoCatApp *app,
+    const SDL_Rect *rect) {
     if (app->window_drag_active || app->resize_gesture) {
         float pointer_x = 0.0f, pointer_y = 0.0f;
         SDL_GetGlobalMouseState(&pointer_x, &pointer_y);
@@ -117,7 +115,7 @@ void bongo_cat_window_clamp_to_display(BongoCatApp *app) {
     SDL_Rect rect;
     if (!app || !app->settings.window.keep_in_screen || !window_rect(app, &rect)) return;
     if (available_displays_cover(app, &rect)) return;
-    fit_to_display(app, target_display(app, &rect), &rect);
+    fit_to_display(app, bongo_cat_window_target_display(app, &rect), &rect);
 }
 
 /* 拖动落点, 入参是屏幕逻辑坐标: 越界时按目标显示器夹取, 坐标没变就直接返回 (拖动中
@@ -168,9 +166,11 @@ void bongo_cat_window_drag_to(BongoCatApp *app, int x, int y) {
     snap_to_screen_edges(app, &next, width, height);
     if (app->settings.window.keep_in_screen &&
         !available_displays_cover(app, &requested)) {
-        SDL_Rect bounds; SDL_DisplayID display = target_display(app, &requested);
+        SDL_Rect bounds;
+        SDL_DisplayID display = bongo_cat_window_target_display(app, &requested);
         if (display && (SDL_GetDisplayUsableBounds(display, &bounds) ||
-            SDL_GetDisplayBounds(display, &bounds))) next = bongo_cat_window_fitted_position(&requested, &bounds);
+            SDL_GetDisplayBounds(display, &bounds)))
+            next = bongo_cat_window_fitted_position(&requested, &bounds);
     }
     if (SDL_GetWindowPosition(app->window, &current_x, &current_y) &&
         current_x == next.x && current_y == next.y) return;
@@ -202,7 +202,8 @@ void bongo_cat_window_display_event(BongoCatApp *app, const SDL_Event *event) {
     if (!app || !event) return;
     if (event->type < SDL_EVENT_DISPLAY_FIRST ||
         event->type > SDL_EVENT_DISPLAY_LAST) return;
-    app->slide_active = false;
+    /* 显示器布局要变了: 正在滑行的窗口必须立刻停下 (边界本身马上就不成立了)。 */
+    bongo_cat_window_stop_inertia(app);
     bongo_cat_window_snapshot_end(app);
     if (app->window_drag_active && app->settings.window.keep_in_screen)
         bongo_cat_window_drag_bounds_refresh(app);
@@ -218,91 +219,4 @@ void bongo_cat_window_update_display_recovery(BongoCatApp *app, uint64_t now) {
     app->display_recovery_due_ns = 0;
     if (app->settings.window.keep_in_screen) bongo_cat_window_clamp_to_display(app);
     else bongo_cat_window_recover_to_display(app);
-}
-
-/* 滑行遇到屏幕边缘: 贴到目标显示器可用区边界, 法向速度反向并保留 SLIDE_BOUNCE_RESTITUTION
-   能量 (镜面反射), 让桌宠像球撞墙一样弹回屏幕内, 而不是一路飞出桌面。 */
-static void slide_bounce(BongoCatApp *app, int *x, int *y,
-    int width, int height, double *vx, double *vy) {
-    SDL_Rect requested = {*x, *y, width, height};
-    SDL_DisplayID display = target_display(app, &requested);
-    if (!display) display = SDL_GetPrimaryDisplay();
-    SDL_Rect bounds;
-    /* 注意: SDL_GetDisplayUsableBounds 成功返回 true, 失败返回 false —— 必须取反, 否则
-       正常取到边界时会提前 return, 让下面的贴边/反弹变成死代码, 桌宠直接飞出屏幕。 */
-    if (!display || !SDL_GetDisplayUsableBounds(display, &bounds)) return;
-    int min_x = bounds.x, min_y = bounds.y;
-    int max_x = bounds.x + bounds.w - width, max_y = bounds.y + bounds.h - height;
-    /* 镜面反射: 撞哪条边就把对应方向的速度翻向, 并保留 SLIDE_BOUNCE_RESTITUTION 能量;
-       切向速度不动, 撞墙角时两条边各自弹一次。 */
-    if (*x < min_x) { *x = min_x; *vx = fabs(*vx) * SLIDE_BOUNCE_RESTITUTION; }
-    else if (*x > max_x) { *x = max_x; *vx = -fabs(*vx) * SLIDE_BOUNCE_RESTITUTION; }
-    if (*y < min_y) { *y = min_y; *vy = fabs(*vy) * SLIDE_BOUNCE_RESTITUTION; }
-    else if (*y > max_y) { *y = max_y; *vy = -fabs(*vy) * SLIDE_BOUNCE_RESTITUTION; }
-}
-
-/* 主循环每帧调用: 拖着 window 沿惯性方向衰减移动。初速在松手时由 window_drag.c 算好。
-   每个渲染帧按一个 15.6ms 标称拍推进 (x += v*0.0156) 且每拍乘一次衰减; 撞到
-   屏幕边缘会弹回; 位移停滞 (整数像素不再前进)/超帧数/窗口不可见就停下并夹回显示器。 */
-void bongo_cat_window_update_inertia(BongoCatApp *app, uint64_t now) {
-    if (!app || !app->slide_active) return;
-    if (!app->window || !app->session.window.visible ||
-        app->window_minimized || app->hover_hidden) {
-        app->slide_active = false;
-        return;
-    }
-    double dt = (double)(now - app->slide_last_ns) / 1.0e9;
-    app->slide_last_ns = now;
-    if (dt <= 0.0 || dt > 0.25) return;
-    int slowdown = app->settings.window.slide_slowdown_percent;
-    if (slowdown < 0) slowdown = 0;
-    else if (slowdown > BONGO_CAT_MAX_SLIDE_SLOWDOWN_PERCENT)
-        slowdown = BONGO_CAT_MAX_SLIDE_SLOWDOWN_PERCENT;
-    double mult = (100.0 - slowdown) / 100.0;
-    /* 每帧顶一个 15.6ms 标称拍: 位移固定按 v*0.0156 推进 (不是 v*真实dt), 衰减也是每拍
-       只乘一次 —— 这样"整数像素判停"的阈值与刷新率无关; 代价是刷新率越高滑行越快。 */
-    double decay = mult;
-    int prev_x = (int)lround(app->slide_x);
-    int prev_y = (int)lround(app->slide_y);
-    app->slide_x += app->slide_velocity_x * SLIDE_NOMINAL_FRAME_S;
-    app->slide_y += app->slide_velocity_y * SLIDE_NOMINAL_FRAME_S;
-    int width = 0, height = 0, x = 0, y = 0;
-    if (!SDL_GetWindowSize(app->window, &width, &height) ||
-        width <= 0 || height <= 0) {
-        app->slide_active = false;
-        return;
-    }
-    x = (int)lround(app->slide_x);
-    y = (int)lround(app->slide_y);
-    /* 判停比较"位移": 整数像素没变就停, 不用速度阈值。亚像素阶段整数位置
-       每几帧才跳 1px, 速度门槛会在滑行还没走完时把它提前掐断。 */
-    if (x == prev_x && y == prev_y) {
-        app->slide_active = false;
-        if (app->settings.window.keep_in_screen) bongo_cat_window_clamp_to_display(app);
-        return;
-    }
-    slide_bounce(app, &x, &y, width, height,
-        &app->slide_velocity_x, &app->slide_velocity_y);
-    app->slide_x = (double)x;
-    app->slide_y = (double)y;
-    /* 反弹之后才按本拍衰减: 先移动 -> 撞边反弹 -> 再衰减。 */
-    app->slide_velocity_x *= decay;
-    app->slide_velocity_y *= decay;
-    if (!SDL_SetWindowPosition(app->window, x, y)) {
-        app->slide_active = false;
-        return;
-    }
-    app->session.window.x = x;
-    app->session.window.y = y;
-    app->session.window.position_known = true;
-    bongo_cat_window_mark_hit_dirty(app);
-    if (app->window_snapshot) {
-        bongo_cat_window_snapshot_geometry(app, NULL);
-        app->dirty = true;
-    }
-    app->slide_frame++;
-    if (app->slide_frame >= SLIDE_MAX_FRAME) {
-        app->slide_active = false;
-        if (app->settings.window.keep_in_screen) bongo_cat_window_clamp_to_display(app);
-    }
 }

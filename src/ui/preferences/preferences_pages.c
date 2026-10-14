@@ -106,6 +106,28 @@ static void page_display(BongoCatApp *app, struct nk_context *context) {
             BONGO_CAT_MAX_SLIDE_SLOWDOWN_PERCENT, 1.0f,
             BONGO_CAT_DEFAULT_SLIDE_SLOWDOWN_PERCENT, "")) {
             window->slide_slowdown_percent = (int)slow;
+            /* 关掉拖动惯性 = 立即停下当前滑行; 打开时什么都不用做 (下一帧就按新值走)。 */
+            if (!window->slide_animation) bongo_cat_window_stop_inertia(app);
+            app->dirty = true;
+        }
+    }
+    /*
+     * 关闭动量衰减: 只在"拖动惯性"打开时显示这一行 —— 关掉惯性时它不生效, 显示出来
+     * 只会让人以为点了没反应。注意这里**不动** window->slide_no_decay: 隐藏不等于重置,
+     * 用户重新打开拖动惯性就接着用原来的选择。
+     * 文案刻意用大白话 (一直滑动 / 撞到边缘弹回来), 不用"动量""衰减系数"这类说法。
+     */
+    if (window->slide_animation) {
+        bongo_cat_pref_row_icon(context, BONGO_CAT_PREF_ICON_FRAME_BOUNDS);
+        if (bongo_cat_pref_toggle(context, "slide-no-decay", tr(app,
+            "pages.preference.cat.labels.slideNoDecay", "Keep Sliding"),
+            tr(app, "pages.preference.cat.hints.slideNoDecay",
+                "After you let go it keeps sliding and bounces off the screen "
+                "edges. Grab it again to stop it."),
+            &window->slide_no_decay)) {
+            /* 关掉这一项 = 立即停下"永不停止"的滑行 (打开不用做什么: 下一帧就按新值走,
+               当前速度不变, 于是从这一刻起开始衰减)。 */
+            if (!window->slide_no_decay) bongo_cat_window_stop_inertia(app);
             app->dirty = true;
         }
     }

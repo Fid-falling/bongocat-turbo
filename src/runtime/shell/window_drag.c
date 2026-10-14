@@ -104,8 +104,9 @@ static bool drag_velocity(BongoCatApp *app, double *vx, double *vy) {
 void bongo_cat_window_drag_begin(BongoCatApp *app,
     const SDL_MouseButtonEvent *event) {
     if (!app || !event) return;
-    /* 新拖动会覆盖之前的惯性态与位移快照。 */
-    app->slide_active = false;
+    /* 新拖动会覆盖之前的惯性态与位移快照。"抓住宠物"因此也是滑行的停止条件之一 ——
+       关闭动量衰减时滑行永不自行停止, 靠的就是这里把它掐掉 (stop_inertia 幂等)。 */
+    bongo_cat_window_stop_inertia(app);
     drag_snapshot_reset(app);
     bongo_cat_window_cancel_wheel_animation(app);
     app->drag_candidate = bongo_cat_window_visible_at_pointer(

@@ -228,6 +228,8 @@ void bongo_cat_settings_defaults(BongoCatSettings *config) {
     config->window.edge_snap_threshold = BONGO_CAT_DEFAULT_EDGE_SNAP_PX;
     config->window.slide_animation = true;
     config->window.slide_slowdown_percent = BONGO_CAT_DEFAULT_SLIDE_SLOWDOWN_PERCENT;
+    /* 默认关闭: "永不停止的滑行"是刻意选的玩法, 不能替用户打开 (它会让宠物一直动)。 */
+    config->window.slide_no_decay = false;
     config->window.obs_background_color = BONGO_CAT_OBS_BACKGROUND_GREEN;
     config->window.corner_radius_percent = BONGO_CAT_DEFAULT_WINDOW_CORNER_PERCENT;
     config->window.hide_fade_seconds = BONGO_CAT_DEFAULT_HIDE_FADE_SECONDS;

@@ -51,6 +51,10 @@ static bool write_window(yyjson_mut_doc *doc, yyjson_mut_val *object,
             value->slide_animation) &&
         yyjson_mut_obj_add_int(doc, object, "slideSlowdownPercent",
             value->slide_slowdown_percent) &&
+        /* 键名/类型与 config_io.c 的 read_bool("slideNoDecay") 一一对齐。对老版本来说
+           这是未知键, 它们原样忽略 —— 升级再回退只会丢掉这一项, 不会让配置读取失败。 */
+        yyjson_mut_obj_add_bool(doc, object, "slideNoDecay",
+            value->slide_no_decay) &&
         yyjson_mut_obj_add_bool(doc, object, "captureOnly",
             value->capture_only) &&
         yyjson_mut_obj_add_int(doc, object, "supersample",
