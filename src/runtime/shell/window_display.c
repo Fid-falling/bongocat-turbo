@@ -339,9 +339,58 @@ static void slide_bounce(BongoCatApp *app, int *x, int *y,
     else if (*y > max_y) { *y = max_y; *vy = -fabs(*vy) * SLIDE_BOUNCE_RESTITUTION; }
 }
 
+/* 单拍推进, 等价定时器收到一次 15.6ms 回调: 先按当前速度移动 -> 整数像素没前进就停 ->
+   撞边反弹 -> 乘一次衰减 -> 落位。返回 true 表示还要继续下一拍。 */
+static bool slide_step(BongoCatApp *app, double mult) {
+    int width = 0, height = 0, actual_x = 0, actual_y = 0;
+    if (!SDL_GetWindowSize(app->window, &width, &height) ||
+        width <= 0 || height <= 0) {
+        return false;
+    }
+    if (!SDL_GetWindowPosition(app->window, &actual_x, &actual_y)) return false;
+    /* 位置对不上上一拍设下的值, 说明窗口被别的东西动了 (吸附/夹取/系统改动), 停止滑行。 */
+    if (app->slide_frame != 0 &&
+        (actual_x != app->slide_last_set_x || actual_y != app->slide_last_set_y)) {
+        return false;
+    }
+    int prev_x = (int)app->slide_x;
+    int prev_y = (int)app->slide_y;
+    app->slide_x += app->slide_velocity_x * SLIDE_NOMINAL_FRAME_S;
+    app->slide_y += app->slide_velocity_y * SLIDE_NOMINAL_FRAME_S;
+    int x = (int)app->slide_x;
+    int y = (int)app->slide_y;
+    /* 判停比较"位移": 整数像素没前进就停, 不用速度阈值。小数余量留在 slide_x/slide_y 里
+       (不每拍取整), 亚像素阶段会攒够 1px 再走。 */
+    if (x == prev_x && y == prev_y) return false;
+    int before_x = x, before_y = y;
+    slide_bounce(app, &x, &y, width, height,
+        &app->slide_velocity_x, &app->slide_velocity_y);
+    if (x != before_x || y != before_y) {
+        /* 撞边被夹回边界: 位置对齐到边界, 丢掉小数余量。 */
+        app->slide_x = (double)x;
+        app->slide_y = (double)y;
+    }
+    app->slide_velocity_x *= mult;
+    app->slide_velocity_y *= mult;
+    if (!SDL_SetWindowPosition(app->window, x, y)) return false;
+    app->slide_last_set_x = x;
+    app->slide_last_set_y = y;
+    app->session.window.x = x;
+    app->session.window.y = y;
+    app->session.window.position_known = true;
+    bongo_cat_window_mark_hit_dirty(app);
+    if (app->window_snapshot) {
+        bongo_cat_window_snapshot_geometry(app, NULL);
+        app->dirty = true;
+    }
+    app->slide_frame++;
+    return app->slide_frame < SLIDE_MAX_FRAME;
+}
+
 /* 主循环每帧调用: 拖着 window 沿惯性方向衰减移动。初速在松手时由 window_drag.c 算好。
-   每个渲染帧按一个 15.6ms 标称拍推进 (x += v*0.0156) 且每拍乘一次衰减; 撞到
-   屏幕边缘会弹回; 位移停滞 (整数像素不再前进)/超帧数/窗口不可见就停下并夹回显示器。 */
+   真实时间累积成 15.6ms 的拍, 每拍推进一次 (x += v*0.0156) 并乘一次衰减 —— 墙钟节奏与
+   固定 15.6ms 定时器一致, 不随渲染帧率变。撞到屏幕边缘会弹回; 整数像素不再前进/窗口被
+   外力移动/超拍数/窗口不可见就停下并夹回显示器。 */
 void bongo_cat_window_update_inertia(BongoCatApp *app, uint64_t now) {
     if (!app || !app->slide_active) return;
     if (!app->window || !app->session.window.visible ||
@@ -357,51 +406,18 @@ void bongo_cat_window_update_inertia(BongoCatApp *app, uint64_t now) {
     else if (slowdown > BONGO_CAT_MAX_SLIDE_SLOWDOWN_PERCENT)
         slowdown = BONGO_CAT_MAX_SLIDE_SLOWDOWN_PERCENT;
     double mult = (100.0 - slowdown) / 100.0;
-    /* 每帧顶一个 15.6ms 标称拍: 位移固定按 v*0.0156 推进 (不是 v*真实dt), 衰减也是每拍
-       只乘一次 —— 这样"整数像素判停"的阈值与刷新率无关; 代价是刷新率越高滑行越快。 */
-    double decay = mult;
-    int prev_x = (int)lround(app->slide_x);
-    int prev_y = (int)lround(app->slide_y);
-    app->slide_x += app->slide_velocity_x * SLIDE_NOMINAL_FRAME_S;
-    app->slide_y += app->slide_velocity_y * SLIDE_NOMINAL_FRAME_S;
-    int width = 0, height = 0, x = 0, y = 0;
-    if (!SDL_GetWindowSize(app->window, &width, &height) ||
-        width <= 0 || height <= 0) {
-        app->slide_active = false;
-        return;
-    }
-    x = (int)lround(app->slide_x);
-    y = (int)lround(app->slide_y);
-    /* 判停比较"位移": 整数像素没变就停, 不用速度阈值。亚像素阶段整数位置
-       每几帧才跳 1px, 速度门槛会在滑行还没走完时把它提前掐断。 */
-    if (x == prev_x && y == prev_y) {
-        app->slide_active = false;
-        if (app->settings.window.keep_in_screen) bongo_cat_window_clamp_to_display(app);
-        return;
-    }
-    slide_bounce(app, &x, &y, width, height,
-        &app->slide_velocity_x, &app->slide_velocity_y);
-    app->slide_x = (double)x;
-    app->slide_y = (double)y;
-    /* 反弹之后才按本拍衰减: 先移动 -> 撞边反弹 -> 再衰减。 */
-    app->slide_velocity_x *= decay;
-    app->slide_velocity_y *= decay;
-    if (!SDL_SetWindowPosition(app->window, x, y)) {
-        app->slide_active = false;
-        return;
-    }
-    app->session.window.x = x;
-    app->session.window.y = y;
-    app->session.window.position_known = true;
-    bongo_cat_window_mark_hit_dirty(app);
-    if (app->window_snapshot) {
-        bongo_cat_window_snapshot_geometry(app, NULL);
-        app->dirty = true;
-    }
-    app->slide_frame++;
-    if (app->slide_frame >= SLIDE_MAX_FRAME) {
-        app->slide_active = false;
-        if (app->settings.window.keep_in_screen) bongo_cat_window_clamp_to_display(app);
+    /* 60fps 下每帧约合 1 拍, 高刷下有的帧不推进, 掉帧时补多拍。 */
+    app->slide_accum_s += dt;
+    int ticks = (int)(app->slide_accum_s / SLIDE_NOMINAL_FRAME_S);
+    if (ticks <= 0) return;
+    app->slide_accum_s -= (double)ticks * SLIDE_NOMINAL_FRAME_S;
+    while (ticks-- > 0) {
+        if (!slide_step(app, mult)) {
+            app->slide_active = false;
+            if (app->settings.window.keep_in_screen)
+                bongo_cat_window_clamp_to_display(app);
+            return;
+        }
     }
 }
 
