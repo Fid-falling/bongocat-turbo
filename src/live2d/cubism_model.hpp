@@ -118,6 +118,34 @@ private:
     void load_expressions();
     void load_effects();
     void load_motions(BongoCatLive2DLoadProgress progress, void *userdata);
+public:
+    /*
+     * 分步加载原语。存在的理由只有一个: 主线程必须能在加载中途出帧, 所以"一次加载"被切
+     * 成"很多次只做一小步"。语义上等价于 load()/load_textures(), 但每一步都必须在两次
+     * 调用之间保持可中断 —— 所以这里**不许**有跨步的临时状态留在栈上, 全部记在成员里。
+     *
+     * 与 load()/load_textures() 的分工:
+     *   - settings_begin/settings_finish 对应 load() 里"读文件 + 解析 + 建 setting_"那一段;
+     *   - motions_begin/step/end 对应 load_motions() 里逐个动作的那段循环;
+     *   - textures_begin/step/end 对应 load_textures() 里逐个贴图 + 收尾建渲染器那一段。
+     * 一次性路径 (load/load_textures) 保留原样, 供启动与不分步的调用方使用。
+     */
+    bool settings_begin(const char *directory, const char *setting_file,
+        BongoCatError *error);
+    bool settings_finish(BongoCatError *error);
+    void motions_begin();
+    bool motions_step();
+    void motions_end();
+    void textures_begin();
+    /* 一张贴图分两步走: decode 读文件+解码 (Vulkan 上传路径的最贵那一步), mask 生成 alpha
+     * 掩码 (纯 CPU, 供 capture_visible_bounds 剔除全透明三角形)。分开是为了让单步更短 ——
+     * 切换期间的帧间隔上界就是"预算 + 单步最长耗时"。GL 路径在 decode 步骤里由
+     * bongo_cat_image_texture_model 顺手把掩码填好, mask 步骤于是成为空操作。 */
+    bool textures_step(int index, BongoCatError *error);
+    void textures_mask_step(int index);
+    int texture_total() const { return texture_count_; }
+    bool textures_end(BongoCatError *error);
+private:
     void start_idle_motion();
     ModelBounds capture_visible_bounds() const;
     void prepare_expression_frame();
@@ -186,6 +214,17 @@ private:
     Csm::csmVector<Csm::CubismIdHandle> eye_blink_ids_;
     Csm::csmVector<Csm::CubismIdHandle> lip_sync_ids_;
     std::string directory_;
+    /* 分步加载的游标: 读进来的 model3.json 原文 (settings_begin 填, settings_finish 用),
+     * 以及动作/贴图两步各自走到哪了。它们跨步存活, 所以不能用局部变量代替。 */
+    std::vector<unsigned char> setting_json_;
+    int motion_group_ = 0;
+    int motion_index_ = 0;
+    int motion_total_ = 0;
+    int motions_done_ = 0;
+    int texture_count_ = 0;
+    /* 刚解码但还没生成 alpha 掩码的那幅位图 (Vulkan 路径)。它必须跨两次 step 存活 (先上传、
+     * 再算掩码), 所以不能是局部变量。 */
+    BongoCatImage pending_alpha_image_{};
 #ifdef CSM_TARGET_MAC_GL
     CoreProfileBuffers core_buffers_;
 #endif

@@ -3,6 +3,10 @@
 
 #include "bongo_cat/config.h"
 
+/* 分步加载会话要接收主窗口与它的 GL 上下文, 但这里只需要一个不透明句柄 —— 免得
+   model.h 把 SDL 的头文件拖进每一个包含它的编译单元。 */
+typedef struct SDL_Window SDL_Window;
+
 typedef enum BongoCatModelSourceFormat {
     BONGO_CAT_MODEL_SOURCE_UNKNOWN,
     BONGO_CAT_MODEL_SOURCE_BUILTIN,
@@ -149,6 +153,43 @@ BongoCatResult bongo_cat_live2d_load(BongoCatLive2D *live2d, const char *model_d
     const BongoCatLive2DRenderOptions *render_options,
     BongoCatLive2DLoadProgress progress, void *userdata,
     BongoCatError *error);
+
+/*
+ * 可分步的加载会话 (切换模型时用; 启动路径仍可用上面的一次性版本)。
+ *
+ * 语义: begin 建会话 (不动当前模型) -> activate 切到主窗口的上下文 -> step 反复推进
+ * (每一步只做一个动作文件或一张贴图, 中间可以让主循环出帧) -> end 收尾。
+ * 失败时用 abort: 它释放半成品并还原上下文, 当前模型**从始至终没有被碰过**。
+ * 全部调用都必须在主线程上 (贴图上传用的是当前 GL 上下文或后端命令池, 没有跨线程同步)。
+ */
+typedef enum BongoCatLive2DStepResult {
+    BONGO_CAT_LIVE2D_STEP_WORKING = 0,
+    BONGO_CAT_LIVE2D_STEP_DONE = 1,
+    BONGO_CAT_LIVE2D_STEP_FAILED = 2
+} BongoCatLive2DStepResult;
+
+typedef struct BongoCatLive2DLoadSession BongoCatLive2DLoadSession;
+BongoCatLive2DLoadSession *bongo_cat_live2d_load_session_begin(
+    BongoCatLive2D *live2d, const char *model_dir, const char *setting_file,
+    bool preset, const BongoCatLive2DRenderOptions *render_options,
+    BongoCatLive2DLoadProgress progress, void *userdata, BongoCatError *error);
+BongoCatLive2DStepResult bongo_cat_live2d_load_session_activate(
+    BongoCatLive2DLoadSession *session, SDL_Window *window, void *context,
+    BongoCatError *error);
+BongoCatLive2DStepResult bongo_cat_live2d_load_session_step(
+    BongoCatLive2DLoadSession *session, const char *model_dir,
+    const char *setting_file, BongoCatError *error);
+void bongo_cat_live2d_load_session_end(BongoCatLive2DLoadSession *session);
+void bongo_cat_live2d_load_session_abort(BongoCatLive2DLoadSession *session);
+/*
+ * 把这次分步加载的分段耗时写成一行 WARN 日志 (只在单步峰值超过 32ms 时输出)。
+ * 为什么放在 C 接口上: 调用方是 runtime 的 C 代码 (model_switch.c), 而摘要存在会话对象
+ * 里 —— 必须是 extern "C" 才能跨过去。**必须在 session_end/abort 之前调**。
+ */
+void bongo_cat_live2d_load_session_log_timing(
+    const BongoCatLive2DLoadSession *session, const char *model_id,
+    uint64_t total_ns);
+
 bool bongo_cat_live2d_ready(const BongoCatLive2D *live2d);
 /* Returns the authored pixel canvas size of the loaded model. */
 bool bongo_cat_live2d_canvas_size(const BongoCatLive2D *live2d,

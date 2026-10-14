@@ -78,18 +78,17 @@ std::string NativeModel::path(const char *relative) const {
     return directory_ + (relative ? relative : "");
 }
 
-bool NativeModel::load(const char *directory, const char *setting_file,
-    bool direct_textures, BongoCatLive2DLoadProgress progress, void *userdata,
+bool NativeModel::settings_begin(const char *directory, const char *setting_file,
     BongoCatError *error) {
+    setting_json_.clear();
     if (!directory || !setting_file) return false;
     visual_state_ready_ = false;
     visual_state_ = BongoCatLive2DVisualState{};
-    direct_textures_ = direct_textures;
     directory_ = directory;
     if (!directory_.empty() && directory_.back() != '/' && directory_.back() != '\\')
         directory_ += '/';
-    std::vector<unsigned char> json = read(path(setting_file), 4 * 1024 * 1024);
-    if (json.empty()) {
+    setting_json_ = read(path(setting_file), 4 * 1024 * 1024);
+    if (setting_json_.empty()) {
         bongo_cat_error_set(error, BONGO_CAT_ERROR_IO, "Cannot read model setting: %s", setting_file);
         return false;
     }
@@ -98,7 +97,8 @@ bool NativeModel::load(const char *directory, const char *setting_file,
      * JSON 再交给 SDK —— SDK 自己的解析器不容忍这些瑕疵。 */
     bool normalized = false;
     yyjson_doc *document = bongo_cat_model_json_parse(
-        reinterpret_cast<const char *>(json.data()), json.size(), &normalized);
+        reinterpret_cast<const char *>(setting_json_.data()), setting_json_.size(),
+        &normalized);
     if (document && normalized) {
         size_t size = 0;
         char *canonical = yyjson_write(document, 0, &size);
@@ -106,27 +106,54 @@ bool NativeModel::load(const char *directory, const char *setting_file,
             yyjson_doc_free(document);
             bongo_cat_error_set(error, BONGO_CAT_ERROR_MEMORY,
                 "Cannot prepare model setting: %s", setting_file);
+            setting_json_.clear();
             return false;
         }
-        json.assign(canonical, canonical + size);
+        setting_json_.assign(canonical, canonical + size);
         std::free(canonical);
     }
     yyjson_doc_free(document);
-    if (!validate_model_setting_json(json, setting_file, error)) return false;
-    if (progress) progress(userdata, .10f);
+    return true;
+}
+
+/* settings_begin 之后必须调它一次: 校验 -> 建 setting_ -> 模型/表情/效果。动作仍由
+ * motions_* 那三个原语负责, 这样"读动作文件"这段大开销才能被切碎。 */
+bool NativeModel::settings_finish(BongoCatError *error) {
+    if (setting_json_.empty()) {
+        bongo_cat_error_set(error, BONGO_CAT_ERROR_IO,
+            "Model setting was not read before finishing the load");
+        return false;
+    }
+    if (!validate_model_setting_json(setting_json_,
+            setting_ ? setting_->GetModelFileName() : "model3.json", error)) return false;
     setting_ = new(std::nothrow)
-        Csm::CubismModelSettingJson(json.data(), (Csm::csmSizeInt)json.size());
+        Csm::CubismModelSettingJson(setting_json_.data(),
+            (Csm::csmSizeInt)setting_json_.size());
     if (!setting_) {
         bongo_cat_error_set(error, BONGO_CAT_ERROR_MEMORY, "Cannot allocate model setting");
         return false;
     }
     if (!load_model(error)) return false;
-    if (progress) progress(userdata, .25f);
     load_expressions();
-    if (progress) progress(userdata, .31f);
     load_effects();
+    return true;
+}
+
+bool NativeModel::load(const char *directory, const char *setting_file,
+    bool direct_textures, BongoCatLive2DLoadProgress progress, void *userdata,
+    BongoCatError *error) {
+    direct_textures_ = direct_textures;
+    if (!settings_begin(directory, setting_file, error)) return false;
+    if (progress) progress(userdata, .10f);
+    if (!settings_finish(error)) return false;
+    if (progress) progress(userdata, .25f);
+    if (progress) progress(userdata, .31f);
     if (progress) progress(userdata, .35f);
-    load_motions(progress, userdata);
+    motions_begin();
+    while (motions_step())
+        if (progress) progress(userdata, .35f + .14f *
+            (float)motions_done_ / (float)(motion_total_ > 0 ? motion_total_ : 1));
+    motions_end();
     Csm::csmMap<Csm::csmString, Csm::csmFloat32> layout;
     setting_->GetLayoutMap(layout);
     _modelMatrix->SetupFromLayout(layout);
@@ -225,8 +252,9 @@ void NativeModel::load_effects() {
     _updateScheduler.SortUpdatableList();
 }
 
-void NativeModel::load_motions(BongoCatLive2DLoadProgress progress,
-    void *userdata) {
+/* 进入"逐个读动作"的状态: 清空上一轮的动作状态, 记下总数与游标。真正的读取在
+ * motions_step 里, 一次一个, 这样调用方能在两个动作之间出帧。 */
+void NativeModel::motions_begin() {
     idle_motion_keys_.clear();
     motion_signatures_.clear();
     motion_states_.clear();
@@ -234,93 +262,134 @@ void NativeModel::load_motions(BongoCatLive2DLoadProgress progress,
     motion_toggle_owners_.clear();
     selected_motion_keys_.clear();
     clear_motion_runs();
-    int total = 0, completed = 0;
+    motion_group_ = 0;
+    motion_index_ = 0;
+    motion_total_ = 0;
+    motions_done_ = 0;
+    if (!setting_) return;
     for (int group_index = 0; group_index < setting_->GetMotionGroupCount();
         ++group_index)
-        total += setting_->GetMotionCount(setting_->GetMotionGroupName(group_index));
-    for (int group_index = 0; group_index < setting_->GetMotionGroupCount(); ++group_index) {
-        const char *group = setting_->GetMotionGroupName(group_index);
-        for (int i = 0; i < setting_->GetMotionCount(group); ++i) {
-            if (progress) progress(userdata, .35f + .14f *
-                (float)(++completed) / (float)(total > 0 ? total : 1));
-            auto bytes = read(path(setting_->GetMotionFileName(group, i)));
-            if (bytes.empty()) continue;
-            std::string key = std::string(group) + "_" + std::to_string(i);
-            auto *motion = static_cast<Csm::CubismMotion *>(LoadMotion(bytes.data(),
-                (Csm::csmSizeInt)bytes.size(), key.c_str(), nullptr, nullptr,
-                setting_, group, i, _motionConsistency));
-            if (!motion) continue;
-            motion->SetEffectIds(eye_blink_ids_, lip_sync_ids_);
-            motions_[key] = motion;
-            load_motion_state(key, group, i, bytes);
-            if (std::strcmp(group, "Idle") == 0) idle_motion_keys_.push_back(key);
-        }
-    }
-    pair_motion_states();
-    _motionManager->StopAllMotions();
+        motion_total_ += setting_->GetMotionCount(
+            setting_->GetMotionGroupName(group_index));
 }
 
-bool NativeModel::load_textures(BongoCatError *error,
-    BongoCatLive2DLoadProgress progress, void *userdata) {
-    release_textures();
-    int count = setting_->GetTextureCount();
-    textures_.assign((size_t)count, 0);
-    /*
-     * 必须在创建贴图之前挂载: Vulkan 分支的贴图上传要用后端句柄, 而挂载本身
-     * 依赖 CubismFramework 已启动 (这里已满足 —— 模型加载发生在框架启动之后)。
-     * 之前把挂载放在 create_renderer 里, 比贴图创建晚, 于是贴图失败、整个模型
-     * 加载失败、渲染器永远不会被创建。
-     */
-    if (bongo_cat_cubism_renderer_uses_vulkan() && !bongo_cat_live2d_vulkan_ready())
-        bongo_cat_live2d_vulkan_attach(NULL, 0, 0);
-    vulkan_textures_.assign((size_t)count, nullptr);
-    texture_alpha_.assign((size_t)count, {});
-    TextureProgressContext texture_context = {progress, userdata, .50f,
-        .45f / (float)(count > 0 ? count : 1)};
-    for (int i = 0; i < count; ++i) {
-        texture_context.start = .50f + .45f * (float)i /
-            (float)(count > 0 ? count : 1);
-        if (bongo_cat_cubism_renderer_uses_vulkan()) {
-            BongoCatImage image = {0};
-            const std::string texture_path = path(setting_->GetTextureFileName(i));
-            if (bongo_cat_image_load(texture_path.c_str(), &image, error) !=
-                    BONGO_CAT_OK || !image.pixels) {
-                release_textures();
-                return false;
-            }
-            /*
-             * 贴图的 alpha 掩码必须在这里生成: 它是纯 CPU 数据, 但后面
-             * prepare_expression_frame 要靠它剔除全透明的三角形来算"可见包络",
-             * 包络又决定窗口的 frame 内边距 —— 少了它, 透明画布会被当成可见内容,
-             * 窗口按错误的尺寸开出来, 模型看起来就没跟着缩放走。
-             * GL 分支由 bongo_cat_image_texture_model 顺手填好, Vulkan 分支
-             * 之前一直是空的。
-             */
-            bongo_cat_image_make_alpha_mask(&image, &texture_alpha_[(size_t)i]);
-            vulkan_textures_[(size_t)i] = bongo_cat_live2d_vulkan_create_texture_attached(
-                image.pixels, image.width, image.height);
-            bongo_cat_image_free(&image);
-            if (!vulkan_textures_[(size_t)i]) {
-                release_textures();
-                return false;
-            }
-            if (progress) progress(userdata, .50f + .45f * (float)(i + 1) /
-                (float)(count > 0 ? count : 1));
+/* 读一个动作。返回 false = 全部读完, 此时已经做了收尾 (配对动作状态并停掉播放队列)。
+ * 游标只在"这一条处理完"之后前进, 所以中途返回也不会漏读或重读。 */
+bool NativeModel::motions_step() {
+    if (!setting_) return false;
+    while (motion_group_ < setting_->GetMotionGroupCount()) {
+        const char *group = setting_->GetMotionGroupName(motion_group_);
+        if (motion_index_ >= setting_->GetMotionCount(group)) {
+            motion_group_++;
+            motion_index_ = 0;
             continue;
         }
-        textures_[(size_t)i] = bongo_cat_image_texture_model(
-            path(setting_->GetTextureFileName(i)).c_str(), direct_textures_,
-            nullptr, nullptr, &texture_alpha_[(size_t)i],
-            progress ? texture_progress : nullptr, &texture_context, error);
-        if (!textures_[(size_t)i]) {
+        int index = motion_index_++;
+        motions_done_++;
+        auto bytes = read(path(setting_->GetMotionFileName(group, index)));
+        if (!bytes.empty()) {
+            std::string key = std::string(group) + "_" + std::to_string(index);
+            auto *motion = static_cast<Csm::CubismMotion *>(LoadMotion(bytes.data(),
+                (Csm::csmSizeInt)bytes.size(), key.c_str(), nullptr, nullptr,
+                setting_, group, index, _motionConsistency));
+            if (motion) {
+                motion->SetEffectIds(eye_blink_ids_, lip_sync_ids_);
+                motions_[key] = motion;
+                load_motion_state(key, group, index, bytes);
+                if (std::strcmp(group, "Idle") == 0) idle_motion_keys_.push_back(key);
+            }
+        }
+        return true;
+    }
+    motions_end();
+    return false;
+}
+
+void NativeModel::motions_end() {
+    pair_motion_states();
+    if (_motionManager) _motionManager->StopAllMotions();
+    motion_group_ = 0;
+    motion_index_ = 0;
+}
+
+/* 进入"逐个上传贴图"的状态。挂载必须在建贴图之前: Vulkan 分支的上传要用后端句柄,
+ * 而挂载本身依赖 CubismFramework 已启动 (模型加载必然在框架启动之后)。 */
+void NativeModel::textures_begin() {
+    release_textures();
+    texture_count_ = setting_ ? setting_->GetTextureCount() : 0;
+    textures_.assign((size_t)texture_count_, 0);
+    if (bongo_cat_cubism_renderer_uses_vulkan() && !bongo_cat_live2d_vulkan_ready())
+        bongo_cat_live2d_vulkan_attach(NULL, 0, 0);
+    vulkan_textures_.assign((size_t)texture_count_, nullptr);
+    texture_alpha_.assign((size_t)texture_count_, {});
+}
+
+/* 上传第 index 张贴图。一次只做一张, 调用方负责限时 —— 解码一张图是这里最长的单步,
+ * 所以"每帧一张"就是切换期间帧间隔的上界。失败会把这一轮已经建好的贴图整体释放。 */
+bool NativeModel::textures_step(int index, BongoCatError *error) {
+    if (!setting_ || index < 0 || index >= texture_count_) return true;
+    if (bongo_cat_cubism_renderer_uses_vulkan()) {
+        BongoCatImage image = {0};
+        const std::string texture_path = path(setting_->GetTextureFileName(index));
+        if (bongo_cat_image_load(texture_path.c_str(), &image, error) !=
+                BONGO_CAT_OK || !image.pixels) {
             release_textures();
             return false;
         }
-        if (progress) progress(userdata, .50f + .45f * (float)(i + 1) /
-            (float)(count > 0 ? count : 1));
+        /*
+         * 掩码留到 textures_mask_step 里做: 它是纯 CPU 的一段 (逐像素), 和"解码 + 上传"
+         * 分开之后每一步都更短, 于是主循环更容易在两步之间插进一帧。
+         */
+        pending_alpha_image_ = image;
+        vulkan_textures_[(size_t)index] = bongo_cat_live2d_vulkan_create_texture_attached(
+            image.pixels, image.width, image.height);
+        if (!vulkan_textures_[(size_t)index]) {
+            bongo_cat_image_free(&pending_alpha_image_);
+            pending_alpha_image_ = BongoCatImage{0};
+            release_textures();
+            if (error && !error->message[0])
+                bongo_cat_error_set(error, BONGO_CAT_ERROR_CUBISM,
+                    "Cannot upload Live2D texture %d to Vulkan", index);
+            return false;
+        }
+        return true;
     }
+    /* GL 路径的渐进回调只用来把"这一张图解码到哪了"报给 UI; 分步调用方不需要它,
+     * 因为分步本身已经把"每帧一张图"变成了帧间隔的上界。掩码由它顺手填好。 */
+    textures_[(size_t)index] = bongo_cat_image_texture_model(
+        path(setting_->GetTextureFileName(index)).c_str(), direct_textures_,
+        nullptr, nullptr, &texture_alpha_[(size_t)index], nullptr, nullptr, error);
+    if (!textures_[(size_t)index]) {
+        release_textures();
+        return false;
+    }
+    return true;
+}
+
+/*
+ * 为上一张上传的贴图生成 alpha 掩码, 然后立刻释放那幅 CPU 位图。
+ *
+ * 为什么必须生成: 后面 prepare_expression_frame 要靠它剔除全透明的三角形来算"可见包络",
+ * 包络又决定窗口的 frame 内边距 —— 少了它, 透明画布会被当成可见内容, 窗口按错误的尺寸开
+ * 出来, 模型看起来就没跟着缩放走。GL 分支由 bongo_cat_image_texture_model 顺手填好,
+ * Vulkan 分支早先一直是空的。
+ *
+ * 幂等: 没有待处理的位图时直接返回, 所以调用方可以无条件按顺序推进。
+ */
+void NativeModel::textures_mask_step(int index) {
+    if (!pending_alpha_image_.pixels) return;
+    if (index >= 0 && index < texture_count_)
+        bongo_cat_image_make_alpha_mask(&pending_alpha_image_,
+            &texture_alpha_[(size_t)index]);
+    bongo_cat_image_free(&pending_alpha_image_);
+    pending_alpha_image_ = BongoCatImage{0};
+}
+
+/* 全部贴图就绪之后的收尾: 算可见包络, 然后重建渲染器 —— 渲染器持有贴图绑定与遮罩缓冲,
+ * 不重建就会继续引用旧句柄。 */
+bool NativeModel::textures_end(BongoCatError *error) {
+    if (!setting_) return false;
     prepare_expression_frame();
-    /* 换贴图必须重建渲染器: 渲染器持有贴图绑定与遮罩缓冲, 不重建就会继续引用旧句柄。 */
     release_renderer();
     if (!create_renderer(error)) {
         release_textures();
@@ -329,5 +398,34 @@ bool NativeModel::load_textures(BongoCatError *error,
     renderer_width_ = width_;
     renderer_height_ = height_;
     return true;
+}
+
+bool NativeModel::load_textures(BongoCatError *error,
+    BongoCatLive2DLoadProgress progress, void *userdata) {
+    textures_begin();
+    const int count = texture_count_;
+    TextureProgressContext texture_context = {progress, userdata, .50f,
+        .45f / (float)(count > 0 ? count : 1)};
+    for (int i = 0; i < count; ++i) {
+        texture_context.start = .50f + .45f * (float)i /
+            (float)(count > 0 ? count : 1);
+        /* 渐进回调是"这一张图解码到哪了", 只在 GL 路径上有 (它内部分块解码);
+         * Vulkan 路径一张图是一次 SDL_LoadFile + 一次上传, 没有中间态可报。 */
+        if (!bongo_cat_cubism_renderer_uses_vulkan()) {
+            textures_[(size_t)i] = bongo_cat_image_texture_model(
+                path(setting_->GetTextureFileName(i)).c_str(), direct_textures_,
+                nullptr, nullptr, &texture_alpha_[(size_t)i],
+                progress ? texture_progress : nullptr, &texture_context, error);
+            if (!textures_[(size_t)i]) {
+                release_textures();
+                return false;
+            }
+        } else if (!textures_step(i, error)) {
+            return false;
+        }
+        if (progress) progress(userdata, .50f + .45f * (float)(i + 1) /
+            (float)(count > 0 ? count : 1));
+    }
+    return textures_end(error);
 }
 } // namespace bongo_cat

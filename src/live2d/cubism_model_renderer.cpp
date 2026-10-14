@@ -57,6 +57,12 @@ void NativeModel::bind_textures() {
 }
 
 void NativeModel::release_textures() {
+    /* 分步加载可能在"位图已解码、掩码还没算"的中间态被打断 (用户又点了一个模型, 或者加载
+     * 失败): 那幅 CPU 位图必须在这里一起还掉, 否则每一次失败的切换都会漏一张贴图的内存。 */
+    if (pending_alpha_image_.pixels) {
+        bongo_cat_image_free(&pending_alpha_image_);
+        pending_alpha_image_ = BongoCatImage{};
+    }
 #ifdef BONGO_CAT_HAS_VULKAN
     if (bongo_cat_cubism_renderer_uses_vulkan()) {
         for (void *texture : vulkan_textures_)

@@ -15,6 +15,7 @@
 #include "bongo_cat/path.h"
 
 #include <SDL3/SDL_log.h>
+#include <SDL3/SDL_video.h>
 #include <stdlib.h>
 
 /* 桩运行时只保留"加载过没有"和最近一次的画布尺寸: 前者让 ready() 的语义与真实实现一致,
@@ -69,6 +70,69 @@ BongoCatResult bongo_cat_live2d_load(BongoCatLive2D *live2d, const char *model_d
     live2d->loaded = true;
     if (progress) progress(userdata, 1.0f);
     return BONGO_CAT_OK;
+}
+
+/* 分步加载会话的桩: 把一次性版本里那段"校验清单 -> 置 loaded"的语义原样搬到一步之内 ——
+ * 诊断构建没有真资源要读, 所以第一步就完成, 但**不能**返回失败: 那会让每一次换模型都弹出
+ * "加载失败", 而这里其实根本没有加载失败这回事。 */
+struct BongoCatLive2DLoadSession {
+    BongoCatLive2D *runtime;
+    bool finished;
+};
+
+BongoCatLive2DLoadSession *bongo_cat_live2d_load_session_begin(
+    BongoCatLive2D *live2d, const char *model_dir, const char *setting_file,
+    bool preset, const BongoCatLive2DRenderOptions *render_options,
+    BongoCatLive2DLoadProgress progress, void *userdata, BongoCatError *error) {
+    (void)preset; (void)render_options; (void)progress; (void)userdata;
+    if (!live2d || !model_dir || !setting_file) {
+        bongo_cat_error_set(error, BONGO_CAT_ERROR_ARGUMENT,
+            "Cannot load a model without a runtime and a model directory");
+        return NULL;
+    }
+    BongoCatLive2DLoadSession *session = calloc(1, sizeof(*session));
+    if (!session) {
+        bongo_cat_error_set(error, BONGO_CAT_ERROR_MEMORY,
+            "Cannot allocate the Live2D load session");
+        return NULL;
+    }
+    session->runtime = live2d;
+    return session;
+}
+
+BongoCatLive2DStepResult bongo_cat_live2d_load_session_activate(
+    BongoCatLive2DLoadSession *session, SDL_Window *window, void *context,
+    BongoCatError *error) {
+    (void)window; (void)context; (void)error;
+    return session ? BONGO_CAT_LIVE2D_STEP_WORKING : BONGO_CAT_LIVE2D_STEP_FAILED;
+}
+
+BongoCatLive2DStepResult bongo_cat_live2d_load_session_step(
+    BongoCatLive2DLoadSession *session, const char *model_dir,
+    const char *setting_file, BongoCatError *error) {
+    if (!session) return BONGO_CAT_LIVE2D_STEP_FAILED;
+    if (session->finished) return BONGO_CAT_LIVE2D_STEP_DONE;
+    char path[BONGO_CAT_PATH_CAP];
+    yyjson_doc *document = bongo_cat_path_join(path, sizeof(path), model_dir,
+        setting_file) ? bongo_cat_model_json_read(path, NULL) : NULL;
+    bool valid = bongo_cat_import_manifest_document_valid(model_dir, document, true);
+    yyjson_doc_free(document);
+    if (!valid) {
+        bongo_cat_error_set(error, BONGO_CAT_ERROR_FORMAT,
+            "Model manifest or required assets are invalid: %s", setting_file);
+        return BONGO_CAT_LIVE2D_STEP_FAILED;
+    }
+    session->runtime->loaded = true;
+    session->finished = true;
+    return BONGO_CAT_LIVE2D_STEP_DONE;
+}
+
+void bongo_cat_live2d_load_session_end(BongoCatLive2DLoadSession *session) {
+    free(session);
+}
+
+void bongo_cat_live2d_load_session_abort(BongoCatLive2DLoadSession *session) {
+    free(session);
 }
 
 bool bongo_cat_live2d_ready(const BongoCatLive2D *live2d) {

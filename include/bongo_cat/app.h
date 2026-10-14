@@ -19,8 +19,41 @@ typedef struct BongoCatMultiPetRuntime BongoCatMultiPetRuntime;
 typedef struct BongoCatModelRefresh BongoCatModelRefresh;
 typedef struct BongoCatUpdateService BongoCatUpdateService;
 typedef struct BongoCatVk BongoCatVk;
+/* 可分步的 Live2D 加载会话: 只在模型切换期间存在, 定义在 live2d 层
+   (bongo_cat/model.h 里的不透明句柄)。这里只需要指针。 */
+typedef struct BongoCatLive2DLoadSession BongoCatLive2DLoadSession;
 
 #define BONGO_CAT_MODEL_COVER_PENDING_CAP 8
+
+/* 模型切换前后要保持的"内容锚点" (画面里真正有内容的矩形), 由
+   runtime/model/model_geometry.h 提供实现。它出现在这里是因为它是影子状态的一部分。 */
+typedef struct BongoCatModelContentAnchor {
+    int x, y;
+    bool valid;
+} BongoCatModelContentAnchor;
+
+/*
+ * 模型切换的"影子状态": 切换开始那一刻就必须定下来、但**不能**立刻生效的那些东西。
+ * 它随切换流程一起存在 (见 runtime/model/model_switch.c), 提交成功或失败回退之后作废。
+ *
+ * 为什么要有它: 一次切换被拆成"影子准备 -> 分步加载 -> 提交"三段, 中间那段要花几秒, 而
+ * 主循环必须在这期间持续出帧。拆分要求把"加载开始前定下的输入"存下来跨帧使用, 于是有了
+ * 这个结构。它同时记录进入时的 GL 上下文, 用来在两条出口还原调用方的 GL 状态。
+ */
+typedef struct BongoCatModelSwitchShadow {
+    /* 旧模型是否可用 (假表示这是启动后的第一次加载, 没有"原模型"可回退)。 */
+    bool replacing;
+    /* 新模型的行为目录: 由影子准备分配, 由提交接手所有权或由释放路径 free。 */
+    BongoCatBehaviorCatalog *behaviors;
+    bool behavior_catalog_valid;
+    BongoCatLive2DRenderOptions render_options;
+    BongoCatModelContentAnchor content_anchor;
+    int pixel_width, pixel_height;
+    /* 进入时当前是哪个上下文 (用于还原), 以及"是否真的切过"。 */
+    SDL_Window *previous_window;
+    void *previous_context;
+    bool context_activated;
+} BongoCatModelSwitchShadow;
 
 typedef struct BongoCatApp {
     BongoCatSettings settings;
@@ -88,6 +121,33 @@ typedef struct BongoCatApp {
     size_t pending_model_cover_count;
     char loaded_model[BONGO_CAT_ID_CAP];
     char loading_model[BONGO_CAT_ID_CAP];
+    /*
+     * "换桌宠"这条路径的队列状态 (实现见 runtime/model/model_switch.c)。
+     *
+     * 为什么按值内嵌而不是堆分配: 同一时刻只可能有一个切换, 而启动与关闭路径都要求它零成本
+     * —— 堆分配会多出一条"分配失败怎么办"的分支, 而这里根本没有这个需求。
+     *
+     * 语义要点: active 期间 target_id 是"用户最后选的那个模型", shadow 与 session 只在
+     * active 期间有效。提交之前 loaded_model / session.active_model_id 一个字节都不改, 所以
+     * 失败时"回退到原模型"不需要任何额外动作。
+     */
+    struct {
+        bool active;
+        char target_id[BONGO_CAT_ID_CAP];
+        BongoCatModelSwitchShadow shadow;
+        BongoCatLive2DLoadSession *session;
+        uint64_t started_ns;
+        uint64_t deadline_ns;
+        /* 诊断计数: 这次切换被推进了多少次 (step_calls)、其中做了多少步 (steps_taken)、
+         * 最长的一步多久 (slowest_step_ns)。它们用来验证"切换期间主循环确实在转" —— 帧
+         * 间隔大到接近切换总时长时, 第一件事就是看这三个数。 */
+        uint64_t step_calls;
+        uint64_t steps_taken;
+        uint64_t slowest_step_ns;
+        BongoCatError error;
+    } model_switch;
+    /* 分步加载的进度 (0..1): 设置页用它画"正在切换"的中间态, 加载期间有效。 */
+    float model_load_progress;
     BongoCatModelMode loaded_mode;
     bool running;
     bool settings_store_valid;
