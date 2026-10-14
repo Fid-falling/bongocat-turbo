@@ -227,6 +227,9 @@ void bongo_cat_app_loop(BongoCatApp *app) {
         bongo_cat_app_apply_frame_pacing(app);
         int wait_ms = bongo_cat_window_wait_timeout(app, SDL_GetTicksNS());
         if (app->secondary_pet && wait_ms > 100) wait_ms = 100;
+        /* 导入进行中时不能用长空闲等待: 完成事件要尽快被取走, 保证队列能串行往下拉 */
+        if (bongo_cat_preferences_imports_busy(app->preferences) &&
+            (wait_ms < 0 || wait_ms > 100)) wait_ms = 100;
         bongo_cat_preferences_input_begin(app->preferences);
         SDL_Event event;
         if (bongo_cat_wait_event(&event, wait_ms)) {
@@ -238,6 +241,7 @@ void bongo_cat_app_loop(BongoCatApp *app) {
         bongo_cat_preferences_input_end(app->preferences);
         uint64_t now = SDL_GetTicksNS();
         bongo_cat_preferences_model_watch(app->preferences, now);
+        bongo_cat_preferences_poll_imports(app->preferences);
         bongo_cat_model_refresh_update(app);
         take_instance_wake(app);
         if (take_update_shutdown(app)) continue;

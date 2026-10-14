@@ -16,6 +16,9 @@ bool bongo_cat_preferences_visible(const BongoCatPreferences *preferences);
 bool bongo_cat_preferences_needs_frame(BongoCatPreferences *preferences);
 void bongo_cat_preferences_model_watch(BongoCatPreferences *preferences,
     uint64_t now);
+bool bongo_cat_preferences_imports_busy(const BongoCatPreferences *preferences);
+void bongo_cat_preferences_stop_imports(BongoCatPreferences *preferences);
+void bongo_cat_preferences_poll_imports(BongoCatPreferences *preferences);
 void bongo_cat_preferences_input_begin(BongoCatPreferences *preferences);
 void bongo_cat_preferences_input_end(BongoCatPreferences *preferences);
 bool bongo_cat_preferences_event(BongoCatPreferences *preferences, const SDL_Event *event);

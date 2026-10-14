@@ -33,6 +33,7 @@ void bongo_cat_app_shutdown(BongoCatApp *app, const char *stage,
     bongo_cat_model_refresh_shutdown(app);
     bongo_cat_update_destroy(app->update);
     app->update = NULL;
+    bongo_cat_preferences_stop_imports(app->preferences);
     bongo_cat_preferences_destroy(app->preferences);
     bongo_cat_import_storage_lock_shutdown();
     bongo_cat_i18n_destroy(app->i18n);

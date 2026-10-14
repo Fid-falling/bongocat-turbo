@@ -85,12 +85,24 @@ void bongo_cat_preferences_import_destroy(BongoCatImportDialog *dialog) {
         if (event.user.data2 != dialog) continue;
         free_import_event(&event, &release_worker);
     }
+    if (dialog->completion_pending) {
+        bongo_cat_preferences_import_job_free(dialog->worker_job);
+        dialog->completion_pending = false;
+        release_worker = true;
+    }
     dialog->worker_job = NULL;
+    while (dialog->pending_head) {
+        BongoCatImportJob *job = dialog->pending_head;
+        dialog->pending_head = job->next;
+        bongo_cat_preferences_import_job_free(job);
+    }
+    dialog->pending_tail = NULL;
     dialog->busy = false;
     dialog->started_ns = 0;
     dialog->completed = dialog->total = 0;
+    /* 补上 worker 没能还回的那一次引用 (队列持有者此刻仍占着 dialog) */
+    if (release_worker) --dialog->references;
     SDL_UnlockMutex(dialog->mutex);
-    if (release_worker) bongo_cat_preferences_import_dialog_release(dialog);
     bongo_cat_preferences_import_dialog_release(dialog);
 }
 /*
@@ -132,12 +144,20 @@ static bool start_job(BongoCatImportDialog *dialog, BongoCatApp *app,
     if (!dialog || !app || !job || !app->models_root[0]) return false;
     snprintf(job->models_root, sizeof(job->models_root), "%s", app->models_root);
     job->dialog = dialog;
+    job->window_id = window_id;
     SDL_LockMutex(dialog->mutex);
-    if (!dialog->active || dialog->busy) {
+    if (!dialog->active) {
         SDL_UnlockMutex(dialog->mutex);
         return false;
     }
-    dialog->window_id = window_id;
+    if (dialog->busy) {
+        /* 有任务在跑, 不丢弃新拖进来的文件, 先进 pending 队列, 完成后再串行拉起来 */
+        if (dialog->pending_tail) dialog->pending_tail->next = job;
+        else dialog->pending_head = job;
+        dialog->pending_tail = job;
+        SDL_UnlockMutex(dialog->mutex);
+        return true;
+    }
     dialog->busy = true;
     dialog->worker_job = job;
     dialog->started_ns = SDL_GetTicksNS();
@@ -148,6 +168,7 @@ static bool start_job(BongoCatImportDialog *dialog, BongoCatApp *app,
         BONGO_CAT_SLUG "-model-import", job);
     if (!dialog->worker) {
         dialog->worker_job = NULL;
+        dialog->completion_pending = false;
         dialog->busy = false;
         dialog->started_ns = 0;
         dialog->completed = dialog->total = 0;
@@ -155,6 +176,34 @@ static bool start_job(BongoCatImportDialog *dialog, BongoCatApp *app,
     }
     SDL_UnlockMutex(dialog->mutex);
     return dialog->worker != NULL;
+}
+/*
+ * 从 pending 队列里把下一个任务拉起来跑。线程创建失败不放弃整批: 把该任务记成
+ * 失败并合并进 summary, 继续试下一个, 直到队列空或有一个真正跑起来。
+ */
+static void start_pending_jobs(BongoCatImportDialog *dialog, BongoCatApp *app) {
+    for (;;) {
+        SDL_LockMutex(dialog->mutex);
+        BongoCatImportJob *job = dialog->active && !dialog->busy
+            ? dialog->pending_head : NULL;
+        if (job) {
+            dialog->pending_head = job->next;
+            if (!dialog->pending_head) dialog->pending_tail = NULL;
+            job->next = NULL;
+        }
+        SDL_UnlockMutex(dialog->mutex);
+        if (!job) return;
+        if (start_job(dialog, app, job->window_id, job)) return;
+        BongoCatError error = {0};
+        bongo_cat_error_set(&error, BONGO_CAT_ERROR_IO,
+            "Cannot start model import thread: %s", SDL_GetError());
+        for (size_t i = 0; i < job->count; ++i)
+            bongo_cat_preferences_import_record_failure(job, job->paths[i]);
+        job->failed_count = job->count;
+        job->error = error;
+        bongo_cat_preferences_import_merge(&dialog->summary, job);
+        bongo_cat_preferences_import_job_free(job);
+    }
 }
 /*
  * 原生文件夹对话框的回调 (跑在对话框自己的线程上)。
@@ -228,6 +277,7 @@ static void complete_job(BongoCatImportDialog *dialog, BongoCatApp *app,
         worker = dialog->worker;
         dialog->worker = NULL;
         dialog->worker_job = NULL;
+        dialog->completion_pending = false;
         dialog->busy = false;
         dialog->started_ns = 0;
         dialog->completed = dialog->total = 0;
@@ -238,19 +288,51 @@ static void complete_job(BongoCatImportDialog *dialog, BongoCatApp *app,
     if (job->result == BONGO_CAT_OK)
         for (size_t i = 0; i < job->package_id_count; ++i)
             if (bongo_cat_settings_restore_model_package(&app->settings,
-                    job->package_ids[i])) restored_count++;
+                    job->package_ids[i])) {
+                restored_count++;
+                job->package_imported[i] = true;
+            }
     bool catalog_changed = job->installed_count > 0 || restored_count > 0;
     if (job->result == BONGO_CAT_OK && catalog_changed)
         for (size_t i = 0; i < job->package_id_count; ++i)
             if (!job->package_refresh_requested[i])
                 bongo_cat_app_request_model_package_refresh(app,
                     job->package_ids[i]);
-    bongo_cat_preferences_import_complete(app, job->result, &job->error,
-        job->resolved_count, job->installed_count + restored_count,
-        job->succeeded_count, job->failed_count, job->failed_names,
-        job->failed_name_count);
+    bongo_cat_preferences_import_merge(&dialog->summary, job);
+    /* 队列里还有就继续拉下一个任务; 全跑完了才合并弹一条完成提示 */
+    start_pending_jobs(dialog, app);
+    if (!bongo_cat_preferences_import_status(dialog, NULL, NULL, NULL)) {
+        bongo_cat_preferences_import_complete(app, &dialog->summary);
+        memset(&dialog->summary, 0, sizeof(dialog->summary));
+    }
     bongo_cat_preferences_import_job_free(job);
     bongo_cat_preferences_import_dialog_release(dialog);
+}
+bool bongo_cat_preferences_imports_busy(const BongoCatPreferences *value) {
+    return value && bongo_cat_preferences_import_status(value->import_dialog,
+        NULL, NULL, NULL);
+}
+/* 交给控制层, 停止接受新的导入任务 (关窗/退出时调用) */
+void bongo_cat_preferences_stop_imports(BongoCatPreferences *value) {
+    BongoCatImportDialog *dialog = value ? value->import_dialog : NULL;
+    if (!dialog) return;
+    SDL_LockMutex(dialog->mutex);
+    dialog->active = false;
+    dialog->open = false;
+    SDL_UnlockMutex(dialog->mutex);
+}
+/*
+ * 每帧兜底: 完成事件没能推给主线程 (active 变 false / PushEvent 失败) 时,
+ * worker 不再发事件, 这里的 completion_pending 是回收 worker 的最后机会。
+ */
+void bongo_cat_preferences_poll_imports(BongoCatPreferences *value) {
+    BongoCatImportDialog *dialog = value ? value->import_dialog : NULL;
+    if (!dialog) return;
+    SDL_LockMutex(dialog->mutex);
+    BongoCatImportJob *job = dialog->active && dialog->completion_pending ?
+        dialog->worker_job : NULL;
+    SDL_UnlockMutex(dialog->mutex);
+    if (job) complete_job(dialog, value->app, job);
 }
 
 /*

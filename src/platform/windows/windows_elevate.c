@@ -7,6 +7,7 @@
 #include <stdio.h>
 #include <SDL3/SDL.h>
 #include <windows.h>
+#include <ole2.h>
 #include <shellapi.h>
 
 /*
@@ -141,8 +142,25 @@ void bongo_cat_platform_allow_file_drop(SDL_Window *window) {
     if (!bongo_cat_platform_is_elevated()) return;
     HWND hwnd = window ? (HWND)SDL_GetPointerProperty(SDL_GetWindowProperties(window),
         SDL_PROP_WINDOW_WIN32_HWND_POINTER, NULL) : NULL;
-    allow_drop_messages(hwnd);
+    if (hwnd) allow_drop_messages(hwnd);
     EnumThreadWindows(GetCurrentThreadId(), allow_drop_messages_for_window, 0);
+    /*
+     * 光放行消息不够: SDL3 默认走的是 OLE 的 IDropTarget 通路, 而提权进程的窗口
+     * (高完整性) 收集 Explorer (中完整性) 的拖放时, OLE 要靠 IDataObject 跨完整性
+     * 级别搬运 HGLOBAL —— 这正是 UIPI 拦不住却仍然"拖不动"的深层原因。所以提权时
+     * 要像 X 那样把 SDL 的 OLE 目标摘掉 (RevokeDragDrop), 让系统退回老式 shell 拖放
+     * (WM_DROPFILES), 由 SDL 把消息转成平时的 UTF-8 drop 事件。
+     */
+    if (hwnd) {
+        HRESULT result = RevokeDragDrop(hwnd);
+        if (FAILED(result) && result != DRAGDROP_E_NOTREGISTERED) {
+            SDL_LogWarn(SDL_LOG_CATEGORY_VIDEO,
+                "Cannot switch elevated file drops to shell delivery: 0x%08lx",
+                (unsigned long)result);
+        } else {
+            DragAcceptFiles(hwnd, TRUE);
+        }
+    }
     SDL_LogInfo(BONGO_CAT_LOG_LIFECYCLE,
         "[runtime] 已放行拖放消息 (UIPI): hwnd=%p", (void *)hwnd);
 }

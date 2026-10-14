@@ -31,6 +31,7 @@
 # Local licensed dependency; install it separately on each machine
 /vendor/CubismSdkForNative/
 /vendor
+/BongoCat-X
 # IDE and editor-local state
 /.vs/
 /.vscode/

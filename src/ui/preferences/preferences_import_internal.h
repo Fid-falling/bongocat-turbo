@@ -20,12 +20,27 @@
 #include "preferences_internal.h"
 #include "model_import.h"
 
+/* 一次"拖放多文件 / 批量导入"结束后的汇总。多个串行任务的结果合并到一起,
+   主线程最后统一弹一条完成提示, 而不是每个文件弹一条。 */
+typedef struct BongoCatImportSummary {
+    char ids[BONGO_CAT_MODEL_CAP][BONGO_CAT_ID_CAP];
+    bool imported[BONGO_CAT_MODEL_CAP];
+    size_t count;
+    size_t failed_count;
+    size_t failed_name_count;
+    char failed_names[BONGO_CAT_IMPORT_FAILURE_NAME_CAP][BONGO_CAT_ID_CAP];
+    BongoCatError error;
+} BongoCatImportSummary;
+
 typedef struct BongoCatImportJob {
+    struct BongoCatImportJob *next;
+    SDL_WindowID window_id;
     size_t count;
     char **paths;
     char models_root[BONGO_CAT_PATH_CAP];
     char package_ids[BONGO_CAT_MODEL_CAP][BONGO_CAT_ID_CAP];
     bool package_refresh_requested[BONGO_CAT_MODEL_CAP];
+    bool package_imported[BONGO_CAT_MODEL_CAP];
     size_t package_id_count;
     size_t resolved_count;
     size_t installed_count;
@@ -74,6 +89,13 @@ struct BongoCatImportDialog {
     SDL_Thread *worker;
     /* 当前在跑的任务; 完成事件用它做身份校验, 防止把过期事件套到新任务上 */
     BongoCatImportJob *worker_job;
+    uint64_t worker_generation;
+    /* 完成事件没能推给主线程时置位, 由 poll_imports 每帧兜底回收 worker */
+    bool completion_pending;
+    /* 拖放多个文件/连续导入时不丢弃, 先进 pending 队列, 逐个串行执行 */
+    BongoCatImportJob *pending_head;
+    BongoCatImportJob *pending_tail;
+    BongoCatImportSummary summary;
     uint64_t started_ns;
     size_t completed;
     size_t total;
@@ -98,5 +120,11 @@ void bongo_cat_preferences_import_job_free(BongoCatImportJob *job);
 void bongo_cat_preferences_import_dialog_release(
     BongoCatImportDialog *dialog);
 int SDLCALL bongo_cat_preferences_import_worker(void *userdata);
+void bongo_cat_preferences_import_merge(BongoCatImportSummary *summary,
+    const BongoCatImportJob *job);
+void bongo_cat_preferences_import_message(BongoCatApp *app,
+    const BongoCatImportSummary *summary, char *message, size_t capacity);
+void bongo_cat_preferences_import_complete(BongoCatApp *app,
+    const BongoCatImportSummary *summary);
 
 #endif
