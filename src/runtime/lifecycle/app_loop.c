@@ -202,14 +202,36 @@ bool bongo_cat_app_capture_pending_model_cover(BongoCatApp *app) {
     return captured;
 }
 
-/* 第二个实例被拒绝时会把"唤醒"信号留下来, 主实例在循环里取走: 显示窗口并置前。
-   首帧还没出来时只显示、不动 Z 序, 免得把空窗口提到最前面。 */
+/* 第二个实例被拒绝时会把"唤醒请求"留下来, 主实例在循环里取走:
+ *   - REVEAL: 显示窗口并置前。首帧还没出来时只显示、不动 Z 序, 免得把空窗口提到最前面;
+ *   - OPEN_PREFERENCES: 用户又启动了一次同一个 exe —— 打开/置前设置窗口 (重复启动的意图
+ *     基本就是"我要改设置")。设置窗口自带"已打开就只置前 + 取消最小化"的策略
+ *     (bongo_cat_preferences_show), 这里不再额外抢焦点, 免得打断用户正在打字的程序。
+ *     无人值守 (--ci-*) 运行里只记日志: 弹窗会把冒烟挂住, 而且 CI 里没人看那个窗口。 */
 static void take_instance_wake(BongoCatApp *app) {
-    if (!bongo_cat_platform_single_instance_take_wake()) return;
+    BongoCatWakeRequest request = bongo_cat_platform_single_instance_take_wake();
+    if (request == BONGO_CAT_WAKE_NONE) return;
+    if (request == BONGO_CAT_WAKE_OPEN_PREFERENCES) {
+        if (app->automated) {
+            SDL_LogInfo(BONGO_CAT_LOG_LIFECYCLE,
+                "[wake] 无人值守 (--ci-*) 运行: 忽略\"打开设置窗口\"的请求");
+            return;
+        }
+        /* 宠物窗口被藏起来时顺手恢复; 已经在屏幕上就不动它 —— 该置前的是设置窗口。 */
+        if (!app->session.window.visible)
+            bongo_cat_window_set_visible(app, true);
+        bongo_cat_preferences_show(app->preferences);
+        /* 必须用 LIFECYCLE 类别: bongo_cat_log_enabled 只放行三个自定义类别的 INFO,
+           裸 SDL_Log (category 0) 的 INFO 会被丢掉 —— "日志里没有这一行"正是排查
+           "第二次启动没反应"时最需要的那条证据。 */
+        SDL_LogInfo(BONGO_CAT_LOG_LIFECYCLE,
+            "[wake] 收到重复启动请求: 打开设置窗口");
+        return;
+    }
     bongo_cat_window_set_visible(app, true);
     if (!app->startup_visibility_pending)
         bongo_cat_platform_raise_window(app->window);
-    SDL_Log("Existing instance requested window reveal");
+    SDL_LogInfo(BONGO_CAT_LOG_LIFECYCLE, "[wake] 收到唤醒请求: 显示并置前宠物窗口");
 }
 
 /* 更新器装完包要求本进程退出: 只置 running=false, 真正的清理交给统一的 shutdown。 */

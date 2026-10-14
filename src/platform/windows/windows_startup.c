@@ -106,18 +106,54 @@ static void create_instance_events(void) {
                 FILE_MAP_WRITE, 0, 0, sizeof(BongoCatWindowsInstanceInfo));
         if (instance_info) {
             memset(instance_info, 0, sizeof(*instance_info));
-            instance_info->magic = 0x42434D49u;
+            instance_info->magic = BONGO_CAT_WINDOWS_INSTANCE_MAGIC;
             GetModuleFileNameW(NULL, instance_info->executable_path,
                 BONGO_CAT_WINDOWS_INSTANCE_PATH_CAP);
             snprintf(instance_info->version, sizeof(instance_info->version),
                 "%s", BONGO_CAT_VERSION);
+        } else {
+            /* 段被旧版本实例建得更小 (或权限不足) 时映射会失败: 单实例照样工作, 只是
+                "唤醒原因"这条通道退回降级行为 (只把窗口唤到前台)。留一条日志, 否则
+               "第二次启动没打开设置"在日志里完全看不出来。 */
+            SDL_LogWarn(BONGO_CAT_LOG_LIFECYCLE,
+                "[startup] 共享内存映射失败, 唤醒原因不可用 (只支持唤到前台): %s",
+                SDL_GetError());
         }
     }
 }
 
 /*
+ * 把"这一次的唤醒原因"写进共享内存, 读侧是 bongo_cat_platform_single_instance_take_wake。
+ *
+ * 为什么需要它: 唤醒事件是自动重置的, 只能表达"有人敲了一下门", 带不了载荷 —— 而
+ * "第二次启动 = 打开设置窗口"这个新语义必须让主实例知道。写载荷和敲门用的是同一对既有
+ * 对象 (共享内存 + 事件), 不是第二套 IPC。
+ *
+ * 顺序必须是"先写原因, 再 SetEvent": 反过来的话主实例可能已经看到事件、读到的却还是旧值。
+ * 打不开段 (旧版本实例、提权实例的安全描述符挡住了普通权限进程) 时不报错退出 —— 唤醒照发,
+ * 只是退化成"把窗口唤到前台"。
+ */
+static void publish_wake_request(uint32_t request) {
+    HANDLE mapping = OpenFileMappingW(FILE_MAP_WRITE, FALSE, instance_info_name);
+    if (!mapping) {
+        SDL_LogWarn(BONGO_CAT_LOG_LIFECYCLE,
+            "[startup] 打不开实例共享内存, 只能把已有实例唤到前台 (request=%u)",
+            (unsigned)request);
+        return;
+    }
+    BongoCatWindowsInstanceInfo *info = MapViewOfFile(mapping, FILE_MAP_WRITE,
+        0, 0, sizeof(*info));
+    if (info) {
+        if (info->magic == BONGO_CAT_WINDOWS_INSTANCE_MAGIC)
+            info->wake_request = request;
+        UnmapViewOfFile(info);
+    }
+    CloseHandle(mapping);
+}
+
+/*
  * 通知已经运行的实例"又有人启动了一次": 先试事件(最快), 事件打不开就退化成按标题
- * 找到窗口并直接激活它。
+ * 找到窗口并直接激活它 —— 走退化的那条路时唤醒原因送不过去, 主实例只会把窗口唤到前台。
  * 重试 30 次 × 100ms: 旧实例可能还在启动过程中, 窗口和事件都没建好; 这时立刻放弃会
  * 让用户点了图标却什么都没发生。
  */
@@ -125,9 +161,14 @@ static void wake_existing_instance(void) {
     for (int attempt = 0; attempt < 30; ++attempt) {
         HANDLE wake = OpenEventW(EVENT_MODIFY_STATE, FALSE, instance_wake_name);
         if (wake) {
+            publish_wake_request((uint32_t)BONGO_CAT_WAKE_OPEN_PREFERENCES);
             bool signaled = SetEvent(wake) != FALSE;
             CloseHandle(wake);
-            if (signaled) return;
+            if (signaled) {
+                SDL_LogInfo(BONGO_CAT_LOG_LIFECYCLE,
+                    "[startup] 已通知运行中的实例打开设置窗口, 本进程退出");
+                return;
+            }
         }
         HWND existing = FindWindowW(NULL, instance_title);
         if (existing) {
@@ -177,10 +218,22 @@ bool bongo_cat_platform_single_instance_begin(void) {
     return false;
 }
 
-/* 非阻塞地取一次唤醒信号: 主循环每轮调用, 返回 true 就把窗口显示出来。 */
-bool bongo_cat_platform_single_instance_take_wake(void) {
-    return instance_wake_event &&
-        WaitForSingleObject(instance_wake_event, 0) == WAIT_OBJECT_0;
+/* 非阻塞地取一次唤醒请求: 主循环每轮调用。原因写在共享内存里, 这里读一次并立刻清零
+   —— 不清的话下一次"只唤醒"的敲门会被当成又一次"打开设置"。读不到原因 (映射失败或
+   magic 不对) 就按旧的"唤到前台"处理。 */
+BongoCatWakeRequest bongo_cat_platform_single_instance_take_wake(void) {
+    if (!instance_wake_event ||
+        WaitForSingleObject(instance_wake_event, 0) != WAIT_OBJECT_0)
+        return BONGO_CAT_WAKE_NONE;
+    uint32_t request = (uint32_t)BONGO_CAT_WAKE_REVEAL;
+    if (instance_info && instance_info->magic == BONGO_CAT_WINDOWS_INSTANCE_MAGIC) {
+        request = instance_info->wake_request;
+        instance_info->wake_request = (uint32_t)BONGO_CAT_WAKE_NONE;
+    }
+    if (request != (uint32_t)BONGO_CAT_WAKE_OPEN_PREFERENCES &&
+        request != (uint32_t)BONGO_CAT_WAKE_REVEAL)
+        request = (uint32_t)BONGO_CAT_WAKE_REVEAL;
+    return (BongoCatWakeRequest)request;
 }
 
 /*

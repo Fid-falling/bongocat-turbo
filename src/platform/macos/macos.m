@@ -301,7 +301,11 @@ bool bongo_cat_platform_single_instance_begin(void) {
         userInfo:nil deliverImmediately:YES];
     close(instance_lock); instance_lock = -1; return false;
 }
-bool bongo_cat_platform_single_instance_take_wake(void) { return false; }
+/* 唤醒原因("打开设置")目前只有 Windows 的共享内存通道能携带; macOS 保持无请求, 第二次
+   启动仍然只通过上面那条分布式通知请已有实例显示自己。 */
+BongoCatWakeRequest bongo_cat_platform_single_instance_take_wake(void) {
+    return BONGO_CAT_WAKE_NONE;
+}
 void bongo_cat_platform_single_instance_end(void) {
     if (instance_lock >= 0) close(instance_lock);
     instance_lock = -1;

@@ -151,8 +151,26 @@ bool bongo_cat_platform_dynamic_hit_supported(void);
 void bongo_cat_platform_set_tray_callbacks(void *tray,
     BongoCatTrayClick left_click, BongoCatModalTick modal_tick,
     BongoCatTrayRestore restore, void *userdata);
+/*
+ * 单实例唤醒请求: 第二个实例被互斥体拒绝之后, 用它告诉正在运行的那个实例"这一次想干
+ * 什么"。载荷只有这一个原因, 所以直接在既有的唤醒通道上加, 不另起一套 IPC。
+ * 取走 (take_wake) 之后请求即被清除, 不会重复生效。
+ */
+typedef enum BongoCatWakeRequest {
+    /* 没有待处理的唤醒请求 (也是主循环每帧的默认结果)。 */
+    BONGO_CAT_WAKE_NONE = 0,
+    /* 只把宠物窗口唤到前台并置前。这是"拿不到唤醒原因"时的降级行为 (旧版本实例、
+       Linux/macOS 实现), 与加这个原因之前的行为一致。 */
+    BONGO_CAT_WAKE_REVEAL = 1,
+    /* 用户又启动了一次同一个可执行文件: 打开/置前设置窗口。重复启动的意图基本就是
+       "我要改设置", 而这个动作在第一次启动时已经做过一遍了。 */
+    BONGO_CAT_WAKE_OPEN_PREFERENCES = 2
+} BongoCatWakeRequest;
+
 bool bongo_cat_platform_single_instance_begin(void);
-bool bongo_cat_platform_single_instance_take_wake(void);
+/* 非阻塞取一次唤醒请求: 主循环每轮调用。返回 NONE 表示没有请求; 取走之后请求被清除,
+   所以调用方每收到一次就只处理一次。 */
+BongoCatWakeRequest bongo_cat_platform_single_instance_take_wake(void);
 bool bongo_cat_platform_update_shutdown_argument(int argc, char **argv);
 bool bongo_cat_platform_single_instance_take_update_shutdown(void);
 void bongo_cat_platform_single_instance_end(void);

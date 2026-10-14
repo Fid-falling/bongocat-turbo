@@ -297,7 +297,11 @@ bool bongo_cat_platform_single_instance_begin(void) {
     if (instance_lock < 0 || flock(instance_lock, LOCK_EX | LOCK_NB) == 0) return true;
     restore_instance_window(); close(instance_lock); instance_lock = -1; return false;
 }
-bool bongo_cat_platform_single_instance_take_wake(void) { return false; }
+/* 唤醒原因只跟着"打开设置窗口"这条新路径走, Windows 才有; 这里保持无请求 (Linux 的
+   第二次启动仍然只把窗口抬到前台, 见 restore_instance_window)。 */
+BongoCatWakeRequest bongo_cat_platform_single_instance_take_wake(void) {
+    return BONGO_CAT_WAKE_NONE;
+}
 void bongo_cat_platform_single_instance_end(void) {
     if (instance_lock >= 0) close(instance_lock);
     instance_lock = -1;
