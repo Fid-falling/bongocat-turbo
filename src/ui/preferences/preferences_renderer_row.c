@@ -5,8 +5,8 @@
  * cmake/CheckLines.cmake), 而这一行从"点了之后干什么"到"被拒也要留痕"都自成一块,
  * 正好搬出来 —— 与"透明背景"那一行 (preferences_window_transparency.c) 同一套做法。
  *
- * 这一行是**托盘那一项的另一个入口**, 两者必须完全一致: 写配置 -> 确认框 -> 按选择
- * 重启或只提示。真正的实现只有一份 (runtime/lifecycle/renderer_switch.c), 这里只负责
+ * 这一行是**托盘那一项的另一个入口**, 两者必须完全一致: 写配置 -> 自动重启 -> 失效时
+ * 提示。真正的实现只有一份 (runtime/lifecycle/renderer_switch.c), 这里只负责
  * 把"用户点在哪一段上"翻译成一次切换请求。
  *
  * 三条容易踩空的细节, 改之前先看:
@@ -77,7 +77,7 @@ void bongo_cat_preferences_renderer_row(BongoCatApp *app,
     /*
      * 只在"配置里就是它、而且它确实已经在跑"的时候才什么都不做 (仍然留一条日志)。
      * effective 用 resolve 算出来是为了照顾 Auto: 配置=auto 且正在跑 Vulkan 时, 点 Auto
-     * 不该再弹一次重启确认框; 但配置=auto 而用户点了 OpenGL 时必须真的切。
+     * 不该再触发一次重启; 但配置=auto 而用户点了 OpenGL 时必须真的切。
      * 目标不可用时不去问 resolve —— 那会多打一条误导性的"请求的后端不可用"警告, 拒绝
      * 路径自己会说明原因。
      */

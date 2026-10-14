@@ -194,6 +194,15 @@ static void renderer(struct nk_command_buffer *c, struct nk_rect b,
     nk_stroke_rect(c, nk_rect(b.x + 6, b.y + 6, 11, 11), 2, 1.5f, color);
 }
 
+/* 外框 + 内部小框与下伸的底座 = 贴住屏幕边缘的窗口 (边缘吸附) */
+static void frame_bounds(struct nk_command_buffer *c, struct nk_rect b,
+    struct nk_color color) {
+    nk_stroke_rect(c, nk_rect(b.x + 1, b.y + 2, 16, 12), 2, 1.5f, color);
+    line(c, b, 9, 14, 9, 16, color);
+    line(c, b, 6, 16, 12, 16, color);
+    nk_stroke_rect(c, nk_rect(b.x + 5, b.y + 5, 8, 6), 1, 1.5f, color);
+}
+
 /*
  * 行图标总表。下标 = icon - BONGO_CAT_PREF_ICON_MULTIPLE_MODELS, 与枚举顺序**逐项
  * 对应** —— 这就是 preferences_icons.h 里"新图标只能加在段末"那条约束的落地处:
@@ -208,7 +217,7 @@ bool bongo_cat_pref_row_icon_draw(struct nk_command_buffer *canvas,
         keep_in_screen, solid_background, window_size, window_corners, opacity,
         random_expression, mirror, mouse_mirror, mouse_centered, ignore_mouse,
         max_fps, autostart, language, theme, shortcut_visibility,
-        shortcut_preferences, hide_fade, renderer};
+        shortcut_preferences, hide_fade, renderer, frame_bounds};
     int index = icon - BONGO_CAT_PREF_ICON_MULTIPLE_MODELS;
     int count = (int)(sizeof(draws) / sizeof(draws[0]));
     if (index < 0 || index >= count) return false;

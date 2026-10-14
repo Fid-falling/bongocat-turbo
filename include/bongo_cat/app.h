@@ -153,6 +153,10 @@ typedef struct BongoCatApp {
      * runtime/lifecycle/application_restart.c。
      */
     bool restart_requested;
+    /* restart_requested 开启时, 置位表示这次重启要**提权** (开启 run_as_admin 且
+       当前未提权)。走 bongo_cat_platform_restart_application_elevated 拉起新进程;
+       否则按普通重启保持当前权限。 */
+    bool restart_elevated;
     int exit_code;
     bool dirty;
     /* 已经下发给后端的 max_fps (垂直同步跟随它变化), -1 表示还没下发过 */
@@ -217,6 +221,16 @@ typedef struct BongoCatApp {
     bool window_drag_active;
     float drag_start_x, drag_start_y;
     int drag_window_x, drag_window_y;
+    /* 拖动惯性: 快照存窗口原点, 3 槽 + 100ms 桶轮转。 */
+    uint64_t drag_snap_tick_ns[3];
+    int drag_snap_x[3], drag_snap_y[3];
+    int drag_snap_slot[3]; /* 存储槽排布: [0] 最新, [1]/[2] 更老; -1 表示空槽 */
+    /* 滑行态: 由 bongo_cat_window_update_inertia 每帧驱动, 沿初速方向衰减移动。 */
+    bool slide_active;
+    double slide_velocity_x, slide_velocity_y;
+    double slide_x, slide_y;
+    uint64_t slide_last_ns;
+    int slide_frame;
     void *drag_display_bounds;
     int drag_display_count;
     float left_stick_x, left_stick_y;
@@ -265,17 +279,19 @@ void bongo_cat_app_request_nearby_model_refresh(BongoCatApp *app);
 void bongo_cat_config_store_flush(BongoCatApp *app);
 /*
  * 请求"改完设置后自动重启本程序"(切换渲染后端、启停便携模式)。
- * 返回 true = 已经排上, 主循环末尾会执行; false = 本次运行不允许自动重启 (刚刚就是被
- * 自动重启出来的, 或者处于 --ci-* 无人值守运行), 调用方应当提示用户手动重启。
+ * 返回 true = 已经排上, 主循环末尾会执行; false = 本次运行不允许自动重启 (处于
+ * --ci-* 无人值守运行), 调用方应当提示用户手动重启。
+ * 本函数**只能**由用户主动操作调用 (初始化、命令行、周期任务等任意自动来源都不得
+ * 调用, 见 runtime/lifecycle/application_restart.c 文件头的"无防循环标记"一段):
+ * 这条不变量靠代码审查强制, 不设运行时守卫。
  * 参数与互斥体的处理都在 runtime/lifecycle/application_restart.c。
  */
 bool bongo_cat_app_request_restart(BongoCatApp *app);
 /*
- * 重启前的确认框: "现在重启" / "稍后手动重启"。返回 true = 用户选了现在重启。
- * 无人值守运行 (--ci-* / 冒烟 / BONGO_CAT_TEST_NO_DIALOG) 不弹窗并返回 false —— 模态框
- * 会把脚本挂死, 而"稍后手动重启"是安全的那条路 (配置照写)。
- * 调用方拿到 false 时只写配置并提示, 绝不能自己重启。
+ * 同 bongo_cat_app_request_restart, 但 elevated=true 时这次重启会**以管理员身份**
+ * 拉起新进程 (用于给"开启以管理员身份运行"立即生效)。仅在 Windows 上有实际差别;
+ * 排上的普通重启可被后续的提权重启升级。
  */
-bool bongo_cat_app_confirm_restart(BongoCatApp *app);
+bool bongo_cat_app_request_restart_elevated(BongoCatApp *app, bool elevated);
 
 #endif

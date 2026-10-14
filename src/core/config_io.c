@@ -90,11 +90,17 @@ static bool read_window(yyjson_val *object, BongoCatWindowPreferences *value,
         !read_bool(object, "alwaysOnTop", &value->always_on_top, error) ||
         !read_bool(object, "hideOnPointerOver", &value->hide_on_hover, error) ||
         !read_bool(object, "keepOnScreen", &value->keep_in_screen, error) ||
+        !read_bool(object, "edgeSnap", &value->edge_snap, error) ||
+        !read_int(object, "edgeSnapThreshold", &value->edge_snap_threshold,
+            error) ||
+        !read_bool(object, "slideAnimation", &value->slide_animation,
+            error) ||
+        !read_int(object, "slideSlowdownPercent",
+            &value->slide_slowdown_percent, error) ||
         !read_bool(object, "captureOnly", &value->capture_only, error) ||
         !read_int(object, "supersample", &value->supersample, error) ||
         !read_int(object, "fontRasterCap", &value->font_raster_cap, error) ||
         !read_int(object, "disableUiEffects", &value->disable_effects, error) ||
-        !read_int(object, "disableElevation", &value->disable_elevation, error) ||
         !read_int(object, "glTransparency", &value->gl_transparency, error) ||
         !read_bool(object, "captureBackground", &value->obs_background,
             error) ||
@@ -124,6 +130,7 @@ static bool read_window(yyjson_val *object, BongoCatWindowPreferences *value,
 static bool read_app(yyjson_val *object, BongoCatApplicationPreferences *value,
     BongoCatError *error) {
     if (!read_bool(object, "launchAtLogin", &value->autostart, error) ||
+        !read_bool(object, "runAsAdmin", &value->run_as_admin, error) ||
         !read_bool(object, "showTrayIcon", &value->tray_visible, error))
         return false;
     const char *text;

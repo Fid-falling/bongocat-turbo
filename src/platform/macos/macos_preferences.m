@@ -13,8 +13,9 @@
  * 调用, 没有池子就会持续泄漏 Objective-C 对象。
  * 关闭时"文件本来就不存在"也算成功 —— 目标状态已经达成。
  */
-BongoCatResult bongo_cat_platform_set_autostart(bool enabled,
+BongoCatResult bongo_cat_platform_set_autostart(bool enabled, bool elevated,
     BongoCatError *error) {
+    (void)elevated;
     @autoreleasepool {
         NSString *directory = [NSHomeDirectory()
             stringByAppendingPathComponent:@"Library/LaunchAgents"];
@@ -43,6 +44,11 @@ BongoCatResult bongo_cat_platform_set_autostart(bool enabled,
             "Cannot write macOS launch agent");
         return BONGO_CAT_ERROR_IO;
     }
+}
+
+BongoCatResult bongo_cat_platform_autostart_enforce_elevated(void) {
+    /* macOS 没有"提权自启"的常态需求: LaunchAgent 以用户会话拉起即可。 */
+    return BONGO_CAT_OK;
 }
 
 /* 设置窗口的外观改造: 加上 FullSizeContentView、隐藏标题并把标题栏设成透明, 于是它看起来

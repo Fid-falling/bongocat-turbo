@@ -12,6 +12,11 @@
 #define BONGO_CAT_DEFAULT_WINDOW_CORNER_PERCENT 6.0f
 #define BONGO_CAT_DEFAULT_HIDE_FADE_SECONDS 0.3f
 #define BONGO_CAT_MAX_HIDE_FADE_SECONDS 3.0f
+#define BONGO_CAT_DEFAULT_EDGE_SNAP_PX 20
+#define BONGO_CAT_MAX_EDGE_SNAP_PX 64
+/* 0 = 每拍不衰减, 松手后近似恒速滑行。 */
+#define BONGO_CAT_DEFAULT_SLIDE_SLOWDOWN_PERCENT 0
+#define BONGO_CAT_MAX_SLIDE_SLOWDOWN_PERCENT 99
 
 typedef enum BongoCatTheme { BONGO_CAT_THEME_AUTO, BONGO_CAT_THEME_LIGHT, BONGO_CAT_THEME_DARK } BongoCatTheme;
 typedef enum BongoCatLanguage {
@@ -64,6 +69,14 @@ typedef struct BongoCatWindowPreferences {
     bool always_on_top;
     bool hide_on_hover;
     bool keep_in_screen;
+    /* 拖动窗口靠近显示器边缘时, 在阈值内吸附贴边。 */
+    bool edge_snap;
+    /* edge_snap 开启时: 窗口某条边距显示器边缘不超过这个像素数就贴平吸附。 */
+    int edge_snap_threshold;
+    /* 拖动惯性: 松手后沿着拖动方向继续滑行一段。关闭则拖动结束立即停在原地。 */
+    bool slide_animation;
+    /* 惯性衰减档位 0-99: 数值越大约快停下; 0 表示几乎匀速滑到超时为止。 */
+    int slide_slowdown_percent;
     /*
      * 只在录屏/直播软件里可见: 桌面上看不见这个窗口, 但 OBS 之类的采集
      * (窗口采集 WGC / 游戏采集) 仍然拿得到画面。Windows 上通过 DWM 隐藏
@@ -80,8 +93,6 @@ typedef struct BongoCatWindowPreferences {
     int font_raster_cap;
     /* 1 = 关掉界面发光/阴影 (浅色主题每帧省约 5ms) */
     int disable_effects;
-    /* 1 = 启动时不检查/不请求管理员权限 (默认 0 = 自动提权) */
-    int disable_elevation;
     /*
      * 1 = 让宠物背景在桌面上真正透明 (默认 0 = 关闭)。
      *
@@ -121,6 +132,12 @@ typedef struct BongoCatWindowState {
 
 typedef struct BongoCatApplicationPreferences {
     bool autostart;
+    /*
+     * 1 = 以管理员身份运行 (启动时请求提权, 与 BongoCat-X 的 run_as_admin 对齐)。
+     * 默认 0 = 普通权限。开启且当前未提权时切换会立即以管理员身份重启; 关掉只影响
+     * 下一次启动, 不影响正在运行的进程。开机自启 + 开启本项 = 每次登录弹一次 UAC。
+     */
+    bool run_as_admin;
     bool tray_visible;
     BongoCatTheme theme;
     BongoCatLanguage language;

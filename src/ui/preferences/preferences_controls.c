@@ -262,7 +262,7 @@ bool bongo_cat_pref_control_int(struct nk_context *context, const char *id,
  */
 bool bongo_cat_pref_control_slider(struct nk_context *context, const char *id,
     float minimum, float *value, float maximum, float step,
-    float default_value) {
+    float default_value, const char *suffix) {
     struct nk_rect bounds;
     if (nk_widget(&bounds, context) == NK_WIDGET_INVALID) return false;
     bounds = nk_rect(bounds.x + bounds.w - 220.0f,
@@ -318,7 +318,8 @@ bool bongo_cat_pref_control_slider(struct nk_context *context, const char *id,
     nk_fill_rect(canvas, thumb, thumb_rounding, p.accent);
     nk_fill_rect(canvas, value_box, 8, p.field);
     nk_stroke_rect(canvas, value_box, 8, 1, p.border_subtle);
-    char number[24]; snprintf(number, sizeof(number), "%.0f%%", *value);
+    char number[24]; snprintf(number, sizeof(number), "%.0f%s", *value,
+        suffix ? suffix : "");
     centered(canvas, value_box, number, bongo_cat_ui_body_font(context), p.text);
     if (hover || value_hover) bongo_cat_ui_cursor_hover_rect(context,
         hover ? hit : value_box,

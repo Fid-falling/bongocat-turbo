@@ -6,6 +6,8 @@
 #include "runtime.h"
 #include "modal_frame.h"
 
+
+
 static int rounded_delta(float value) {
     return value < 0.0f ? (int)(value - 0.5f) : (int)(value + 0.5f);
 }
@@ -22,11 +24,79 @@ static bool use_pointer_drag(const BongoCatApp *app) {
 #endif
 }
 
+/* 位移快照: 3 槽, 每 100ms 轮转一格桶; snapshot[0] 超过 100ms 视为不新鲜。存的是窗口
+   原点 (被拖动、被惯性驱动的量), 而不是指针位置。 */
+#define DRAG_SNAP_BUCKET_NS 100000000ull
+#define DRAG_SNAP_STALE_NS 100000000ull
+
+static void drag_snapshot_reset(BongoCatApp *app) {
+    for (int i = 0; i < 3; ++i) {
+        app->drag_snap_tick_ns[i] = 0;
+        app->drag_snap_x[i] = 0;
+        app->drag_snap_y[i] = 0;
+        app->drag_snap_slot[i] = -1;
+    }
+}
+
+/* 快照轮转: 第一个快照占 slot[0]; 第二个把 slot[0] 降级成 slot[1]、自己占 slot[0]; 之后
+   每当 slot[1] 满 100ms 就把三个槽轮转一格, 保证 slot[0] 与 slot[1] 相隔一个桶。中间空档
+   超过 100ms 则整段重来。 */
+static void drag_snapshot_update(BongoCatApp *app, int window_x, int window_y) {
+    uint64_t tick = SDL_GetTicksNS();
+    if (app->drag_snap_slot[0] >= 0 &&
+        tick - app->drag_snap_tick_ns[app->drag_snap_slot[0]] >= DRAG_SNAP_STALE_NS) {
+        drag_snapshot_reset(app);
+    }
+    if (app->drag_snap_slot[0] < 0) {
+        app->drag_snap_slot[0] = 0;
+    } else if (app->drag_snap_slot[1] < 0) {
+        app->drag_snap_slot[1] = app->drag_snap_slot[0];
+        app->drag_snap_slot[0] = 1;
+    }
+    if (app->drag_snap_slot[1] >= 0 &&
+        tick - app->drag_snap_tick_ns[app->drag_snap_slot[1]] >= DRAG_SNAP_BUCKET_NS) {
+        if (app->drag_snap_slot[2] < 0) app->drag_snap_slot[2] = 2;
+        int temp = app->drag_snap_slot[2];
+        app->drag_snap_slot[2] = app->drag_snap_slot[1];
+        app->drag_snap_slot[1] = app->drag_snap_slot[0];
+        app->drag_snap_slot[0] = temp;
+    }
+    app->drag_snap_tick_ns[app->drag_snap_slot[0]] = tick;
+    app->drag_snap_x[app->drag_snap_slot[0]] = window_x;
+    app->drag_snap_y[app->drag_snap_slot[0]] = window_y;
+}
+
 /* 按"按下时的窗口原点 + 指针总位移"算落点; 越界与否交给 drag_to 判断。 */
 static void move_with_pointer(BongoCatApp *app, float x, float y) {
     int next_x = app->drag_window_x + rounded_delta(x - app->drag_start_x);
     int next_y = app->drag_window_y + rounded_delta(y - app->drag_start_y);
     bongo_cat_window_drag_to(app, next_x, next_y);
+    /* 记录窗口原点快照 (不是指针位置), 供松手时算惯性初速。 */
+    int window_x = next_x, window_y = next_y;
+    if (!SDL_GetWindowPosition(app->window, &window_x, &window_y)) {
+        window_x = next_x;
+        window_y = next_y;
+    }
+    drag_snapshot_update(app, window_x, window_y);
+}
+
+/* 用 snapshot[0] 与 snapshot[2] (无则 [1]) 的窗口位移 / 时间差算 px/s 初速。snapshot[0]
+   超过 100ms 视为不新鲜、直接不滑; 快照不足两个或时间差为 0 也返回 false。初速因此始终是
+   "约 100ms 位移"推出来的稳定值 —— 旧实现挑相邻两点时基线可能只有几毫秒, 慢拖会被算成接近
+   0 (于是"只能猛甩"), 猛甩又会被算成瞬时尖峰。 */
+static bool drag_velocity(BongoCatApp *app, double *vx, double *vy) {
+    if (app->drag_snap_slot[0] < 0 || app->drag_snap_slot[1] < 0) return false;
+    int last = app->drag_snap_slot[0];
+    if (SDL_GetTicksNS() - app->drag_snap_tick_ns[last] >= DRAG_SNAP_STALE_NS)
+        return false;
+    int prev = app->drag_snap_slot[2] >= 0 ? app->drag_snap_slot[2]
+        : app->drag_snap_slot[1];
+    uint64_t dt_ns = app->drag_snap_tick_ns[last] - app->drag_snap_tick_ns[prev];
+    if (dt_ns == 0) return false;
+    double scale = 1e9 / (double)dt_ns;
+    *vx = (double)(app->drag_snap_x[last] - app->drag_snap_x[prev]) * scale;
+    *vy = (double)(app->drag_snap_y[last] - app->drag_snap_y[prev]) * scale;
+    return true;
 }
 
 /* 只有按在模型不透明的像素上才算拖动候选 (透明区域留给桌面点击); 同时记下窗口原点与按下
@@ -34,6 +104,9 @@ static void move_with_pointer(BongoCatApp *app, float x, float y) {
 void bongo_cat_window_drag_begin(BongoCatApp *app,
     const SDL_MouseButtonEvent *event) {
     if (!app || !event) return;
+    /* 新拖动会覆盖之前的惯性态与位移快照。 */
+    app->slide_active = false;
+    drag_snapshot_reset(app);
     bongo_cat_window_cancel_wheel_animation(app);
     app->drag_candidate = bongo_cat_window_visible_at_pointer(
         app, event->x, event->y);
@@ -138,6 +211,27 @@ void bongo_cat_window_drag_end(BongoCatApp *app) {
     app->window_drag_active = false;
     bongo_cat_window_snapshot_end(app);
     bongo_cat_window_drag_bounds_clear(app);
+    /* 惯性: 松手瞬间用位移快照算初速, 开启即进入滑行。没有最小速度门槛 —— 只要拖动过程存下
+       了 >=2 个位移快照就按当前速度滑行, 慢拖少滑、快拖多滑, 按比例平滑收尾; 设一个 150px/s
+       门槛会让普通拖动完全不滑, 只能"快速甩动"才触发。注意: drag_end 会被隐藏/最小化/快照/
+       退出等路径幂等地反复调用, 不能在这里无条件清掉 slide_active —— 否则松手后第二次调用
+       (was_active 为 false) 会把刚武装好的滑行立刻掐死, 表现为"完全没有惯性"。所以只在真正
+       结束一次拖动 (was_active) 时才进入滑行分支; 新拖动由 drag_begin 中止正在进行的滑行。 */
+    if (was_active && app->settings.window.slide_animation) {
+        double vx = 0.0, vy = 0.0;
+        if (drag_velocity(app, &vx, &vy)) {
+            int wx = 0, wy = 0;
+            if (SDL_GetWindowPosition(app->window, &wx, &wy)) {
+                app->slide_active = true;
+                app->slide_velocity_x = vx;
+                app->slide_velocity_y = vy;
+                app->slide_x = (double)wx;
+                app->slide_y = (double)wy;
+                app->slide_last_ns = SDL_GetTicksNS();
+                app->slide_frame = 0;
+            }
+        }
+    }
     if (was_active && app->settings.model.mouse_centered) {
         float pointer_x = 0.0f, pointer_y = 0.0f;
         SDL_GetGlobalMouseState(&pointer_x, &pointer_y);
