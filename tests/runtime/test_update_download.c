@@ -350,14 +350,43 @@ static void test_update_download(void) {
         free(blind_app);
     }
 
+    /*
+     * 无人值守运行 (--ci-* / 冒烟): **只能检查, 不能动二进制**。这里即使把这次调用标成
+     * manual (相当于"有人在 CI 里点了按钮"), 也必须停在 AVAILABLE: 不下载、不选落点、
+     * 不请求替换。
+     */
+    {
+        char good_hash[BONGO_CAT_UPDATE_DIGEST_CAP];
+        bongo_cat_sha256_bytes(payload, strlen(payload), good_hash);
+        build_feed(server.feed, sizeof(server.feed), good_hash);
+        BongoCatApp *ci_app = app_state(root);
+        BongoCatUpdateService *ci = ci_app ?
+            bongo_cat_update_create(ci_app) : NULL;
+        CHECK(ci != NULL);
+        if (ci) {
+            ci_app->automated = true;
+            CHECK(bongo_cat_update_check(ci, true));
+            CHECK(wait_for_result(ci) == BONGO_CAT_UPDATE_AVAILABLE);
+            CHECK(!ci->install_requested);
+            CHECK(ci->new_path[0] == '\0');
+            BongoCatUpdateSnapshot snapshot;
+            bongo_cat_update_snapshot(ci, &snapshot);
+            CHECK(snapshot.downloaded == 0);
+            bongo_cat_update_destroy(ci);
+        }
+        free(ci_app);
+    }
+
     free(app);
-    SDL_Quit();
     SDL_setenv_unsafe("BONGO_CAT_UPDATE_FEED_URL", "", 1);
     bongo_cat_path_remove(sources_path);
     bongo_cat_path_remove(state_path);
     /* 临时目录也一起收掉: 用例跑完不该在用户机器上留东西 (目录空时 remove 就能删掉)。 */
     bongo_cat_path_remove(root);
+    /* 顺序不能换: 先 join 服务线程再 SDL_Quit, 否则 SDL 已经收掉线程表, 退出时会报
+       "Leaked thread" (用例本身仍然是过的, 但日志里会多一条噪音)。 */
     server_stop(&server);
+    SDL_Quit();
     WSACleanup();
 }
 
