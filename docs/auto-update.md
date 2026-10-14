@@ -59,21 +59,29 @@
 ## 4. 安全演练 (不碰真实发布)
 
 `BONGO_CAT_UPDATE_FEED_URL` 环境变量可以把"检查更新"的元数据地址换成本机服务, 用于
-演练整条链路 (它不改变信任边界: 期望哈希仍来自那份元数据, 下载后仍要本地重算比对):
+演练整条链路 (它不改变信任边界: 期望哈希仍来自那份元数据, 下载后仍要本地重算比对)。
 
-1. 起一个本地 HTTP 服务, 提供一份假的 release JSON: 版本号比当前高、资产名与
-   `BongoCat-<版本>-<平台>-portable.exe` 一致、`digest` 是"新版本"文件的真实 SHA-256。
-2. 用 `update-sources.txt` 把下载源指到本机 (可故意把前几个源写成连不上的地址, 观察回退)。
-3. 以**副本**运行程序 (不要用正在使用的安装):
+现成的脚本: `pwsh -File scripts/rehearse-update.ps1 -Executable <构建产物>`。它会
 
-   ```
-   set BONGO_CAT_UPDATE_FEED_URL=http://127.0.0.1:8123/feed
-   BongoCatTurbo.exe --storage-root=<临时目录副本>
-   ```
+1. 把构建产物复制到临时目录并在**副本**上演练 (脚本只用副本, 不碰你正在用的程序);
+2. 用同一份副本当"线上新版本"的载荷, 把它的真实 SHA-256 写进假 release 元数据的
+   `digest` 字段;
+3. 起一个只监听 127.0.0.1 的服务: `/feed` 返回元数据, 其它路径返回载荷;
+4. 写好 `update-sources.txt`: 源 1 是连不上的地址 (用来观察"正在尝试第 N/M 个源"),
+   源 2 指向本机服务;
+5. 打印一条可直接粘贴的启动命令 (带 `BONGO_CAT_UPDATE_FEED_URL` 与 `--storage-root`)。
 
-   点"检查更新"即可看到: 下载进度、当前源、校验、替换、自动重启。
-4. 想让"演练"不替换任何东西, 把假 release 的哈希写成错的: 会走到"校验不通过, 已删除
-   下载文件"的拒绝路径。
+手工做法也一样: 起一个本地 HTTP 服务提供假 release JSON (版本号更高、资产名与
+`BongoCat-<版本>-<平台>-portable.exe` 一致、`digest` 是新文件的真实 SHA-256), 用
+`update-sources.txt` 把下载源指到本机, 然后以副本运行:
+
+```
+set BONGO_CAT_UPDATE_FEED_URL=http://127.0.0.1:8123/feed
+BongoCatTurbo.exe --storage-root=<临时目录副本>
+```
+
+点"检查更新"即可看到: 下载进度、当前源、校验、替换、自动重启。想让演练**不替换**任何
+东西, 把假 release 的哈希写成错的: 会走到"校验不通过, 已删除下载文件"的拒绝路径。
 
 单元/集成测试已经覆盖同样的链路, 不需要联网:
 `ctest -R "update-download|windows-update-self-replace"`。
