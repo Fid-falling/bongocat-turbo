@@ -5,11 +5,16 @@
  * 1. 布局是"能并排就并排, 放不下就换两行"(stacked)。所有宽度都是先把各段量出来
  * 再累加得到的, 加一项就要把它算进 total/actions_width, 否则窄窗口下会被裁掉;
  * 2. 更新按钮是一个多态按钮, 文案和点击行为都由 update_snapshot 的 status 决定
- * (检查中/有新版/商店版/不支持自更新/普通检查)。文案由 update_label 统一给出,
- * 状态判断在这里重复了一次 —— 改动状态语义时两处要一起改。
+ * (检查中/下载中 xx%/校验中/准备重启/有新版/商店版/不支持自更新/普通检查)。文案由
+ * update_label 统一给出, 状态判断在这里重复了一次 —— 改动状态语义时两处要一起改。
  * 3. "查看发布版本"只在 ERROR 时出现: 检查失败后按钮只会重试, 得给用户一条不经过
  * GitHub API 的出路 (限流时 API 打不通, 发布页本身仍能打开)。
  * 版本号用 BONGO_CAT_VERSION_DISPLAY (带构建渠道信息), 不要再拼别的字符串。
+ *
+ * 一键更新的"下载中 -> 校验中 -> 准备重启"三段都体现在这个按钮上: 点击即开始, 百分比
+ * 直接写在按钮文案里; 当前用的源、以及失败原因由 preferences_update_status.c 的状态条
+ * 显示 (用户可能已经切到别的设置页, 那时按钮根本看不见)。
+ * 三段进行中都不接受点击 —— 重复点击不会让下载更快, 只会让用户以为点漏了。
  */
 #include "preferences_about_footer.h"
 #include "preferences_notice.h"
@@ -109,9 +114,18 @@ static void open_update_page(BongoCatPreferences *value) {
 /*
  * 更新按钮。右上角那个小红点是"真有可下载的新版本"的标记 —— 它和按钮文案是两套
  * 判断: 文案可能只写"检查更新", 但有红点就说明点下去会去下载。
- * CHECKING 状态下点击直接返回 (不发第二次请求); 打开商店/发布页失败时把
- * SDL_GetError 一起带上, 否则用户只看到"无法打开"而不知道是系统拒绝了 URL。
+ * 点击语义: 进行中的阶段 (检查/下载/校验/准备重启) 直接返回, 不发第二次请求;
+ * 有新版或上次失败但有版本号时, 走一键更新入口 (Windows 上它就是"下载并替换");
+ * 商店/不支持自更新的平台打开商店或发布页; 其余情况发起一次普通的手动检查。
  */
+/* 一键更新是否正在进行 (界面据此禁用按钮、并让状态条保持可见)。 */
+static bool update_busy(BongoCatUpdateStatus status) {
+    return status == BONGO_CAT_UPDATE_CHECKING ||
+        status == BONGO_CAT_UPDATE_DOWNLOADING ||
+        status == BONGO_CAT_UPDATE_VERIFYING ||
+        status == BONGO_CAT_UPDATE_INSTALLING;
+}
+
 static void draw_update(BongoCatPreferences *value,
     struct nk_context *context, struct nk_command_buffer *canvas,
     struct nk_rect bounds, const char *label, float content_width,
@@ -120,6 +134,7 @@ static void draw_update(BongoCatPreferences *value,
         0, 4, 14, 0, nk_rgba(p.accent.r, p.accent.g, p.accent.b, 89));
     nk_fill_rect(canvas, bounds, 10, p.accent);
     if (snapshot->status == BONGO_CAT_UPDATE_AVAILABLE ||
+            snapshot->status == BONGO_CAT_UPDATE_DOWNLOADING ||
             (snapshot->status == BONGO_CAT_UPDATE_ERROR &&
                 snapshot->release.version[0])) {
         /* Mark the actionable update without obscuring its label. */
@@ -134,11 +149,11 @@ static void draw_update(BongoCatPreferences *value,
         nk_rgb(255, 255, 255));
     link_cursor(context, bounds);
     if (hit(context, bounds)) {
-        if (snapshot->status == BONGO_CAT_UPDATE_CHECKING) return;
+        if (update_busy(snapshot->status)) return;
         if (snapshot->status == BONGO_CAT_UPDATE_AVAILABLE ||
                 (snapshot->status == BONGO_CAT_UPDATE_ERROR &&
                     snapshot->release.version[0])) {
-            if (!bongo_cat_update_refresh_and_open(value->app->update))
+            if (!bongo_cat_update_start(value->app->update))
                 bongo_cat_preferences_notice_show(value->app, tr(value,
                     "native.support.updateFailed",
                     "Unable to check for updates"), true);
@@ -169,12 +184,28 @@ static void draw_releases(BongoCatPreferences *value,
     if (hit(context, bounds)) open_update_page(value);
 }
 
-/* 更新按钮的文案表。buffer 由调用方提供, 因为"更新到 vX.Y.Z"要拼接版本号 */
+/* 更新按钮的文案表。buffer 由调用方提供, 因为"更新到 vX.Y.Z"与"下载中 xx%"都要拼接。
+   进行中的三段共用这里: 下载显示百分比 (服务端没给长度时退化成不带百分比的"下载中"), 
+   校验与准备重启各一句短语 —— 所有文案都不含状态码或英文原文。 */
 static const char *update_label(BongoCatPreferences *value,
     const BongoCatUpdateSnapshot *snapshot, char *buffer, size_t capacity) {
     switch (snapshot->status) {
     case BONGO_CAT_UPDATE_CHECKING:
         return tr(value, "native.support.checkingUpdate", "Checking...");
+    case BONGO_CAT_UPDATE_DOWNLOADING: {
+        unsigned percent = snapshot->total
+            ? (unsigned)((snapshot->downloaded * 100) / snapshot->total) : 0;
+        if (!snapshot->total)
+            return tr(value, "native.support.updateDownloadingUnknown",
+                "Downloading...");
+        snprintf(buffer, capacity, tr(value, "native.support.updateDownloading",
+            "Downloading %u%%"), percent);
+        return buffer;
+    }
+    case BONGO_CAT_UPDATE_VERIFYING:
+        return tr(value, "native.support.updateVerifying", "Verifying...");
+    case BONGO_CAT_UPDATE_INSTALLING:
+        return tr(value, "native.support.updateInstalling", "Restarting...");
     case BONGO_CAT_UPDATE_AVAILABLE:
         snprintf(buffer, capacity, tr(value,
             "native.support.downloadUpdate", "Update to v%s"),

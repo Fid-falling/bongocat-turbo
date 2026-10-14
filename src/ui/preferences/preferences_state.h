@@ -125,6 +125,16 @@ struct BongoCatPreferences {
      * 漏标的表现就是"界面卡住不动"。
      */
     bool render_dirty;
+    /*
+     * 一键更新状态条的"上次画出来的样子": 阶段、已下载字节、当前源序号、是否需手动替换。
+     * 更新进度只存在于 update service 里 (工作线程写), 没有 SDL 事件通知界面, 所以
+     * needs_frame 每帧比对这四个值, 变了才标脏 —— 下载期间的重画次数因此与进度变化同阶,
+     * 而不是每帧一次。
+     */
+    int update_status_seen;
+    uint64_t update_downloaded_seen;
+    unsigned update_source_seen;
+    bool update_manual_seen;
     bool font_reload_pending;
     bool font_reload_defer_once;
     size_t pending_import_name_count;

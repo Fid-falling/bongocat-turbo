@@ -60,6 +60,37 @@ if(BUILD_TESTING)
     bongo_cat_runtime bongo_cat_warnings)
   add_test(NAME log-policy COMMAND bongo_cat_log_policy_tests)
 
+  # 一键更新的下载阶段: 起一个只在 127.0.0.1 监听的假镜像, 验证多源回退/记住可用源/
+  # 哈希不匹配即拒绝。不碰线上资产 (feed 由 BONGO_CAT_UPDATE_FEED_URL 指到本机)。
+  add_executable(bongo_cat_update_download_tests
+    tests/runtime/test_update_download.c)
+  target_include_directories(bongo_cat_update_download_tests PRIVATE
+    ${BONGO_CAT_RUNTIME_INTERNAL_INCLUDE_DIRS} tests/support)
+  target_link_libraries(bongo_cat_update_download_tests PRIVATE
+    bongo_cat_runtime bongo_cat_warnings
+    $<$<PLATFORM_ID:Windows>:ws2_32>)
+  if(WIN32)
+    # CMake 把子项目源文件按 C++ 判断时, tests/runtime 里的 C11 原子需要这个开关
+    target_compile_options(bongo_cat_update_download_tests PRIVATE
+      $<$<C_COMPILER_ID:MSVC>:/experimental:c11atomics>)
+  endif()
+  add_test(NAME update-download COMMAND bongo_cat_update_download_tests)
+  set_tests_properties(update-download PROPERTIES TIMEOUT 180)
+
+  # 自动替换链路 (--apply-update): 等 PID -> 换文件 -> 用新文件重启, 以及校验不通过/目录
+  # 不可写时必须安全失败。全部在临时目录里用构建产物与系统 cmd.exe 扮演新旧版本, 不碰
+  # 用户数据 (见脚本头部)。需要 pwsh: 没装就跳过这条用例, 不影响其它测试。
+  if(WIN32)
+    find_program(BONGO_CAT_PWSH_EXECUTABLE pwsh)
+    if(BONGO_CAT_PWSH_EXECUTABLE)
+      add_test(NAME windows-update-self-replace COMMAND
+        ${BONGO_CAT_PWSH_EXECUTABLE} -NoProfile -File
+        "${CMAKE_CURRENT_SOURCE_DIR}/tests/platform/test_update_self_replace.ps1"
+        -Executable "$<TARGET_FILE:bongo_cat>")
+      set_tests_properties(windows-update-self-replace PROPERTIES TIMEOUT 300)
+    endif()
+  endif()
+
   add_executable(bongo_cat_core_tests
     tests/core/test_main.c
     tests/core/test_config.c

@@ -89,10 +89,36 @@ bool bongo_cat_preferences_visible(const BongoCatPreferences *value) {
 }
 /*
  * 轮询式"还需不需要下一帧", 是事件驱动渲染里唯一允许主动拉帧的地方。
- * 处理两类没有 SDL 事件可依赖的状态变化: 模型加载动画自然到点 (没有任何输入也会
- * 结束), 以及行为页上试听音频的开始/结束 —— 音频状态只有轮询才知道。返回 false
- * 时主循环就不再调 render, 设置窗口这时才真正闲下来 (进而被 release_idle_window 回收)。
+ * 处理三类没有 SDL 事件可依赖的状态变化: 模型加载动画自然到点 (没有任何输入也会
+ * 结束), 行为页上试听音频的开始/结束 (音频状态只有轮询才知道), 以及一键更新的进度
+ * (下载百分比只写在 update service 里)。返回 false 时主循环就不再调 render, 设置窗口
+ * 这时才真正闲下来 (进而被 release_idle_window 回收)。
  */
+/*
+ * 一键更新的进度轮询: 比对"上次画出来的样子", 变了才标脏。
+ * 进行中的阶段 (下载/校验/准备重启) 一律返回 true, 让主循环保持 4ms 级的轮询 —— 否则
+ * 一次长空闲等待会让进度停在半路, 用户以为卡死了。
+ */
+static bool update_frame_pending(BongoCatPreferences *value) {
+    if (!value->app || !value->app->update) return false;
+    BongoCatUpdateSnapshot snapshot;
+    bongo_cat_update_snapshot(value->app->update, &snapshot);
+    bool active = snapshot.status == BONGO_CAT_UPDATE_DOWNLOADING ||
+        snapshot.status == BONGO_CAT_UPDATE_VERIFYING ||
+        snapshot.status == BONGO_CAT_UPDATE_INSTALLING;
+    if ((int)snapshot.status != value->update_status_seen ||
+        snapshot.downloaded != value->update_downloaded_seen ||
+        snapshot.source_index != value->update_source_seen ||
+        snapshot.manual_replace != value->update_manual_seen) {
+        value->update_status_seen = (int)snapshot.status;
+        value->update_downloaded_seen = snapshot.downloaded;
+        value->update_source_seen = snapshot.source_index;
+        value->update_manual_seen = snapshot.manual_replace;
+        value->render_dirty = true;
+    }
+    return active;
+}
+
 bool bongo_cat_preferences_needs_frame(BongoCatPreferences *value) {
     if (!value) return false;
     uint64_t now = SDL_GetTicksNS();
@@ -121,7 +147,8 @@ bool bongo_cat_preferences_needs_frame(BongoCatPreferences *value) {
     if (value->render_retry_ns > now) return false;
     bool raster_due = value->pending_raster_scale > 0.0f &&
         value->raster_retry_ns <= now;
-    return value->render_dirty || raster_due || value->chrome_dragging; }
+    return value->render_dirty || raster_due || value->chrome_dragging ||
+        update_frame_pending(value); }
 /* input_begin/input_end 必须成对包住一次 render: 输入收尾跟着渲染走, 不能提前 return */
 void bongo_cat_preferences_input_begin(BongoCatPreferences *value) {
     if (!value || !value->window || !value->visible || value->input_active) return;

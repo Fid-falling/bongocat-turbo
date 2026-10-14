@@ -3,6 +3,7 @@
 #include "preferences_page_dispatch.h"
 #include "preferences_controls.h"
 #include "preferences_notice.h"
+#include "preferences_update_status.h"
 #include "ui_catime.h"
 #include "ui_animation.h"
 #include "ui_icons.h"
@@ -123,6 +124,9 @@ static bool draw_shell(BongoCatPreferences *value, struct nk_context *context,
     BongoCatUpdateSnapshot update_snapshot;
     bongo_cat_update_snapshot(value->app->update, &update_snapshot);
     bool about_badge = update_snapshot.status == BONGO_CAT_UPDATE_AVAILABLE ||
+        update_snapshot.status == BONGO_CAT_UPDATE_DOWNLOADING ||
+        update_snapshot.status == BONGO_CAT_UPDATE_VERIFYING ||
+        update_snapshot.status == BONGO_CAT_UPDATE_INSTALLING ||
         (update_snapshot.status == BONGO_CAT_UPDATE_ERROR &&
             update_snapshot.release.version[0]);
     bongo_cat_ui_tabs(context, menus, menu_icons, 4, &value->page,
@@ -273,6 +277,7 @@ static bool draw_shell(BongoCatPreferences *value, struct nk_context *context,
     nk_layout_row_end(context);
     context->style.window.fixed_background = nk_style_item_color(p.surface);
     context->style.window.background = p.surface;
+    bongo_cat_preferences_update_status_draw(value, context, width, height);
     bongo_cat_preferences_notice_draw(value, context, width, height);
     bongo_cat_preferences_remove_dialog_draw(value->app, context);
     bongo_cat_preferences_behavior_dialog_draw(value, context);
