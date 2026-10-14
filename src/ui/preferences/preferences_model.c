@@ -11,11 +11,15 @@
  * 又被切回去。所以只标脏, 让下一帧正常画。
  */
 #include "preferences_state.h"
+#include "preferences_internal.h"
 #include "preferences_model_card.h"
 #include "preferences_model_cover.h"
 #include "preferences_notice.h"
 #include "preferences_widgets.h"
 #include "model_import.h"
+#include "ui_animation.h"
+#include "ui_backend.h"
+#include "ui_paint.h"
 #include "bongo_cat/i18n.h"
 #include "bongo_cat/preferences.h"
 
@@ -142,6 +146,17 @@ static void finish_model_load_progress(BongoCatPreferences *value) {
  * 触发一次选择流程, 标志不清就会出现递归。
  * 注意它不重绘 (见函数末尾的英文注释): 只标脏, 由下一帧正常画。
  */
+void bongo_cat_preferences_process_model_hidden(BongoCatPreferences *value) {
+    if (!value || !value->pending_model_hidden_toggle) return;
+    char id[BONGO_CAT_ID_CAP];
+    snprintf(id, sizeof(id), "%s", value->pending_model_id);
+    value->pending_model_hidden_toggle = false;
+    value->pending_model_id[0] = '\0';
+    bool hidden = bongo_cat_settings_model_hidden(&value->app->settings, id);
+    bongo_cat_settings_set_model_hidden(&value->app->settings, id, !hidden);
+    value->render_dirty = true;
+}
+
 void bongo_cat_preferences_process_model_selection(BongoCatPreferences *value) {
     if (!value || !value->model_selection_pending || value->model_loading)
         return;
@@ -260,9 +275,70 @@ static void draw_models(BongoCatPreferences *value,
  * 列数按内容宽度而不是窗口宽度算, 因为侧栏宽度本身也随宽度变化。
  * 卡片间距是临时改的全局样式, 用完必须还原 (Nuklear 没有样式作用域)。
  */
+/*
+ * 模型页顶部的分段标签 (类型 X 的模型商店): "模型" 是商店/网格, "随机" 收纳
+ * 随机表情/随机动作/顺序切换。点某个标签只登记 model_page_tab 并让滚动回顶,
+ * 内容切换在 page_model 里按标签分发, 不触发嵌套渲染。
+ */
+static void model_page_centered(struct nk_command_buffer *canvas,
+    struct nk_rect bounds, const char *text, const struct nk_user_font *font,
+    struct nk_color color) {
+    float width = font->width(font->userdata, font->height, text,
+        nk_strlen(text));
+    nk_draw_text(canvas, nk_rect(bounds.x + (bounds.w - width) * .5f,
+        bounds.y + (bounds.h - font->height) * .5f, width + 1, font->height),
+        text, nk_strlen(text), font, nk_rgba(0, 0, 0, 0), color);
+}
+
+static void model_page_segments(BongoCatPreferences *value,
+    struct nk_context *context) {
+    BongoCatApp *app = value->app;
+    const char *labels[2] = {
+        tr(app, "pages.preference.model.tabs.models", "Models"),
+        tr(app, "pages.preference.model.tabs.random", "Random")};
+    int count = 2;
+    nk_layout_row_dynamic(context, 44, 1);
+    struct nk_rect wrapper;
+    nk_widget(&wrapper, context);
+    BongoCatUIPalette p = bongo_cat_ui_palette(bongo_cat_ui_dark(context));
+    struct nk_command_buffer *canvas = nk_window_get_canvas(context);
+    nk_fill_rect(canvas, wrapper, 10, p.field);
+    float width = (wrapper.w - 6) / (float)count;
+    for (int i = 0; i < count; ++i) {
+        struct nk_rect button = nk_rect(wrapper.x + 3 + width * i,
+            wrapper.y + 3, width, wrapper.h - 6);
+        bool hover = nk_input_is_mouse_hovering_rect(&context->input, button);
+        char id[32]; snprintf(id, sizeof(id), "model-tab-%d", i);
+        float active = bongo_cat_ui_animate_eased(context, id,
+            value->model_page_tab == i ? 1.0f : 0.0f, 200,
+            BONGO_CAT_UI_EASE_STANDARD);
+        struct nk_color background = bongo_cat_ui_color_mix(
+            hover ? p.hover : p.field, p.accent, active);
+        if (active > .01f && p.effects) bongo_cat_ui_paint_shadow(context,
+            button, 8, 0, 2, 10, 0,
+            nk_rgba(p.accent.r, p.accent.g, p.accent.b, 89));
+        nk_fill_rect(canvas, button, 8, background);
+        model_page_centered(canvas, button, labels[i], value->ui.caption_font,
+            bongo_cat_ui_color_mix(p.muted, nk_rgb(255, 255, 255), active));
+        if (hover) bongo_cat_ui_cursor_hover_rect(context, button,
+            BONGO_CAT_UI_CURSOR_POINTER);
+        if (hover && nk_input_is_mouse_click_in_rect(&context->input,
+            NK_BUTTON_LEFT, button) && value->model_page_tab != i) {
+            value->model_page_tab = i;
+            value->scroll_target[1] = 0.0f;
+            value->render_dirty = true;
+        }
+    }
+}
+
 void bongo_cat_preferences_page_model(BongoCatPreferences *value,
     struct nk_context *context) {
     BongoCatApp *app = value->app;
+    model_page_segments(value, context);
+    if (value->model_page_tab != 0) {
+        bongo_cat_preferences_page_model_random(value, context);
+        return;
+    }
     smoke_model_behavior(value);
     bongo_cat_preferences_model_covers_begin(app);
     bool multiple = app->settings.model.multiple_pets;

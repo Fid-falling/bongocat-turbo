@@ -29,6 +29,10 @@
           "windowCorners": "Esquinas redondeadas (%)",
           "opacity": "Opacidad",
           "randomExpression": "Expresiones aleatorias",
+          "secondsUnit": "s",
+          "randomSettings": "Aleatorio",
+          "randomMotion": "Movimientos aleatorios",
+          "sequentialModel": "Modelos secuenciales",
           "obsBackground": "Fondo sólido",
           "hideOnHover": "Ocultar al pasar el ratón",
           "hideFadeSeconds": "Duración del fundido (s)",
@@ -47,6 +51,9 @@
         },
         "hints": {
         "rendererRestart": "Ajuste guardado. Reinicia BongoCat manualmente para aplicarlo.",
+        "randomExpression": "Cambia aleatoriamente la expresión a intervalos fijados. Usa el botón de ajustes para elegir las expresiones participantes.",
+        "randomMotion": "Activa un movimiento aleatorio a intervalos fijados. Usa el botón de ajustes para elegir los movimientos participantes.",
+        "sequentialModel": "Cambia de modelo en orden a intervalos fijados. Usa el botón de ajustes para reordenar modelos en la página de Modelos.",
         "rendererRestarting": "Reiniciando BongoCat para aplicar el nuevo motor de renderizado...",
         "supersample": "Se ajusta al tamaño de la ventana para ahorrar",
           "hoverUnavailable": "Ocultar al pasar el cursor no está disponible en el entorno de escritorio actual.",
@@ -127,6 +134,10 @@
         "title": "Modelo",
         "nearbyTitle": "Modelos cercanos",
         "builtinsTitle": "Modelos integrados",
+        "tabs": {
+          "models": "Modelos",
+          "random": "Aleatorio"
+        },
         "labels": {
           "deleteModel": "Eliminar modelo"
         },
@@ -160,6 +171,7 @@
             "motion": "Movimiento",
             "expression": "Expresión",
             "audio": "Audio",
+            "switch": "Cambiar",
             "stopAllAudio": "Detener todo el audio",
             "motionIndex": "Movimiento {index}",
             "motionGroupIndex": "Grupo de movimientos {index}",

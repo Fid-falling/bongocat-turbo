@@ -304,6 +304,7 @@ void bongo_cat_preferences_model_card(BongoCatPreferences *value,
     bool action_hover = false;
     draw_actions(value, context, canvas, bounds, entry, p, selected, primary,
         storage_busy, &action_hover);
+    bool blocked = action_hover;
     float outline_width = 1.0f + selection_amount;
     struct nk_rect outline = bongo_cat_preferences_model_card_outline_bounds(
         bounds, outline_width);
@@ -318,10 +319,10 @@ void bongo_cat_preferences_model_card(BongoCatPreferences *value,
         outline_width, outline_color);
     bongo_cat_preferences_model_card_draw_progress(canvas, outline,
         14.0f - outline_width * .5f, 2.0f, progress, p.pink);
-    if (!name_hover && (action_hover || hover))
+    if (!name_hover && (blocked || hover))
         bongo_cat_ui_cursor_hover_rect(context, bounds,
             BONGO_CAT_UI_CURSOR_POINTER);
-    if (!name_hover && !action_hover && hover &&
+    if (!name_hover && !blocked && hover &&
         nk_input_is_mouse_click_in_rect(&context->input,
             NK_BUTTON_LEFT, bounds))
         bongo_cat_preferences_model_select(value, entry);

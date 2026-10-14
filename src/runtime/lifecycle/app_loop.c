@@ -250,6 +250,8 @@ void bongo_cat_app_loop(BongoCatApp *app) {
         bongo_cat_window_snapshot_update(app, now);
         bongo_cat_multi_pet_update(app, now);
         bongo_cat_random_expression_update(app, now);
+        bongo_cat_random_motion_update(app, now);
+        bongo_cat_sequential_model_update(app, now);
         bongo_cat_audio_update(app->audio);
         bongo_cat_window_update_display_recovery(app, now);
         bongo_cat_window_update_inertia(app, now);
@@ -271,6 +273,8 @@ void bongo_cat_app_loop(BongoCatApp *app) {
         /* 渲染两次是刻意的: 设置窗口的渲染与"选模型"处理会改动应用状态并置脏, 第二遍
            只处理这种刚被改脏的情况 (不脏就不会重画)。 */
         bongo_cat_preferences_process_model_selection(app->preferences);
+        bongo_cat_preferences_process_model_hidden(app->preferences);
+        bongo_cat_preferences_process_behavior_toggle(app->preferences);
         if (app->session.window.visible && !app->window_minimized && app->dirty)
             render(app, true);
         bongo_cat_tray_sync(app->tray);

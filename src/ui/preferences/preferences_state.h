@@ -54,6 +54,7 @@ enum BongoCatOptionsSection {
     BONGO_CAT_OPTIONS_MODEL,
     BONGO_CAT_OPTIONS_APPLICATION,
     BONGO_CAT_OPTIONS_APPEARANCE,
+    BONGO_CAT_OPTIONS_RANDOM,
     BONGO_CAT_OPTIONS_SECTION_COUNT
 };
 
@@ -140,6 +141,8 @@ struct BongoCatPreferences {
     bool model_selection_pending;
     bool pending_model_multiple;
     bool pending_model_active;
+    bool pending_model_hidden_toggle;
+    bool pending_behavior_toggle;
     bool model_loading;
     bool model_load_visual_active;
     float model_load_progress;
@@ -149,6 +152,7 @@ struct BongoCatPreferences {
     uint64_t model_load_visual_completion_ns;
     char pending_model_id[BONGO_CAT_ID_CAP];
     char loading_model_id[BONGO_CAT_ID_CAP];
+    char pending_behavior_id[BONGO_CAT_BEHAVIOR_ID_CAP];
     char model_load_visual_id[BONGO_CAT_ID_CAP];
     uint64_t last_render_ns;
     uint64_t shown_ns;
@@ -177,10 +181,12 @@ struct BongoCatPreferences {
     bool behavior_dialog;
     bool behavior_dialog_input_armed;
     int behavior_tab;
+    int model_page_tab;
     uint64_t behavior_dialog_opened_ns;
     uint64_t behavior_dialog_closing_ns;
     uint64_t behavior_tab_transition_ns;
-    float behavior_scroll[3];
+    /* 0=动作 1=表情 2=声音 3=切换参与(每个模型的 switch:<id> 勾选)。 */
+    float behavior_scroll[4];
     bool behavior_audio_playing[BONGO_CAT_BEHAVIOR_CAP];
     BongoCatPreferencesScrollbar behavior_scrollbar;
     BongoCatPreferencesTextSession behavior_rename;
@@ -254,6 +260,8 @@ void bongo_cat_preferences_assets_load(BongoCatPreferences *value);
 void bongo_cat_preferences_support_assets_load(BongoCatPreferences *value);
 void bongo_cat_preferences_support_assets_clear(BongoCatPreferences *value);
 void bongo_cat_preferences_process_model_selection(BongoCatPreferences *value);
+void bongo_cat_preferences_process_model_hidden(BongoCatPreferences *value);
+void bongo_cat_preferences_process_behavior_toggle(BongoCatPreferences *value);
 void bongo_cat_preferences_model_visual_begin(BongoCatPreferences *value,
     const char *model_id);
 void bongo_cat_preferences_model_load_progress(BongoCatPreferences *value,

@@ -28,6 +28,10 @@ void bongo_cat_preferences_render(BongoCatPreferences *preferences);
 void bongo_cat_preferences_invalidate(BongoCatPreferences *preferences);
 void bongo_cat_preferences_process_model_selection(
     BongoCatPreferences *preferences);
+void bongo_cat_preferences_process_model_hidden(
+    BongoCatPreferences *preferences);
+void bongo_cat_preferences_process_behavior_toggle(
+    BongoCatPreferences *preferences);
 void bongo_cat_preferences_model_load_progress(
     BongoCatPreferences *preferences, float progress);
 void bongo_cat_preferences_models_changed(BongoCatPreferences *preferences);

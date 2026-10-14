@@ -29,6 +29,10 @@
           "windowCorners": "Coins arrondis (%)",
           "opacity": "Opacité",
           "randomExpression": "Expressions aléatoires",
+          "secondsUnit": "s",
+          "randomSettings": "Aléatoire",
+          "randomMotion": "Mouvements aléatoires",
+          "sequentialModel": "Modèles séquentiels",
           "obsBackground": "Arrière-plan uni",
           "hideOnHover": "Masquer au survol",
           "hideFadeSeconds": "Durée du fondu (s)",
@@ -47,6 +51,9 @@
         },
         "hints": {
         "rendererRestart": "Réglage enregistré. Redémarrez BongoCat manuellement pour l'appliquer.",
+        "randomExpression": "Change d'expression aléatoirement à intervalle réglé. Utilisez le bouton de réglage pour choisir les expressions participantes.",
+        "randomMotion": "Déclenche un mouvement aléatoire à intervalle réglé. Utilisez le bouton de réglage pour choisir les mouvements participants.",
+        "sequentialModel": "Change de modèle en ordre à intervalle réglé. Utilisez le bouton de réglage pour réordonner les modèles sur la page Modèles.",
         "rendererRestarting": "Redémarrage de BongoCat pour appliquer le nouveau moteur de rendu...",
         "supersample": "S'adapte à la taille de la fenêtre pour économiser",
           "hoverUnavailable": "Le masquage au survol est indisponible dans cet environnement de bureau.",
@@ -127,6 +134,10 @@
         "title": "Modèle",
         "nearbyTitle": "Modèles à proximité",
         "builtinsTitle": "Modèles intégrés",
+        "tabs": {
+          "models": "Modèles",
+          "random": "Aléatoire"
+        },
         "labels": {
           "deleteModel": "Supprimer le modèle"
         },
@@ -160,6 +171,7 @@
             "motion": "Mouvement",
             "expression": "Expression",
             "audio": "Audio",
+            "switch": "Changer",
             "stopAllAudio": "Arrêter tous les sons",
             "motionIndex": "Mouvement {index}",
             "motionGroupIndex": "Groupe de mouvements {index}",

@@ -29,6 +29,10 @@
           "windowCorners": "ウィンドウの角丸 (%)",
           "opacity": "不透明度",
           "randomExpression": "ランダム表情",
+          "secondsUnit": "秒",
+          "randomSettings": "ランダム",
+          "randomMotion": "ランダムモーション",
+          "sequentialModel": "順次モデル",
           "obsBackground": "単色背景",
           "hideOnHover": "ホバー時に非表示",
           "hideFadeSeconds": "フェード時間 (秒)",
@@ -47,6 +51,9 @@
         },
         "hints": {
         "rendererRestart": "設定を保存しました。反映するには BongoCat を手動で再起動してください。",
+        "randomExpression": "設定した間隔で表情をランダムに切り替えます。設定ボタンで参加する表情を選べます。",
+        "randomMotion": "設定した間隔でモーションをランダムに再生します。設定ボタンで参加するモーションを選べます。",
+        "sequentialModel": "設定した間隔でモデルを順番に切り替えます。設定ボタンでモデルページの順番を調整できます。",
         "rendererRestarting": "新しいレンダラーバックエンドを適用するため BongoCat を再起動しています...",
         "supersample": "自動ではウィンドウの大きさに合わせて調整し、負担を減らします",
           "hoverUnavailable": "現在のデスクトップ環境では、マウスを重ねて非表示にする機能は利用できません。",
@@ -127,6 +134,10 @@
         "title": "モデル",
         "nearbyTitle": "近くのモデル",
         "builtinsTitle": "組み込みモデル",
+        "tabs": {
+          "models": "モデル",
+          "random": "ランダム"
+        },
         "labels": {
           "deleteModel": "モデルを削除"
         },
@@ -160,6 +171,7 @@
             "motion": "モーション",
             "expression": "表情",
             "audio": "音声",
+            "switch": "切り替え",
             "stopAllAudio": "すべての音声を停止",
             "motionIndex": "モーション {index}",
             "motionGroupIndex": "モーショングループ {index}",

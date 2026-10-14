@@ -106,6 +106,8 @@ static bool read_window(yyjson_val *object, BongoCatWindowPreferences *value,
             error) ||
         !read_bool(object, "randomExpression", &value->random_expression,
             error) ||
+        !read_bool(object, "randomMotion", &value->random_motion, error) ||
+        !read_bool(object, "sequentialModel", &value->sequential_model, error) ||
         !read_bool(object, "roundedCorners", &value->rounded_corners, error) ||
         !read_float(object, "cornerRadiusPercent", &value->corner_radius_percent,
             error) ||
@@ -115,7 +117,11 @@ static bool read_window(yyjson_val *object, BongoCatWindowPreferences *value,
             error) ||
         !read_float(object, "randomExpressionIntervalSeconds",
             &value->random_expression_interval_seconds,
-            error)) return false;
+            error) ||
+        !read_float(object, "randomMotionIntervalSeconds",
+            &value->random_motion_interval_seconds, error) ||
+        !read_float(object, "sequentialModelIntervalSeconds",
+            &value->sequential_model_interval_seconds, error)) return false;
     const char *color;
     size_t length;
     if (!read_string(object, "captureBackgroundColor", &color, &length,
@@ -252,6 +258,54 @@ static bool read_removed_models(yyjson_val *array, BongoCatSettings *settings,
     return true;
 }
 
+/* hiddenModels / randomDisabled 与 removedModels 同一条数组约定: 数组整体缺省属
+   正常情况直接成功; 存在则先清零 count 再逐项填充; 超限一律报错不截断。 */
+static bool read_hidden_models(yyjson_val *array, BongoCatSettings *settings,
+    BongoCatError *error) {
+    if (!array) return true;
+    if (yyjson_arr_size(array) > BONGO_CAT_MODEL_CAP)
+        return type_error(error, "hiddenModels", "a smaller array");
+    settings->hidden_model_count = 0;
+    size_t index, count;
+    yyjson_val *item;
+    yyjson_arr_foreach(array, index, count, item) {
+        const char *id = yyjson_get_str(item);
+        size_t length = yyjson_get_len(item);
+        if (!yyjson_is_str(item) || !id || !length || strlen(id) != length)
+            return type_error(error, "hiddenModels[]",
+                "a non-empty string without embedded nulls");
+        BongoCatRemovedModel *entry =
+            &settings->hidden_models[settings->hidden_model_count++];
+        memset(entry, 0, sizeof(*entry));
+        if (!copy_text(entry->id, sizeof(entry->id), id, length,
+                "hiddenModels[]", error)) return false;
+    }
+    return true;
+}
+
+static bool read_random_disabled(yyjson_val *array, BongoCatSettings *settings,
+    BongoCatError *error) {
+    if (!array) return true;
+    if (yyjson_arr_size(array) > BONGO_CAT_RANDOM_DISABLED_CAP)
+        return type_error(error, "randomDisabled", "a smaller array");
+    settings->random_disabled_count = 0;
+    size_t index, count;
+    yyjson_val *item;
+    yyjson_arr_foreach(array, index, count, item) {
+        const char *id = yyjson_get_str(item);
+        size_t length = yyjson_get_len(item);
+        if (!yyjson_is_str(item) || !id || !length || strlen(id) != length)
+            return type_error(error, "randomDisabled[]",
+                "a non-empty string without embedded nulls");
+        char *entry = settings->random_disabled[
+            settings->random_disabled_count++];
+        memset(entry, 0, BONGO_CAT_BEHAVIOR_ID_CAP);
+        if (!copy_text(entry, BONGO_CAT_BEHAVIOR_ID_CAP, id, length,
+                "randomDisabled[]", error)) return false;
+    }
+    return true;
+}
+
 /*
  * extensions 是留给"未来版本或其它工具"写的未知子树: 这里把它原样序列化成
  * 文本存进 settings->extensions_json, 下次保存时再写回文件, 于是老版本读写
@@ -304,6 +358,8 @@ BongoCatResult bongo_cat_settings_load(const char *path,
     yyjson_val *behaviors = NULL;
     yyjson_val *models = NULL;
     yyjson_val *removed_models = NULL;
+    yyjson_val *hidden_models = NULL;
+    yyjson_val *random_disabled = NULL;
     yyjson_val *extensions_value = NULL;
     bool valid = read_object(root, "rendering", &model, error) &&
         read_object(root, "window", &window, error) &&
@@ -312,6 +368,8 @@ BongoCatResult bongo_cat_settings_load(const char *path,
         read_array(root, "behaviorOverrides", &behaviors, error) &&
         read_array(root, "modelOverrides", &models, error) &&
         read_array(root, "removedModels", &removed_models, error) &&
+        read_array(root, "hiddenModels", &hidden_models, error) &&
+        read_array(root, "randomDisabled", &random_disabled, error) &&
         read_value(root, "extensions", &extensions_value, error) &&
         (!model || read_model(model, &loaded.model, error)) &&
         (!window || read_window(window, &loaded.window, error)) &&
@@ -319,7 +377,9 @@ BongoCatResult bongo_cat_settings_load(const char *path,
         (!shortcuts || read_shortcuts(shortcuts, &loaded.shortcuts, error)) &&
         read_behaviors(behaviors, &loaded, error) &&
         read_model_labels(models, &loaded, error) &&
-        read_removed_models(removed_models, &loaded, error);
+        read_removed_models(removed_models, &loaded, error) &&
+        read_hidden_models(hidden_models, &loaded, error) &&
+        read_random_disabled(random_disabled, &loaded, error);
     /* cache_path is optional; missing means the platform default is used. */
     valid = valid && read_text(root, "cachePath", loaded.cache_root,
         sizeof(loaded.cache_root), error);

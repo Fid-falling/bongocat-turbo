@@ -29,6 +29,10 @@
           "windowCorners": "視窗圓角 (%)",
           "opacity": "不透明度",
           "randomExpression": "隨機表情",
+          "secondsUnit": "秒",
+          "randomSettings": "隨機",
+          "randomMotion": "隨機動作",
+          "sequentialModel": "順序模型",
           "obsBackground": "純色背景",
           "hideOnHover": "滑鼠游標移入隱藏",
           "hideFadeSeconds": "隱藏漸變時長 (秒)",
@@ -47,6 +51,9 @@
         },
         "hints": {
         "rendererRestart": "設定已儲存，請手動重新啟動 BongoCat 才會生效。",
+        "randomExpression": "在設定的間隔隨機切換表情。按說明右側的設定按鈕，選擇參與的表情。",
+        "randomMotion": "在設定的間隔隨機觸發動作。按說明右側的設定按鈕，選擇參與的動作。",
+        "sequentialModel": "在設定的間隔依序切換模型。按說明右側的設定按鈕，到模型頁調整輪換順序。",
         "rendererRestarting": "正在重新啟動 BongoCat 以套用新的渲染後端...",
         "supersample": "自動時會依視窗大小調整, 更省資源",
           "hoverUnavailable": "目前桌面環境暫不支援滑鼠移入隱藏。",
@@ -127,6 +134,10 @@
         "title": "模型",
         "nearbyTitle": "附近模型",
         "builtinsTitle": "內建模型",
+        "tabs": {
+          "models": "模型",
+          "random": "隨機"
+        },
         "labels": {
           "deleteModel": "刪除模型"
         },
@@ -160,6 +171,7 @@
             "motion": "動作",
             "expression": "表情",
             "audio": "音訊",
+            "switch": "切換",
             "stopAllAudio": "停止所有音訊",
             "motionIndex": "動作{index}",
             "motionGroupIndex": "動作組{index}",

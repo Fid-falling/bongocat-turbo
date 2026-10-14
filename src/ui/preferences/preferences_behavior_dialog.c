@@ -61,6 +61,8 @@ static bool matches(const BongoCatPreferences *value,
 
 /* 声音那一档要求 sound[0] 非空: sound_clear 类型的条目本身没有文件名, 列出来也没得改 */
 static bool tab_available(const BongoCatPreferences *value, int tab) {
+    /* 切换参与这一档: 只要目录里还有别的模型就显示 (哪怕只剩一个也会列出)。 */
+    if (tab == 3) return value->app->models.count > 0;
     for (size_t i = 0; i < value->app->behaviors.count; ++i) {
         const BongoCatBehaviorEntry *entry = &value->app->behaviors.entries[i];
         if (matches(value, entry, tab) && (tab != 2 || entry->sound[0])) return true;
@@ -71,6 +73,7 @@ static bool tab_available(const BongoCatPreferences *value, int tab) {
 /* 当前 tab 的行数。面板高度是用它算出来的, 所以必须在画面板之前就能拿到 (见 draw) */
 static size_t row_count(const BongoCatPreferences *value) {
     if (!tab_available(value, value->behavior_tab)) return 0;
+    if (value->behavior_tab == 3) return value->app->models.count;
     size_t count = 0;
     for (size_t i = 0; i < value->app->behaviors.count; ++i)
         if (matches(value, &value->app->behaviors.entries[i],
@@ -137,12 +140,13 @@ static void draw_segments(BongoCatPreferences *value,
     const char *labels[] = {tr(value,
         "pages.preference.model.behaviorModal.labels.motion", "Motions"), tr(value,
         "pages.preference.model.behaviorModal.labels.expression", "Expressions"), tr(value,
-        "pages.preference.model.behaviorModal.labels.audio", "Audio")};
+        "pages.preference.model.behaviorModal.labels.audio", "Audio"), tr(value,
+        "pages.preference.model.behaviorModal.labels.switch", "Switch")};
     int count = 0, position = 0;
-    for (int i = 0; i < 3; ++i) count += tab_available(value, i);
+    for (int i = 0; i < 4; ++i) count += tab_available(value, i);
     if (!count) return;
     float width = (wrapper.w - 6) / count;
-    for (int i = 0; i < 3; ++i) {
+    for (int i = 0; i < 4; ++i) {
         if (!tab_available(value, i)) continue;
         struct nk_rect button = nk_rect(wrapper.x + 3 + width * position++,
             wrapper.y + 3, width, 37);
@@ -170,6 +174,48 @@ static void draw_segments(BongoCatPreferences *value,
             value->behavior_tab_transition_ns = SDL_GetTicksNS();
             bongo_cat_preferences_shortcut_cancel(value);
         }
+    }
+}
+
+/*
+ * 切换参与的一行: 一个复选框 + 目标模型名。勾选 = 参与顺序/随机切换 (默认)。
+ * 判定走 "switch:<模型id>" 这个合成行为 id 在参与集合里的排他名单 (random_disabled):
+ * 未在名单 = 参与 (勾选); 在名单 = 不参与 (取消勾选)。点一下就在两个状态间切换。
+ */
+static void draw_switch_row(BongoCatPreferences *value,
+    struct nk_context *context, struct nk_command_buffer *canvas,
+    struct nk_rect row, const BongoCatModelEntry *entry,
+    BongoCatUIPalette p, float opacity, bool enabled) {
+    char switch_id[BONGO_CAT_BEHAVIOR_ID_CAP];
+    snprintf(switch_id, sizeof(switch_id), "switch:%s", entry->id);
+    bool participating = !bongo_cat_settings_random_disabled(
+        &value->app->settings, switch_id);
+    struct nk_rect checkbox = nk_rect(row.x + 14, row.y + 14, 28, 28);
+    bool hover = enabled && nk_input_is_mouse_hovering_rect(
+        &context->input, row);
+    nk_fill_rect(canvas, checkbox, 8, alpha(hover ? p.hover : p.field, opacity));
+    nk_stroke_rect(canvas, checkbox, 8, 1, alpha(participating ? p.accent :
+        (hover ? p.accent : p.border_subtle), opacity));
+    if (participating) bongo_cat_preferences_icon_draw(value, canvas,
+        BONGO_CAT_UI_ICON_CHECK, nk_rect(row.x + 19, row.y + 19, 18, 18),
+        alpha(p.accent, opacity));
+
+    const char *label = bongo_cat_settings_model_label(
+        &value->app->settings, entry->id);
+    const char *name = (label && label[0]) ? label :
+        (entry->display_name[0] ? entry->display_name : entry->id);
+    text(canvas, nk_rect(row.x + 56, row.y + 14, row.w - 70, 28), name,
+        value->ui.caption_font,
+        alpha(participating ? p.text : p.muted, opacity));
+    if (hover) bongo_cat_ui_cursor_hover_rect(context, row,
+        BONGO_CAT_UI_CURSOR_POINTER);
+    if (hit(context, row, enabled)) {
+        /* 点开的是 switch:<id> 的参与位, 反转它。只登记 pending, 由
+           process_behavior_toggle 在两次渲染之间翻转一次。 */
+        snprintf(value->pending_behavior_id,
+            sizeof(value->pending_behavior_id), "%s", switch_id);
+        value->pending_behavior_toggle = true;
+        value->render_dirty = true;
     }
 }
 
@@ -218,15 +264,26 @@ static void draw_rows(BongoCatPreferences *value, struct nk_context *context,
     }
     nk_push_scissor(canvas, viewport);
     size_t shown = 0;
-    for (size_t i = 0; i < value->app->behaviors.count; ++i) {
-        BongoCatBehaviorEntry *entry = &value->app->behaviors.entries[i];
-        if (!matches(value, entry, value->behavior_tab)) continue;
-        struct nk_rect row = nk_rect(viewport.x,
-            viewport.y + shown++ * 56.0f - render_offset, row_width, 56);
-        if (row.y + row.h >= viewport.y && row.y <= viewport.y + viewport.h)
-            bongo_cat_preferences_behavior_row_draw(value, context, canvas,
-                row, entry, p,
-                content_opacity, enabled);
+    if (value->behavior_tab == 3) {
+        for (size_t i = 0; i < value->app->models.count; ++i) {
+            const BongoCatModelEntry *entry = &value->app->models.entries[i];
+            struct nk_rect row = nk_rect(viewport.x,
+                viewport.y + shown++ * 56.0f - render_offset, row_width, 56);
+            if (row.y + row.h >= viewport.y && row.y <= viewport.y + viewport.h)
+                draw_switch_row(value, context, canvas, row, entry, p,
+                    content_opacity, enabled);
+        }
+    } else {
+        for (size_t i = 0; i < value->app->behaviors.count; ++i) {
+            BongoCatBehaviorEntry *entry = &value->app->behaviors.entries[i];
+            if (!matches(value, entry, value->behavior_tab)) continue;
+            struct nk_rect row = nk_rect(viewport.x,
+                viewport.y + shown++ * 56.0f - render_offset, row_width, 56);
+            if (row.y + row.h >= viewport.y && row.y <= viewport.y + viewport.h)
+                bongo_cat_preferences_behavior_row_draw(value, context, canvas,
+                    row, entry, p,
+                    content_opacity, enabled);
+        }
     }
     nk_push_scissor(canvas, nk_window_get_content_region(context));
     if (!shown) centered(canvas, viewport, tr(value, "native.noBehaviors",
@@ -245,7 +302,7 @@ void bongo_cat_preferences_behavior_dialog_draw(
     BongoCatPreferences *value, struct nk_context *context) {
     if (!bongo_cat_preferences_behavior_dialog_active(value)) return;
     if (!tab_available(value, value->behavior_tab))
-        for (int i = 0; i < 3; ++i) if (tab_available(value, i)) {
+        for (int i = 0; i < 4; ++i) if (tab_available(value, i)) {
             value->behavior_tab = i; break;
         }
     bongo_cat_ui_cursor_reset(context);
@@ -280,4 +337,19 @@ void bongo_cat_preferences_behavior_dialog_draw(
         !nk_input_is_mouse_hovering_rect(&context->input, frame.panel);
     if (close || outside) bongo_cat_preferences_behavior_dialog_close(value);
     if (frame.visibility < 1.0f || closing) value->render_dirty = true;
+}
+
+/* 帧末处理"行为参与开关"的 pending 请求: 设置窗口会一帧画两次, 直接翻转
+   random_disabled 会被第二次渲染重放再翻回去, 所以只在两次渲染之间翻转一次。 */
+void bongo_cat_preferences_process_behavior_toggle(BongoCatPreferences *value) {
+    if (!value || !value->pending_behavior_toggle) return;
+    char id[BONGO_CAT_BEHAVIOR_ID_CAP];
+    snprintf(id, sizeof(id), "%s", value->pending_behavior_id);
+    value->pending_behavior_toggle = false;
+    value->pending_behavior_id[0] = '\0';
+    bool disabled = bongo_cat_settings_random_disabled(&value->app->settings,
+        id);
+    bongo_cat_settings_set_random_disabled(&value->app->settings, id,
+        !disabled);
+    value->render_dirty = true;
 }

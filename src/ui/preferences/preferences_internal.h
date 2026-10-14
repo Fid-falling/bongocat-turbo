@@ -19,6 +19,8 @@ void bongo_cat_preferences_page_settings(BongoCatPreferences *value,
     struct nk_context *context);
 void bongo_cat_preferences_page_model(BongoCatPreferences *value,
     struct nk_context *context);
+void bongo_cat_preferences_page_model_random(BongoCatPreferences *value,
+    struct nk_context *context);
 bool bongo_cat_preferences_behavior_dialog_active(
     const BongoCatPreferences *value);
 void bongo_cat_preferences_behavior_dialog_open(

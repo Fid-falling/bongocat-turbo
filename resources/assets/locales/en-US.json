@@ -29,6 +29,10 @@
           "windowCorners": "Window Corners (%)",
           "opacity": "Opacity",
           "randomExpression": "Random Expressions",
+          "secondsUnit": "s",
+          "randomSettings": "Random",
+          "randomMotion": "Random Motions",
+          "sequentialModel": "Sequential Models",
           "obsBackground": "Solid Background",
           "hideOnHover": "Hide on Hover",
           "hideFadeSeconds": "Fade Duration (s)",
@@ -47,6 +51,9 @@
         },
         "hints": {
         "rendererRestart": "Setting saved. Restart BongoCat manually to apply it.",
+        "randomExpression": "Pick a random expression at the set interval. Use the settings button to choose participating expressions.",
+        "randomMotion": "Trigger a random motion at the set interval. Use the settings button to choose participating motions.",
+        "sequentialModel": "Switch models in order at the set interval. Use the settings button to reorder models on the Model page.",
         "rendererRestarting": "Restarting BongoCat to apply the new render backend...",
         "supersample": "Adjusts itself to the window size to save resources",
           "hoverUnavailable": "Hover hiding is unavailable in the current desktop environment.",
@@ -127,6 +134,10 @@
         "title": "Model",
         "nearbyTitle": "Nearby models",
         "builtinsTitle": "Built-in models",
+        "tabs": {
+          "models": "Models",
+          "random": "Random"
+        },
         "labels": {
           "deleteModel": "Delete Model"
         },
@@ -160,6 +171,7 @@
             "motion": "Motion",
             "expression": "Expression",
             "audio": "Audio",
+            "switch": "Switch",
             "stopAllAudio": "Stop all audio",
             "motionIndex": "Motion {index}",
             "motionGroupIndex": "Motion Group {index}",

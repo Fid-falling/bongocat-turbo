@@ -23,6 +23,10 @@ bool bongo_cat_pref_toggle(struct nk_context *context, const char *id,
 bool bongo_cat_pref_toggle_float(struct nk_context *context, const char *id,
     const char *title, bool *enabled, float minimum, float *value,
     float maximum, float step, float default_value);
+bool bongo_cat_pref_toggle_float_config(struct nk_context *context,
+    const char *id, const char *title, const char *unit, bool *enabled,
+    float minimum, float *value, float maximum, float step,
+    float default_value, const char *detail, bool *config_clicked);
 bool bongo_cat_pref_toggle_slider(struct nk_context *context, const char *id,
     const char *title, const char *description, bool *enabled,
     float minimum, float *value, float maximum, float step,

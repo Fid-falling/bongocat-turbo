@@ -29,6 +29,10 @@
           "windowCorners": "Fensterrundung (%)",
           "opacity": "Deckkraft",
           "randomExpression": "Zufällige Ausdrücke",
+          "secondsUnit": "Sek.",
+          "randomSettings": "Zufall",
+          "randomMotion": "Zufällige Bewegungen",
+          "sequentialModel": "Sequenzielle Modelle",
           "obsBackground": "Einfarbiger Hintergrund",
           "hideOnHover": "Beim Darüberfahren ausblenden",
           "hideFadeSeconds": "Ausblendedauer (s)",
@@ -47,6 +51,9 @@
         },
         "hints": {
         "rendererRestart": "Einstellung gespeichert. Bitte BongoCat manuell neu starten, um sie anzuwenden.",
+        "randomExpression": "Wechselt in eingestellten Abständen zufällig den Ausdruck. Wählen Sie mit der Einstell-Schaltfläche die teilnehmenden Ausdrücke.",
+        "randomMotion": "Löst in eingestellten Abständen eine zufällige Bewegung aus. Wählen Sie mit der Einstell-Schaltfläche die teilnehmenden Bewegungen aus.",
+        "sequentialModel": "Wechselt in eingestellten Abständen der Reihe nach das Modell. Ordnen Sie die Modelle mit der Einstell-Schaltfläche auf der Modellseite neu.",
         "rendererRestarting": "BongoCat wird neu gestartet, um das neue Render-Backend anzuwenden...",
         "supersample": "Passt sich der Fenstergröße an, um Ressourcen zu sparen",
           "hoverUnavailable": "Ausblenden bei Mausberührung ist in dieser Desktop-Umgebung nicht verfügbar.",
@@ -127,6 +134,10 @@
         "title": "Modell",
         "nearbyTitle": "Nahe Modelle",
         "builtinsTitle": "Integrierte Modelle",
+        "tabs": {
+          "models": "Modelle",
+          "random": "Zufall"
+        },
         "labels": {
           "deleteModel": "Modell löschen"
         },
@@ -160,6 +171,7 @@
             "motion": "Bewegung",
             "expression": "Ausdruck",
             "audio": "Audio",
+            "switch": "Wechseln",
             "stopAllAudio": "Alle Audios stoppen",
             "motionIndex": "Bewegung {index}",
             "motionGroupIndex": "Bewegungsgruppe {index}",

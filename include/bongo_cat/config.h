@@ -9,6 +9,8 @@
 #define BONGO_CAT_DEFAULT_WINDOW_SCALE_PERCENT 100.0f
 #define BONGO_CAT_DEFAULT_WINDOW_OPACITY_PERCENT 100.0f
 #define BONGO_CAT_DEFAULT_RANDOM_EXPRESSION_SECONDS 5.0f
+#define BONGO_CAT_DEFAULT_RANDOM_MOTION_SECONDS 5.0f
+#define BONGO_CAT_DEFAULT_SEQUENTIAL_MODEL_SECONDS 600.0f
 #define BONGO_CAT_DEFAULT_WINDOW_CORNER_PERCENT 6.0f
 #define BONGO_CAT_DEFAULT_HIDE_FADE_SECONDS 0.3f
 #define BONGO_CAT_MAX_HIDE_FADE_SECONDS 3.0f
@@ -107,11 +109,15 @@ typedef struct BongoCatWindowPreferences {
     int gl_transparency;
     bool obs_background;
     bool random_expression;
+    bool random_motion;
+    bool sequential_model;
     bool rounded_corners;
     BongoCatObsBackgroundColor obs_background_color;
     float hide_delay_seconds;
     float hide_fade_seconds;
     float random_expression_interval_seconds;
+    float random_motion_interval_seconds;
+    float sequential_model_interval_seconds;
     float corner_radius_percent;
 } BongoCatWindowPreferences;
 
@@ -188,6 +194,14 @@ typedef struct BongoCatSettings {
     size_t model_label_count;
     BongoCatRemovedModel removed_models[BONGO_CAT_MODEL_CAP];
     size_t removed_model_count;
+    /* 切换时跳过的模型(隐藏)。结构与 removed_models 相同(一批 id), 但它不删除磁盘上的
+       模型, 只让随机/顺序切换跳过它们。 */
+    BongoCatRemovedModel hidden_models[BONGO_CAT_MODEL_CAP];
+    size_t hidden_model_count;
+    /* 随机/顺序切换的参与集合: 一串被排除的行为 id。模型切换的合成 id 是 "switch:<模型id>",
+       要排除某模型就把它对应的 switch:<id> 加进来; 默认全参与。 */
+    char random_disabled[BONGO_CAT_RANDOM_DISABLED_CAP][BONGO_CAT_BEHAVIOR_ID_CAP];
+    size_t random_disabled_count;
     char extensions_json[BONGO_CAT_SETTINGS_EXTENSIONS_CAP];
 } BongoCatSettings;
 
@@ -228,6 +242,14 @@ bool bongo_cat_settings_model_removed(const BongoCatSettings *settings,
     const char *id);
 bool bongo_cat_settings_set_model_removed(BongoCatSettings *settings,
     const char *id, bool removed);
+bool bongo_cat_settings_model_hidden(const BongoCatSettings *settings,
+    const char *id);
+bool bongo_cat_settings_set_model_hidden(BongoCatSettings *settings,
+    const char *id, bool hidden);
+bool bongo_cat_settings_random_disabled(const BongoCatSettings *settings,
+    const char *behavior_id);
+bool bongo_cat_settings_set_random_disabled(BongoCatSettings *settings,
+    const char *behavior_id, bool disabled);
 bool bongo_cat_settings_restore_model_package(BongoCatSettings *settings,
     const char *package_id);
 BongoCatResult bongo_cat_settings_load(const char *path,
