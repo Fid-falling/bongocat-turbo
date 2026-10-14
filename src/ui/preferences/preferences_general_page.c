@@ -14,6 +14,7 @@
  */
 #include "preferences_internal.h"
 #include "preferences_notice.h"
+#include "preferences_state.h"
 #include "preferences_theme.h"
 #include "preferences_widgets.h"
 #include "bongo_cat/i18n.h"
@@ -174,17 +175,24 @@ static void input_monitoring_section(BongoCatApp *app,
 }
 #endif
 
-void bongo_cat_preferences_general_page(BongoCatApp *app,
+/*
+ * [应用]/[外观] 两区现在各自是一个可折叠分区 (bongo_cat_preferences_options_begin/end,
+ * 单击分区头收起/展开)。缓存目录与便携模式搬进 [应用] 区: 它们跟开机自启一样属于
+ * "程序怎么跑/数据放哪", 不再是 [外观] 的一部分; 而 [外观] 只剩下语言与主题。
+ */
+void bongo_cat_preferences_general_page(BongoCatPreferences *value,
     struct nk_context *context) {
+    BongoCatApp *app = value->app;
     BongoCatApplicationPreferences *options = &app->settings.app;
     // Keep each option in its own native language so the list is recognizable
     // regardless of the language currently used by the settings window.
     const char *ui_languages[] = {"简体中文", "繁體中文", "English",
         "Français", "Deutsch", "日本語", "한국어", "Português",
         "Русский", "Español"};
-    bongo_cat_pref_section_icon(context, tr(app,
-        "pages.preference.general.labels.appSettings", "Application"),
-        BONGO_CAT_PREF_ICON_SECTION_APPLICATION);
+    if (bongo_cat_preferences_options_begin(value, context,
+        BONGO_CAT_OPTIONS_APPLICATION,
+        tr(app, "pages.preference.general.labels.appSettings", "Application"),
+        BONGO_CAT_PREF_ICON_SECTION_APPLICATION)) {
     bool old_autostart = options->autostart;
     bongo_cat_pref_row_icon(context, BONGO_CAT_PREF_ICON_AUTOSTART);
     if (bongo_cat_pref_toggle(context, "autostart", tr(app,
@@ -197,9 +205,15 @@ void bongo_cat_preferences_general_page(BongoCatApp *app,
             "Requests administrator rights at startup. While enabled, a UAC prompt appears every launch, including auto-start."),
         &options->run_as_admin)) update_run_as_admin(app);
     section_gap(context, 7);
-    bongo_cat_pref_section_icon(context, tr(app,
-        "pages.preference.general.labels.appearanceSettings", "Appearance"),
-        BONGO_CAT_PREF_ICON_SECTION_APPEARANCE);
+    /* 便携模式紧挨着路径那一行: 它们说的是同一件事 (数据放在哪), 用户应该连着看。 */
+    bongo_cat_preferences_portable_draw(value, context);
+    bongo_cat_preferences_cache_path_draw(value, context);
+    bongo_cat_preferences_options_end(value, context);
+    }    section_gap(context, 7);
+    if (bongo_cat_preferences_options_begin(value, context,
+        BONGO_CAT_OPTIONS_APPEARANCE,
+        tr(app, "pages.preference.general.labels.appearanceSettings", "Appearance"),
+        BONGO_CAT_PREF_ICON_SECTION_APPEARANCE)) {
     section_gap(context, 6);
     const int language_to_ui[] = {2, 0, 1, 3, 4, 5, 6, 7, 8, 9};
     const BongoCatLanguage ui_to_language[] = {
@@ -222,6 +236,8 @@ void bongo_cat_preferences_general_page(BongoCatApp *app,
     options->theme = (BongoCatTheme)bongo_cat_pref_theme(context,
         "theme", tr(app, "pages.preference.general.labels.themeMode",
         "Theme"), themes, options->theme);
+    bongo_cat_preferences_options_end(value, context);
+    }
 #ifdef __APPLE__
     section_gap(context, 7);
     input_monitoring_section(app, context);

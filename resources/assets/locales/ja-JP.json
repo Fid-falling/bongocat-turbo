@@ -30,6 +30,10 @@
           "windowCorners": "ウィンドウの角丸 (%)",
           "opacity": "不透明度",
           "randomExpression": "ランダム表情",
+          "secondsUnit": "秒",
+          "randomSettings": "ランダム",
+          "randomMotion": "ランダムモーション",
+          "sequentialModel": "順次モデル",
           "obsBackground": "単色背景",
           "hideOnHover": "ホバー時に非表示",
           "hideFadeSeconds": "フェード時間 (秒)",
@@ -48,6 +52,9 @@
         },
         "hints": {
         "rendererRestart": "設定を保存しました。反映するには BongoCat を手動で再起動してください。",
+        "randomExpression": "設定した間隔で表情をランダムに切り替えます。設定ボタンで参加する表情を選べます。",
+        "randomMotion": "設定した間隔でモーションをランダムに再生します。設定ボタンで参加するモーションを選べます。",
+        "sequentialModel": "設定した間隔でモデルを順番に切り替えます。設定ボタンでモデルページの順番を調整できます。",
         "rendererRestarting": "新しいレンダラーバックエンドを適用するため BongoCat を再起動しています...",
         "supersample": "自動ではウィンドウの大きさに合わせて調整し、負担を減らします",
           "hoverUnavailable": "現在のデスクトップ環境では、マウスを重ねて非表示にする機能は利用できません。",
@@ -58,7 +65,7 @@
           "keepInScreen": "有効にすると、ウィンドウが自動的に画面の範囲内に収まります。",
           "edgeSnap": "画面の端付近へドラッグすると端に吸着します。",
           "slideAnimation": "ドラッグを離した後、その方向へ少し滑らせて止まります。",
-          "slideNoDecay": "ドラッグを離したあとも滑り続け、画面の端に当たると跳ね返ります。もう一度つかむと止まります。",
+          "slideNoDecay": "ドラッグを離したあとも滑り続け、画面の端に当たると跳ね返ります。もう一度つかむと止まります。オンの間、上にある減速のスライダーは効きません。",
           "captureOnly": "デスクトップには表示されず、OBS などでは引き続き表示されます",
           "obsBackground": "ウィンドウキャプチャが黒い？",
           "obsBackgroundHelp": "OBS：「Windows 7互換」方式でキャプチャする場合はこの項目を有効にし、カラーキーフィルターで背景を除去してください。",
@@ -101,8 +108,8 @@
           "inputMonitoringPermissionGuide": "入力監視の権限があると、BongoCat は他のアプリでのキー入力を取得できます。マウスは権限なしでも動作します。BongoCat は起動時に監視を構築するため、権限を変更した場合は再起動が必要です。\n\n手順：\n1. 「システム設定」→「プライバシーとセキュリティ」→「入力監視」を開きます。\n2. 一覧にすでにある BongoCat の項目をオンにします。既存の項目は削除しないでください。\n3. 一覧に BongoCat がない場合は「+」をクリックし、現在実行しているアプリを追加します（アプリの場所を確認してください）。\n4. BongoCat を完全に終了してから再起動し、監視を再構築させます。\n\nキーボードが反応しないままの場合は、ご自身で BongoCat の項目を削除して再追加して確認できます。",
           "administratorPermission": "管理者として実行すると、一部のシステムキーや入力イベントをより確実に取得できます。",
           "administratorPermissionGuide": "一部のシステムキーや入力イベントをより確実に取得するため、アプリを管理者として実行することを推奨します。\n\n手順：\n1. まずアプリを終了します。\n2. エクスプローラーでアプリのexeファイルまたはショートカットを探します。\n3. 起動方法を選びます：\n   - 今回のみ：右クリックして\"管理者として実行\"を選びます。\n   - 常に：右クリック > プロパティ > 互換性 > \"管理者としてこのプログラムを実行する\"にチェック > OK。",
-          "cacheDirectory": "現在実際に使用しているフォルダです。「リセット」で既定の場所に戻ります。",
-          "portableMode": "すべてのファイルをプログラムと同じ場所の BongoCatData フォルダに保存します。プログラムとこのフォルダを一緒にコピーすれば移行できます。コピーするのは設定とモデルだけで、キャッシュは必要に応じて再作成されます。",
+          "cacheDirectory": "現在使用中のフォルダ。「リセット」で既定位置に戻ります。",
+          "portableMode": "データは全てプログラムの横の BongoCatData フォルダに保存。プログラムと一緒にコピーするだけで移行できます。",
           "portableMigrating": "設定とモデルを移行しています。しばらくお待ちください...",
           "portableRestarting": "移行が完了しました。新しい保存先を使うため BongoCat を再起動します...",
           "portableManualRestart": "移行が完了しました。新しい保存先を使うには BongoCat を手動で再起動してください。",
@@ -128,6 +135,11 @@
       "model": {
         "title": "モデル",
         "nearbyTitle": "近くのモデル",
+        "builtinsTitle": "組み込みモデル",
+        "tabs": {
+          "models": "モデル",
+          "random": "ランダム"
+        },
         "labels": {
           "deleteModel": "モデルを削除"
         },
@@ -146,11 +158,10 @@
           "importOutOfMemory": "メモリが不足しているため、このモデルをインポートできません",
           "importLoadFailed": "モデルはインポートされましたが、表示できませんでした",
           "importFailed": "モデルのインポートに失敗しました。選択したファイルを確認して、もう一度お試しください",
+          "importingBackground": "バックグラウンドでインポート中...",
           "clickOrDragToImport": "モデルフォルダーをクリックまたはドラッグ",
           "supportedImportFormats": "Mver・Tauri形式に対応",
-          "dropBlockedTitle": "ドラッグで取り込めない？",
-          "dropBlocked": "管理者として実行すると Windows がエクスプローラーのドラッグ&ドロップを遮断することがあります。上のインポートボタンをお使いください。",
-          "openDirectoryFailed": "モデルフォルダーを開けません"
+          "openDirectoryFailed": "モデルディレクトリを開けません"
         },
         "tooltips": {
           "createModel": "モデルを作成",
@@ -163,6 +174,7 @@
             "motion": "モーション",
             "expression": "表情",
             "audio": "音声",
+            "switch": "切り替え",
             "stopAllAudio": "すべての音声を停止",
             "motionIndex": "モーション {index}",
             "motionGroupIndex": "モーショングループ {index}",

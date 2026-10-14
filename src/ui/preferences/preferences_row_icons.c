@@ -203,6 +203,17 @@ static void frame_bounds(struct nk_command_buffer *c, struct nk_rect b,
     nk_stroke_rect(c, nk_rect(b.x + 5, b.y + 5, 8, 6), 1, 1.5f, color);
 }
 
+/* 随机动作: 边角小圆点 (起点) + 折线 (奔跑的动感) */
+static void random_motion(struct nk_command_buffer *c, struct nk_rect b,
+    struct nk_color color) {
+    nk_stroke_circle(c, nk_rect(b.x + 10, b.y + 1, 4, 4), 1.5f, color);
+    line(c, b, 10, 6, 8, 11, color);
+    line(c, b, 10, 6, 6, 6, color); line(c, b, 6, 6, 3, 9, color);
+    line(c, b, 10, 6, 13, 9, color); line(c, b, 13, 9, 16, 9, color);
+    line(c, b, 8, 11, 12, 13, color); line(c, b, 12, 13, 11, 17, color);
+    line(c, b, 8, 11, 5, 16, color); line(c, b, 5, 16, 2, 16, color);
+}
+
 /*
  * 行图标总表。下标 = icon - BONGO_CAT_PREF_ICON_MULTIPLE_MODELS, 与枚举顺序**逐项
  * 对应** —— 这就是 preferences_icons.h 里"新图标只能加在段末"那条约束的落地处:
@@ -217,7 +228,8 @@ bool bongo_cat_pref_row_icon_draw(struct nk_command_buffer *canvas,
         keep_in_screen, solid_background, window_size, window_corners, opacity,
         random_expression, mirror, mouse_mirror, mouse_centered, ignore_mouse,
         max_fps, autostart, language, theme, shortcut_visibility,
-        shortcut_preferences, hide_fade, renderer, frame_bounds};
+        shortcut_preferences, hide_fade, renderer, frame_bounds,
+        random_motion};
     int index = icon - BONGO_CAT_PREF_ICON_MULTIPLE_MODELS;
     int count = (int)(sizeof(draws) / sizeof(draws[0]));
     if (index < 0 || index >= count) return false;

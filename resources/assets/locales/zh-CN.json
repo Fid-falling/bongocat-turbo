@@ -30,6 +30,10 @@
           "windowCorners": "窗口圆角 (%)",
           "opacity": "不透明度",
           "randomExpression": "随机表情",
+          "secondsUnit": "秒",
+          "randomSettings": "随机",
+          "randomMotion": "随机动作",
+          "sequentialModel": "顺序模型",
           "obsBackground": "纯色背景",
           "hideOnHover": "鼠标移入隐藏",
           "hideFadeSeconds": "鼠标移入淡出时长（秒）",
@@ -48,6 +52,9 @@
         },
         "hints": {
         "rendererRestart": "设置已保存，请手动重启 BongoCat 才会生效。",
+        "randomExpression": "在设定间隔随机切换表情。点说明右侧的设置按钮，选择参与的表情。",
+        "randomMotion": "在设定间隔随机触发动作。点说明右侧的设置按钮，选择参与的动作。",
+        "sequentialModel": "在设定间隔按顺序切换模型。点说明右侧的设置按钮，去模型页调整轮换顺序。",
         "rendererRestarting": "正在重启 BongoCat 以应用新的渲染后端...",
         "supersample": "自动时会根据窗口大小调整, 更省资源",
           "hoverUnavailable": "当前桌面环境暂不支持鼠标移入隐藏。",
@@ -58,7 +65,7 @@
           "keepInScreen": "启用后，窗口会自动调整位置，防止超出屏幕边界。",
           "edgeSnap": "拖动到屏幕边缘附近时，自动吸附到边缘。",
           "slideAnimation": "松手后沿拖动方向继续滑行一小段距离。",
-          "slideNoDecay": "松手后它会一直滑下去，撞到屏幕边缘就弹回来；再抓住它、或关掉这个选项才会停下。",
+          "slideNoDecay": "松手后它会一直滑下去，撞到屏幕边缘就弹回来；再抓住它、或关掉这个选项才会停下。开启时上面那个放缓百分比不再生效。",
           "captureOnly": "桌面不再显示窗口，OBS 等采集软件仍能拍到画面",
           "obsBackground": "窗口捕获黑屏？",
           "obsBackgroundHelp": "OBS：开启当前选项，使用 Windows 7 兼容捕获，并用色键滤镜移除背景。\n哔哩哔哩直播姬：无需开启当前选项，选择游戏进程捕获，并开启允许窗口透明。",
@@ -101,8 +108,8 @@
           "inputMonitoringPermissionGuide": "输入监控权限让 BongoCat 能接收其他应用中的按键；鼠标移动和点击无需该权限。BongoCat 在启动时建立监听，因此权限变更后需要重启。\n\n操作方式：\n1. 打开「系统设置」→「隐私与安全性」→「输入监控」。\n2. 直接开启列表中已有的 BongoCat 条目，不要删除现有条目。\n3. 若列表中没有 BongoCat，点击「+」按钮，添加你当前运行的那份应用（注意确认应用位置）。\n4. 完全退出 BongoCat 后重新启动，让它重建监听。\n\n若键盘仍然无响应，可由你自行删除并重新添加 BongoCat 条目来排障。",
           "administratorPermission": "以管理员身份运行应用，可以更稳定地捕获部分系统级按键与输入事件。",
           "administratorPermissionGuide": "为了能更稳定地捕获部分系统级按键与输入事件，建议以管理员身份运行应用。\n\n操作方式：\n1. 先退出应用。\n2. 在资源管理器中找到应用的 exe 或快捷方式。\n3. 根据需要选择启动方式：\n   • 仅本次：右键并选择「以管理员身份运行」。\n   • 永久默认：右键 → 属性 → 兼容性选项卡 → 勾选「以管理员身份运行此程序」→ 确定。",
-          "cacheDirectory": "当前实际使用的文件夹。点「重置」回到默认位置。",
-          "portableMode": "所有文件都放在程序目录下的 BongoCatData 文件夹里；把程序和这个文件夹一起拷走就能迁移。只复制设置与模型，缓存会按需重建。",
+          "cacheDirectory": "当前使用的文件夹；「重置」恢复默认位置。",
+          "portableMode": "所有数据放在程序旁的 BongoCatData 文件夹；把程序和该文件夹一起拷走即可迁移。",
           "portableMigrating": "正在迁移设置与模型，请稍候...",
           "portableRestarting": "迁移完成，正在重启 BongoCat 以使用新的位置...",
           "portableManualRestart": "迁移完成，请手动重启 BongoCat 以使用新的位置。",
@@ -128,6 +135,11 @@
       "model": {
         "title": "模型",
         "nearbyTitle": "附近模型",
+        "builtinsTitle": "内置模型",
+        "tabs": {
+          "models": "模型",
+          "random": "随机"
+        },
         "labels": {
           "deleteModel": "删除模型"
         },
@@ -146,10 +158,9 @@
           "importOutOfMemory": "内存不足，无法导入此模型",
           "importLoadFailed": "模型已导入，但无法正常显示",
           "importFailed": "模型导入失败，请检查所选文件后重试",
+          "importingBackground": "正在后台导入...",
           "clickOrDragToImport": "点击或拖入模型文件夹",
           "supportedImportFormats": "同时支持 Mver 和 Tauri 格式",
-          "dropBlockedTitle": "拖不进模型？",
-          "dropBlocked": "以管理员身份运行时，Windows 可能拦截资源管理器的拖放；可以改用上面的导入按钮选择 zip。",
           "openDirectoryFailed": "无法打开模型目录"
         },
         "tooltips": {
@@ -163,6 +174,7 @@
             "motion": "动作",
             "expression": "表情",
             "audio": "音频",
+            "switch": "切换",
             "stopAllAudio": "停止所有音频",
             "motionIndex": "动作{index}",
             "motionGroupIndex": "动作组{index}",

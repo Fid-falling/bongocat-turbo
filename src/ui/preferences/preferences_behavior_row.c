@@ -10,6 +10,7 @@
  * 光标和点击范围会留在旧位置。
  */
 #include "preferences_state.h"
+#include "preferences_controls.h"
 #include "bongo_cat/audio.h"
 #include "bongo_cat/shortcut.h"
 #include "preferences_overlay.h"
@@ -191,10 +192,35 @@ void bongo_cat_preferences_behavior_row_draw(BongoCatPreferences *value,
     struct nk_context *context, struct nk_command_buffer *canvas,
     struct nk_rect row, BongoCatBehaviorEntry *entry, BongoCatUIPalette p,
     float opacity, bool enabled) {
-    struct nk_rect play = nk_rect(row.x + row.w - 52, row.y + 10, 36, 36);
-    struct nk_rect shortcut_bounds = nk_rect(play.x - 188, row.y + 10, 180, 36);
+    struct nk_rect play;
+    struct nk_rect shortcut_bounds;
+    bool participating = true;
+    bool has_sw = entry->kind == BONGO_CAT_BEHAVIOR_MOTION ||
+        entry->kind == BONGO_CAT_BEHAVIOR_EXPRESSION;
+    if (has_sw) {
+        participating = !bongo_cat_settings_random_disabled(
+            &value->app->settings, entry->id);
+        /* 开关复用偏好页的动画开关, 右对齐到行尾(试听键右侧), 播放键左移让位。 */
+        play = nk_rect(row.x + row.w - 110, row.y + 10, 36, 36);
+    } else {
+        play = nk_rect(row.x + row.w - 52, row.y + 10, 36, 36);
+    }
+    shortcut_bounds = nk_rect(play.x - 188, row.y + 10, 180, 36);
     struct nk_rect name = nk_rect(row.x + 8, row.y + 9,
         NK_MAX(48.0f, shortcut_bounds.x - row.x - 16), 38);
+    if (has_sw) {
+        struct nk_rect sw_cell = nk_rect(row.x + row.w - 56, row.y - 6,
+            56, 68);
+        if (bongo_cat_pref_control_toggle_rect(context, entry->id,
+            &participating, sw_cell, enabled)) {
+            /* 只登记 pending, 由 process_behavior_toggle 在两次渲染之间翻转一次,
+               避免嵌套渲染重放把这次点击再翻回去。 */
+            snprintf(value->pending_behavior_id,
+                sizeof(value->pending_behavior_id), "%s", entry->id);
+            value->pending_behavior_toggle = true;
+            value->render_dirty = true;
+        }
+    }
     BongoCatBehaviorShortcut *binding = binding_for(&value->app->settings,
         entry->id);
     draw_name(value, context, canvas, name, entry, binding, p, opacity, enabled);

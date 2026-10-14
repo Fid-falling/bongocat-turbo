@@ -9,13 +9,16 @@
 #define BONGO_CAT_DEFAULT_WINDOW_SCALE_PERCENT 100.0f
 #define BONGO_CAT_DEFAULT_WINDOW_OPACITY_PERCENT 100.0f
 #define BONGO_CAT_DEFAULT_RANDOM_EXPRESSION_SECONDS 5.0f
+#define BONGO_CAT_DEFAULT_RANDOM_MOTION_SECONDS 5.0f
+#define BONGO_CAT_DEFAULT_SEQUENTIAL_MODEL_SECONDS 600.0f
 #define BONGO_CAT_DEFAULT_WINDOW_CORNER_PERCENT 6.0f
 #define BONGO_CAT_DEFAULT_HIDE_FADE_SECONDS 0.3f
 #define BONGO_CAT_MAX_HIDE_FADE_SECONDS 3.0f
 #define BONGO_CAT_DEFAULT_EDGE_SNAP_PX 20
 #define BONGO_CAT_MAX_EDGE_SNAP_PX 64
-/* 0 = 每拍不衰减, 松手后近似恒速滑行。 */
-#define BONGO_CAT_DEFAULT_SLIDE_SLOWDOWN_PERCENT 0
+/* 每拍速度乘 (100-值)/100: 0 表示不衰减 —— 恒速滑行且撞边不损失速度 (就是设置页里
+   "一直滑动"打开时的效果), 越大人越快停下。合并 PR#4 后默认从 0 改成 15。 */
+#define BONGO_CAT_DEFAULT_SLIDE_SLOWDOWN_PERCENT 15
 #define BONGO_CAT_MAX_SLIDE_SLOWDOWN_PERCENT 99
 
 typedef enum BongoCatTheme { BONGO_CAT_THEME_AUTO, BONGO_CAT_THEME_LIGHT, BONGO_CAT_THEME_DARK } BongoCatTheme;
@@ -75,11 +78,20 @@ typedef struct BongoCatWindowPreferences {
     int edge_snap_threshold;
     /* 拖动惯性: 松手后沿着拖动方向继续滑行一段。关闭则拖动结束立即停在原地。 */
     bool slide_animation;
-    /* 惯性衰减档位 0-99: 数值越大约快停下; 0 表示几乎匀速滑到超时为止。 */
+    /*
+     * 惯性衰减档位 0-99: 每拍速度乘 (100-值)/100, 数值越大越快停下; 0 = 不衰减 (恒速)。
+     * 这是全局唯一的速度衰减输入 —— "一直滑动" (slide_no_decay) 不另起一套, 它只是把本帧
+     * 生效的值钉在 0 (见 window_inertia.c 的注释)。放缓值生效为 0 时撞边不再损失速度、
+     * 也没有拍数兜底, 所以那时它永不自行停止。缺省 15 (v1.16.3 是 0)。
+     */
     int slide_slowdown_percent;
     /*
-     * 关闭动量衰减: 松手后不再减速, 以恒定速度一直滑下去, 撞到屏幕边缘就完整反弹
-     * (速度不损失), 于是永不自行停止 —— 屏保那种"在屏幕上撞来撞去"的效果。
+     * "一直滑动": 松手后不减速, 以恒定速度一直滑下去, 撞到屏幕边缘完整反弹 (速度不损失),
+     * 于是永不自行停止 —— 屏保那种"在屏幕上撞来撞去"的效果。
+     *
+     * 它和上面 slide_slowdown_percent 说的是同一件事的两面, 不是第二个旋钮: 打开时把
+     * **本帧生效的**放缓值钉在 0, 用户自己拖的百分比原样留在配置里, 关掉立刻按原值恢复
+     * 衰减。实现处 (window_inertia.c) 与设置页提示都写明了这层关系。
      *
      * 只在 slide_animation 打开时有意义: 关掉拖动惯性时这一行在设置页里隐藏、也不生效,
      * 但取值原样保留 —— 重新打开拖动惯性就能接着用, 不偷偷改用户的选择。
@@ -116,11 +128,15 @@ typedef struct BongoCatWindowPreferences {
     int gl_transparency;
     bool obs_background;
     bool random_expression;
+    bool random_motion;
+    bool sequential_model;
     bool rounded_corners;
     BongoCatObsBackgroundColor obs_background_color;
     float hide_delay_seconds;
     float hide_fade_seconds;
     float random_expression_interval_seconds;
+    float random_motion_interval_seconds;
+    float sequential_model_interval_seconds;
     float corner_radius_percent;
 } BongoCatWindowPreferences;
 
@@ -197,6 +213,14 @@ typedef struct BongoCatSettings {
     size_t model_label_count;
     BongoCatRemovedModel removed_models[BONGO_CAT_MODEL_CAP];
     size_t removed_model_count;
+    /* 切换时跳过的模型(隐藏)。结构与 removed_models 相同(一批 id), 但它不删除磁盘上的
+       模型, 只让随机/顺序切换跳过它们。 */
+    BongoCatRemovedModel hidden_models[BONGO_CAT_MODEL_CAP];
+    size_t hidden_model_count;
+    /* 随机/顺序切换的参与集合: 一串被排除的行为 id。模型切换的合成 id 是 "switch:<模型id>",
+       要排除某模型就把它对应的 switch:<id> 加进来; 默认全参与。 */
+    char random_disabled[BONGO_CAT_RANDOM_DISABLED_CAP][BONGO_CAT_BEHAVIOR_ID_CAP];
+    size_t random_disabled_count;
     char extensions_json[BONGO_CAT_SETTINGS_EXTENSIONS_CAP];
 } BongoCatSettings;
 
@@ -237,6 +261,14 @@ bool bongo_cat_settings_model_removed(const BongoCatSettings *settings,
     const char *id);
 bool bongo_cat_settings_set_model_removed(BongoCatSettings *settings,
     const char *id, bool removed);
+bool bongo_cat_settings_model_hidden(const BongoCatSettings *settings,
+    const char *id);
+bool bongo_cat_settings_set_model_hidden(BongoCatSettings *settings,
+    const char *id, bool hidden);
+bool bongo_cat_settings_random_disabled(const BongoCatSettings *settings,
+    const char *behavior_id);
+bool bongo_cat_settings_set_random_disabled(BongoCatSettings *settings,
+    const char *behavior_id, bool disabled);
 bool bongo_cat_settings_restore_model_package(BongoCatSettings *settings,
     const char *package_id);
 BongoCatResult bongo_cat_settings_load(const char *path,

@@ -23,14 +23,15 @@ static void section_gap(struct nk_context *context, float pixels) {
     context->current->layout->at_y += pixels;
 }
 
-static void page_display(BongoCatApp *app, struct nk_context *context) {
+static void page_display(BongoCatPreferences *value, struct nk_context *context) {
+    BongoCatApp *app = value->app;
     BongoCatModelPreferences *model = &app->settings.model;
     BongoCatWindowPreferences *window = &app->settings.window;
     BongoCatWindowState *window_state = &app->session.window;
-    bongo_cat_pref_section_icon(context, tr(app,
-        "pages.preference.cat.labels.windowSettings",
-        "Window"),
-        BONGO_CAT_PREF_ICON_SECTION_WINDOW);
+    if (bongo_cat_preferences_options_begin(value, context,
+        BONGO_CAT_OPTIONS_WINDOW,
+        tr(app, "pages.preference.cat.labels.windowSettings", "Window"),
+        BONGO_CAT_PREF_ICON_SECTION_WINDOW)) {
     bongo_cat_ui_question_tooltip(context, tr(app,
         "pages.preference.cat.hints.gameInput", "Pet not responding in games?"),
         tr(app, "pages.preference.cat.hints.gameInputHelp",
@@ -196,17 +197,13 @@ static void page_display(BongoCatApp *app, struct nk_context *context) {
         bongo_cat_platform_set_opacity(&app->platform,
             window_state->opacity_percent / 100.0f);
     }
-    bongo_cat_pref_row_icon(context, BONGO_CAT_PREF_ICON_RANDOM_EXPRESSION);
-    bongo_cat_pref_toggle_float(context, "random-expression", tr(app,
-        "pages.preference.cat.labels.randomExpression", "Random Expressions"),
-        &window->random_expression, 1.0f,
-        &window->random_expression_interval_seconds, 3600.0f, 1.0f,
-        BONGO_CAT_DEFAULT_RANDOM_EXPRESSION_SECONDS);
-
     section_gap(context, 10);
-    bongo_cat_pref_section_icon(context, tr(app,
-        "pages.preference.cat.labels.performanceSettings", "Performance"),
-        BONGO_CAT_PREF_ICON_SECTION_APPEARANCE);
+    bongo_cat_preferences_options_end(value, context);
+    }
+    if (bongo_cat_preferences_options_begin(value, context,
+        BONGO_CAT_OPTIONS_PERFORMANCE,
+        tr(app, "pages.preference.cat.labels.performanceSettings", "Performance"),
+        BONGO_CAT_PREF_ICON_SECTION_APPEARANCE)) {
     {
         /* 超采样: 质量档 2x 边缘更干净; 2x 是 4 倍面积, 大窗口很吃显存 */
         const char *const labels[] = {
@@ -256,9 +253,12 @@ static void page_display(BongoCatApp *app, struct nk_context *context) {
             app->dirty = true;
         }
     }    section_gap(context, 10);
-    bongo_cat_pref_section_icon(context, tr(app,
-        "pages.preference.cat.labels.modelSettings", "Model"),
-        BONGO_CAT_PREF_ICON_SECTION_MODEL);
+    bongo_cat_preferences_options_end(value, context);
+    }
+    if (bongo_cat_preferences_options_begin(value, context,
+        BONGO_CAT_OPTIONS_MODEL,
+        tr(app, "pages.preference.cat.labels.modelSettings", "Model"),
+        BONGO_CAT_PREF_ICON_SECTION_MODEL)) {
     bongo_cat_pref_row_icon(context, BONGO_CAT_PREF_ICON_MIRROR);
     if (bongo_cat_pref_toggle(context, "mirror", tr(app,
         "pages.preference.cat.labels.mirrorMode", "Mirror Mode"), "",
@@ -293,17 +293,79 @@ static void page_display(BongoCatApp *app, struct nk_context *context) {
     /* 渲染后端: 实现在 preferences_renderer_row.c (它要同时管"写配置 -> 确认框 ->
        重启"和"被拒也要留痕", 与托盘那一项共用 runtime 里的同一份实现)。 */
     bongo_cat_preferences_renderer_row(app, context);
+    bongo_cat_preferences_options_end(value, context);
+    }
 }
 
 void bongo_cat_preferences_page_settings(BongoCatPreferences *value,
     struct nk_context *context) {
+    page_display(value, context);
+    section_gap(context, 10);
+    bongo_cat_preferences_general_page(value, context);
+}
+/* 模型页的"随机"标签页: 随机表情/随机动作/顺序切换模型, 原来在设置页, 现在收纳到
+   模型页顶部分段控件里 (类型 X 的模型商店)。开关右边那个设置按钮各自打开行为弹窗
+   (动作/表情 tab), 顺序切换模型的设置按钮跳到模型页第一个标签重新拖拽顺序。 */
+void bongo_cat_preferences_page_model_random(BongoCatPreferences *value,
+    struct nk_context *context) {
     BongoCatApp *app = value->app;
-    page_display(app, context);
+    BongoCatWindowPreferences *window = &app->settings.window;
+    if (bongo_cat_preferences_options_begin(value, context,
+        BONGO_CAT_OPTIONS_RANDOM,
+        tr(app, "pages.preference.cat.labels.randomSettings", "Random"),
+        BONGO_CAT_PREF_ICON_RANDOM_EXPRESSION)) {
+    bongo_cat_pref_row_icon(context, BONGO_CAT_PREF_ICON_RANDOM_EXPRESSION);
+    bool random_expression_config = false;
+    bongo_cat_pref_toggle_float_config(context, "random-expression",
+        tr(app, "pages.preference.cat.labels.randomExpression", "Random Expressions"),
+        tr(app, "pages.preference.cat.labels.secondsUnit", "s"),
+        &window->random_expression, 1.0f,
+        &window->random_expression_interval_seconds, 3600.0f, 1.0f,
+        BONGO_CAT_DEFAULT_RANDOM_EXPRESSION_SECONDS,
+        tr(app, "pages.preference.cat.hints.randomExpression",
+            "Pick a random expression at the set interval. Use the settings button "
+            "to choose participating expressions."),
+        &random_expression_config);
+    if (random_expression_config) {
+        value->behavior_tab = 1; /* 表情 tab */
+        bongo_cat_preferences_behavior_dialog_open(value);
+    }
+
+    bongo_cat_pref_row_icon(context, BONGO_CAT_PREF_ICON_RANDOM_MOTION);
+    bool random_motion_config = false;
+    bongo_cat_pref_toggle_float_config(context, "random-motion",
+        tr(app, "pages.preference.cat.labels.randomMotion", "Random Motions"),
+        tr(app, "pages.preference.cat.labels.secondsUnit", "s"),
+        &window->random_motion, 1.0f,
+        &window->random_motion_interval_seconds, 3600.0f, 1.0f,
+        BONGO_CAT_DEFAULT_RANDOM_MOTION_SECONDS,
+        tr(app, "pages.preference.cat.hints.randomMotion",
+            "Trigger a random motion at the set interval. Use the settings "
+            "button to choose participating motions."),
+        &random_motion_config);
+    if (random_motion_config) {
+        value->behavior_tab = 0; /* motion tab */
+        bongo_cat_preferences_behavior_dialog_open(value);
+    }
+
+    bongo_cat_pref_row_icon(context, BONGO_CAT_PREF_ICON_MULTIPLE_MODELS);
+    bool sequential_model_config = false;
+    bongo_cat_pref_toggle_float_config(context, "sequential-model",
+        tr(app, "pages.preference.cat.labels.sequentialModel",
+            "Sequential Models"),
+        tr(app, "pages.preference.cat.labels.secondsUnit", "s"),
+        &window->sequential_model, 1.0f,
+        &window->sequential_model_interval_seconds, 3600.0f, 1.0f,
+        BONGO_CAT_DEFAULT_SEQUENTIAL_MODEL_SECONDS,
+        tr(app, "pages.preference.cat.hints.sequentialModel",
+            "Switch models in order at the set interval. Use the settings "
+            "button to reorder models on the Model page."),
+        &sequential_model_config);
+    if (sequential_model_config) {
+        value->model_page_tab = 0; /* 模型 tab: 拖拽顺序即轮换顺序 */
+    }
+
     section_gap(context, 10);
-    bongo_cat_preferences_general_page(app, context);
-    section_gap(context, 10);
-    bongo_cat_preferences_cache_path_draw(value, context);
-    section_gap(context, 7);
-    /* 便携模式紧挨着上面那行路径: 它们说的是同一件事 (数据放在哪), 用户应该连着看。 */
-    bongo_cat_preferences_portable_draw(value, context);
+    bongo_cat_preferences_options_end(value, context);
+    }
 }

@@ -30,6 +30,10 @@
           "windowCorners": "Cantos arredondados (%)",
           "opacity": "Opacidade",
           "randomExpression": "Expressões Aleatórias",
+          "secondsUnit": "s",
+          "randomSettings": "Aleatório",
+          "randomMotion": "Movimentos Aleatórios",
+          "sequentialModel": "Modelos Sequenciais",
           "obsBackground": "Fundo sólido",
           "hideOnHover": "Ocultar ao Passar o Mouse",
           "hideFadeSeconds": "Duração do fade (s)",
@@ -48,6 +52,9 @@
         },
         "hints": {
         "rendererRestart": "Configuração salva. Reinicie o BongoCat manualmente para aplicá-la.",
+        "randomExpression": "Troca de expressão aleatoriamente no intervalo definido. Use o botão de configurações para escolher as expressões participantes.",
+        "randomMotion": "Dispara um movimento aleatório no intervalo definido. Use o botão de configurações para escolher os movimentos participantes.",
+        "sequentialModel": "Alterna os modelos em ordem no intervalo definido. Use o botão de configurações para reordenar os modelos na página de Modelos.",
         "rendererRestarting": "Reiniciando o BongoCat para aplicar o novo backend de renderização...",
         "supersample": "Ajusta-se ao tamanho da janela para economizar",
           "hoverUnavailable": "Ocultar ao passar o mouse não está disponível no ambiente de desktop atual.",
@@ -58,7 +65,7 @@
           "keepInScreen": "Quando ativado, a janela permanece automaticamente dentro dos limites da tela.",
           "edgeSnap": "Encaixa na borda da tela ao arrastar para perto dela.",
           "slideAnimation": "Continua deslizando um pouco na direção do arrasto após soltar.",
-          "slideNoDecay": "Depois de soltar, ele continua deslizando e quica nas bordas da tela. Segure-o de novo para parar.",
+          "slideNoDecay": "Depois de soltar, ele continua deslizando e quica nas bordas da tela. Segure-o de novo para parar. Enquanto esta opção estiver ativa, o controle de desaceleração acima não tem efeito.",
           "captureOnly": "Invisível na área de trabalho, ainda visível no OBS",
           "obsBackground": "A captura da janela está preta?",
           "obsBackgroundHelp": "OBS: ative esta opção, use o método compatível com o Windows 7 e remova o fundo com um filtro de chave de cor.",
@@ -101,8 +108,8 @@
           "inputMonitoringPermissionGuide": "O Monitoramento de Entrada permite que o BongoCat veja teclas pressionadas em outros aplicativos; o mouse continua funcionando sem ele. O BongoCat cria o monitoramento ao iniciar, então uma mudança de permissão exige reiniciar.\n\nPassos:\n1. Abra Ajustes do Sistema → Privacidade e Segurança → Monitoramento de Entrada.\n2. Ative a entrada do BongoCat que já está na lista; não remova entradas existentes.\n3. Se o BongoCat não estiver na lista, clique em \"+\" e adicione a cópia que você executa (confira o local do aplicativo).\n4. Encerre o BongoCat por completo e inicie de novo para recriar o monitoramento.\n\nSe o teclado continuar sem resposta, você pode remover e adicionar de novo a entrada do BongoCat.",
           "administratorPermission": "Executar o aplicativo como administrador ajuda a capturar algumas teclas e eventos de entrada em nível de sistema com mais confiabilidade.",
           "administratorPermissionGuide": "Para capturar algumas teclas e eventos de entrada em nível de sistema com mais confiabilidade, é recomendado executar o aplicativo como administrador.\n\nComo fazer:\n1. Feche o aplicativo primeiro.\n2. Encontre o exe do aplicativo ou o atalho no Explorador de Arquivos.\n3. Escolha como iniciar:\n   • Apenas desta vez: Clique com o botão direito e escolha \"Executar como administrador\".\n   • Sempre (padrão): Botão direito → Propriedades → aba Compatibilidade → marque \"Executar este programa como administrador\" → OK.",
-          "cacheDirectory": "A pasta realmente em uso agora. «Redefinir» volta ao local padrão.",
-          "portableMode": "Guarda tudo numa pasta BongoCatData ao lado do programa; copie o programa junto com essa pasta para migrar. Apenas configurações e modelos são copiados, os caches são recriados quando necessário.",
+          "cacheDirectory": "Pasta em uso. «Redefinir» volta ao local padrão.",
+          "portableMode": "Guarda tudo numa pasta BongoCatData ao lado do programa; copie-a com o programa para migrar.",
           "portableMigrating": "Migrando configurações e modelos, aguarde...",
           "portableRestarting": "Migração concluída. Reiniciando o BongoCat para usar o novo local...",
           "portableManualRestart": "Migração concluída. Reinicie o BongoCat manualmente para usar o novo local.",
@@ -128,6 +135,11 @@
       "model": {
         "title": "Modelo",
         "nearbyTitle": "Modelos próximos",
+        "builtinsTitle": "Modelos integrados",
+        "tabs": {
+          "models": "Modelos",
+          "random": "Aleatório"
+        },
         "labels": {
           "deleteModel": "Excluir modelo"
         },
@@ -146,10 +158,9 @@
           "importOutOfMemory": "Não há memória suficiente para importar este modelo",
           "importLoadFailed": "O modelo foi importado, mas não pôde ser exibido",
           "importFailed": "Falha ao importar o modelo. Verifique os arquivos selecionados e tente novamente",
+          "importingBackground": "Importando em segundo plano...",
           "clickOrDragToImport": "Clique ou arraste uma pasta",
           "supportedImportFormats": "Compatível com Mver e Tauri",
-          "dropBlockedTitle": "Não consegue soltar um modelo?",
-          "dropBlocked": "Executando como administrador, o Windows pode bloquear o arrastar do Explorer; use o botão de importar acima.",
           "openDirectoryFailed": "Não foi possível abrir a pasta do modelo"
         },
         "tooltips": {
@@ -163,6 +174,7 @@
             "motion": "Movimento",
             "expression": "Expressão",
             "audio": "Áudio",
+            "switch": "Alternar",
             "stopAllAudio": "Parar todos os áudios",
             "motionIndex": "Movimento {index}",
             "motionGroupIndex": "Grupo de Movimento {index}",

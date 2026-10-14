@@ -212,6 +212,61 @@ static void compact_removed_models(BongoCatSettings *config) {
     config->removed_model_count = output_count;
 }
 
+static void compact_hidden_models(BongoCatSettings *config) {
+    size_t input_count = config->hidden_model_count;
+    if (input_count > BONGO_CAT_MODEL_CAP) input_count = BONGO_CAT_MODEL_CAP;
+    size_t output_count = 0;
+    for (size_t i = 0; i < input_count; ++i) {
+        BongoCatRemovedModel entry = config->hidden_models[i];
+        entry.id[sizeof(entry.id) - 1] = '\0';
+        if (!entry.id[0] || !bongo_cat_utf8_valid(entry.id)) continue;
+        bool duplicate = false;
+        for (size_t j = 0; j < output_count; ++j)
+            if (!strcmp(config->hidden_models[j].id, entry.id)) {
+                duplicate = true;
+                break;
+            }
+        if (!duplicate) {
+            BongoCatRemovedModel canonical = {0};
+            snprintf(canonical.id, sizeof(canonical.id), "%s", entry.id);
+            config->hidden_models[output_count++] = canonical;
+        }
+    }
+    memset(&config->hidden_models[output_count], 0,
+        (BONGO_CAT_MODEL_CAP - output_count) *
+        sizeof(config->hidden_models[0]));
+    config->hidden_model_count = output_count;
+}
+
+static void compact_random_disabled(BongoCatSettings *config) {
+    size_t input_count = config->random_disabled_count;
+    if (input_count > BONGO_CAT_RANDOM_DISABLED_CAP)
+        input_count = BONGO_CAT_RANDOM_DISABLED_CAP;
+    size_t output_count = 0;
+    for (size_t i = 0; i < input_count; ++i) {
+        char temp[BONGO_CAT_BEHAVIOR_ID_CAP];
+        memcpy(temp, config->random_disabled[i], BONGO_CAT_BEHAVIOR_ID_CAP);
+        temp[BONGO_CAT_BEHAVIOR_ID_CAP - 1] = '\0';
+        if (!temp[0] || !bongo_cat_utf8_valid(temp)) continue;
+        char *existing = NULL;
+        for (size_t j = 0; j < output_count; ++j)
+            if (!strcmp(config->random_disabled[j], temp)) {
+                existing = config->random_disabled[j];
+                break;
+            }
+        if (!existing) {
+            memset(config->random_disabled[output_count], 0,
+                BONGO_CAT_BEHAVIOR_ID_CAP);
+            snprintf(config->random_disabled[output_count],
+                BONGO_CAT_BEHAVIOR_ID_CAP, "%s", temp);
+            output_count++;
+        }
+    }
+    for (size_t i = output_count; i < BONGO_CAT_RANDOM_DISABLED_CAP; ++i)
+        memset(config->random_disabled[i], 0, BONGO_CAT_BEHAVIOR_ID_CAP);
+    config->random_disabled_count = output_count;
+}
+
 /* 全新配置的初值: 首次运行、没有配置文件时由调用方用它铺底。
    由于读取是可选读(缺键保留原值), 这里给出的初值同时就是那些键的默认值,
    改动它会直接改变老配置的行为。 */
@@ -235,6 +290,10 @@ void bongo_cat_settings_defaults(BongoCatSettings *config) {
     config->window.hide_fade_seconds = BONGO_CAT_DEFAULT_HIDE_FADE_SECONDS;
     config->window.random_expression_interval_seconds =
         BONGO_CAT_DEFAULT_RANDOM_EXPRESSION_SECONDS;
+    config->window.random_motion_interval_seconds =
+        BONGO_CAT_DEFAULT_RANDOM_MOTION_SECONDS;
+    config->window.sequential_model_interval_seconds =
+        BONGO_CAT_DEFAULT_SEQUENTIAL_MODEL_SECONDS;
     config->app.tray_visible = true;
     /* 默认以管理员身份运行 (与 BongoCat-X 一致, 但 turbo 的默认值是开): 启动时
        请求提权。因此每次启动 (含开机自启) 都会弹一次 UAC, 用户可在设置里关掉。 */
@@ -276,6 +335,12 @@ void bongo_cat_settings_validate(BongoCatSettings *config) {
     config->window.random_expression_interval_seconds = clampf_or(
         config->window.random_expression_interval_seconds, 1.0f, 3600.0f,
         BONGO_CAT_DEFAULT_RANDOM_EXPRESSION_SECONDS);
+    config->window.random_motion_interval_seconds = clampf_or(
+        config->window.random_motion_interval_seconds, 1.0f, 3600.0f,
+        BONGO_CAT_DEFAULT_RANDOM_MOTION_SECONDS);
+    config->window.sequential_model_interval_seconds = clampf_or(
+        config->window.sequential_model_interval_seconds, 1.0f, 3600.0f,
+        BONGO_CAT_DEFAULT_SEQUENTIAL_MODEL_SECONDS);
     if ((unsigned)config->window.obs_background_color >=
         BONGO_CAT_OBS_BACKGROUND_COLOR_COUNT)
         config->window.obs_background_color = BONGO_CAT_OBS_BACKGROUND_GREEN;
@@ -286,6 +351,8 @@ void bongo_cat_settings_validate(BongoCatSettings *config) {
     compact_behavior_overrides(config);
     compact_model_overrides(config);
     compact_removed_models(config);
+    compact_hidden_models(config);
+    compact_random_disabled(config);
     validate_shortcuts(config);
     compact_behavior_overrides(config);
 }

@@ -249,6 +249,9 @@ void bongo_cat_app_loop(BongoCatApp *app) {
         bongo_cat_app_apply_frame_pacing(app);
         int wait_ms = bongo_cat_window_wait_timeout(app, SDL_GetTicksNS());
         if (app->secondary_pet && wait_ms > 100) wait_ms = 100;
+        /* 导入进行中时不能用长空闲等待: 完成事件要尽快被取走, 保证队列能串行往下拉 */
+        if (bongo_cat_preferences_imports_busy(app->preferences) &&
+            (wait_ms < 0 || wait_ms > 100)) wait_ms = 100;
         bongo_cat_preferences_input_begin(app->preferences);
         SDL_Event event;
         if (bongo_cat_wait_event(&event, wait_ms)) {
@@ -260,6 +263,7 @@ void bongo_cat_app_loop(BongoCatApp *app) {
         bongo_cat_preferences_input_end(app->preferences);
         uint64_t now = SDL_GetTicksNS();
         bongo_cat_preferences_model_watch(app->preferences, now);
+        bongo_cat_preferences_poll_imports(app->preferences);
         bongo_cat_model_refresh_update(app);
         take_instance_wake(app);
         if (take_update_shutdown(app)) continue;
@@ -268,6 +272,8 @@ void bongo_cat_app_loop(BongoCatApp *app) {
         bongo_cat_window_snapshot_update(app, now);
         bongo_cat_multi_pet_update(app, now);
         bongo_cat_random_expression_update(app, now);
+        bongo_cat_random_motion_update(app, now);
+        bongo_cat_sequential_model_update(app, now);
         bongo_cat_audio_update(app->audio);
         bongo_cat_window_update_display_recovery(app, now);
         bongo_cat_window_update_inertia(app, now);
@@ -289,6 +295,8 @@ void bongo_cat_app_loop(BongoCatApp *app) {
         /* 渲染两次是刻意的: 设置窗口的渲染与"选模型"处理会改动应用状态并置脏, 第二遍
            只处理这种刚被改脏的情况 (不脏就不会重画)。 */
         bongo_cat_preferences_process_model_selection(app->preferences);
+        bongo_cat_preferences_process_model_hidden(app->preferences);
+        bongo_cat_preferences_process_behavior_toggle(app->preferences);
         if (app->session.window.visible && !app->window_minimized && app->dirty)
             render(app, true);
         bongo_cat_tray_sync(app->tray);

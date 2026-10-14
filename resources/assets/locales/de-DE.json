@@ -30,6 +30,10 @@
           "windowCorners": "Fensterrundung (%)",
           "opacity": "Deckkraft",
           "randomExpression": "Zufällige Ausdrücke",
+          "secondsUnit": "Sek.",
+          "randomSettings": "Zufall",
+          "randomMotion": "Zufällige Bewegungen",
+          "sequentialModel": "Sequenzielle Modelle",
           "obsBackground": "Einfarbiger Hintergrund",
           "hideOnHover": "Beim Darüberfahren ausblenden",
           "hideFadeSeconds": "Ausblendedauer (s)",
@@ -48,6 +52,9 @@
         },
         "hints": {
         "rendererRestart": "Einstellung gespeichert. Bitte BongoCat manuell neu starten, um sie anzuwenden.",
+        "randomExpression": "Wechselt in eingestellten Abständen zufällig den Ausdruck. Wählen Sie mit der Einstell-Schaltfläche die teilnehmenden Ausdrücke.",
+        "randomMotion": "Löst in eingestellten Abständen eine zufällige Bewegung aus. Wählen Sie mit der Einstell-Schaltfläche die teilnehmenden Bewegungen aus.",
+        "sequentialModel": "Wechselt in eingestellten Abständen der Reihe nach das Modell. Ordnen Sie die Modelle mit der Einstell-Schaltfläche auf der Modellseite neu.",
         "rendererRestarting": "BongoCat wird neu gestartet, um das neue Render-Backend anzuwenden...",
         "supersample": "Passt sich der Fenstergröße an, um Ressourcen zu sparen",
           "hoverUnavailable": "Ausblenden bei Mausberührung ist in dieser Desktop-Umgebung nicht verfügbar.",
@@ -58,7 +65,7 @@
           "keepInScreen": "Wenn aktiviert, bleibt das Fenster automatisch innerhalb der Bildschirmgrenzen.",
           "edgeSnap": "Beim Ziehen nahe an einen Bildschirmrand dort einrasten.",
           "slideAnimation": "Gleitet nach dem Loslassen noch ein Stück in Ziehrichtung weiter.",
-          "slideNoDecay": "Nach dem Loslassen gleitet es weiter und prallt an den Bildschirmrändern ab. Erneut anfassen stoppt es.",
+          "slideNoDecay": "Nach dem Loslassen gleitet es weiter und prallt an den Bildschirmrändern ab. Erneut anfassen stoppt es. Solange dies aktiv ist, wirkt der Regler für die Verlangsamung oben nicht.",
           "captureOnly": "Auf dem Desktop unsichtbar, in OBS weiterhin sichtbar",
           "obsBackground": "Fensteraufnahme schwarz?",
           "obsBackgroundHelp": "OBS: Diese Option aktivieren, die Windows-7-Kompatibilitätsmethode verwenden und den Hintergrund mit einem Farbschlüssel-Filter entfernen.",
@@ -101,8 +108,8 @@
           "inputMonitoringPermissionGuide": "Die Eingabeüberwachung erlaubt BongoCat, in anderen Apps gedrückte Tasten zu sehen; die Maus funktioniert auch ohne sie. BongoCat baut die Überwachung beim Start auf, eine Berechtigungsänderung erfordert daher einen Neustart.\n\nSchritte:\n1. Öffnen Sie Systemeinstellungen → Datenschutz & Sicherheit → Eingabeüberwachung.\n2. Schalten Sie den bereits gelisteten BongoCat-Eintrag ein; entfernen Sie keine vorhandenen Einträge.\n3. Falls BongoCat fehlt, klicken Sie auf \"+\" und fügen Sie die laufende Kopie hinzu (prüfen Sie den Speicherort).\n4. Beenden Sie BongoCat vollständig und starten Sie es erneut, damit es die Überwachung neu aufbaut.\n\nWenn die Tastatur weiterhin nicht reagiert, können Sie den BongoCat-Eintrag selbst entfernen und neu hinzufügen.",
           "administratorPermission": "Als Administrator kann die Anwendung bestimmte Systemtasten und Eingabeereignisse zuverlässiger erfassen.",
           "administratorPermissionGuide": "Für eine zuverlässigere Erfassung bestimmter Systemtasten und Eingabeereignisse wird empfohlen, die Anwendung als Administrator auszuführen.\n\nVorgehen:\n1. Beenden Sie zuerst die Anwendung.\n2. Suchen Sie die exe-Datei oder ihre Verknüpfung im Datei-Explorer.\n3. Wählen Sie die Startart:\n   - Einmalig: Rechtsklick und \"Als Administrator ausführen\" wählen.\n   - Immer: Rechtsklick > Eigenschaften > Kompatibilität > \"Programm als Administrator ausführen\" aktivieren > OK.",
-          "cacheDirectory": "Der aktuell verwendete Ordner. \"Zurücksetzen\" stellt den Standardort wieder her.",
-          "portableMode": "Alle Dateien liegen in einem Ordner BongoCatData neben dem Programm; zum Umziehen Programm und Ordner zusammen kopieren. Nur Einstellungen und Modelle werden kopiert, Caches werden bei Bedarf neu aufgebaut.",
+          "cacheDirectory": "Aktuell verwendeter Ordner. „Zurücksetzen“ stellt den Standardort wieder her.",
+          "portableMode": "Alle Daten liegen in einem Ordner BongoCatData neben dem Programm; kopieren Sie den Ordner mitsamt Programm zum Umziehen.",
           "portableMigrating": "Einstellungen und Modelle werden verschoben, bitte warten...",
           "portableRestarting": "Daten verschoben. BongoCat wird neu gestartet, um den neuen Ort zu verwenden...",
           "portableManualRestart": "Daten verschoben. Bitte BongoCat manuell neu starten, um den neuen Ort zu verwenden.",
@@ -128,6 +135,11 @@
       "model": {
         "title": "Modell",
         "nearbyTitle": "Nahe Modelle",
+        "builtinsTitle": "Integrierte Modelle",
+        "tabs": {
+          "models": "Modelle",
+          "random": "Zufall"
+        },
         "labels": {
           "deleteModel": "Modell löschen"
         },
@@ -146,11 +158,10 @@
           "importOutOfMemory": "Zum Importieren dieses Modells ist nicht genügend Arbeitsspeicher verfügbar",
           "importLoadFailed": "Das Modell wurde importiert, konnte aber nicht angezeigt werden",
           "importFailed": "Der Modellimport ist fehlgeschlagen. Prüfen Sie die ausgewählten Dateien und versuchen Sie es erneut",
+          "importingBackground": "Import läuft im Hintergrund...",
           "clickOrDragToImport": "Modellordner wählen oder ziehen",
           "supportedImportFormats": "Unterstützt Mver und Tauri",
-          "dropBlockedTitle": "Modell lässt sich nicht ablegen?",
-          "dropBlocked": "Als Administrator kann Windows das Ziehen aus dem Explorer blockieren; nutzen Sie die Import-Schaltfläche oben.",
-          "openDirectoryFailed": "Modellordner konnte nicht geöffnet werden"
+          "openDirectoryFailed": "Modellverzeichnis konnte nicht geöffnet werden"
         },
         "tooltips": {
           "createModel": "Modell erstellen",
@@ -163,6 +174,7 @@
             "motion": "Bewegung",
             "expression": "Ausdruck",
             "audio": "Audio",
+            "switch": "Wechseln",
             "stopAllAudio": "Alle Audios stoppen",
             "motionIndex": "Bewegung {index}",
             "motionGroupIndex": "Bewegungsgruppe {index}",

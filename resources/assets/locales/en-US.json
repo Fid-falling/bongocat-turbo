@@ -30,6 +30,10 @@
           "windowCorners": "Window Corners (%)",
           "opacity": "Opacity",
           "randomExpression": "Random Expressions",
+          "secondsUnit": "s",
+          "randomSettings": "Random",
+          "randomMotion": "Random Motions",
+          "sequentialModel": "Sequential Models",
           "obsBackground": "Solid Background",
           "hideOnHover": "Hide on Hover",
           "hideFadeSeconds": "Fade Duration (s)",
@@ -48,6 +52,9 @@
         },
         "hints": {
         "rendererRestart": "Setting saved. Restart BongoCat manually to apply it.",
+        "randomExpression": "Pick a random expression at the set interval. Use the settings button to choose participating expressions.",
+        "randomMotion": "Trigger a random motion at the set interval. Use the settings button to choose participating motions.",
+        "sequentialModel": "Switch models in order at the set interval. Use the settings button to reorder models on the Model page.",
         "rendererRestarting": "Restarting BongoCat to apply the new render backend...",
         "supersample": "Adjusts itself to the window size to save resources",
           "hoverUnavailable": "Hover hiding is unavailable in the current desktop environment.",
@@ -58,7 +65,7 @@
           "keepInScreen": "When enabled, the window automatically stays within the screen boundaries.",
           "edgeSnap": "Snap to a screen edge when dragging near it.",
           "slideAnimation": "Keep gliding a short distance after you release a drag.",
-          "slideNoDecay": "After you let go it keeps sliding and bounces off the screen edges. Grab it again to stop it.",
+          "slideNoDecay": "After you let go it keeps sliding and bounces off the screen edges. Grab it again to stop it. While this is on, the slowdown slider above has no effect.",
           "captureOnly": "Hidden on the desktop, still visible in OBS",
           "obsBackground": "Window capture is black?",
           "obsBackgroundHelp": "OBS: enable this option, use the Windows 7 compatibility method, and remove the background with a color key filter.",
@@ -101,8 +108,8 @@
           "inputMonitoringPermissionGuide": "Input Monitoring lets BongoCat see keys pressed in other apps; the mouse keeps working without it. BongoCat builds the listener when it starts, so a permission change needs a restart.\n\nSteps:\n1. Open System Settings → Privacy & Security → Input Monitoring.\n2. Turn on the BongoCat entry that is already listed; do not remove existing entries.\n3. If BongoCat is not listed, click the \"+\" button and add the copy you are running (check the app location).\n4. Quit BongoCat completely and start it again, so it rebuilds the listener.\n\nIf the keyboard still stays silent, you can remove and re-add the BongoCat entry yourself.",
           "administratorPermission": "Running the app as administrator helps capture some system-level keys and input events more reliably.",
           "administratorPermissionGuide": "To capture some system-level keys and input events more reliably, it is recommended to run the app as administrator.\n\nHow to do it:\n1. Exit the app first.\n2. Find the app exe or its shortcut in File Explorer.\n3. Choose how to launch:\n   • One-time: Right-click and choose \"Run as administrator\".\n   • Always (default): Right-click → Properties → Compatibility tab → check \"Run this program as an administrator\" → OK.",
-          "cacheDirectory": "The folder actually in use right now. Reset goes back to the default location.",
-          "portableMode": "Store everything in a BongoCatData folder next to the program; copy the program together with that folder to move it. Settings and models are copied once, caches are rebuilt when needed.",
+          "cacheDirectory": "Folder currently in use. Reset restores the default.",
+          "portableMode": "Keep everything in a BongoCatData folder beside the app; copy the folder with the program to migrate.",
           "portableMigrating": "Migrating settings and models, please wait...",
           "portableRestarting": "Data migrated. Restarting BongoCat to use the new location...",
           "portableManualRestart": "Data migrated. Restart BongoCat manually to use the new location.",
@@ -128,6 +135,11 @@
       "model": {
         "title": "Model",
         "nearbyTitle": "Nearby models",
+        "builtinsTitle": "Built-in models",
+        "tabs": {
+          "models": "Models",
+          "random": "Random"
+        },
         "labels": {
           "deleteModel": "Delete Model"
         },
@@ -146,10 +158,9 @@
           "importOutOfMemory": "There is not enough memory to import this model",
           "importLoadFailed": "The model was imported, but it could not be displayed",
           "importFailed": "Model import failed. Check the selected files and try again",
+          "importingBackground": "Importing in background...",
           "clickOrDragToImport": "Click or drag a model folder",
           "supportedImportFormats": "Supports Mver and Tauri formats",
-          "dropBlockedTitle": "Cannot drop a model?",
-          "dropBlocked": "Running as administrator can make Windows block Explorer drag and drop; use the import button above instead.",
           "openDirectoryFailed": "Unable to open model directory"
         },
         "tooltips": {
@@ -163,6 +174,7 @@
             "motion": "Motion",
             "expression": "Expression",
             "audio": "Audio",
+            "switch": "Switch",
             "stopAllAudio": "Stop all audio",
             "motionIndex": "Motion {index}",
             "motionGroupIndex": "Motion Group {index}",

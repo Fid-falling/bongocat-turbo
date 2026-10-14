@@ -16,6 +16,9 @@ bool bongo_cat_preferences_visible(const BongoCatPreferences *preferences);
 bool bongo_cat_preferences_needs_frame(BongoCatPreferences *preferences);
 void bongo_cat_preferences_model_watch(BongoCatPreferences *preferences,
     uint64_t now);
+bool bongo_cat_preferences_imports_busy(const BongoCatPreferences *preferences);
+void bongo_cat_preferences_stop_imports(BongoCatPreferences *preferences);
+void bongo_cat_preferences_poll_imports(BongoCatPreferences *preferences);
 void bongo_cat_preferences_input_begin(BongoCatPreferences *preferences);
 void bongo_cat_preferences_input_end(BongoCatPreferences *preferences);
 bool bongo_cat_preferences_event(BongoCatPreferences *preferences, const SDL_Event *event);
@@ -24,6 +27,10 @@ bool bongo_cat_preferences_shortcuts_blocked(
 void bongo_cat_preferences_render(BongoCatPreferences *preferences);
 void bongo_cat_preferences_invalidate(BongoCatPreferences *preferences);
 void bongo_cat_preferences_process_model_selection(
+    BongoCatPreferences *preferences);
+void bongo_cat_preferences_process_model_hidden(
+    BongoCatPreferences *preferences);
+void bongo_cat_preferences_process_behavior_toggle(
     BongoCatPreferences *preferences);
 void bongo_cat_preferences_model_load_progress(
     BongoCatPreferences *preferences, float progress);

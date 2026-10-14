@@ -40,6 +40,9 @@
 #define BONGO_CAT_BEHAVIOR_CAP 128
 #define BONGO_CAT_BEHAVIOR_ID_CAP 384
 #define BONGO_CAT_BEHAVIOR_BINDING_CAP 256
+/* 随机/顺序切换的"参与集合": 本质是一组被排除(不参与)的行为 id 字符串, 默认全参与、
+   列在名单里才排除。容量取 "最多模型数 + 若干其它行为" 的余量。 */
+#define BONGO_CAT_RANDOM_DISABLED_CAP (BONGO_CAT_MODEL_CAP * 2)
 #define BONGO_CAT_MENU_LABEL_CAP (BONGO_CAT_ID_CAP + BONGO_CAT_SHORTCUT_CAP + 4)
 #define BONGO_CAT_SCHEDULED_RELEASE_CAP 64
 #define BONGO_CAT_UPDATE_VERSION_CAP 32

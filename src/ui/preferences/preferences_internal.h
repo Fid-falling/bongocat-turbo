@@ -17,12 +17,15 @@
 
 void bongo_cat_preferences_page_settings(BongoCatPreferences *value,
     struct nk_context *context);
-/* 设置页 [应用] 区 (开关 + 外观) 与 macOS 的输入监控区。定义在
+/* 设置页 [应用]/[外观] 区 (开关 + 外观) 与 macOS 的输入监控区。定义在
    preferences_general_page.c: 与 [窗口] 区没有共享状态, 拆开是为了 500 行的行数策略
-   (见 cmake/CheckLines.cmake)。 */
-void bongo_cat_preferences_general_page(BongoCatApp *app,
+   (见 cmake/CheckLines.cmake)。入参是 BongoCatPreferences 而不是 BongoCatApp:
+   分区折叠状态 (options_sections) 挂在 preferences 上 (合并 PR#4 后新增的分区头)。 */
+void bongo_cat_preferences_general_page(BongoCatPreferences *value,
     struct nk_context *context);
 void bongo_cat_preferences_page_model(BongoCatPreferences *value,
+    struct nk_context *context);
+void bongo_cat_preferences_page_model_random(BongoCatPreferences *value,
     struct nk_context *context);
 bool bongo_cat_preferences_behavior_dialog_active(
     const BongoCatPreferences *value);
@@ -67,10 +70,9 @@ void bongo_cat_preferences_shortcut_cancel(BongoCatPreferences *value);
 void bongo_cat_preferences_shortcut_smoke(BongoCatPreferences *value);
 void bongo_cat_preferences_import_path(BongoCatApp *app, SDL_Window *window,
     const char *path);
-void bongo_cat_preferences_import_complete(BongoCatApp *app,
-    BongoCatResult result, const BongoCatError *error, size_t resolved_count,
-    size_t installed_count, size_t succeeded_count, size_t failed_count,
-    const char (*failed_names)[BONGO_CAT_ID_CAP], size_t failed_name_count);
+bool bongo_cat_preferences_imports_busy(const BongoCatPreferences *value);
+void bongo_cat_preferences_stop_imports(BongoCatPreferences *value);
+void bongo_cat_preferences_poll_imports(BongoCatPreferences *value);
 void bongo_cat_preferences_model_cache_clear(BongoCatApp *app);
 bool bongo_cat_preferences_remove_dialog_active(const BongoCatApp *app);
 void bongo_cat_preferences_remove_dialog_open(BongoCatApp *app, const char *id);

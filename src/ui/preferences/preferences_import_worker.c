@@ -86,23 +86,28 @@ int SDLCALL bongo_cat_preferences_import_worker(void *userdata) {
      */
     SDL_Event event = {0};
     SDL_LockMutex(job->dialog->mutex);
-    bool notify = job->dialog->active;
+    bool active = job->dialog->active;
+    bool notify = active;
     if (notify) {
         event.type = job->dialog->event_type;
-        event.user.windowID = job->dialog->window_id;
+        event.user.windowID = job->window_id;
         event.user.code = BONGO_CAT_IMPORT_COMPLETE_CODE;
         event.user.data1 = job;
         event.user.data2 = job->dialog;
         notify = SDL_PushEvent(&event);
     }
-    if (!notify) {
+    if (active && !notify) job->dialog->completion_pending = true;
+    if (!active) {
         job->dialog->worker_job = NULL;
         job->dialog->busy = false;
         job->dialog->started_ns = 0;
         job->dialog->completed = job->dialog->total = 0;
     }
     SDL_UnlockMutex(job->dialog->mutex);
-    if (!notify) {
+    if (active && !notify) SDL_LogWarn(SDL_LOG_CATEGORY_APPLICATION,
+        "Model import completion event was rejected; the main loop will "
+        "reclaim the worker");
+    if (!active) {
         BongoCatImportDialog *dialog = job->dialog;
         bongo_cat_preferences_import_job_free(job);
         bongo_cat_preferences_import_dialog_release(dialog);

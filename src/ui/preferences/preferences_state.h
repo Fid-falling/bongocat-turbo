@@ -18,6 +18,7 @@
 #define BONGO_CAT_PREFERENCES_STATE_H
 
 #include "preferences_internal.h"
+#include "preferences_icons.h"
 #include "preferences_scrollbar.h"
 #include "preferences_text_session.h"
 #include "ui_backend.h"
@@ -42,6 +43,20 @@
 #include "bongo_cat/i18n.h"
 #include "bongo_cat/preferences.h"
 #include "modal_frame.h"
+
+/*
+ * 偏好页的可折叠分区。each section maps to one collapsible header drawn by
+ * bongo_cat_preferences_options_begin/end; 单击分区头在展开/折叠间切换 (照 X)。
+ */
+enum BongoCatOptionsSection {
+    BONGO_CAT_OPTIONS_WINDOW,
+    BONGO_CAT_OPTIONS_PERFORMANCE,
+    BONGO_CAT_OPTIONS_MODEL,
+    BONGO_CAT_OPTIONS_APPLICATION,
+    BONGO_CAT_OPTIONS_APPEARANCE,
+    BONGO_CAT_OPTIONS_RANDOM,
+    BONGO_CAT_OPTIONS_SECTION_COUNT
+};
 
 typedef struct BongoCatPreferenceNotice {
     char message[384];
@@ -102,6 +117,8 @@ struct BongoCatPreferences {
     bool import_render_active;
     BongoCatImportDialog *import_dialog;
     bool frame_checked;
+    /* 偏好页可折叠分区是否展开 (true = 展开); 跨窗口会话保留 */
+    bool options_sections[BONGO_CAT_OPTIONS_SECTION_COUNT];
     /*
      * 事件驱动渲染的总开关: 为真才画这一帧, render 一开始就把它清掉, 帧末再按
      * "还有动画在跑吗"决定要不要重新置真。所有输入/状态变化都必须经过标脏,
@@ -124,6 +141,8 @@ struct BongoCatPreferences {
     bool model_selection_pending;
     bool pending_model_multiple;
     bool pending_model_active;
+    bool pending_model_hidden_toggle;
+    bool pending_behavior_toggle;
     bool model_loading;
     bool model_load_visual_active;
     float model_load_progress;
@@ -133,6 +152,7 @@ struct BongoCatPreferences {
     uint64_t model_load_visual_completion_ns;
     char pending_model_id[BONGO_CAT_ID_CAP];
     char loading_model_id[BONGO_CAT_ID_CAP];
+    char pending_behavior_id[BONGO_CAT_BEHAVIOR_ID_CAP];
     char model_load_visual_id[BONGO_CAT_ID_CAP];
     uint64_t last_render_ns;
     uint64_t shown_ns;
@@ -161,10 +181,12 @@ struct BongoCatPreferences {
     bool behavior_dialog;
     bool behavior_dialog_input_armed;
     int behavior_tab;
+    int model_page_tab;
     uint64_t behavior_dialog_opened_ns;
     uint64_t behavior_dialog_closing_ns;
     uint64_t behavior_tab_transition_ns;
-    float behavior_scroll[3];
+    /* 0=动作 1=表情 2=声音 3=切换参与(每个模型的 switch:<id> 勾选)。 */
+    float behavior_scroll[4];
     bool behavior_audio_playing[BONGO_CAT_BEHAVIOR_CAP];
     BongoCatPreferencesScrollbar behavior_scrollbar;
     BongoCatPreferencesTextSession behavior_rename;
@@ -211,6 +233,12 @@ void bongo_cat_preferences_input_monitoring_refresh(BongoCatPreferences *value);
 
 int bongo_cat_preferences_resolved_theme(const BongoCatPreferences *value);
 void bongo_cat_preferences_apply_theme(BongoCatPreferences *value);
+/* 偏好页可折叠分区: begin 单击分区头切换展开/折叠, 返回 true 表示展开 (应画内容) */
+bool bongo_cat_preferences_options_begin(BongoCatPreferences *value,
+    struct nk_context *context, enum BongoCatOptionsSection section,
+    const char *title, BongoCatPrefIcon icon);
+void bongo_cat_preferences_options_end(BongoCatPreferences *value,
+    struct nk_context *context);
 bool bongo_cat_preferences_open_window(BongoCatPreferences *value);
 /*
  * 把设置窗口从 Vulkan 换成 OpenGL 并重建。只在窗口"帧外"调用 (目前是 render 的开头),
@@ -232,6 +260,8 @@ void bongo_cat_preferences_assets_load(BongoCatPreferences *value);
 void bongo_cat_preferences_support_assets_load(BongoCatPreferences *value);
 void bongo_cat_preferences_support_assets_clear(BongoCatPreferences *value);
 void bongo_cat_preferences_process_model_selection(BongoCatPreferences *value);
+void bongo_cat_preferences_process_model_hidden(BongoCatPreferences *value);
+void bongo_cat_preferences_process_behavior_toggle(BongoCatPreferences *value);
 void bongo_cat_preferences_model_visual_begin(BongoCatPreferences *value,
     const char *model_id);
 void bongo_cat_preferences_model_load_progress(BongoCatPreferences *value,

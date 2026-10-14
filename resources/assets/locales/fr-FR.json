@@ -30,6 +30,10 @@
           "windowCorners": "Coins arrondis (%)",
           "opacity": "Opacité",
           "randomExpression": "Expressions aléatoires",
+          "secondsUnit": "s",
+          "randomSettings": "Aléatoire",
+          "randomMotion": "Mouvements aléatoires",
+          "sequentialModel": "Modèles séquentiels",
           "obsBackground": "Arrière-plan uni",
           "hideOnHover": "Masquer au survol",
           "hideFadeSeconds": "Durée du fondu (s)",
@@ -48,6 +52,9 @@
         },
         "hints": {
         "rendererRestart": "Réglage enregistré. Redémarrez BongoCat manuellement pour l'appliquer.",
+        "randomExpression": "Change d'expression aléatoirement à intervalle réglé. Utilisez le bouton de réglage pour choisir les expressions participantes.",
+        "randomMotion": "Déclenche un mouvement aléatoire à intervalle réglé. Utilisez le bouton de réglage pour choisir les mouvements participants.",
+        "sequentialModel": "Change de modèle en ordre à intervalle réglé. Utilisez le bouton de réglage pour réordonner les modèles sur la page Modèles.",
         "rendererRestarting": "Redémarrage de BongoCat pour appliquer le nouveau moteur de rendu...",
         "supersample": "S'adapte à la taille de la fenêtre pour économiser",
           "hoverUnavailable": "Le masquage au survol est indisponible dans cet environnement de bureau.",
@@ -58,7 +65,7 @@
           "keepInScreen": "Lorsque cette option est activée, la fenêtre reste automatiquement dans les limites de l'écran.",
           "edgeSnap": "Accroche la fenêtre au bord de l'écran lors d'un déplacement à proximité.",
           "slideAnimation": "Continue de glisser un peu dans la direction du déplacement après avoir relâché.",
-          "slideNoDecay": "Après le relâchement, il continue de glisser et rebondit sur les bords de l’écran. Attrapez-le à nouveau pour l’arrêter.",
+          "slideNoDecay": "Après le relâchement, il continue de glisser et rebondit sur les bords de l’écran. Attrapez-le à nouveau pour l’arrêter. Tant que cette option est active, le curseur de ralentissement ci-dessus est sans effet.",
           "captureOnly": "Invisible sur le bureau, toujours visible dans OBS",
           "obsBackground": "La capture de fenêtre est noire ?",
           "obsBackgroundHelp": "OBS : activez cette option, utilisez la méthode compatible Windows 7 et supprimez le fond avec un filtre d'incrustation couleur.",
@@ -101,8 +108,8 @@
           "inputMonitoringPermissionGuide": "La surveillance des entrées permet à BongoCat de voir les touches pressées dans d'autres applications ; la souris continue de fonctionner sans elle. BongoCat construit l'écoute à son démarrage, un changement d'autorisation demande donc un redémarrage.\n\nÉtapes :\n1. Ouvrez Réglages Système → Confidentialité et sécurité → Surveillance de l'entrée.\n2. Activez l'entrée BongoCat déjà présente dans la liste ; ne supprimez aucune entrée.\n3. Si BongoCat n'est pas listé, cliquez sur \"+\" et ajoutez la copie que vous exécutez (vérifiez son emplacement).\n4. Quittez complètement BongoCat puis relancez-le pour qu'il reconstruise l'écoute.\n\nSi le clavier reste sans réponse, vous pouvez supprimer puis rajouter vous-même l'entrée BongoCat.",
           "administratorPermission": "Exécuter l'application en tant qu'administrateur permet de capturer plus fiablement certaines touches système et certains événements d'entrée.",
           "administratorPermissionGuide": "Pour capturer plus fiablement certaines touches système et certains événements d'entrée, il est recommandé d'exécuter l'application en tant qu'administrateur.\n\nProcédure :\n1. Quittez d'abord l'application.\n2. Trouvez le fichier exe ou son raccourci dans l'Explorateur de fichiers.\n3. Choisissez le mode de lancement :\n   - Une fois : faites un clic droit et choisissez \"Exécuter en tant qu'administrateur\".\n   - Toujours : clic droit > Propriétés > onglet Compatibilité > cochez \"Exécuter ce programme en tant qu'administrateur\" > OK.",
-          "cacheDirectory": "Dossier réellement utilisé. « Réinitialiser » revient à l'emplacement par défaut.",
-          "portableMode": "Tout est stocké dans un dossier BongoCatData à côté du programme ; copiez le programme avec ce dossier pour le déplacer. Seuls les réglages et les modèles sont copiés, les caches sont reconstruits au besoin.",
+          "cacheDirectory": "Dossier actuellement utilisé. « Réinitialiser » rétablit l'emplacement par défaut.",
+          "portableMode": "Toutes les données sont dans un dossier BongoCatData à côté du programme ; copiez-le avec le programme pour migrer.",
           "portableMigrating": "Migration des réglages et des modèles, veuillez patienter...",
           "portableRestarting": "Migration terminée. Redémarrage de BongoCat pour utiliser le nouvel emplacement...",
           "portableManualRestart": "Migration terminée. Redémarrez BongoCat manuellement pour utiliser le nouvel emplacement.",
@@ -128,6 +135,11 @@
       "model": {
         "title": "Modèle",
         "nearbyTitle": "Modèles à proximité",
+        "builtinsTitle": "Modèles intégrés",
+        "tabs": {
+          "models": "Modèles",
+          "random": "Aléatoire"
+        },
         "labels": {
           "deleteModel": "Supprimer le modèle"
         },
@@ -146,10 +158,9 @@
           "importOutOfMemory": "La mémoire disponible est insuffisante pour importer ce modèle",
           "importLoadFailed": "Le modèle a été importé, mais il n'a pas pu être affiché",
           "importFailed": "Échec de l'importation du modèle. Vérifiez les fichiers sélectionnés et réessayez",
+          "importingBackground": "Importation en arrière-plan...",
           "clickOrDragToImport": "Cliquez ou déposez un dossier",
           "supportedImportFormats": "Formats Mver et Tauri pris en charge",
-          "dropBlockedTitle": "Impossible de déposer un modèle ?",
-          "dropBlocked": "Lancé en administrateur, Windows peut bloquer le glisser-déposer de l'Explorateur ; utilisez le bouton d'import ci-dessus.",
           "openDirectoryFailed": "Impossible d'ouvrir le dossier du modèle"
         },
         "tooltips": {
@@ -163,6 +174,7 @@
             "motion": "Mouvement",
             "expression": "Expression",
             "audio": "Audio",
+            "switch": "Changer",
             "stopAllAudio": "Arrêter tous les sons",
             "motionIndex": "Mouvement {index}",
             "motionGroupIndex": "Groupe de mouvements {index}",

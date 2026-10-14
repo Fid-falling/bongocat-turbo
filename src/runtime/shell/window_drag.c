@@ -230,6 +230,7 @@ void bongo_cat_window_drag_end(BongoCatApp *app) {
                 app->slide_y = (double)wy;
                 app->slide_last_ns = SDL_GetTicksNS();
                 app->slide_frame = 0;
+                app->slide_accum_s = 0.0;
             }
         }
     }

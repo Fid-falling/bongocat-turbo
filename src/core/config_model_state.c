@@ -110,6 +110,93 @@ bool bongo_cat_settings_set_model_removed(BongoCatSettings *config,
     return true;
 }
 
+bool bongo_cat_settings_model_hidden(const BongoCatSettings *config,
+    const char *id) {
+    if (!config || !id) return false;
+    size_t count = config->hidden_model_count;
+    if (count > BONGO_CAT_MODEL_CAP) count = BONGO_CAT_MODEL_CAP;
+    for (size_t i = 0; i < count; ++i)
+        if (!strcmp(config->hidden_models[i].id, id)) return true;
+    return false;
+}
+
+bool bongo_cat_settings_set_model_hidden(BongoCatSettings *config,
+    const char *id, bool hidden) {
+    if (!config || !id || !id[0] || strlen(id) >= BONGO_CAT_ID_CAP ||
+        !bongo_cat_utf8_valid(id)) return false;
+    bongo_cat_settings_validate(config);
+    size_t index = config->hidden_model_count;
+    for (size_t i = 0; i < config->hidden_model_count; ++i)
+        if (!strcmp(config->hidden_models[i].id, id)) {
+            index = i;
+            break;
+        }
+    if (hidden) {
+        if (index < config->hidden_model_count) return false;
+        if (config->hidden_model_count >= BONGO_CAT_MODEL_CAP) return false;
+        BongoCatRemovedModel *entry =
+            &config->hidden_models[config->hidden_model_count++];
+        memset(entry, 0, sizeof(*entry));
+        snprintf(entry->id, sizeof(entry->id), "%s", id);
+        return true;
+    }
+    if (index == config->hidden_model_count) return false;
+    if (index + 1 < config->hidden_model_count)
+        memmove(&config->hidden_models[index],
+            &config->hidden_models[index + 1],
+            (config->hidden_model_count - index - 1) *
+            sizeof(config->hidden_models[0]));
+    config->hidden_model_count--;
+    memset(&config->hidden_models[config->hidden_model_count], 0,
+        sizeof(config->hidden_models[0]));
+    return true;
+}
+
+bool bongo_cat_settings_random_disabled(const BongoCatSettings *config,
+    const char *behavior_id) {
+    if (!config || !behavior_id) return false;
+    size_t count = config->random_disabled_count;
+    if (count > BONGO_CAT_RANDOM_DISABLED_CAP)
+        count = BONGO_CAT_RANDOM_DISABLED_CAP;
+    for (size_t i = 0; i < count; ++i)
+        if (!strcmp(config->random_disabled[i], behavior_id)) return true;
+    return false;
+}
+
+bool bongo_cat_settings_set_random_disabled(BongoCatSettings *config,
+    const char *behavior_id, bool disabled) {
+    if (!config || !behavior_id || !behavior_id[0] ||
+        strlen(behavior_id) >= BONGO_CAT_BEHAVIOR_ID_CAP ||
+        !bongo_cat_utf8_valid(behavior_id)) return false;
+    bongo_cat_settings_validate(config);
+    if (disabled) {
+        if (bongo_cat_settings_random_disabled(config, behavior_id))
+            return false;
+        if (config->random_disabled_count >= BONGO_CAT_RANDOM_DISABLED_CAP)
+            return false;
+        char *entry = config->random_disabled[config->random_disabled_count++];
+        memset(entry, 0, BONGO_CAT_BEHAVIOR_ID_CAP);
+        snprintf(entry, BONGO_CAT_BEHAVIOR_ID_CAP, "%s", behavior_id);
+        return true;
+    }
+    size_t index = config->random_disabled_count;
+    for (size_t i = 0; i < config->random_disabled_count; ++i)
+        if (!strcmp(config->random_disabled[i], behavior_id)) {
+            index = i;
+            break;
+        }
+    if (index == config->random_disabled_count) return false;
+    if (index + 1 < config->random_disabled_count)
+        memmove(&config->random_disabled[index],
+            &config->random_disabled[index + 1],
+            (config->random_disabled_count - index - 1) *
+            sizeof(config->random_disabled[0]));
+    config->random_disabled_count--;
+    memset(config->random_disabled[config->random_disabled_count], 0,
+        BONGO_CAT_BEHAVIOR_ID_CAP);
+    return true;
+}
+
 /* 模型 id 有两种形态: "<package>" 表示包本身, "<package>~<序号>" 表示包内
    的单条模型。恢复整个包时这两类条目都要清掉。 */
 static bool package_model_id(const char *id, const char *package_id) {

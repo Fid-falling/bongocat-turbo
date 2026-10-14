@@ -56,11 +56,13 @@ void bongo_cat_random_expression_update(BongoCatApp *app, uint64_t now) {
         (uint64_t)(seconds * (float)NANOSECONDS_PER_SECOND);
 
     int current = bongo_cat_live2d_expression(app->live2d);
+    const BongoCatSettings *settings = &app->settings;
     size_t expression_count = 0;
     size_t alternate_count = 0;
     for (size_t i = 0; i < app->behaviors.count; ++i) {
         const BongoCatBehaviorEntry *entry = &app->behaviors.entries[i];
-        if (entry->kind != BONGO_CAT_BEHAVIOR_EXPRESSION) continue;
+        if (entry->kind != BONGO_CAT_BEHAVIOR_EXPRESSION ||
+            bongo_cat_settings_random_disabled(settings, entry->id)) continue;
         expression_count++;
         if (entry->index != current) alternate_count++;
     }
@@ -72,12 +74,119 @@ void bongo_cat_random_expression_update(BongoCatApp *app, uint64_t now) {
     for (size_t i = 0; i < app->behaviors.count; ++i) {
         const BongoCatBehaviorEntry *entry = &app->behaviors.entries[i];
         if (entry->kind != BONGO_CAT_BEHAVIOR_EXPRESSION ||
+            bongo_cat_settings_random_disabled(settings, entry->id) ||
             (choose_alternate && entry->index == current)) continue;
         if (choice--) continue;
         if (bongo_cat_live2d_set_expression(app->live2d, entry->index))
             app->dirty = true;
         return;
     }
+}
+
+/* 随机动作：和随机表情同一套排期/随机数/候选过滤逻辑，只是按 MOTION 行为挑。
+ * 动作必须仍可见才算候选（持久动作被选中时再次触发即关掉它，与手动切换一致），
+ * 因此不排除当前动作。真正触发（或切走）由 run_behavior 处理。 */
+void bongo_cat_random_motion_update(BongoCatApp *app, uint64_t now) {
+    if (app && app->window_snapshot) return;
+    if (!app || !app->settings.window.random_motion || !app->live2d) {
+        bongo_cat_random_motion_reset(app);
+        return;
+    }
+    float seconds = app->settings.window.random_motion_interval_seconds;
+    if (!(seconds >= 1.0f && seconds <= 3600.0f))
+        seconds = BONGO_CAT_DEFAULT_RANDOM_MOTION_SECONDS;
+    if (!app->random_motion_due_ns ||
+        app->random_motion_interval_seconds != seconds) {
+        app->random_motion_interval_seconds = seconds;
+        app->random_motion_due_ns = now +
+            (uint64_t)(seconds * (float)NANOSECONDS_PER_SECOND);
+        return;
+    }
+    if (now < app->random_motion_due_ns) return;
+    app->random_motion_due_ns = now +
+        (uint64_t)(seconds * (float)NANOSECONDS_PER_SECOND);
+
+    size_t motion_count = 0;
+    const BongoCatSettings *settings = &app->settings;
+    for (size_t i = 0; i < app->behaviors.count; ++i) {
+        const BongoCatBehaviorEntry *entry = &app->behaviors.entries[i];
+        if (entry->kind != BONGO_CAT_BEHAVIOR_MOTION ||
+            bongo_cat_settings_random_disabled(settings, entry->id) ||
+            !bongo_cat_live2d_motion_visible(app->live2d, entry->group,
+                entry->index)) continue;
+        motion_count++;
+    }
+    if (!motion_count) return;
+    size_t choice = random_expression_next(app, now) % motion_count;
+    for (size_t i = 0; i < app->behaviors.count; ++i) {
+        const BongoCatBehaviorEntry *entry = &app->behaviors.entries[i];
+        if (entry->kind != BONGO_CAT_BEHAVIOR_MOTION ||
+            bongo_cat_settings_random_disabled(settings, entry->id) ||
+            !bongo_cat_live2d_motion_visible(app->live2d, entry->group,
+                entry->index)) continue;
+        if (choice--) continue;
+        bongo_cat_app_run_behavior(app, entry);
+        return;
+    }
+}
+
+void bongo_cat_random_motion_reset(BongoCatApp *app) {
+    if (!app) return;
+    app->random_motion_due_ns = 0;
+    app->random_motion_interval_seconds = 0.0f;
+}
+
+/* 顺序模型：按目录顺序切换到下一个参与且未被隐藏的模型，到末尾回绕。
+ * 参与判定对齐 BongoCat-X: 每个模型配一个合成行为 id "switch:<模型id>"，默认全参
+ * 与；只要这个 id 出现在 random_disabled 参与集合里(或模型本身在隐藏列表里)，就跳过
+ * 它。只有一个候选模型时什么都不做。 */
+void bongo_cat_sequential_model_update(BongoCatApp *app, uint64_t now) {
+    if (app && app->window_snapshot) return;
+    if (!app || !app->settings.window.sequential_model || !app->live2d) {
+        bongo_cat_sequential_model_reset(app);
+        return;
+    }
+    float seconds = app->settings.window.sequential_model_interval_seconds;
+    if (!(seconds >= 1.0f && seconds <= 3600.0f))
+        seconds = BONGO_CAT_DEFAULT_SEQUENTIAL_MODEL_SECONDS;
+    if (!app->sequential_model_due_ns ||
+        app->sequential_model_interval_seconds != seconds) {
+        app->sequential_model_interval_seconds = seconds;
+        app->sequential_model_due_ns = now +
+            (uint64_t)(seconds * (float)NANOSECONDS_PER_SECOND);
+        return;
+    }
+    if (now < app->sequential_model_due_ns) return;
+    app->sequential_model_due_ns = now +
+        (uint64_t)(seconds * (float)NANOSECONDS_PER_SECOND);
+
+    const BongoCatSettings *settings = &app->settings;
+    const char *active = app->session.active_model_id;
+    const BongoCatModelEntry *first = NULL;
+    const BongoCatModelEntry *next = NULL;
+    bool after_active = false;
+    for (size_t i = 0; i < app->models.count; ++i) {
+        const BongoCatModelEntry *entry = &app->models.entries[i];
+        if (bongo_cat_settings_model_hidden(settings, entry->id)) continue;
+        char switch_id[BONGO_CAT_BEHAVIOR_ID_CAP];
+        snprintf(switch_id, sizeof(switch_id), "switch:%s", entry->id);
+        if (bongo_cat_settings_random_disabled(settings, switch_id)) continue;
+        if (active[0] && !strcmp(entry->id, active)) {
+            after_active = true;
+            continue;
+        }
+        if (!first) first = entry;
+        if (after_active) { next = entry; break; }
+    }
+    if (!next) next = first;
+    if (!next || !strcmp(next->id, active)) return;
+    if (bongo_cat_app_select_model(app, next->id)) app->dirty = true;
+}
+
+void bongo_cat_sequential_model_reset(BongoCatApp *app) {
+    if (!app) return;
+    app->sequential_model_due_ns = 0;
+    app->sequential_model_interval_seconds = 0.0f;
 }
 
 /* 把一帧的时间片交给 Live2D 物理。delta 先夹到 0.25 秒（窗口被挂起或卡顿后的补帧上限），

@@ -172,6 +172,10 @@ typedef struct BongoCatApp {
     uint64_t random_expression_due_ns;
     float random_expression_interval_seconds;
     uint32_t random_expression_state;
+    uint64_t random_motion_due_ns;
+    float random_motion_interval_seconds;
+    uint64_t sequential_model_due_ns;
+    float sequential_model_interval_seconds;
     uint64_t settings_saved_hash, settings_observed_hash;
     uint64_t session_saved_hash, session_observed_hash;
     uint64_t settings_save_due_ns, session_save_due_ns;
@@ -231,6 +235,10 @@ typedef struct BongoCatApp {
     double slide_x, slide_y;
     uint64_t slide_last_ns;
     int slide_frame;
+    /* 不足一拍的余量: 按真实时间累积成 15.6ms 的拍, 见 update_inertia。 */
+    double slide_accum_s;
+    /* 上一拍设下的窗口位置: 下一拍照面不是这个值, 就说明窗口被外力动了, 滑行停止。 */
+    int slide_last_set_x, slide_last_set_y;
     void *drag_display_bounds;
     int drag_display_count;
     float left_stick_x, left_stick_y;

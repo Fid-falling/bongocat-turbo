@@ -30,6 +30,10 @@
           "windowCorners": "視窗圓角 (%)",
           "opacity": "不透明度",
           "randomExpression": "隨機表情",
+          "secondsUnit": "秒",
+          "randomSettings": "隨機",
+          "randomMotion": "隨機動作",
+          "sequentialModel": "順序模型",
           "obsBackground": "純色背景",
           "hideOnHover": "滑鼠游標移入隱藏",
           "hideFadeSeconds": "隱藏漸變時長 (秒)",
@@ -48,6 +52,9 @@
         },
         "hints": {
         "rendererRestart": "設定已儲存，請手動重新啟動 BongoCat 才會生效。",
+        "randomExpression": "在設定的間隔隨機切換表情。按說明右側的設定按鈕，選擇參與的表情。",
+        "randomMotion": "在設定的間隔隨機觸發動作。按說明右側的設定按鈕，選擇參與的動作。",
+        "sequentialModel": "在設定的間隔依序切換模型。按說明右側的設定按鈕，到模型頁調整輪換順序。",
         "rendererRestarting": "正在重新啟動 BongoCat 以套用新的渲染後端...",
         "supersample": "自動時會依視窗大小調整, 更省資源",
           "hoverUnavailable": "目前桌面環境暫不支援滑鼠移入隱藏。",
@@ -58,7 +65,7 @@
           "keepInScreen": "啟用後，視窗會自動調整位置，防止超出螢幕邊界。",
           "edgeSnap": "拖曳到螢幕邊緣附近時，自動吸附到邊緣。",
           "slideAnimation": "鬆手後沿拖曳方向繼續滑行一小段距離。",
-          "slideNoDecay": "放開後它會一直滑下去，撞到螢幕邊緣就彈回來；再抓住它、或關掉這個選項才會停下來。",
+          "slideNoDecay": "放開後它會一直滑下去，撞到螢幕邊緣就彈回來；再抓住它、或關掉這個選項才會停下來。開啟時上面那個放緩百分比不再生效。",
           "captureOnly": "桌面不再顯示視窗，OBS 等擷取軟體仍能拍到畫面",
           "obsBackground": "視窗擷取黑屏？",
           "obsBackgroundHelp": "OBS：開啟目前選項，使用 Windows 7 相容擷取，並用色鍵濾鏡移除背景。\n嗶哩嗶哩直播姬：不需要開啟目前選項，選擇遊戲程序擷取，並開啟允許視窗透明。",
@@ -101,8 +108,8 @@
           "inputMonitoringPermissionGuide": "輸入監控權限讓 BongoCat 能接收其他應用程式中的按鍵；滑鼠移動和點擊無需該權限。BongoCat 在啟動時建立監聽，因此權限變更後需要重新啟動。\n\n操作方式：\n1. 開啟「系統設定」→「隱私權與安全性」→「輸入監控」。\n2. 直接開啟清單中已有的 BongoCat 項目，不要刪除現有項目。\n3. 若清單中沒有 BongoCat，點擊「+」按鈕，加入你目前執行的那份應用程式（請確認應用程式位置）。\n4. 完全結束 BongoCat 後重新啟動，讓它重建監聽。\n\n若鍵盤仍然沒有反應，可由你自行移除並重新加入 BongoCat 項目來排解問題。",
           "administratorPermission": "以系統管理員身分執行應用程式，可以更穩定地擷取部分系統層級按鍵與輸入事件。",
           "administratorPermissionGuide": "為了能更穩定地擷取部分系統層級按鍵與輸入事件，建議以系統管理員身分執行應用程式。\n\n操作方式：\n1. 先退出應用程式。\n2. 在檔案總管中找到應用程式的 exe 或捷徑。\n3. 根據需求選擇啟動方式：\n   • 僅本次：右鍵並選擇「以系統管理員身分執行」。\n   • 永久預設：右鍵 → 內容 → 相容性索引標籤 → 勾選「以系統管理員身分執行此程式」→ 確定。",
-          "cacheDirectory": "目前實際使用的資料夾。按「重設」回到預設位置。",
-          "portableMode": "所有檔案都放在程式目錄下的 BongoCatData 資料夾裡；把程式和這個資料夾一起複製就能搬移。只會複製設定與模型，快取會在需要時重建。",
+          "cacheDirectory": "目前使用的資料夾；「重設」恢復預設位置。",
+          "portableMode": "所有資料放在程式旁的 BongoCatData 資料夾；把程式和該資料夾一起複製即可搬移。",
           "portableMigrating": "正在搬移設定與模型，請稍候...",
           "portableRestarting": "搬移完成，正在重新啟動 BongoCat 以使用新的位置...",
           "portableManualRestart": "搬移完成，請手動重新啟動 BongoCat 以使用新的位置。",
@@ -128,6 +135,11 @@
       "model": {
         "title": "模型",
         "nearbyTitle": "附近模型",
+        "builtinsTitle": "內建模型",
+        "tabs": {
+          "models": "模型",
+          "random": "隨機"
+        },
         "labels": {
           "deleteModel": "刪除模型"
         },
@@ -146,10 +158,9 @@
           "importOutOfMemory": "記憶體不足，無法匯入此模型",
           "importLoadFailed": "模型已匯入，但無法正常顯示",
           "importFailed": "模型匯入失敗，請檢查所選檔案後再試一次",
+          "importingBackground": "正在背景匯入...",
           "clickOrDragToImport": "點擊或拖入模型資料夾",
           "supportedImportFormats": "支援 Mver 與 Tauri 格式",
-          "dropBlockedTitle": "拖不進模型？",
-          "dropBlocked": "以管理員身分執行時，Windows 可能攔截檔案總管的拖放；可以改用上方的匯入按鈕選擇 zip。",
           "openDirectoryFailed": "無法開啟模型目錄"
         },
         "tooltips": {
@@ -163,6 +174,7 @@
             "motion": "動作",
             "expression": "表情",
             "audio": "音訊",
+            "switch": "切換",
             "stopAllAudio": "停止所有音訊",
             "motionIndex": "動作{index}",
             "motionGroupIndex": "動作組{index}",
