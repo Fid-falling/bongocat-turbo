@@ -202,10 +202,19 @@ int main(void) {
     BongoCatError error = {0};
     BongoCatI18n *all = bongo_cat_i18n_create(root,
         BONGO_CAT_LANG_EN_US, &error);
-    uint32_t all_ranges[2048];
+    /*
+     * 全语言字形范围并集的预算: 每个**不连续**的码点区间占 2 个元素, 加上 ASCII 区
+     * ([0x20,0x7e]) 与末尾哨兵。10 种语言合起来目前需要 2100 多个元素 (中文/日文/韩文
+     * 的字符集各自独立, 交集很小), 所以这里给 4096 —— 原来的 2048 会在并集上截断尾部
+     * 区间, 表现为"某些语言的部分文字没有字形"(本用例的 return 5/6 就是在报这个)。
+     * 应用侧不受影响: 它给字体图集的是**当前语言**的范围 (preferences_state.h 的
+     * glyph_ranges[2048]), 单语言最坏情况只有这个并集的一半。
+     */
+    uint32_t all_ranges[4096];
     const uint32_t menu_points[] = {0x7b80, 0x9ad4, 0x00e7, 0x00fc, 0x65e5,
         0xd55c, 0x00ea, 0x0420, 0x00f1};
-    if (!all || bongo_cat_i18n_all_glyph_ranges(all, all_ranges, 2048) < 3)
+    if (!all || bongo_cat_i18n_all_glyph_ranges(all, all_ranges,
+            sizeof(all_ranges) / sizeof(all_ranges[0])) < 3)
         return 4;
     for (size_t i = 0; i < sizeof(menu_points) / sizeof(menu_points[0]); ++i)
         if (!includes(all_ranges, menu_points[i])) return 5;
