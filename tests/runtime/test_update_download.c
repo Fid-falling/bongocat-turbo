@@ -355,6 +355,8 @@ static void test_update_download(void) {
     SDL_setenv_unsafe("BONGO_CAT_UPDATE_FEED_URL", "", 1);
     bongo_cat_path_remove(sources_path);
     bongo_cat_path_remove(state_path);
+    /* 临时目录也一起收掉: 用例跑完不该在用户机器上留东西 (目录空时 remove 就能删掉)。 */
+    bongo_cat_path_remove(root);
     server_stop(&server);
     WSACleanup();
 }
