@@ -197,7 +197,15 @@ if ($Denied) {
 
 # ------------------------------------------------------------------------- 收尾
 if (-not $KeepArtifacts -and (Test-Path -LiteralPath $WorkRoot)) {
-  Remove-Item -LiteralPath $WorkRoot -Recurse -Force -ErrorAction SilentlyContinue
+  # 刚被替换/刚启动的文件可能还被占着一小会儿 (杀软扫描、cmd 进程还没退出), 重试几次,
+  # 免得在用户机器上留下一个几十 MB 的临时目录。
+  for ($Attempt = 0; $Attempt -lt 10 -and (Test-Path -LiteralPath $WorkRoot); $Attempt++) {
+    Remove-Item -LiteralPath $WorkRoot -Recurse -Force -ErrorAction SilentlyContinue
+    if (Test-Path -LiteralPath $WorkRoot) { Start-Sleep -Milliseconds 500 }
+  }
+  if (Test-Path -LiteralPath $WorkRoot) {
+    Write-Host "note : temporary directory kept (files still in use): $WorkRoot"
+  }
 }
 if ($script:Failures) {
   Write-Host "$($script:Failures) checks failed"
