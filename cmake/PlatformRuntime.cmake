@@ -5,6 +5,9 @@ if(WIN32)
     src/platform/windows/windows_directory.c
     src/platform/windows/windows_package.c
     src/platform/windows/windows_startup.c
+    # 开机自启 (启动文件夹快捷方式 + 最高权限计划任务): 从 windows_startup.c 拆出,
+    # 与单实例/唤醒没有共享状态 (见行数策略 cmake/CheckLines.cmake)。
+    src/platform/windows/windows_autostart.c
     src/platform/windows/windows_update_handoff.c
     src/platform/windows/windows_borderless.c
     src/platform/windows/windows_capture.c

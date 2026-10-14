@@ -17,6 +17,11 @@
 
 void bongo_cat_preferences_page_settings(BongoCatPreferences *value,
     struct nk_context *context);
+/* 设置页 [应用] 区 (开关 + 外观) 与 macOS 的输入监控区。定义在
+   preferences_general_page.c: 与 [窗口] 区没有共享状态, 拆开是为了 500 行的行数策略
+   (见 cmake/CheckLines.cmake)。 */
+void bongo_cat_preferences_general_page(BongoCatApp *app,
+    struct nk_context *context);
 void bongo_cat_preferences_page_model(BongoCatPreferences *value,
     struct nk_context *context);
 bool bongo_cat_preferences_behavior_dialog_active(

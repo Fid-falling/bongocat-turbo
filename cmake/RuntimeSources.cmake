@@ -191,6 +191,8 @@ set(BONGO_CAT_RUNTIME_SHELL_SOURCES
   src/runtime/shell/window.c
   src/runtime/shell/window_background.c
   src/runtime/shell/window_display.c
+  # 显示器几何的纯计算 + 自检 (window_display.c 只留"什么时候该动窗口")。
+  src/runtime/shell/window_display_geometry.c
   src/runtime/shell/window_drag.c
   src/runtime/shell/window_geometry.c
   src/runtime/shell/window_hit.c
@@ -284,6 +286,8 @@ set(BONGO_CAT_UI_PREFERENCES_SOURCES
   src/ui/preferences/preferences_notice.c
   src/ui/preferences/preferences_overlay.c
   src/ui/preferences/preferences_page_dispatch.c
+  # [应用] 区与 macOS 输入监控区 (从 preferences_pages.c 拆出, 见行数策略)
+  src/ui/preferences/preferences_general_page.c
   src/ui/preferences/preferences_pages.c
   src/ui/preferences/preferences_portable.c
   src/ui/preferences/preferences_present.c
