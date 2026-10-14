@@ -23,6 +23,7 @@
  */
 #include "runtime.h"
 #include "portable_mode.h"
+#include "update_install.h"
 
 #include "bongo_cat/i18n.h"
 #include "bongo_cat/log.h"
@@ -144,6 +145,30 @@ bool bongo_cat_app_request_restart_elevated(BongoCatApp *app,
     return true;
 }
 
+/*
+ * 一键更新的最后一步: 请求"退出 -> 替换 exe -> 用新版本重启"。
+ * 与普通重启共用同一个请求位与主循环末尾的收尾 (见 bongo_cat_app_update_restart),
+ * 只多一个 update_install_pending 标记: 那条分支拉起的是隐藏的更新助手进程, 而不是
+ * 立刻重启当前 exe —— 运行中的 exe 不能被覆盖, 必须等本进程真的退出。
+ * 无人值守运行 (--ci-* / 冒烟) 一律拒绝: **CI 只能检查, 不能动二进制**。
+ */
+bool bongo_cat_app_request_update_restart(BongoCatApp *app) {
+    if (!app) return false;
+    if (app->restart_requested && app->update_install_pending) return true;
+    if (restart_blocked(app)) {
+        SDL_LogInfo(BONGO_CAT_LOG_LIFECYCLE,
+            "[update] 无人值守运行 (%s): 不自动替换可执行文件, 请手动替换",
+            app->smoke ? "冒烟" : "自动化");
+        return false;
+    }
+    app->restart_requested = true;
+    app->restart_elevated = false;
+    app->update_install_pending = true;
+    SDL_LogInfo(BONGO_CAT_LOG_LIFECYCLE,
+        "[update] 已安排自动替换并重启: 本进程先正常退出, 由更新助手完成替换");
+    return true;
+}
+
 /* 主循环末尾调用 (config_store 更新之后): 真正的重启动作。 */
 void bongo_cat_app_update_restart(BongoCatApp *app) {
     if (!app || !app->restart_requested) return;
@@ -162,6 +187,28 @@ void bongo_cat_app_update_restart(BongoCatApp *app) {
     bongo_cat_runtime_log_preserve();
     /* 先把单实例锁还回去, 新进程才拿得到它。 */
     bongo_cat_platform_single_instance_end();
+    /*
+     * 自动替换分支: 拉起同一个 exe 的隐藏助手模式, 由它在本进程退出后做
+     * "旧文件改名 -> 新文件就位 -> 重启"。单实例锁同样已经还回去了 —— 助手不抢锁,
+     * 它拉起的新版本会在本进程退出之后才抢。
+     * 拉起失败必须撤销替换意图并抢回锁继续运行: 用户看到的是"更新没装成, 但程序还在",
+     * 而不是"程序关了却再也没起来"。
+     */
+    if (app->update_install_pending) {
+        BongoCatError update_error = {0};
+        if (bongo_cat_update_install_spawn(app, arguments, &update_error)) {
+            app->running = false;
+            return;
+        }
+        app->update_install_pending = false;
+        app->restart_requested = false;
+        app->restart_elevated = false;
+        if (!bongo_cat_platform_single_instance_begin())
+            SDL_LogWarn(SDL_LOG_CATEGORY_APPLICATION,
+                "[update] 更新助手启动失败后未能重新取得单实例锁");
+        bongo_cat_update_install_abort(app->update, &update_error);
+        return;
+    }
     BongoCatError error = {0};
     BongoCatResult result = app->restart_elevated
         ? bongo_cat_platform_restart_application_elevated(arguments, &error)

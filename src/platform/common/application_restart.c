@@ -30,6 +30,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <wchar.h>
 #include <windows.h>
 #include <shellapi.h>
 
@@ -55,14 +56,12 @@ BongoCatResult bongo_cat_platform_restart_application(const char *arguments,
         return BONGO_CAT_ERROR_PLATFORM;
     }
     const char *extra = arguments ? arguments : "";
-    char command[BONGO_CAT_RESTART_COMMAND_CAP];
-    /* 路径必须带引号: 程序装在 "C:\Program Files\..." 时不带引号会被拆成两个参数,
-       新进程会去启动一个不存在的 exe。 */
-    int written = snprintf(command, sizeof(command), "\"%ls\"%s%s",
-        executable, extra[0] ? " " : "", extra);
-    if (written < 0 || (size_t)written >= sizeof(command)) {
+    /* 参数长度先在这里挡住: 被截断的命令行会让新进程用错目录, 那比不重启更糟。
+       路径必须带引号 (下面拼命令行时加), 否则装在 "C:\Program Files\..." 下会被拆成
+       两个参数, 新进程会去启动一个不存在的 exe。 */
+    if (strlen(extra) >= BONGO_CAT_RESTART_COMMAND_CAP) {
         bongo_cat_error_set(error, BONGO_CAT_ERROR_PLATFORM,
-            "Restart arguments do not fit (%d bytes)", written);
+            "Restart arguments do not fit (%zu bytes)", strlen(extra));
         return BONGO_CAT_ERROR_PLATFORM;
     }
     SetEnvironmentVariableA(BONGO_CAT_ELEVATION_TRIED_ENV, "1");
@@ -80,8 +79,10 @@ BongoCatResult bongo_cat_platform_restart_application(const char *arguments,
         info.fMask = SEE_MASK_FLAG_NO_UI;
         info.lpVerb = L"runas";
         info.lpFile = executable;
-        /* lpParameters 只要参数部分 (lpFile 已经是 exe 了), 而且要宽字符。 */
-        wchar_t *wide_extra = extra[0] ? bongo_cat_windows_wide(extra) : NULL;
+        /* lpParameters 只要参数部分 (lpFile 已经是 exe 了), 而且要宽字符。
+           这里必须用"纯文本"转换: 参数里的正斜杠是语法 (cmd 的 /c、URL、--x=/y),
+           路径版转换会把它们变成反斜杠, 新进程收到的是另一个命令行。 */
+        wchar_t *wide_extra = extra[0] ? bongo_cat_windows_wide_text(extra) : NULL;
         info.lpParameters = wide_extra;
         info.nShow = SW_SHOWNORMAL;
         bool launched = ShellExecuteExW(&info) != FALSE;
@@ -94,19 +95,29 @@ BongoCatResult bongo_cat_platform_restart_application(const char *arguments,
             extra[0] ? extra : "无");
         return BONGO_CAT_OK;
     }
-    wchar_t *wide_command = bongo_cat_windows_wide(command);
-    if (!wide_command) {
+    /*
+     * 命令行的两段分开转换: 路径用路径版 (会做 '/'->'\\' 归一, 长路径还能拿到 \\?\ 前缀),
+     * 参数用纯文本版 (理由见上面 lpParameters 的注释)。原先整串一起转, 结果凡是带正斜杠的
+     * 参数都会走样。
+     */
+    wchar_t *wide_extra = extra[0] ? bongo_cat_windows_wide_text(extra) : NULL;
+    wchar_t command_line[BONGO_CAT_RESTART_COMMAND_CAP * 2];
+    int written_wide = swprintf(command_line,
+        sizeof(command_line) / sizeof(command_line[0]),
+        extra[0] ? L"\"%ls\" %ls" : L"\"%ls\"", executable,
+        wide_extra ? wide_extra : L"");
+    free(wide_extra);
+    if (written_wide < 0) {
         bongo_cat_error_set(error, BONGO_CAT_ERROR_PLATFORM,
-            "Restart command line is not valid UTF-8");
+            "Restart command line does not fit");
         return BONGO_CAT_ERROR_PLATFORM;
     }
     STARTUPINFOW startup = {0};
     PROCESS_INFORMATION process = {0};
     startup.cb = sizeof(startup);
-    bool launched = CreateProcessW(executable, wide_command, NULL, NULL, FALSE,
+    bool launched = CreateProcessW(executable, command_line, NULL, NULL, FALSE,
         0, NULL, NULL, &startup, &process) != FALSE;
     DWORD failure = launched ? 0 : GetLastError();
-    free(wide_command);
     if (!launched) return launch_failure(error, failure);
     CloseHandle(process.hThread);
     CloseHandle(process.hProcess);

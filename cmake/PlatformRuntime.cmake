@@ -9,6 +9,8 @@ if(WIN32)
     # 与单实例/唤醒没有共享状态 (见行数策略 cmake/CheckLines.cmake)。
     src/platform/windows/windows_autostart.c
     src/platform/windows/windows_update_handoff.c
+    # 自动更新的隐藏助手模式 (--apply-update): 等旧进程退出 -> 替换 exe -> 重启
+    src/platform/windows/windows_update_apply.c
     src/platform/windows/windows_borderless.c
     src/platform/windows/windows_capture.c
     src/platform/windows/windows_transparency.c

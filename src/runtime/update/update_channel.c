@@ -84,6 +84,13 @@ const char *bongo_cat_update_platform_asset(void) {
 #endif
 }
 
+/* Windows 上"下载 -> 校验 -> 原地替换自己 -> 重启"这条链路是通的 (见
+   platform/windows/windows_update_apply.c), 所以手动检查发现新版本后可以直接一键更新,
+   不必把用户丢到浏览器里。 */
+bool bongo_cat_update_platform_self_update(void) {
+    return true;
+}
+
 #else
 
 /* Unix packages are published as a single archive for each architecture.
@@ -105,6 +112,12 @@ bool bongo_cat_update_platform_supported(void) {
 /* Unix 上没有商店也没有安装登记: 两个判断恒为 false, 更新一律走 portable 归档。 */
 bool bongo_cat_update_platform_store(void) { return false; }
 bool bongo_cat_update_platform_installed(void) { return false; }
+/* Unix 上没有"替换正在运行的自己"这套做法 (AppImage/包管理/bundle 替换都需要外部进程
+   参与), 所以自动更新不在这里做: 手动检查仍然只打开对应的下载页。 */
+bool bongo_cat_update_platform_self_update(void) {
+    return false;
+}
+
 const char *bongo_cat_update_platform_asset(void) {
 #if defined(__APPLE__)
 #if defined(__aarch64__) || defined(__arm64__)
@@ -127,16 +140,43 @@ static const char *tr(BongoCatUpdateService *service, const char *key,
     return bongo_cat_i18n_get(service->app->i18n, key, fallback);
 }
 
+/*
+ * "已下载到 <路径>, 请手动替换" —— 更新链路里唯一必须带参数的文案。
+ * 先看文案里有没有 %s 再决定要不要传参数: 某个语言的翻译漏了占位符时, 直接把路径追加在
+ * 末尾, 而不是拿一个不匹配的格式串去 snprintf (那是未定义行为)。
+ * 路径是用户唯一的出路, 任何情况下都不能丢。
+ */
+static void manual_replace_message(BongoCatUpdateService *service,
+    const BongoCatUpdateSnapshot *snapshot, char *output, size_t capacity) {
+    const char *format = tr(service, "native.support.updateManualReplace",
+        "Unable to replace the running program automatically. The new version "
+        "was downloaded to %s; close BongoCat and replace the file manually.");
+    if (format && strstr(format, "%s"))
+        snprintf(output, capacity, format, snapshot->manual_path);
+    else snprintf(output, capacity, "%s (%s)",
+        format ? format : "Update downloaded", snapshot->manual_path);
+}
+
 /* 手动检查完成后的回执: 只有 manual 检查会走到这里 (自动检查静默, 免得每次启动
  * 都弹提示), 而且 app->preferences 为空时底层直接丢弃, 不会崩。
- * ERROR 分支把人话交给 core/update_error.c: 那里认识 update_http*.c 写出的
- * "GitHub returned HTTP status N", 403/429 给"接口限流, 稍后重试或直接看发布页",
- * 其余状态码给通用文案 —— 界面不出现状态码, 原文仍由 update_service.c 记进日志。
+ * 三种情况:
+ *   1. "替换没能自动完成": 新文件已经在磁盘上 (manual_path), 唯一的出路是告诉用户它在
+ *      哪、让他手动替换 —— 这是本条分支存在的全部理由, 所以走危险色;
+ *   2. ERROR: 人话交给 core/update_error.c (它认识 update.h 里那几个阶段原文, 也认识
+ *      "GitHub returned HTTP status N" 这种限流原文), 界面不出现状态码与英文原文;
+ *   3. CURRENT/AVAILABLE: 一句结果提示。
+ * 下载中/校验中/准备重启这些进行中的阶段不弹提示: 进度由关于页的状态条持续显示,
+ * 弹一次 2.6 秒的 toast 反而会让人以为已经结束了。
  * message/detail 都是固定栈缓冲, 超长只截断不报错。 */
 void bongo_cat_update_show_completion(BongoCatUpdateService *service) {
     BongoCatUpdateSnapshot snapshot;
     bongo_cat_update_snapshot(service, &snapshot);
-    char message[192];
+    char message[384];
+    if (snapshot.manual_replace && snapshot.manual_path[0]) {
+        manual_replace_message(service, &snapshot, message, sizeof(message));
+        bongo_cat_preferences_notice_show(service->app, message, true);
+        return;
+    }
     if (snapshot.status == BONGO_CAT_UPDATE_CURRENT) {
         snprintf(message, sizeof(message), "%s v%s", tr(service,
             "native.support.latest", "Already up to date"), BONGO_CAT_VERSION);

@@ -79,8 +79,7 @@ static int transfer_progress(void *userdata, curl_off_t download_total,
     return cancelled(userdata) ? 1 : 0;
 }
 
-/* 与 Windows 侧同一套英文短句, 便于两平台日志互相对照; 未列举的码统一兜底。 */
-static const char *curl_error_name(CURLcode code) {
+/* 与 Windows 侧同一套英文短句, 便于两平台日志互相对照; 未列举的码统一兜底。 */static const char *curl_error_name(CURLcode code) {
     switch (code) {
     case CURLE_OPERATION_TIMEDOUT: return "network timeout";
     case CURLE_COULDNT_RESOLVE_HOST: return "DNS lookup failed";
@@ -100,6 +99,15 @@ static const char *curl_error_name(CURLcode code) {
 BongoCatUpdateFetchResult bongo_cat_update_http_fetch(
     BongoCatUpdateService *service, char **response, char *error,
     size_t error_capacity) {
+    return bongo_cat_update_http_fetch_url(service,
+        "https://api.github.com/repos/Fid-falling/bongocat-turbo/releases/latest",
+        response, error, error_capacity);
+}
+
+/* 抓指定 URL: 与 Windows 侧同构, 目前唯一的调用者是官方 .sha256 校验资产。 */
+BongoCatUpdateFetchResult bongo_cat_update_http_fetch_url(
+    BongoCatUpdateService *service, const char *url, char **response,
+    char *error, size_t error_capacity) {
     *response = NULL;
     if (!service || !error || !error_capacity)
         return BONGO_CAT_UPDATE_FETCH_MEMORY;
@@ -141,8 +149,7 @@ BongoCatUpdateFetchResult bongo_cat_update_http_fetch(
     struct curl_slist *headers = NULL;
     headers = curl_slist_append(headers, "Accept: application/vnd.github+json");
     headers = curl_slist_append(headers, "X-GitHub-Api-Version: 2022-11-28");
-    curl_easy_setopt(curl, CURLOPT_URL,
-        "https://api.github.com/repos/Fid-falling/bongocat-turbo/releases/latest");
+    curl_easy_setopt(curl, CURLOPT_URL, url);
     curl_easy_setopt(curl, CURLOPT_USERAGENT, "BongoCat Update Checker/1.0");
     curl_easy_setopt(curl, CURLOPT_HTTPHEADER, headers);
     curl_easy_setopt(curl, CURLOPT_FOLLOWLOCATION, 1L);
@@ -197,6 +204,23 @@ void bongo_cat_update_http_cancel(BongoCatUpdateService *service) {
     SDL_LockMutex(service->http_mutex);
     service->http_cancelled = true;
     SDL_UnlockMutex(service->http_mutex);
+}
+
+/*
+ * 下载阶段的 Unix 桩: 非 Windows 没有"替换正在运行的自己"这套机制 (Windows 用
+ * MoveFileEx 改名旧 exe 再落新文件, 见 platform/windows/windows_update_apply.c), 所以
+ * 下载在这里直接判为不支持 —— 手动检查仍然只跳到发布页, 与加这个功能之前完全一致。
+ * 保留一个桩而不是在调用点上 #ifdef, 是为了让更新状态机在两个平台上同构。
+ */
+BongoCatUpdateFetchResult bongo_cat_update_http_download(
+    BongoCatUpdateService *service, const char *url, const char *path,
+    char *error, size_t error_capacity) {
+    (void)service;
+    (void)url;
+    (void)path;
+    snprintf(error, error_capacity,
+        "Automatic updates are not supported on this platform");
+    return BONGO_CAT_UPDATE_FETCH_UNSUPPORTED;
 }
 
 #endif

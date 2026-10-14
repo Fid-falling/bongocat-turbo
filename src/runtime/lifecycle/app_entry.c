@@ -21,6 +21,12 @@ int bongo_cat_app_run(int argc, char **argv) {
         return 0;
     }
     if (bongo_cat_platform_update_shutdown_argument(argc, argv)) return 0;
+    /* 自动更新的隐藏助手模式 (--apply-update): 等旧进程退出 -> 替换 exe -> 重启。
+       必须排在单实例锁之前 —— 助手进程就是被替换的那个 exe, 去抢锁只会自己挡自己;
+       也绝不能走到 SDL/窗口初始化: 那时用户已经关掉程序了, 助手只做文件操作。 */
+    int apply_exit_code = 0;
+    if (bongo_cat_platform_update_apply_argument(argc, argv, &apply_exit_code))
+        return apply_exit_code;
     bool secondary = bongo_cat_multi_pet_secondary_argument(argc, argv);
     if (!secondary && !bongo_cat_platform_single_instance_begin()) return 0;
 /* 还没有 app 可传, 所以 startup_failure(NULL) 只打日志; 但单实例锁仍要归还。 */

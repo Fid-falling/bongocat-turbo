@@ -172,6 +172,19 @@ bool bongo_cat_platform_single_instance_begin(void);
    所以调用方每收到一次就只处理一次。 */
 BongoCatWakeRequest bongo_cat_platform_single_instance_take_wake(void);
 bool bongo_cat_platform_update_shutdown_argument(int argc, char **argv);
+/*
+ * 隐藏的自动更新模式: "同一个 exe 在旧进程退出后完成替换并重启自己"。
+ * 命令行形如
+ *   BongoCatTurbo.exe --apply-update --wait-pid=<pid> --src=<新文件> --dst=<当前 exe>
+ *     [--sha256=<hex>] [--restart-args=<原样带给新进程的参数>]
+ *     [--result-file=<失败回执>] [--log-file=<助手日志>]
+ * 返回 true = 本次启动就是助手进程, 调用方必须立刻退出 (**不建窗口、不初始化 SDL、不碰单
+ * 实例锁**), 退出码写进 *exit_code (0 成功, 非 0 失败)。
+ * 返回 false = 不是这个模式, 正常启动流程继续 (非 Windows 平台恒为 false)。
+ * 细节与不变量见 src/platform/windows/windows_update_apply.c。
+ */
+bool bongo_cat_platform_update_apply_argument(int argc, char **argv,
+    int *exit_code);
 bool bongo_cat_platform_single_instance_take_update_shutdown(void);
 void bongo_cat_platform_single_instance_end(void);
 BongoCatResult bongo_cat_platform_set_autostart(bool enabled, bool elevated,

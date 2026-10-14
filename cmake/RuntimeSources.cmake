@@ -80,6 +80,12 @@ set(BONGO_CAT_RUNTIME_UPDATE_SOURCES
   src/runtime/update/update_channel.c
   src/runtime/update/update_http.c
   src/runtime/update/update_http_unix.c
+  # 一键更新的"下载 + 校验"阶段 (多源回退, 独立于状态机)
+  src/runtime/update/update_download.c
+  # 替换/重启的调度与启动收尾 (.old 备份、失败回执)
+  src/runtime/update/update_install.c
+  # 下载源列表的配置覆盖 (update-sources.txt) 与"记住上次成功的源"
+  src/runtime/update/update_source_store.c
   src/runtime/update/update_service.c)
 
 set(BONGO_CAT_RUNTIME_DIAGNOSTIC_SOURCES
@@ -308,6 +314,8 @@ set(BONGO_CAT_UI_PREFERENCES_SOURCES
   src/ui/preferences/preferences_text_session.c
   src/ui/preferences/preferences_theme.c
   src/ui/preferences/preferences_toggle.c
+  # 一键更新的状态条 (下载进度/当前源/失败原因), 与一次性提示条分开
+  src/ui/preferences/preferences_update_status.c
   src/ui/preferences/preferences_widget_shortcut.c
   src/ui/preferences/preferences_widgets.c
   src/ui/preferences/preferences_widgets_compound.c

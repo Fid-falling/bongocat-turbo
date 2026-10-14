@@ -157,6 +157,14 @@ typedef struct BongoCatApp {
        当前未提权)。走 bongo_cat_platform_restart_application_elevated 拉起新进程;
        否则按普通重启保持当前权限。 */
     bool restart_elevated;
+    /*
+     * restart_requested 开启时, 置位表示这次不是"重启自己"而是"换成刚下载好的新版本":
+     * 主循环末尾会拉起同一个 exe 的隐藏助手模式 (--apply-update), 由它在旧进程退出后
+     * 替换文件并重新启动 (见 runtime/update/update_install.c)。
+     * 与 restart_elevated 的区别: 那条路是立刻用**当前**的 exe 起一个新进程, 这条路的
+     * 新进程是替换之后的新文件, 所以必须等本进程真的退出。
+     */
+    bool update_install_pending;
     int exit_code;
     bool dirty;
     /* 已经下发给后端的 max_fps (垂直同步跟随它变化), -1 表示还没下发过 */
@@ -301,5 +309,13 @@ bool bongo_cat_app_request_restart(BongoCatApp *app);
  * 排上的普通重启可被后续的提权重启升级。
  */
 bool bongo_cat_app_request_restart_elevated(BongoCatApp *app, bool elevated);
+/*
+ * 请求"关掉自己, 换成刚下载并校验通过的新版本" (一键更新的最后一步)。
+ * 与 bongo_cat_app_request_restart 共用主循环末尾的收尾 (落盘 -> 还回单实例锁 -> 退出),
+ * 区别只在退出前做的是"拉起隐藏的更新助手"而不是"重启当前 exe"。
+ * 返回 false = 本次运行不允许自动替换 (--ci-* / 冒烟): CI 只能检查, 不能动二进制。
+ * 调用方随即将更新状态改成"请手动替换"。
+ */
+bool bongo_cat_app_request_update_restart(BongoCatApp *app);
 
 #endif

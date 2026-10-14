@@ -35,6 +35,28 @@ wchar_t *bongo_cat_windows_wide(const char *text) {
     free(wide); return extended;
 }
 
+/*
+ * 纯文本的 UTF-8 -> UTF-16: 与 bongo_cat_windows_wide 的唯一区别是**不做路径归一**
+ * (不把 '/' 换成 '\\', 也不加 \\?\ 前缀)。
+ *
+ * 为什么必须有两个: bongo_cat_windows_wide 是给文件路径用的, 而命令行参数不是路径 ——
+ * 参数里的正斜杠是有意义的语法 (cmd 的 /c、URL、--switch=/value 这类写法), 被换成反斜杠
+ * 之后程序收到的就是另一个东西了 (实测: 重启参数里的 "/c" 变成 "\c", cmd 什么也不做)。
+ * 同理也不能给它加 \\?\ 前缀, 那会变成参数字符串的一部分。
+ */
+wchar_t *bongo_cat_windows_wide_text(const char *text) {
+    int length = text ? MultiByteToWideChar(CP_UTF8, MB_ERR_INVALID_CHARS,
+        text, -1, NULL, 0) : 0;
+    wchar_t *wide = length > 0 ? malloc((size_t)length * sizeof(*wide)) : NULL;
+    if (!wide) return NULL;
+    if (!MultiByteToWideChar(CP_UTF8, MB_ERR_INVALID_CHARS, text, -1, wide,
+            length)) {
+        free(wide);
+        return NULL;
+    }
+    return wide;
+}
+
 /* 先问需要多少字节再转换, 因此容量不够时直接失败, 不会写出半截字符串。 */
 bool bongo_cat_windows_utf8(const wchar_t *text, char *output, size_t capacity) {
     if (!text || !output || !capacity) return false;
