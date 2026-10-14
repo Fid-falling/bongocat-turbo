@@ -194,6 +194,10 @@ bool bongo_cat_app_switch_renderer(BongoCatApp *app, BongoCatRenderer target,
 bool bongo_cat_app_capture_pending_model_cover(BongoCatApp *app);
 /* --- 运行时策略: 流程脚本、系统语言、配置落盘、多宠协同 --- */
 void bongo_cat_runtime_flow_update(BongoCatApp *app, uint64_t now);
+/* --ci-model-switch= 的自测驱动器 (实现见 lifecycle/smoke_model_switch.c): 按 delay/gap 把
+ * 命令行给的模型 id 依次登记成切换请求, 用来无人值守地跑"连点好几个模型"与"切到坏模型"。
+ * 没有这个参数时第一行就返回。 */
+void bongo_cat_smoke_model_switch_update(BongoCatApp *app, uint64_t now);
 /* --- 模型切换的异步队列 (实现见 model/model_switch.c) ---
  * 换模型必须走这条异步路径: 加载要 1~5 秒, 同步做会让主循环一帧不出、设置窗口也点不动。
  * 调用方只登记请求, 由主循环每轮调一次 step 按帧预算推进; 失败时当前模型保持不变。 */

@@ -24,6 +24,9 @@ typedef struct BongoCatVk BongoCatVk;
 typedef struct BongoCatLive2DLoadSession BongoCatLive2DLoadSession;
 
 #define BONGO_CAT_MODEL_COVER_PENDING_CAP 8
+/* --ci-model-switch= 一次能登记的模型数。它只是自测驱动器的输入, 取 8 足够表达
+   "连点好几个模型" (真实用户连点也远少于这个数)。 */
+#define BONGO_CAT_SMOKE_SWITCH_CAP 8
 
 /* 模型切换前后要保持的"内容锚点" (画面里真正有内容的矩形), 由
    runtime/model/model_geometry.h 提供实现。它出现在这里是因为它是影子状态的一部分。 */
@@ -187,6 +190,26 @@ typedef struct BongoCatApp {
     unsigned model_load_runtime_stage;
     unsigned model_selection_serial;
     uint64_t smoke_runtime_flow_ns;
+    /*
+     * --ci-model-switch= 的自测驱动器状态 (实现见 runtime/lifecycle/smoke_model_switch.c)。
+     *
+     * 为什么要有它: "连点好几个模型, 最终只应用最后一次"以及"切到坏模型时回退原模型"这两条
+     * 结论只能由真实主循环跑出来 —— 单测里手工调一次 request/step 无法覆盖"请求落在上一
+     * 次加载进行到一半时"这条路径。它只登记请求、不碰模型状态, 与设置页点卡片走的是同一个
+     * 入口 (bongo_cat_app_request_model_switch)。
+     */
+    struct {
+        bool enabled;
+        bool armed;
+        bool issued;
+        /* 已经登记过的请求数; 等于 count 时表示这一轮连点已经发完, 剩下只等队列排空。 */
+        unsigned count;
+        unsigned next;
+        uint64_t delay_ns;
+        uint64_t gap_ns;
+        uint64_t due_ns;
+        char ids[BONGO_CAT_SMOKE_SWITCH_CAP][BONGO_CAT_ID_CAP];
+    } smoke_switch;
     int smoke_language;
     int smoke_theme;
     int smoke_preference_page;

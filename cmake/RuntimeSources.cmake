@@ -69,6 +69,8 @@ set(BONGO_CAT_RUNTIME_LIFECYCLE_SOURCES
   # "切换渲染后端"的唯一实现: 设置页分段选择器与托盘菜单共用同一条路径
   src/runtime/lifecycle/renderer_switch.c
   src/runtime/lifecycle/runtime_flow.c
+  # --ci-model-switch= 的自测驱动器 (连点模型 / 切到坏模型): 只登记请求, 不做断言
+  src/runtime/lifecycle/smoke_model_switch.c
   src/runtime/lifecycle/runtime_state.c
   src/runtime/lifecycle/shutdown.c
   src/runtime/lifecycle/startup.c

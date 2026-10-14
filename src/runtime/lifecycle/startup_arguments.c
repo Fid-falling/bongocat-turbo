@@ -23,6 +23,12 @@
 #include "windows_package.h"
 #endif
 
+/* --ci-model-switch= 的默认时序 (见 lifecycle/smoke_model_switch.c):
+   第一帧之后 2.5s 才开始登记 (让启动自己先收尾), 两次登记之间 120ms —— 比"同一帧连发"
+   更接近真实连点: 上一次切换已经跑出十几个半成品步骤, 下一个请求必须走 supersede。 */
+#define SMOKE_SWITCH_DELAY_DEFAULT_NS 2500000000ull
+#define SMOKE_SWITCH_GAP_DEFAULT_NS 120000000ull
+
 static bool store_argument(char *target, size_t capacity, const char *value,
     const char *name, BongoCatError *error) {
     int length = snprintf(target, capacity, "%s", value ? value : "");
@@ -30,6 +36,57 @@ static bool store_argument(char *target, size_t capacity, const char *value,
     bongo_cat_error_set(error, BONGO_CAT_ERROR_ARGUMENT,
         "%s path is too long", name);
     return false;
+}
+
+/*
+ * --ci-model-switch=id1,id2,... 的解析 (驱动器见 lifecycle/smoke_model_switch.c)。
+ * 逗号分隔而不是重复给同一个参数: 顺序是这条自测的全部意义 ("最后一个是哪一个"), 写在
+ * 一行里才看得清。id 超长或整串写不下都直接失败 —— 被静默截断的模型 id 会让断言以
+ * "模型不存在"的形式误报, 比启动失败难查得多。给多了只 WARN 并截断到上限。
+ */
+static bool parse_switch_list(BongoCatApp *app, const char *value,
+    BongoCatError *error) {
+    const char *cursor = value ? value : "";
+    unsigned dropped = 0;
+    while (*cursor) {
+        const char *comma = strchr(cursor, ',');
+        size_t length = comma ? (size_t)(comma - cursor) : strlen(cursor);
+        if (length) {
+            if (app->smoke_switch.count >= BONGO_CAT_SMOKE_SWITCH_CAP) dropped++;
+            else if (length >= BONGO_CAT_ID_CAP) {
+                bongo_cat_error_set(error, BONGO_CAT_ERROR_ARGUMENT,
+                    "Model id is too long: %.*s", (int)length, cursor);
+                return false;
+            } else {
+                char *target =
+                    app->smoke_switch.ids[app->smoke_switch.count++];
+                memcpy(target, cursor, length);
+                target[length] = '\0';
+            }
+        }
+        if (!comma) break;
+        cursor = comma + 1;
+    }
+    if (dropped)
+        SDL_LogWarn(SDL_LOG_CATEGORY_APPLICATION,
+            "--ci-model-switch keeps at most %d models; ignoring %u more",
+            BONGO_CAT_SMOKE_SWITCH_CAP, dropped);
+    app->smoke_switch.enabled = app->smoke_switch.count > 0;
+    return true;
+}
+
+/* 毫秒参数 (--ci-model-switch-delay-ms= / -gap-ms=): 只接受纯数字, 认不出来的值按默认值
+   处理并 WARN —— 自测参数写错时"跑起来用的是默认值"比"启动失败"好查。 */
+static uint64_t milliseconds_argument(const char *value, uint64_t fallback) {
+    if (!value || !*value) return fallback;
+    char *end = NULL;
+    unsigned long long parsed = strtoull(value, &end, 10);
+    if (!end || *end || parsed > UINT64_MAX / 1000000ull) {
+        SDL_LogWarn(SDL_LOG_CATEGORY_APPLICATION,
+            "Ignoring malformed millisecond argument: %s", value);
+        return fallback;
+    }
+    return (uint64_t)parsed * 1000000ull;
 }
 
 /*
@@ -116,6 +173,8 @@ static bool prepare_nearby_root(BongoCatApp *app, BongoCatError *error) {
 bool bongo_cat_startup_arguments(BongoCatApp *app, int argc, char **argv,
     BongoCatError *error) {
     if (!prepare_nearby_root(app, error)) return false;
+    app->smoke_switch.delay_ns = SMOKE_SWITCH_DELAY_DEFAULT_NS;
+    app->smoke_switch.gap_ns = SMOKE_SWITCH_GAP_DEFAULT_NS;
     for (int i = 1; i < argc; ++i) {
         const char *arg = argv[i];
         /* --ci-* 一律算无人值守运行: 模态弹窗在那种运行里会把进程挂死, 见 app.h。 */
@@ -202,6 +261,14 @@ bool bongo_cat_startup_arguments(BongoCatApp *app, int argc, char **argv,
         } else if (strncmp(arg, "--ci-model=", 11) == 0) {
             if (!store_argument(app->smoke_model, sizeof(app->smoke_model),
                 arg + 11, "Model", error)) return false;
+        } else if (strncmp(arg, "--ci-model-switch=", 18) == 0) {
+            if (!parse_switch_list(app, arg + 18, error)) return false;
+        } else if (strncmp(arg, "--ci-model-switch-delay-ms=", 27) == 0) {
+            app->smoke_switch.delay_ns = milliseconds_argument(arg + 27,
+                SMOKE_SWITCH_DELAY_DEFAULT_NS);
+        } else if (strncmp(arg, "--ci-model-switch-gap-ms=", 25) == 0) {
+            app->smoke_switch.gap_ns = milliseconds_argument(arg + 25,
+                SMOKE_SWITCH_GAP_DEFAULT_NS);
         } else if (strncmp(arg, "--ci-viewer-trace=", 18) == 0) {
             if (!store_argument(app->smoke_viewer_trace,
                 sizeof(app->smoke_viewer_trace), arg + 18,

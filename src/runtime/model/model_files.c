@@ -139,6 +139,21 @@ bool bongo_cat_app_begin_model_switch(BongoCatApp *app,
     return true;
 }
 
+/* "要切换的正好就是当前已经加载的模型"这条短路的收尾, 与 begin_model_switch 里那一支完全一致:
+ * 只补一次可能变过的模式提交, 不重新加载, 也**不碰影子**。
+ *
+ * 为什么必须单独开一个函数: 异步队列 (model_switch.c) 也要处理这条路径, 但它走到那里时手上
+ * 没有可用的影子 —— 影子要么从未准备过, 要么刚被 job_clear 释放掉 (behaviors 已经是 NULL),
+ * 而 bongo_cat_app_commit_model_switch 会无条件解引用 shadow->behaviors。用户在设置页点当前
+ * 已选中的模型、在右键菜单里选当前模型、或连点若干次后又绕回原模型, 都会命中这里。 */
+bool bongo_cat_app_recommit_loaded_model(BongoCatApp *app,
+    const BongoCatModelEntry *entry) {
+    if (!app || !entry || !app->loaded_model[0] ||
+        strcmp(app->loaded_model, entry->id) != 0) return false;
+    commit_model(app, entry, false, false);
+    return true;
+}
+
 /* 提交: 走到这里说明新模型已经完整可用 (分步加载返回 DONE), 于是按固定顺序改写全部状态。
  * shadow->behaviors 的所有权在这里交出去, 之后不能再调 model_switch_release 释放它。 */
 bool bongo_cat_app_commit_model_switch(BongoCatApp *app,
@@ -146,6 +161,19 @@ bool bongo_cat_app_commit_model_switch(BongoCatApp *app,
     BongoCatError *error) {
     (void)error;
     if (!app || !entry || !shadow) return false;
+    /* 影子必须已经由 model_switch_prepare 填过。空影子走到这里说明调用方用错了入口
+       (那条路径是 bongo_cat_app_recommit_loaded_model): 下面无条件解引用 shadow->behaviors,
+       与其让主循环直接空指针崩掉, 不如明确报错并拒绝提交 —— 当前模型从始至终没被改过,
+       所以拒绝提交的后果只是"没换成", 而不是坏状态。 */
+    if (!shadow->behaviors) {
+        SDL_LogError(SDL_LOG_CATEGORY_APPLICATION,
+            "Model switch commit called without a prepared shadow: id=%s "
+            "(the already-loaded case must use "
+            "bongo_cat_app_recommit_loaded_model)", entry->id);
+        bongo_cat_error_set(error, BONGO_CAT_ERROR_ARGUMENT,
+            "Model switch commit requires a prepared shadow");
+        return false;
+    }
     const bool replacing_model = shadow->replacing;
     BongoCatLive2DRenderOptions render_options = shadow->render_options;
     BongoCatModelContentAnchor content_anchor = shadow->content_anchor;

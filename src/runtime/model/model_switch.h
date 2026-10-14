@@ -39,5 +39,10 @@ bool bongo_cat_app_begin_model_switch(BongoCatApp *app,
 bool bongo_cat_app_commit_model_switch(BongoCatApp *app,
     const BongoCatModelEntry *entry, BongoCatModelSwitchShadow *shadow,
     BongoCatError *error);
+/* "要切换的正好就是当前已加载的模型"的收尾 (实现见 model_files.c): 只补一次可能变过的模式
+ * 提交, 不重新加载, 也不碰影子。异步队列命中这条路径时**必须**用它 —— 那时影子是空的
+ * (从未准备, 或刚被 job_clear 释放), 走 commit_model_switch 会解引用空的 behaviors。 */
+bool bongo_cat_app_recommit_loaded_model(BongoCatApp *app,
+    const BongoCatModelEntry *entry);
 
 #endif

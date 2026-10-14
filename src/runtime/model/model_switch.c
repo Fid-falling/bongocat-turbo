@@ -26,6 +26,7 @@
 #include "runtime.h"
 #include "model_switch.h"
 #include "model_switch_shadow.h"
+#include "bongo_cat/log.h"
 #include "bongo_cat/memory_policy.h"
 #include "bongo_cat/preferences.h"
 #include "preferences_notice.h"
@@ -222,14 +223,25 @@ bool bongo_cat_app_model_switch_step(BongoCatApp *app, uint64_t now,
         job_fail(app, NULL);
         return true;
     }
-    /* 已经加载的就是这个模型: 只补一次 commit (模式可能变过), 不重新加载。 */
+    /* 已经加载的就是这个模型: 只补一次 commit (模式可能变过), 不重新加载。
+     *
+     * 这里**不能**走 bongo_cat_app_commit_model_switch: 那个函数要求影子已经被
+     * bongo_cat_app_begin_model_switch 填好 (它会无条件解引用 shadow->behaviors), 而走到这个
+     * 分支时影子要么从未准备, 要么刚被 job_clear 释放成 NULL —— 完整提交会在主循环里空指针
+     * 崩溃 (实测 0xC0000005, 帧序列直接断掉)。用户在设置页点当前已选中的模型、在右键菜单里选
+     * 当前模型、或连点若干次后又绕回原模型, 都会命中这里, 所以它是一条常见路径而不是边角。 */
     if (app->loaded_model[0] && strcmp(app->loaded_model, entry->id) == 0) {
-        BongoCatError ignored = {0};
-        bongo_cat_app_commit_model_switch(app, entry, &app->model_switch.shadow,
-            &ignored);
+        bongo_cat_app_recommit_loaded_model(app, entry);
         bongo_cat_model_switch_release(app, &app->model_switch.shadow);
         app->model_switch.active = false;
         app->model_switch.target_id[0] = '\0';
+        app->loading_model[0] = '\0';
+        app->model_load_runtime_stage = 0;
+        app->model_load_progress = 0.0f;
+        /* 这行是"绕回原模型时没有重新加载"的证据: 它只会出现在这条分支上。 */
+        SDL_LogInfo(BONGO_CAT_LOG_LIFECYCLE,
+            "[runtime] Model switch already loaded: id=%s skipped_reload=1",
+            entry->id);
         if (app->preferences)
             bongo_cat_preferences_model_switch_finished(app->preferences,
                 entry->id);

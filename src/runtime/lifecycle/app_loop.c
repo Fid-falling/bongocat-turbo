@@ -280,6 +280,9 @@ void bongo_cat_app_loop(BongoCatApp *app) {
         bongo_cat_window_update_display_recovery(app, now);
         bongo_cat_window_update_inertia(app, now);
         bongo_cat_runtime_flow_update(app, now);
+        /* 自测驱动器必须在 model_switch_step 之前: 它这一帧登记的请求要能被同一帧推进,
+           否则"连点"会退化成每帧最多一次, 覆盖不到 supersede 那条路径。 */
+        bongo_cat_smoke_model_switch_update(app, now);
         bongo_cat_window_apply_pending_resize(app);
         bongo_cat_app_drain_input(app, true);
         now = SDL_GetTicksNS();
