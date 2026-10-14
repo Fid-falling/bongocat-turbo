@@ -126,6 +126,7 @@
       "model": {
         "title": "模型",
         "nearbyTitle": "附近模型",
+        "builtinsTitle": "內建模型",
         "labels": {
           "deleteModel": "刪除模型"
         },
@@ -146,8 +147,6 @@
           "importFailed": "模型匯入失敗，請檢查所選檔案後再試一次",
           "clickOrDragToImport": "點擊或拖入模型資料夾",
           "supportedImportFormats": "支援 Mver 與 Tauri 格式",
-          "dropBlockedTitle": "拖不進模型？",
-          "dropBlocked": "以管理員身分執行時，Windows 可能攔截檔案總管的拖放；可以改用上方的匯入按鈕選擇 zip。",
           "openDirectoryFailed": "無法開啟模型目錄"
         },
         "tooltips": {

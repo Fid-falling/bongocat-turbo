@@ -126,6 +126,7 @@
       "model": {
         "title": "Model",
         "nearbyTitle": "Nearby models",
+        "builtinsTitle": "Built-in models",
         "labels": {
           "deleteModel": "Delete Model"
         },
@@ -146,8 +147,6 @@
           "importFailed": "Model import failed. Check the selected files and try again",
           "clickOrDragToImport": "Click or drag a model folder",
           "supportedImportFormats": "Supports Mver and Tauri formats",
-          "dropBlockedTitle": "Cannot drop a model?",
-          "dropBlocked": "Running as administrator can make Windows block Explorer drag and drop; use the import button above instead.",
           "openDirectoryFailed": "Unable to open model directory"
         },
         "tooltips": {

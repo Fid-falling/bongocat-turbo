@@ -126,6 +126,7 @@
       "model": {
         "title": "Modèle",
         "nearbyTitle": "Modèles à proximité",
+        "builtinsTitle": "Modèles intégrés",
         "labels": {
           "deleteModel": "Supprimer le modèle"
         },
@@ -146,8 +147,6 @@
           "importFailed": "Échec de l'importation du modèle. Vérifiez les fichiers sélectionnés et réessayez",
           "clickOrDragToImport": "Cliquez ou déposez un dossier",
           "supportedImportFormats": "Formats Mver et Tauri pris en charge",
-          "dropBlockedTitle": "Impossible de déposer un modèle ?",
-          "dropBlocked": "Lancé en administrateur, Windows peut bloquer le glisser-déposer de l'Explorateur ; utilisez le bouton d'import ci-dessus.",
           "openDirectoryFailed": "Impossible d'ouvrir le dossier du modèle"
         },
         "tooltips": {

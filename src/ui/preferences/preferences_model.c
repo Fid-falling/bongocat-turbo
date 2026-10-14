@@ -205,17 +205,21 @@ static void smoke_model_behavior(BongoCatPreferences *value) {
     }
 }
 
-/* managed=false 是本机模型, true 是"附近的模型"(同局域网/同目录发现的) */
-static size_t model_count(const BongoCatPreferences *value, bool managed) {
+/* managed=false 是本机模型, true 是"附近的模型"(同局域网/同目录发现的);
+   presets 区分预置模型 (与导入模型分开成段, 排到页面下方)。 */
+static size_t model_count(const BongoCatPreferences *value, bool managed,
+    bool presets) {
     size_t count = 0;
-    for (size_t i = 0; i < value->app->models.count; ++i)
-        if (value->app->models.entries[i].managed == managed) count++;
+    for (size_t i = 0; i < value->app->models.count; ++i) {
+        const BongoCatModelEntry *entry = &value->app->models.entries[i];
+        if (entry->managed == managed && entry->preset == presets) count++;
+    }
     return count;
 }
 
 /*
  * 预置模型的展示顺序 (标准/键盘/手柄), 返回 3 表示"不是预置"或"未知预置"。
- * 排序是按 order 值分四趟画而不是排序数组: 模型列表是共享数据, 在这里改动顺序会
+ * 排序是按 order 值分几趟画而不是排序数组: 模型列表是共享数据, 在这里改动顺序会
  * 影响别处 (托盘菜单、会话恢复), 所以顺序只体现在绘制上。
  */
 static int preset_model_order(const BongoCatModelEntry *entry) {
@@ -226,13 +230,19 @@ static int preset_model_order(const BongoCatModelEntry *entry) {
     return 3;
 }
 
-/*
- * storage_busy 为真时卡片会画成"忙碌/不可操作": 导入或目录刷新期间动模型文件会和
- * 后台任务抢同一个目录。
- */
 static void draw_models(BongoCatPreferences *value,
-    struct nk_context *context, bool managed, bool storage_busy) {
-    for (int order = 0; order <= 3; ++order) {
+    struct nk_context *context, bool managed, bool presets,
+    bool storage_busy) {
+    if (!presets) {
+        for (size_t i = 0; i < value->app->models.count; ++i) {
+            const BongoCatModelEntry *entry = &value->app->models.entries[i];
+            if (entry->managed != managed || entry->preset) continue;
+            bongo_cat_preferences_model_card(value, context, entry,
+                storage_busy);
+        }
+        return;
+    }
+    for (int order = 0; order < 3; ++order) {
         for (size_t i = 0; i < value->app->models.count; ++i) {
             const BongoCatModelEntry *entry = &value->app->models.entries[i];
             if (entry->managed != managed || preset_model_order(entry) != order)
@@ -275,12 +285,19 @@ void bongo_cat_preferences_page_model(BongoCatPreferences *value,
     bool storage_busy = bongo_cat_preferences_import_status(
         value->import_dialog, NULL, NULL, NULL) ||
         bongo_cat_app_model_refresh_busy(app);
-    draw_models(value, context, false, storage_busy);
-    if (model_count(value, true)) {
+    draw_models(value, context, false, false, storage_busy);
+    if (model_count(value, false, true)) {
+        bongo_cat_pref_section(context,
+            tr(app, "pages.preference.model.builtinsTitle",
+                "Built-in models"));
+        nk_layout_row_dynamic(context, MODEL_CARD_HEIGHT, columns);
+        draw_models(value, context, false, true, storage_busy);
+    }
+    if (model_count(value, true, false)) {
         bongo_cat_pref_section(context,
             tr(app, "pages.preference.model.nearbyTitle", "Nearby models"));
         nk_layout_row_dynamic(context, MODEL_CARD_HEIGHT, columns);
-        draw_models(value, context, true, storage_busy);
+        draw_models(value, context, true, false, storage_busy);
     }
     context->style.window.spacing = old_spacing;
     bongo_cat_preferences_model_covers_prune(app);

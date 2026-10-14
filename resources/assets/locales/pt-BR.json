@@ -126,6 +126,7 @@
       "model": {
         "title": "Modelo",
         "nearbyTitle": "Modelos próximos",
+        "builtinsTitle": "Modelos integrados",
         "labels": {
           "deleteModel": "Excluir modelo"
         },
@@ -146,8 +147,6 @@
           "importFailed": "Falha ao importar o modelo. Verifique os arquivos selecionados e tente novamente",
           "clickOrDragToImport": "Clique ou arraste uma pasta",
           "supportedImportFormats": "Compatível com Mver e Tauri",
-          "dropBlockedTitle": "Não consegue soltar um modelo?",
-          "dropBlocked": "Executando como administrador, o Windows pode bloquear o arrastar do Explorer; use o botão de importar acima.",
           "openDirectoryFailed": "Não foi possível abrir a pasta do modelo"
         },
         "tooltips": {

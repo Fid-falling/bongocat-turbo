@@ -126,6 +126,7 @@
       "model": {
         "title": "モデル",
         "nearbyTitle": "近くのモデル",
+        "builtinsTitle": "組み込みモデル",
         "labels": {
           "deleteModel": "モデルを削除"
         },
@@ -146,9 +147,7 @@
           "importFailed": "モデルのインポートに失敗しました。選択したファイルを確認して、もう一度お試しください",
           "clickOrDragToImport": "モデルフォルダーをクリックまたはドラッグ",
           "supportedImportFormats": "Mver・Tauri形式に対応",
-          "dropBlockedTitle": "ドラッグで取り込めない？",
-          "dropBlocked": "管理者として実行すると Windows がエクスプローラーのドラッグ&ドロップを遮断することがあります。上のインポートボタンをお使いください。",
-          "openDirectoryFailed": "モデルフォルダーを開けません"
+          "openDirectoryFailed": "モデルディレクトリを開けません"
         },
         "tooltips": {
           "createModel": "モデルを作成",

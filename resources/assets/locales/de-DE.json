@@ -126,6 +126,7 @@
       "model": {
         "title": "Modell",
         "nearbyTitle": "Nahe Modelle",
+        "builtinsTitle": "Integrierte Modelle",
         "labels": {
           "deleteModel": "Modell löschen"
         },
@@ -146,9 +147,7 @@
           "importFailed": "Der Modellimport ist fehlgeschlagen. Prüfen Sie die ausgewählten Dateien und versuchen Sie es erneut",
           "clickOrDragToImport": "Modellordner wählen oder ziehen",
           "supportedImportFormats": "Unterstützt Mver und Tauri",
-          "dropBlockedTitle": "Modell lässt sich nicht ablegen?",
-          "dropBlocked": "Als Administrator kann Windows das Ziehen aus dem Explorer blockieren; nutzen Sie die Import-Schaltfläche oben.",
-          "openDirectoryFailed": "Modellordner konnte nicht geöffnet werden"
+          "openDirectoryFailed": "Modellverzeichnis konnte nicht geöffnet werden"
         },
         "tooltips": {
           "createModel": "Modell erstellen",
