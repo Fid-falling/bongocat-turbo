@@ -26,7 +26,7 @@
  * 卡片高度与加载动画的最小重绘间隔 (30Hz): 加载期间动画不必每帧都画, 这里限流,
  * 但输入事件仍然照常触发渲染 —— 限的是"定时重绘", 不是交互响应。
  */
-#define MODEL_CARD_HEIGHT 214
+#define MODEL_CARD_HEIGHT 254
 #define MODEL_LOAD_RENDER_INTERVAL_NS 33333333ull
 
 static const char *tr(BongoCatApp *app, const char *key,
@@ -272,13 +272,6 @@ void bongo_cat_preferences_page_model(BongoCatPreferences *value,
     nk_layout_row_dynamic(context, MODEL_CARD_HEIGHT, columns);
     if (bongo_cat_preferences_model_import_card(value, context))
         bongo_cat_preferences_request_model_import(app->preferences);
-    /* 退路提示: 以管理员运行时 UIPI 会挡住资源管理器的拖放 (平台层已尽力放行, 但安全
-       软件仍可能拦), 用户需要有第二只手能够到导入按钮, 否则会以为"这软件坏了"。 */
-    bongo_cat_pref_status(context, "import-drop-fallback", tr(app,
-        "pages.preference.model.hints.dropBlockedTitle", "Cannot drop a model?"),
-        tr(app, "pages.preference.model.hints.dropBlocked",
-            "Running as administrator can make Windows block Explorer drag and drop; "
-            "use the import button above instead."));
     bool storage_busy = bongo_cat_preferences_import_status(
         value->import_dialog, NULL, NULL, NULL) ||
         bongo_cat_app_model_refresh_busy(app);

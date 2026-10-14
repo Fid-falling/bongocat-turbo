@@ -82,13 +82,15 @@ bool bongo_cat_preferences_model_import_card(BongoCatPreferences *value,
     float cx = bounds.x + bounds.w * .5f, cy = bounds.y + 91;
     bongo_cat_preferences_icon_draw(value, canvas,
         BONGO_CAT_UI_ICON_UPLOAD, nk_rect(cx - 20, cy - 20, 40, 40), p.pink);
-    const char *label = tr(value->app,
+    const char *label = importing ? tr(value->app,
+        "pages.preference.model.hints.importingBackground",
+        "Importing in background...") : tr(value->app,
         "pages.preference.model.hints.clickOrDragToImport",
-        "Click or drag a model folder");
+        "Click or drag a model folder or ZIP");
     float width = value->ui.caption_font->width(value->ui.caption_font->userdata,
         value->ui.caption_font->height, label, nk_strlen(label));
-    text(context, canvas, nk_rect(cx - width * .5f, cy + 25,
-        NK_MIN(width + 1, bounds.w - 20), 24), label, p.accent,
+    text(context, canvas, nk_rect(cx - NK_MIN(width, bounds.w - 20) * .5f,
+        cy + 25, NK_MIN(width + 1, bounds.w - 20), 24), label, p.accent,
         value->ui.caption_font);
     const char *support = tr(value->app,
         "pages.preference.model.hints.supportedImportFormats",
@@ -100,7 +102,8 @@ bool bongo_cat_preferences_model_import_card(BongoCatPreferences *value,
         value->ui.caption_font);
     if (pointer_hover) bongo_cat_ui_cursor_hover_rect(context, bounds,
         BONGO_CAT_UI_CURSOR_POINTER);
-    return pointer_hover && nk_input_is_mouse_click_in_rect(&context->input,
+    return pointer_hover && !(context->current->layout->flags & NK_WINDOW_ROM) &&
+        nk_input_is_mouse_click_in_rect(&context->input,
         NK_BUTTON_LEFT, bounds);
 }
 
