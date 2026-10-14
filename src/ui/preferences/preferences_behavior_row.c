@@ -188,14 +188,14 @@ static void draw_name(BongoCatPreferences *value, struct nk_context *context,
  * 快捷键框的 id 要带 entry->id 前缀 (behavior-xxx), 它是动画与录制会话的键, 用
  * 固定名字会让所有行共用一次录制。
  */
-void bongo_cat_preferences_behavior_row_draw(BongoCatPreferences *value,
+static void row_draw_impl(BongoCatPreferences *value,
     struct nk_context *context, struct nk_command_buffer *canvas,
     struct nk_rect row, BongoCatBehaviorEntry *entry, BongoCatUIPalette p,
-    float opacity, bool enabled) {
+    float opacity, bool enabled, bool force_sw) {
     struct nk_rect play;
     struct nk_rect shortcut_bounds;
     bool participating = true;
-    bool has_sw = entry->kind == BONGO_CAT_BEHAVIOR_MOTION ||
+    bool has_sw = force_sw || entry->kind == BONGO_CAT_BEHAVIOR_MOTION ||
         entry->kind == BONGO_CAT_BEHAVIOR_EXPRESSION;
     if (has_sw) {
         participating = !bongo_cat_settings_random_disabled(
@@ -252,4 +252,24 @@ void bongo_cat_preferences_behavior_row_draw(BongoCatPreferences *value,
         p, opacity, enabled))
         bongo_cat_preferences_shortcut_begin(value, id, binding->shortcut,
             sizeof(binding->shortcut));
+}
+
+/* 普通行为行: 名字 + 快捷键 + 试听, motion/expression 另有参与开关。 */
+void bongo_cat_preferences_behavior_row_draw(BongoCatPreferences *value,
+    struct nk_context *context, struct nk_command_buffer *canvas,
+    struct nk_rect row, BongoCatBehaviorEntry *entry, BongoCatUIPalette p,
+    float opacity, bool enabled) {
+    row_draw_impl(value, context, canvas, row, entry, p, opacity, enabled,
+        false);
+}
+
+/* 随机页参与列表的分行: 与普通行为行一样, 但强制给三类都画参与开关 —— 声音也要
+   能单独排除, 普通对话框里声音行没有开关, 只有这里能逐个排除。 */
+void bongo_cat_preferences_behavior_row_participation_draw(
+    BongoCatPreferences *value, struct nk_context *context,
+    struct nk_command_buffer *canvas, struct nk_rect row,
+    BongoCatBehaviorEntry *entry, BongoCatUIPalette p, float opacity,
+    bool enabled) {
+    row_draw_impl(value, context, canvas, row, entry, p, opacity, enabled,
+        true);
 }

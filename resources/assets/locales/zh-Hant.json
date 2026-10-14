@@ -33,6 +33,8 @@
           "secondsUnit": "秒",
           "randomSettings": "隨機",
           "randomMotion": "隨機動作",
+          "randomSound": "隨機聲音",
+          "intervalSeconds": "間隔（秒）",
           "sequentialModel": "順序模型",
           "obsBackground": "純色背景",
           "hideOnHover": "滑鼠游標移入隱藏",
@@ -142,6 +144,10 @@
         },
         "labels": {
           "deleteModel": "刪除模型"
+        },
+        "random": {
+          "configuring": "正在設定",
+          "defaultPet": "目前桌寵"
         },
         "hints": {
           "deleteSuccess": "已刪除「%s」",

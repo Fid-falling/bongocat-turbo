@@ -283,6 +283,7 @@ bool bongo_cat_app_select_model_with_error(BongoCatApp *app,
     bongo_cat_model_cover_schedule(app, entry);
     bongo_cat_random_expression_reset(app);
     bongo_cat_random_motion_reset(app);
+    bongo_cat_random_sound_reset(app);
     bongo_cat_sequential_model_reset(app);
     app->pointer_known = false;
     bool geometry_changed = bongo_cat_model_apply_aspect(app, &render_options,

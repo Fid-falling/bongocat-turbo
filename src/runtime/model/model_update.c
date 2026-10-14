@@ -136,6 +136,55 @@ void bongo_cat_random_motion_reset(BongoCatApp *app) {
     app->random_motion_interval_seconds = 0.0f;
 }
 
+/* 随机声音：和随机动作同一套排期/随机数/候选过滤逻辑，只是按 SOUND 行为挑。
+ * 参与判定走同一份 random_disabled 参与集合；只挑有实际音效文件(sound 非空)的
+ * 条目，触发委托给 run_behavior（含绑定音效、状态回写）。 */
+void bongo_cat_random_sound_update(BongoCatApp *app, uint64_t now) {
+    if (app && app->window_snapshot) return;
+    if (!app || !app->settings.window.random_sound || !app->audio) {
+        bongo_cat_random_sound_reset(app);
+        return;
+    }
+    float seconds = app->settings.window.random_sound_interval_seconds;
+    if (!(seconds >= 1.0f && seconds <= 3600.0f))
+        seconds = BONGO_CAT_DEFAULT_RANDOM_SOUND_SECONDS;
+    if (!app->random_sound_due_ns ||
+        app->random_sound_interval_seconds != seconds) {
+        app->random_sound_interval_seconds = seconds;
+        app->random_sound_due_ns = now +
+            (uint64_t)(seconds * (float)NANOSECONDS_PER_SECOND);
+        return;
+    }
+    if (now < app->random_sound_due_ns) return;
+    app->random_sound_due_ns = now +
+        (uint64_t)(seconds * (float)NANOSECONDS_PER_SECOND);
+
+    size_t sound_count = 0;
+    const BongoCatSettings *settings = &app->settings;
+    for (size_t i = 0; i < app->behaviors.count; ++i) {
+        const BongoCatBehaviorEntry *entry = &app->behaviors.entries[i];
+        if (entry->kind != BONGO_CAT_BEHAVIOR_SOUND || !entry->sound[0] ||
+            bongo_cat_settings_random_disabled(settings, entry->id)) continue;
+        sound_count++;
+    }
+    if (!sound_count) return;
+    size_t choice = random_expression_next(app, now) % sound_count;
+    for (size_t i = 0; i < app->behaviors.count; ++i) {
+        const BongoCatBehaviorEntry *entry = &app->behaviors.entries[i];
+        if (entry->kind != BONGO_CAT_BEHAVIOR_SOUND || !entry->sound[0] ||
+            bongo_cat_settings_random_disabled(settings, entry->id)) continue;
+        if (choice--) continue;
+        bongo_cat_app_run_behavior(app, entry);
+        return;
+    }
+}
+
+void bongo_cat_random_sound_reset(BongoCatApp *app) {
+    if (!app) return;
+    app->random_sound_due_ns = 0;
+    app->random_sound_interval_seconds = 0.0f;
+}
+
 /* 顺序模型：按目录顺序切换到下一个参与且未被隐藏的模型，到末尾回绕。
  * 参与判定对齐 BongoCat-X: 每个模型配一个合成行为 id "switch:<模型id>"，默认全参
  * 与；只要这个 id 出现在 random_disabled 参与集合里(或模型本身在隐藏列表里)，就跳过
