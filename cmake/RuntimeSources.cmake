@@ -1,5 +1,8 @@
 set(BONGO_CAT_RUNTIME_INTERNAL_INCLUDE_DIRS
   "${CMAKE_CURRENT_SOURCE_DIR}/src/runtime"
+  # 分发层的内部头(live2d_dispatch.h): "这次到底是谁在渲染"只应该有一处判定, 诊断输出与
+  # 设置页状态都问它。
+  "${CMAKE_CURRENT_SOURCE_DIR}/src/live2d"
   "${CMAKE_CURRENT_SOURCE_DIR}/src/runtime/input"
   "${CMAKE_CURRENT_SOURCE_DIR}/src/runtime/lifecycle"
   "${CMAKE_CURRENT_SOURCE_DIR}/src/runtime/model"

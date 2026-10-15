@@ -237,6 +237,9 @@ bool bongo_cat_startup_prepare(BongoCatApp *app, int argc, char **argv,
     BongoCatRendererModuleInfo modules[8];
     bongo_cat_renderer_module_scan(modules,
         sizeof(modules) / sizeof(modules[0]));
+    /* 目录服务要知道六棵树在哪, 而那只有 app 知道 —— 启动期绑定一次(退出时解绑)。
+       组件装载发生在首次建实例时(那时才知道资源根), 所以绑定必须早于它。 */
+    bongo_cat_renderer_module_bind_app(app);
     bongo_cat_live2d_core_initialize();
     bongo_cat_startup_stage(app, "paths-ready"); return true;
 }

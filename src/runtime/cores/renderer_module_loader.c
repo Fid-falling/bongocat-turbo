@@ -99,14 +99,20 @@ typedef struct BongoCatRendererModuleSlot {
 
 static BongoCatRendererModuleSlot slot;
 
-bool bongo_cat_renderer_module_open(const char *path,
-    const char *asset_root, BongoCatError *error) {
+/*
+ * 装载 = dlopen + 取导出符号 + query + 校验, **不建实例**。
+ *
+ * 为什么要把"装载"和"建实例"分开: 宿主可能同时持有多个 Live2D 实例(主窗口 + 封面离屏渲染),
+ * 而组件是**一份**实现 —— 装载一次, 每个实例各自 create。把两者绑在一个 open() 里, 第二个
+ * 实例就会去抢同一个槽位(这也是分发层能按"实例指针来自组件"来路由的前提)。
+ */
+bool bongo_cat_renderer_module_load(const char *path, BongoCatError *error) {
     if (!path || !path[0]) {
         bongo_cat_error_set(error, BONGO_CAT_ERROR_ARGUMENT,
             "Cannot load a renderer component without a path");
         return false;
     }
-    if (slot.object) bongo_cat_renderer_module_close();
+    if (slot.object) return true; /* 已经装载: 一次运行只装一份实现 */
     if (!bongo_cat_renderer_module_validate_host(bongo_cat_renderer_module_host())) {
         bongo_cat_error_set(error, BONGO_CAT_ERROR_PLATFORM,
             "The host service table is inconsistent; refusing to load a component");
@@ -131,31 +137,45 @@ bool bongo_cat_renderer_module_open(const char *path,
         bongo_cat_renderer_module_host());
     char reason[BONGO_CAT_RENDERER_MODULE_REASON_CAP] = {0};
     BongoCatResult result = BONGO_CAT_ERROR_CUBISM;
-    if (!bongo_cat_renderer_module_validate(module, bongo_cat_renderer_module_host(), &result, reason,
-            sizeof(reason))) {
+    if (!bongo_cat_renderer_module_validate(module, bongo_cat_renderer_module_host(),
+            &result, reason, sizeof(reason))) {
         SDL_UnloadObject(object);
         bongo_cat_error_set(error, result, "%s", reason);
         return false;
     }
+    slot.object = object;
+    slot.module = module;
+    snprintf(slot.path, sizeof(slot.path), "%s", path);
+    SDL_LogInfo(BONGO_CAT_LOG_LIFECYCLE,
+        "[live2d] 已加载渲染组件 %s (引擎 %u, 后端位 0x%x, 需要 Core: %s): %s",
+        module->name ? module->name : "(unnamed)", (unsigned)module->engine,
+        (unsigned)module->graphics_backends,
+        (module->flags & BONGO_CAT_RENDERER_FLAG_REQUIRES_CORE) ? "是" : "否", path);
+    return true;
+}
+
+const BongoCatRendererModule *bongo_cat_renderer_module_active_descriptor(void) {
+    return slot.object ? slot.module : NULL;
+}
+
+bool bongo_cat_renderer_module_open(const char *path,
+    const char *asset_root, BongoCatError *error) {
+    if (!bongo_cat_renderer_module_load(path, error)) return false;
     /* 校验通过才建实例: 让"不匹配的组件"在创建任何资源之前就被挡住 —— 否则失败的 create
        可能已经申请了 GPU 资源, 而它的 destroy 未必被调用。 */
-    void *instance = module->ops.create(bongo_cat_renderer_module_host(), asset_root, error);
+    void *instance = slot.module->ops.create(bongo_cat_renderer_module_host(),
+        asset_root, error);
     if (!instance) {
-        SDL_UnloadObject(object);
+        SDL_UnloadObject(slot.object);
+        slot.object = NULL;
+        slot.module = NULL;
+        slot.path[0] = '\0';
         if (error && !error->message[0])
             bongo_cat_error_set(error, BONGO_CAT_ERROR_CUBISM,
                 "The renderer component failed to create an instance");
         return false;
     }
-    slot.object = object;
-    slot.module = module;
     slot.instance = instance;
-    snprintf(slot.path, sizeof(slot.path), "%s", path);
-    SDL_LogInfo(BONGO_CAT_LOG_LIFECYCLE,
-        "[live2d] 已加载渲染组件 %s (引擎 %u, 后端位 0x%x, 需要 Core: %s)",
-        module->name ? module->name : "(unnamed)", (unsigned)module->engine,
-        (unsigned)module->graphics_backends,
-        (module->flags & BONGO_CAT_RENDERER_FLAG_REQUIRES_CORE) ? "是" : "否");
     return true;
 }
 

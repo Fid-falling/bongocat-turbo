@@ -101,10 +101,41 @@ if(EXISTS "${CUBISM_CORE_HEADER}")
       src/live2d/cubism_model_bounds.cpp
       src/live2d/cubism_model_viewport.cpp
       src/live2d/cubism_model_validate.cpp)
-    # 宿主这一侧仍然编译这套实现(过渡期: 没有组件时它就是渲染器); 组件那一侧由
-    # cmake/RendererModule.cmake 单独编同一个列表, 保证两条路径不会分叉。
+    # 宿主这一侧**不再编译这套实现**(阶段 2c): 真正渲染的是组件(cores/bongo_live2d.*),
+    # 宿主只保留"分发层 + 诊断实现"。BONGO_CAT_CUBISM_IMPLEMENTATION_SOURCES 仍要保留, 因为
+    # 组件那一侧编的就是它(见 cmake/RendererModule.cmake) —— 两条路径共用同一批源文件。
     set(BONGO_CAT_LIVE2D_SOURCES ${BONGO_CAT_LIVE2D_CORE_SOURCES}
-      ${BONGO_CAT_CUBISM_IMPLEMENTATION_SOURCES})
+      src/live2d/live2d_dispatch.c src/live2d/live2d_dispatch_vulkan.c
+      src/live2d/live2d_stub.c)
+    # 诊断实现与分发层提供的是**同一组符号**, 同时编就会撞定义。照上游的做法把诊断实现这一份
+    # 改名(逐个函数加前缀), 于是分发层独占 `bongo_cat_live2d_*`, 回落到 `stub_live2d_*`。
+    # 只在"有分发层"的构建里改名: 没有 SDK 的诊断构建里 stub 就是唯一实现, 保持原名。
+    set(BONGO_CAT_LIVE2D_STUB_METHODS
+      create destroy load ready canvas_size frame viewport overlay_viewport resize
+      reshape update draw set_mirror set_vertical_flip set_render_options
+      set_dragging set_centered_dragging set_parameter parameter start_motion
+      restore_motion_state preview_motion restore_motion_preview
+      commit_motion_preview motion_selected motion_persistent motion_visible
+      motion_same_toggle set_expression expression visual_state
+      prepare_cover_capture prepare_viewer_audit load_session_begin
+      load_session_activate load_session_step load_session_end load_session_abort
+      vulkan_attach vulkan_detach vulkan_ready vulkan_shaders_available
+      vulkan_set_shader_root vulkan_set_supersample vulkan_begin_frame
+      vulkan_end_frame vulkan_target_info vulkan_release_target
+      vulkan_create_texture vulkan_create_texture_attached
+      vulkan_destroy_texture vulkan_bind_texture)
+    set(BONGO_CAT_LIVE2D_STUB_DEFINITIONS "")
+    foreach(method IN LISTS BONGO_CAT_LIVE2D_STUB_METHODS)
+      if(method MATCHES "^vulkan_")
+        list(APPEND BONGO_CAT_LIVE2D_STUB_DEFINITIONS
+          "bongo_cat_live2d_${method}=stub_live2d_${method}")
+      else()
+        list(APPEND BONGO_CAT_LIVE2D_STUB_DEFINITIONS
+          "bongo_cat_live2d_${method}=stub_live2d_${method}")
+      endif()
+    endforeach()
+    set_source_files_properties(src/live2d/live2d_stub.c PROPERTIES
+      COMPILE_DEFINITIONS "${BONGO_CAT_LIVE2D_STUB_DEFINITIONS}")
     set(BONGO_CAT_CUBISM_ENABLED ON)
   endif()
 elseif(BONGO_CAT_REQUIRE_CUBISM)

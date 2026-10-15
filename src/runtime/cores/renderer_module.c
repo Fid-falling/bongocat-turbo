@@ -190,7 +190,10 @@ size_t bongo_cat_renderer_module_scan(BongoCatRendererModuleInfo *entries,
     }
     SDL_LogInfo(BONGO_CAT_LOG_LIFECYCLE, "[live2d] 扫描渲染组件目录: %s",
         directory);
-    ModuleScan scan = {entries, &cached_count, capacity};
+    /* 扫描结果必须写进**缓存**(cached), 而不是只写调用方给的数组: 分发层稍后要问"有没有
+       可用的组件、路径是什么", 它读的是缓存。踩过: 只写调用方数组时, 缓存永远是空的, 表现
+       为"日志说发现了组件, 但装载时说没有路径"。 */
+    ModuleScan scan = {cached, &cached_count, MODULE_ENTRY_LIMIT};
     if (!bongo_cat_path_enumerate(directory, scan_visitor, &scan))
         SDL_LogWarn(BONGO_CAT_LOG_LIFECYCLE, "[live2d] 目录枚举失败: %s",
             directory);
@@ -198,6 +201,10 @@ size_t bongo_cat_renderer_module_scan(BongoCatRendererModuleInfo *entries,
         SDL_LogInfo(BONGO_CAT_LOG_LIFECYCLE,
             "[live2d] 组件目录里没有可用的渲染组件; 应用照常启动, "
             "Live2D 渲染走诊断兜底");
+    if (entries && capacity) {
+        size_t copied = cached_count < capacity ? cached_count : capacity;
+        for (size_t i = 0; i < copied; ++i) entries[i] = cached[i];
+    }
     return cached_count;
 }
 

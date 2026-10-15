@@ -19,10 +19,22 @@
 
 #include <SDL3/SDL.h>
 
-/* Cubism 渲染器的后端选择由 src/live2d/cubism_renderer_factory.cpp 持有, 但真正的函数在
-   namespace bongo_cat 里(C++ 修饰名), 所以那边额外提供了两个 extern "C" 薄包装。 */
-extern bool bongo_cat_renderer_select_uses_vulkan(void);
-extern void bongo_cat_renderer_select_use_vulkan(bool enabled);
+/*
+ * Cubism 渲染器走不走 Vulkan: 这份状态现在由**宿主**持有, 组件通过服务表问它 / 回报它。
+ *
+ * 阶段 2c 之前它在 src/live2d/cubism_renderer_factory.cpp(实现那一侧); 实现搬进组件之后,
+ * 宿主再留一份"实现的开关"就没有意义了 —— 这里改成宿主自己的状态: 宿主决定给组件哪个后端,
+ * 组件回报它实际用了哪个(这样 VK 合成路径与日志才有单一事实来源)。
+ */
+static bool host_component_uses_vulkan;
+
+bool bongo_cat_renderer_select_uses_vulkan(void) {
+    return host_component_uses_vulkan;
+}
+
+void bongo_cat_renderer_select_use_vulkan(bool enabled) {
+    host_component_uses_vulkan = enabled;
+}
 
 #include <stdio.h>
 #include <string.h>

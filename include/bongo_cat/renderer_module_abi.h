@@ -163,6 +163,21 @@ typedef struct BongoCatRendererModuleOps {
     int (*expression)(const void *instance);
     bool (*visual_state)(const void *instance, BongoCatLive2DVisualState *state);
     bool (*prepare_cover_capture)(void *instance);
+    /* 诊断: 让模型按"查看器"的固定输入步进(审计场景用)。 */
+    void (*prepare_viewer_audit)(void *instance);
+    /* 分步加载会话: 换模型是渐进过程(解码/上传/建纹理), 宿主要能在其间继续出帧。
+       会话句柄对宿主是不透明指针; 下面三个返回的 int 与宿主 BongoCatLive2DStepResult 的取值
+       一一对应(0=working 1=done 2=failed), 这样两边不必共享枚举定义。 */
+    void *(*load_session_begin)(void *instance, const char *model_dir,
+        const char *setting_file, bool preset,
+        const BongoCatLive2DRenderOptions *render_options,
+        BongoCatLive2DLoadProgress progress, void *userdata, BongoCatError *error);
+    int (*load_session_activate)(void *session, void *window, void *context,
+        BongoCatError *error);
+    int (*load_session_step)(void *session, const char *model_dir,
+        const char *setting_file, BongoCatError *error);
+    void (*load_session_end)(void *session);
+    void (*load_session_abort)(void *session);
 } BongoCatRendererModuleOps;
 
 /* 描述符: 组件唯一的导出符号返回它。字段顺序是 ABI 的一部分, 不得重排。 */

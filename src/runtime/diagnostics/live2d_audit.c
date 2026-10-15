@@ -6,6 +6,7 @@
  */
 #include "runtime.h"
 #include "live2d_audit_scenario.h"
+#include "live2d_dispatch.h"
 #include "live2d_pointer_audit.h"
 #include "bongo_cat/file.h"
 #include "bongo_cat/path.h"
@@ -219,8 +220,15 @@ void bongo_cat_live2d_audit_run(BongoCatApp *app) {
         bongo_cat_mode_name(app->loaded_mode), result ? "accepted" : "rejected",
         verified ? "passed" : "failed", duration_ms);
 #ifdef BONGO_CAT_HAS_CUBISM
-    fputs("renderer=cubism-native\n", file);
-    if (!verified) app->exit_code = 1;
+    /* renderer= 必须反映**实际**在渲染的实现, 而不是"这个构建支持 Live2D": 组件缺失/被停用/
+       ABI 不匹配时跑的是诊断实现, 那时写 cubism-native 就是撒谎 —— 而 CI 的视觉验收正是靠
+       这一行判断"真的渲染了", 撒谎等于把验收变成永远通过。 */
+    if (bongo_cat_live2d_native_active()) {
+        fputs("renderer=cubism-native\n", file);
+        if (!verified) app->exit_code = 1;
+    } else {
+        fputs("renderer=diagnostic; visual-model-result=blocked\n", file);
+    }
 #else
     fputs("renderer=diagnostic; visual-model-result=blocked\n", file);
 #endif

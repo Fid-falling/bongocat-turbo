@@ -86,8 +86,13 @@ bool bongo_cat_renderer_module_validate(const BongoCatRendererModule *module,
     char *reason, size_t capacity);
 bool bongo_cat_renderer_module_validate_host(
     const BongoCatRendererModuleHost *host);
+/* 只装载(不建实例): 宿主可能有多个 Live2D 实例(主窗口 + 封面), 而组件只有一份实现。 */
+bool bongo_cat_renderer_module_load(const char *path, BongoCatError *error);
+/* 装载 + 建一个实例(测试与单实例路径用)。 */
 bool bongo_cat_renderer_module_open(const char *path, const char *asset_root,
     BongoCatError *error);
+/* 已装载组件的描述符(未装载为 NULL): 分发层据此取 ops。 */
+const BongoCatRendererModule *bongo_cat_renderer_module_active_descriptor(void);
 void bongo_cat_renderer_module_close(void);
 bool bongo_cat_renderer_module_active(void);
 const char *bongo_cat_renderer_module_active_path(void);

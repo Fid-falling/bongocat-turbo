@@ -16,6 +16,8 @@
 
 #include "component_host.h"
 
+#include <SDL3/SDL_video.h>
+
 #include <string.h>
 
 /* 桥接实现的入口(声明在 include/bongo_cat/model.h 与 live2d_vulkan.h 里, 这里再声明一次
@@ -72,6 +74,19 @@ int bongo_cat_live2d_expression(const BongoCatLive2D *live2d);
 bool bongo_cat_live2d_visual_state(const BongoCatLive2D *live2d,
     BongoCatLive2DVisualState *state);
 bool bongo_cat_live2d_prepare_cover_capture(BongoCatLive2D *live2d);
+void bongo_cat_live2d_prepare_viewer_audit(BongoCatLive2D *live2d);
+BongoCatLive2DLoadSession *bongo_cat_live2d_load_session_begin(
+    BongoCatLive2D *live2d, const char *model_dir, const char *setting_file,
+    bool preset, const BongoCatLive2DRenderOptions *render_options,
+    BongoCatLive2DLoadProgress progress, void *userdata, BongoCatError *error);
+BongoCatLive2DStepResult bongo_cat_live2d_load_session_activate(
+    BongoCatLive2DLoadSession *session, SDL_Window *window, void *context,
+    BongoCatError *error);
+BongoCatLive2DStepResult bongo_cat_live2d_load_session_step(
+    BongoCatLive2DLoadSession *session, const char *model_dir,
+    const char *setting_file, BongoCatError *error);
+void bongo_cat_live2d_load_session_end(BongoCatLive2DLoadSession *session);
+void bongo_cat_live2d_load_session_abort(BongoCatLive2DLoadSession *session);
 }
 
 namespace {
@@ -225,6 +240,43 @@ bool op_prepare_cover_capture(void *instance) {
     return bongo_cat_live2d_prepare_cover_capture((BongoCatLive2D *)instance);
 }
 
+void op_prepare_viewer_audit(void *instance) {
+    bongo_cat_live2d_prepare_viewer_audit((BongoCatLive2D *)instance);
+}
+
+/*
+ * 分步加载会话。宿主换模型走的正是这条路径(渐进解码/上传, 其间还要继续出帧), 所以**必须**
+ * 接上: 只接一次性 load 的话, 组件会在"宿主以为已经加载完"的状态下从未真正装载过模型 ——
+ * 表现是模型不显示, 而且没有任何报错, 属于最难查的一类失败。
+ */
+void *op_load_session_begin(void *instance, const char *model_dir,
+    const char *setting_file, bool preset,
+    const BongoCatLive2DRenderOptions *render_options,
+    BongoCatLive2DLoadProgress progress, void *userdata, BongoCatError *error) {
+    return bongo_cat_live2d_load_session_begin((BongoCatLive2D *)instance,
+        model_dir, setting_file, preset, render_options, progress, userdata, error);
+}
+
+int op_load_session_activate(void *session, void *window, void *context,
+    BongoCatError *error) {
+    return (int)bongo_cat_live2d_load_session_activate(
+        (BongoCatLive2DLoadSession *)session, (SDL_Window *)window, context, error);
+}
+
+int op_load_session_step(void *session, const char *model_dir,
+    const char *setting_file, BongoCatError *error) {
+    return (int)bongo_cat_live2d_load_session_step(
+        (BongoCatLive2DLoadSession *)session, model_dir, setting_file, error);
+}
+
+void op_load_session_end(void *session) {
+    bongo_cat_live2d_load_session_end((BongoCatLive2DLoadSession *)session);
+}
+
+void op_load_session_abort(void *session) {
+    bongo_cat_live2d_load_session_abort((BongoCatLive2DLoadSession *)session);
+}
+
 const BongoCatRendererModule module = {
     BONGO_CAT_RENDERER_MODULE_ABI,
     sizeof(BongoCatRendererModule),
@@ -241,7 +293,9 @@ const BongoCatRendererModule module = {
         op_restore_motion_preview, op_commit_motion_preview, op_motion_selected,
         op_motion_persistent, op_motion_visible, op_motion_same_toggle,
         op_set_expression, op_expression, op_visual_state,
-        op_prepare_cover_capture
+        op_prepare_cover_capture, op_prepare_viewer_audit,
+        op_load_session_begin, op_load_session_activate, op_load_session_step,
+        op_load_session_end, op_load_session_abort
     }
 };
 
