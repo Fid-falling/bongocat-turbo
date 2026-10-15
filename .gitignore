@@ -80,6 +80,9 @@ Desktop.ini
 # Local Windows audit tools
 /cmake/*.ps1
 !/cmake/RunCubismViewerBlindTest.ps1
+# GenCoreShim.ps1 不是"本地审计工具"而是**构建输入**: cmake/GenCoreShim.cmake 在每次构建时
+# 调它生成 Cubism Core 的运行期 shim(缺它就配不出来), 所以必须入库。
+!/cmake/GenCoreShim.ps1
 
 # Local diagnostic test state
 /.diagnostic-session/

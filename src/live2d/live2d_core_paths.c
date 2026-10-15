@@ -173,6 +173,13 @@ void *bongo_cat_live2d_core_symbol(const char *name) {
         : NULL;
 }
 
+/* 生成的 shim(cmake/GenCoreShim.ps1)只认这一个入口: 它把每个 csm* 函数的调用转发给
+   "当前已加载的用户 Core"。宿主这里给的就是自己的符号解析; 渲染组件里会给出走宿主服务表
+   core_symbol 的另一份实现 —— 于是同一份 shim 既能编进宿主, 也能编进组件。 */
+void *bongo_cat_cubism_core_resolve(const char *name) {
+    return bongo_cat_live2d_core_symbol(name);
+}
+
 void bongo_cat_live2d_core_shutdown(void) {
     if (!core_handle) return;
     bongo_cat_platform_live2d_core_close(core_handle);

@@ -108,12 +108,9 @@ function(bongo_cat_collect_core_links target out visited)
   set(${visited} "${${visited}}" PARENT_SCOPE)
 endfunction()
 
-# 迁移期开关(阶段 2 完成后删除):
-# 阶段 2 之前宿主仍把 Core 静态链进 exe(现状见 cmake/Cubism.cmake:11,90), 因此链接级
-# 守卫此刻只能告警。置 OFF 即为硬失败; 阶段 2 删掉这个 option 后守卫自动变成硬失败。
-option(BONGO_CAT_CORE_LINK_TRANSITION
-  "迁移期临时允许宿主静态链接 Cubism Core(阶段 2 完成后删除)" ON)
-
+# 阶段 2e 起这里是**硬失败**: 宿主改用生成的 shim(cmake/GenCoreShim.ps1)之后, 链接列表里
+# 任何 Core 引用都是违规, 不再有"迁移期暂时允许"的例外。那条过渡 option 已删除 —— 留这行
+# 注释是为了让后人知道它曾经存在、以及为什么现在没有例外。
 function(bongo_cat_assert_no_cubism_core_link target)
   set(_visited "")
   set(_found "")
@@ -124,17 +121,11 @@ function(bongo_cat_assert_no_cubism_core_link target)
   list(REMOVE_DUPLICATES _found)
   list(REMOVE_ITEM _found "")
   list(JOIN _found ", " _joined)
-  if(BONGO_CAT_CORE_LINK_TRANSITION)
-    message(WARNING
-      "目标 ${target} 仍链接 Live2D Cubism Core(${_joined})。这是迁移期的已知状态, "
-      "阶段 2(见 LIVE2D-PLUGIN-PLAN.md §P0.3)完成后宿主与插件都不得再链接它 —— "
-      "在此之前发行物仍在静态包含专有库的目标码。")
-  else()
-    message(FATAL_ERROR
-      "目标 ${target} 链接了 Live2D Cubism Core(${_joined})。"
-      "宿主与渲染插件都不得链接或内嵌 Core: Core 由用户自行从 Live2D 官网取得, "
-      "运行期经宿主服务表 core_symbol 解析。见 LIVE2D-PLUGIN-PLAN.md §9.1 规则 1。")
-  endif()
+  message(FATAL_ERROR
+    "目标 ${target} 链接了 Live2D Cubism Core(${_joined})。"
+    "宿主与渲染组件都不得链接或内嵌 Core: Core 只能由用户自行从 Live2D 官网取得, "
+    "运行期经宿主服务表 core_symbol 解析(csm* 符号由生成的 shim 提供)。"
+    "见 LIVE2D-PLUGIN-PLAN.md §9.1 规则 1。")
 endfunction()
 
 # 脚本期入口: 供打包后/CI 复用同一套判定, 避免"构建期查一套、CI 查另一套"。
