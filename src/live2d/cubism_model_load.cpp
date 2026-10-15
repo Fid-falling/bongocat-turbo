@@ -331,8 +331,16 @@ bool NativeModel::textures_step(int index, BongoCatError *error) {
     if (bongo_cat_cubism_renderer_uses_vulkan()) {
         BongoCatImage image = {0};
         const std::string texture_path = path(setting_->GetTextureFileName(index));
-        if (bongo_cat_image_load(texture_path.c_str(), &image, error) !=
-                BONGO_CAT_OK || !image.pixels) {
+        /*
+         * 与 GL 路径同一个工作尺寸上限: GL 那边在 Windows 上用 WIC 直接解到
+         * ≤BONGO_CAT_LIVE2D_TEXTURE_LIMIT (见 bongo_cat_image_texture_model), 这里过去
+         * 一直按原始尺寸解码上传。8192px 的图集只画几百像素, 原尺寸采样等于放弃图集自身的
+         * 预平均, 于是 Vulkan 侧的边缘落在与 GL 不同的采样密度上, 表现为模型轮廓上分散的
+         * 细差异。bongo_cat_image_fit 是纯 CPU 的 (WIC -> stb + 等比缩小), 不依赖 GL。
+         */
+        if (bongo_cat_image_fit(texture_path.c_str(),
+                BONGO_CAT_LIVE2D_TEXTURE_LIMIT, BONGO_CAT_LIVE2D_TEXTURE_LIMIT,
+                &image, error) != BONGO_CAT_OK || !image.pixels) {
             release_textures();
             return false;
         }

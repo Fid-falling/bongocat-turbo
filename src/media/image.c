@@ -16,7 +16,7 @@
 #include <stdlib.h>
 #include <string.h>
 
-#define BONGO_CAT_LIVE2D_EFFICIENT_TEXTURE_LIMIT 2048
+#define BONGO_CAT_LIVE2D_EFFICIENT_TEXTURE_LIMIT BONGO_CAT_LIVE2D_TEXTURE_LIMIT
 BongoCatResult bongo_cat_image_load(const char *path, BongoCatImage *image, BongoCatError *error) {
     BongoCatResult result = bongo_cat_image_decode_pixels(path, image, error);
     if (result != BONGO_CAT_OK) return result;

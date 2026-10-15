@@ -263,17 +263,17 @@ extern "C" BongoCatLive2DStepResult bongo_cat_live2d_load_session_step(
         case LoadCursor::kTextures: {
             const int total = model->texture_total();
             if (session->texture_index >= total) {
-                session->cursor = LoadCursor::kTexturesMask;
+                session->cursor = LoadCursor::kFinalize;
                 break;
             }
-            const int index = session->texture_index++;
-            if (!model->textures_step(index, error)) {
+            /* 记下索引但不前进: 前进交给配对的 kTexturesMask, 这样"上传第 i 张"与
+             * "给第 i 张补掩码"之间不会夹进别的上传。 */
+            if (!model->textures_step(session->texture_index, error)) {
                 session->cursor = LoadCursor::kFailed;
                 outcome = BONGO_CAT_LIVE2D_STEP_FAILED;
                 break;
             }
-            bongo_cat_live2d_session_report(session,
-                settings_step_progress(session->texture_index, total));
+            session->cursor = LoadCursor::kTexturesMask;
             break;
         }
         case LoadCursor::kTexturesMask:
@@ -282,12 +282,19 @@ extern "C" BongoCatLive2DStepResult bongo_cat_live2d_load_session_step(
              * 单独成步能把单步耗时压下来 (切换期间的帧间隔上界 = 预算 + 单步最长耗时),
              * 同时让主循环有机会在这两步之间插进一帧。GL 路径的掩码在解码时已填好,
              * 这一步对它就是空操作。
+             *
+             * 两步必须**交替**走 (上传 i -> 掩码 i -> 上传 i+1), 不能"全部上传完再统一补
+             * 掩码": Vulkan 分支的 textures_step 只保留一份待处理位图 (pending_alpha_image_),
+             * 下一次上传会把它顶掉, 于是除最后一张外全都拿不到掩码 —— prepare_expression_frame
+             * 随后会把整张透明画布当成可见内容, frame 内边距偏大, 模型被画小、内容视口与
+             * 叠加层错位。掩码在 textures_begin 里已按贴图数一次性分配, 与这里的索引一一对应。
              */
-            if (session->texture_index >= model->texture_total()) {
-                session->cursor = LoadCursor::kFinalize;
-                break;
-            }
             model->textures_mask_step(session->texture_index);
+            session->texture_index++;
+            session->cursor = LoadCursor::kTextures;
+            bongo_cat_live2d_session_report(session,
+                settings_step_progress(session->texture_index,
+                    model->texture_total()));
             break;
         case LoadCursor::kFinalize:
             if (!model->textures_end(error)) {

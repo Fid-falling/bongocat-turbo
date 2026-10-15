@@ -55,8 +55,22 @@ static bool render(BongoCatApp *app, bool present) {
     /* Vulkan 后端有自己的一整条帧路径 (交换链获取/绘制/呈现), 这里直接分叉,
        不碰任何 OpenGL 状态。 */
     if (bongo_cat_renderer_active() == BONGO_CAT_RENDERER_VULKAN) {
+        /*
+         * 与 GL 路径逐行对齐: 封面帧要先把外部输入 (鼠标/键盘映射到的参数) 盖到模型上、
+         * 更新 drawable, 再画这一帧。GL 路径一直在做 (prepare_cover_capture 夹在
+         * begin 与 draw 之间), Vulkan 分支当初整段漏了 —— 于是 VK 的封面永远停在
+         * "没有指针姿势"的那一帧, 而且 --ci-freeze-model (不推进模型时间) 下两个后端
+         * 定格的姿势也不一致, 接缝比对会把这层姿势差算进渲染差里。
+         */
+        bool cover_requested = !present && bongo_cat_model_cover_pending(app);
+        bool cover_ready = !cover_requested ||
+            bongo_cat_live2d_prepare_cover_capture(app->live2d);
         if (!bongo_cat_vk_render_main(app, present)) return false;
         if (present) return true;
+        if (!cover_ready) {
+            bongo_cat_model_cover_defer(app, "model-state-preparation");
+            return false;
+        }
         /*
          * 离屏截帧 (模型封面): 与 GL 路径在同一处收尾 —— vk_render_main 刚把这一帧
          * 渲染并呈现, 同时把整帧入队回读; 这里尝试取像素写 PNG。第一次通常还没

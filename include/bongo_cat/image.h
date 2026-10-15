@@ -21,6 +21,11 @@ typedef struct BongoCatImage {
 /* 降采样 alpha 掩码的边长上限 (不是纹理尺寸): 供 CPU 侧判断"这块有没有可见像素", 于是扫描
  * 三角形时不必回读原图。128 足够做"可见/不可见"这种粗判。 */
 #define BONGO_CAT_ALPHA_MASK_SIZE 128
+/* 模型图集的工作尺寸上限。图集可能声明 8192px, 而桌宠只画几百像素: 按原尺寸解码要几百 MB
+ * 临时内存, 而且等于放弃图集自带的预平均 —— 采样会落在远高于显示分辨率的密度上, 边缘出现
+ * 锯齿。GL 与 Vulkan 两条上传路径必须用**同一个**上限, 否则同一个模型在两个后端会拿到不同
+ * 分辨率的图集, 画面就对不上 (见 media/image.c 与 live2d/cubism_model_load.cpp)。 */
+#define BONGO_CAT_LIVE2D_TEXTURE_LIMIT 2048
 typedef struct BongoCatImageAlphaMask {
     unsigned char pixels[BONGO_CAT_ALPHA_MASK_SIZE * BONGO_CAT_ALPHA_MASK_SIZE];
     int width, height;
