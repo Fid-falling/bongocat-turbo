@@ -38,10 +38,15 @@ static void show(BongoCatApp *app, const char *message, bool error) {
 /* 状态描述: 已导入(带版本) / 组件在但缺 Core / 连组件都没有。 */
 static void status_text(BongoCatApp *app, char *output, size_t capacity) {
     if (bongo_cat_live2d_core_available()) {
-        snprintf(output, capacity, "%s (%s %u)",
-            tr(app, "pages.preference.live2dSetup.installed",
-                "Cubism Core imported; Live2D rendering is available"),
-            "csm", (unsigned)bongo_cat_live2d_core_version());
+        /* 只有"渲染组件真的活着"才敢说渲染可用。阶段 1 里宿主还没有把渲染切到运行期加载的
+           Core 上(编译进去的 Cubism 桥接仍链着导入库), 此时如果说"渲染可用", 用户导入完
+           看不到模型就会以为是自己下载错了 —— 所以这里退回"已导入"这句实话。 */
+        const char *text = bongo_cat_renderer_module_active()
+            ? tr(app, "pages.preference.live2dSetup.installed",
+                "Cubism Core imported; Live2D rendering is available")
+            : tr(app, "native.live2dCoreImported", "Live2D Cubism Core imported.");
+        snprintf(output, capacity, "%s (%s %u)", text, "csm",
+            (unsigned)bongo_cat_live2d_core_version());
         return;
     }
     const char *key = bongo_cat_renderer_module_live2d_available()
