@@ -178,10 +178,18 @@ int bongo_cat_vk_max_texture_dimension(const BongoCatVk *vk);
  * 返回 false 表示后端没就绪, 调用方应当回退 OpenGL。
  */
 typedef struct BongoCatVkNativeInfo {
+    void *instance;
     void *device;
     void *physical_device;
     void *command_pool;
     void *queue;
+    /* 队列族与深度格式: 组件要自己建渲染目标/管线, 光有 queue 句柄不够。 */
+    unsigned int queue_family;
+    int depth_format;   /* VkFormat */
+    /* 动态解析入口: 组件不链接 volk/loader 的表, 需要新函数时从这里取。
+       两个函数指针由宿主填(它们是 loader 提供的、进程级的), 组件只调用。 */
+    void *(*get_instance_proc)(const char *name);
+    void *(*get_device_proc)(const char *name);
     /* 交换链第 0 张图像的视图: SDK 的 SetConstantSettings 需要一个默认目标 */
     void *image_view;
     int width;

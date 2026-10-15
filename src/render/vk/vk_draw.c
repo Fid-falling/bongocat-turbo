@@ -356,10 +356,21 @@ int bongo_cat_vk_max_texture_dimension(const BongoCatVk *vk) {
 bool bongo_cat_vk_native_info(const BongoCatVk *vk, BongoCatVkNativeInfo *info) {
     if (!vk || !info || vk->device == VK_NULL_HANDLE) return false;
     memset(info, 0, sizeof(*info));
+    info->instance = (void *)vk->instance;
     info->device = (void *)vk->device;
     info->physical_device = (void *)vk->physical;
     info->command_pool = (void *)vk->command_pool;
     info->queue = (void *)vk->queue;
+    info->queue_family = vk->queue_family;
+    /* 这个后端不做深度缓冲, 于是深度格式填 VK_FORMAT_UNDEFINED(0): 组件按它建管线时
+       会走"无深度附件"的路径, 而不是拿一个假格式去建。 */
+    info->depth_format = 0;
+    /* 动态入口: 组件不链接 volk, 需要新函数时从这两个 loader 入口取。
+       vkGetInstanceProcAddr 对 instance 级与 device 级函数都有效, device 版本更省一层。 */
+    info->get_instance_proc = (void *(*)(const char *))
+        vkGetInstanceProcAddr(vk->instance, "vkGetInstanceProcAddr");
+    info->get_device_proc = (void *(*)(const char *))
+        vkGetDeviceProcAddr(vk->device, "vkGetDeviceProcAddr");
     info->width = (int)vk->extent.width;
     info->height = (int)vk->extent.height;
     info->image_format = (int)vk->format;
