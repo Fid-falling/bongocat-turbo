@@ -348,6 +348,12 @@ bool bongo_cat_vk_create_swapchain(BongoCatVk *vk, int width, int height,
     }
     /* 管线绑定渲染通道, 交换链重建后必须跟着重建 */
     bongo_cat_vk_rebuild_pipelines(vk);
+    /*
+     * 注意这只是"交换链建出来了"的机械事实, 不代表用户的垂直同步设置已经落定:
+     * VkContext 初始 vsync=true, 首次建链必然按 FIFO 建, 随后才由 frame_clock.c 的
+     * bongo_cat_app_apply_frame_pacing 按设置改写。所以这行里 present_mode 的最终
+     * 归属以那条 "[runtime] 垂直同步已…" 为准 (它总在后面一条)。
+     */
     SDL_LogInfo(BONGO_CAT_LOG_LIFECYCLE,
         "[vulkan] 交换链 %ux%u images=%u format=%d present_mode=%d "
         "composite_alpha=0x%x supported=0x%x transparent=%d",

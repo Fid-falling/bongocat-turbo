@@ -77,7 +77,13 @@ static bool read_model(yyjson_val *object, BongoCatModelPreferences *value,
         !read_bool(object, "centerPointerTracking", &value->mouse_centered,
             error) ||
         !read_bool(object, "ignorePointerInput", &value->ignore_mouse, error) ||
-        !read_int(object, "maximumFps", &value->max_fps, error))
+        !read_int(object, "maximumFps", &value->max_fps, error) ||
+        /*
+         * 垂直同步: 可选读。缺键时保留 -1(sentinel), 由 bongo_cat_settings_validate()
+         * 按"老版本里同步跟随最大帧率"的规则收口, 老配置因此不会因为升级而突变。
+         * 用 read_int 而不是 read_bool 就是为了保住这个第三态。
+         */
+        !read_int(object, "vsync", &value->vsync, error))
         return false;
     const char *text;
     size_t length;

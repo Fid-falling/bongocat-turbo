@@ -79,6 +79,7 @@ bool bongo_cat_app_initialize(BongoCatApp *app, int argc, char **argv,
     app->smoke_theme = -1;
     app->smoke_preference_page = -1;
     app->applied_max_fps = -1;
+    app->applied_vsync = -1;
     /* -1 = 命令行没有覆盖渲染后端, 按 settings.json 走 */
     app->renderer_override = -1;
     bongo_cat_settings_defaults(&app->settings);

@@ -275,6 +275,13 @@ void bongo_cat_settings_defaults(BongoCatSettings *config) {
     memset(config, 0, sizeof(*config));
     config->model.mouse_centered = true;
     config->model.max_fps = BONGO_CAT_DEFAULT_MAX_FPS;
+    /*
+     * 垂直同步默认留"未设置"而不是直接 true: 老版本里它不是一个独立设置, 而是由最大
+     * 帧率推出来的 (限帧 30/60 -> 开, "无限" -> 关, 见 frame_clock.c)。sentinel 让
+     * 校验阶段能按这条老规则收口, 于是**新装的默认值和老用户升级后的行为完全一致**
+     * (默认 60 帧 => 开同步), 只有用户真的动过这个开关才会覆盖它。
+     */
+    config->model.vsync = BONGO_CAT_VSYNC_DEFAULT;
     /* 默认走 OpenGL: Vulkan 现在是显式选项 (见 render_backend.c 的 resolve) */
     config->model.renderer = BONGO_CAT_RENDERER_OPENGL;
     config->window.always_on_top = true;
@@ -318,6 +325,16 @@ void bongo_cat_settings_validate(BongoCatSettings *config) {
     if (max_fps != BONGO_CAT_MAX_FPS_UNLIMITED)
         max_fps = max_fps > 0 && max_fps <= 30 ? 30 : BONGO_CAT_DEFAULT_MAX_FPS;
     config->model.max_fps = max_fps;
+    /*
+     * 垂直同步收口: 未设置(-1)就按老规则从最大帧率推 (此时 max_fps 已经钳过, 用的是
+     * 最终值), 其余非法值一律当"开" —— 见 config.h 的三态注释。收口之后结构体里只会
+     * 剩 0/1, 于是保存写盘的是具体开关状态: 这份配置一旦被本版本写过, 即使之后又在
+     * 设置里把帧率改成"无限", 也不会再退回"同步跟着帧率变"的老语义 (那时用户已经能
+     * 在界面上直接看到这个开关了)。
+     */
+    if (config->model.vsync != 0 && config->model.vsync != 1)
+        config->model.vsync = config->model.vsync == BONGO_CAT_VSYNC_DEFAULT ?
+            BONGO_CAT_VSYNC_FOR_MAX_FPS(max_fps) : 1;
     if ((unsigned)config->model.renderer >= BONGO_CAT_RENDERER_COUNT)
         config->model.renderer = BONGO_CAT_RENDERER_OPENGL;
     config->window.hide_delay_seconds = clampf_or(

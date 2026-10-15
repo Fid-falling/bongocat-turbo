@@ -257,6 +257,28 @@ static void page_display(BongoCatPreferences *value, struct nk_context *context)
             app->settings.window.font_raster_cap = capped ? 1 : 0;
             app->dirty = true;
         }
+    }
+    {
+        /*
+         * 垂直同步: 紧挨着上面的帧率相关项。开=锁在显示器刷新率上(FIFO / swap interval 1),
+         * 关=按"最大帧率"限帧(IMMEDIATE / swap interval 0); 两种状态下"最大帧率"都仍然
+         * 是天花板。语义的唯一权威在 frame_clock.c 的 bongo_cat_app_apply_frame_pacing(),
+         * 这里的提示文案必须和它一致。
+         *
+         * 显示的是**收口后**的值: 老配置里 sentinel(-1)已经由 settings_validate 按
+         * "同步跟随帧率"的老规则解成了 0/1, 所以界面看到的就是当前真实生效的状态;
+         * 用户一拨动就写成显式 0/1, 从此不再依赖那条兼容规则。
+         */
+        bool vsync = app->settings.model.vsync != 0;
+        bongo_cat_pref_row_icon(context, BONGO_CAT_PREF_ICON_VSYNC);
+        if (bongo_cat_pref_toggle(context, "vsync", tr(app,
+                "pages.preference.cat.labels.vsync", "V-Sync"),
+                tr(app, "pages.preference.cat.hints.vsync",
+                    "让画面与显示器刷新同步, 减少撕裂; 关闭后按上面的最大帧率运行"),
+                &vsync)) {
+            app->settings.model.vsync = vsync ? 1 : 0;
+            app->dirty = true;
+        }
     }    section_gap(context, 10);
     bongo_cat_preferences_options_end(value, context);
     }

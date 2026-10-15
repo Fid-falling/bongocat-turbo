@@ -244,6 +244,19 @@ static void random_sound(struct nk_command_buffer *c, struct nk_rect b,
 }
 
 /*
+ * 垂直同步: 一道竖线(垂直回扫) + 左右两个错开的方块(前后两帧被它切开对齐)。
+ * 用与 max_fps 相同的柱状图会混淆两行, 所以这里刻意换成"分割线"的意象。
+ */
+static void vsync(struct nk_command_buffer *c, struct nk_rect b,
+    struct nk_color color) {
+    nk_stroke_rect(c, nk_rect(b.x + 1, b.y + 3, 7, 12), 2, 1.5f, color);
+    nk_stroke_rect(c, nk_rect(b.x + 10, b.y + 3, 7, 12), 2, 1.5f, color);
+    line(c, b, 9, 1, 9, 6, color);
+    line(c, b, 9, 8, 9, 12, color);
+    line(c, b, 9, 14, 9, 18, color);
+}
+
+/*
  * 行图标总表。下标 = icon - BONGO_CAT_PREF_ICON_MULTIPLE_MODELS, 与枚举顺序**逐项
  * 对应** —— 这就是 preferences_icons.h 里"新图标只能加在段末"那条约束的落地处:
  * 在枚举中间插一个值, 这张表的下标就全错位了。
@@ -258,7 +271,7 @@ bool bongo_cat_pref_row_icon_draw(struct nk_command_buffer *canvas,
         random_expression, mirror, mouse_mirror, mouse_centered, ignore_mouse,
         max_fps, autostart, language, theme, shortcut_visibility,
         shortcut_preferences, hide_fade, renderer, frame_bounds,
-        random_motion, random_sound, vertical_flip, mouse_vertical_flip};
+        random_motion, random_sound, vertical_flip, mouse_vertical_flip, vsync};
     int index = icon - BONGO_CAT_PREF_ICON_MULTIPLE_MODELS;
     int count = (int)(sizeof(draws) / sizeof(draws[0]));
     if (index < 0 || index >= count) return false;

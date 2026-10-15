@@ -1,7 +1,9 @@
 #ifndef BONGO_CAT_RENDERER_MODULE_H
 #define BONGO_CAT_RENDERER_MODULE_H
 
+#include "bongo_cat/app.h"
 #include "bongo_cat/common.h"
+#include "bongo_cat/renderer_module_abi.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -72,6 +74,28 @@ size_t bongo_cat_renderer_module_last(BongoCatRendererModuleInfo **entries);
 /* Live2D 渲染组件是否可用(找到、未停用、ABI 通过)。降级路径与提示文案按它分流:
    "缺组件"与"缺 Core"是两件不同的事, 提示也必须分开。 */
 bool bongo_cat_renderer_module_live2d_available(void);
+
+/*
+ * 阶段 2: 校验 / 装载 / 卸载。
+ *
+ * validate 是**纯函数**(不碰文件系统、不加载库), 所以"坏描述符矩阵"可以逐条断言;
+ * open 负责加载、取导出符号、校验、建实例, 任何一步失败都按相反顺序回滚。
+ */
+bool bongo_cat_renderer_module_validate(const BongoCatRendererModule *module,
+    const BongoCatRendererModuleHost *host, BongoCatResult *result,
+    char *reason, size_t capacity);
+bool bongo_cat_renderer_module_validate_host(
+    const BongoCatRendererModuleHost *host);
+bool bongo_cat_renderer_module_open(const char *path, const char *asset_root,
+    BongoCatError *error);
+void bongo_cat_renderer_module_close(void);
+bool bongo_cat_renderer_module_active(void);
+const char *bongo_cat_renderer_module_active_path(void);
+/* 宿主服务表(静态, 生命周期覆盖组件存活期)。 */
+const BongoCatRendererModuleHost *bongo_cat_renderer_module_host(void);
+/* 目录服务要回答"六棵树在哪", 而那只有 app 知道 —— 启动期绑定一次。
+   传 NULL 表示解绑(退出时调用, 免得服务表里留下悬空指针)。 */
+void bongo_cat_renderer_module_bind_app(const BongoCatApp *app);
 
 #ifdef __cplusplus
 }

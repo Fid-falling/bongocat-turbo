@@ -188,6 +188,52 @@ void test_config(void) {
         "\"rendering\":{\"maximumFps\":30,\"maximumFps\":60}}");
     CHECK(bongo_cat_settings_load(unsupported, &loaded_settings, &error) ==
         BONGO_CAT_ERROR_FORMAT);
+
+    /* "垂直同步"是新增键: 老配置里没有它, 行为必须和加这个键之前完全一样
+       (那时同步是由最大帧率推出来的: 限帧 -> 开, "无限" -> 关, 见 frame_clock.c)。
+       所以下面这条只写 maximumFps, 期望读出来的是**推出来的**同步状态, 而不是新增
+       字段的原始默认值 —— 这是"老用户升级后不突变"的回归测试。 */
+    write_text(unsupported,
+        "{\"format\":\"bongocat/settings\",\"schemaVersion\":1,"
+        "\"rendering\":{\"maximumFps\":30}}");
+    bongo_cat_settings_defaults(&loaded_settings);
+    CHECK(bongo_cat_settings_load(unsupported, &loaded_settings, &error) ==
+        BONGO_CAT_OK && loaded_settings.model.max_fps == 30 &&
+        loaded_settings.model.vsync == 1);
+    write_text(unsupported,
+        "{\"format\":\"bongocat/settings\",\"schemaVersion\":1,"
+        "\"rendering\":{\"maximumFps\":0}}");
+    bongo_cat_settings_defaults(&loaded_settings);
+    CHECK(bongo_cat_settings_load(unsupported, &loaded_settings, &error) ==
+        BONGO_CAT_OK && loaded_settings.model.max_fps == 0 &&
+        loaded_settings.model.vsync == 0);
+    /* 显式写了 vsync 就听它的, 即使和"跟随帧率"的老规则相反 */
+    write_text(unsupported,
+        "{\"format\":\"bongocat/settings\",\"schemaVersion\":1,"
+        "\"rendering\":{\"maximumFps\":0,\"vsync\":1}}");
+    bongo_cat_settings_defaults(&loaded_settings);
+    CHECK(bongo_cat_settings_load(unsupported, &loaded_settings, &error) ==
+        BONGO_CAT_OK && loaded_settings.model.max_fps == 0 &&
+        loaded_settings.model.vsync == 1);
+    write_text(unsupported,
+        "{\"format\":\"bongocat/settings\",\"schemaVersion\":1,"
+        "\"rendering\":{\"maximumFps\":60,\"vsync\":0}}");
+    bongo_cat_settings_defaults(&loaded_settings);
+    CHECK(bongo_cat_settings_load(unsupported, &loaded_settings, &error) ==
+        BONGO_CAT_OK && loaded_settings.model.vsync == 0);
+    /* 类型不对 / 越界都是配置损坏, 不能悄悄当成某个开关状态; 失败时保留原设置 */
+    write_text(unsupported,
+        "{\"format\":\"bongocat/settings\",\"schemaVersion\":1,"
+        "\"rendering\":{\"vsync\":\"on\"}}");
+    loaded_settings.model.vsync = 1;
+    CHECK(bongo_cat_settings_load(unsupported, &loaded_settings, &error) ==
+        BONGO_CAT_ERROR_FORMAT);
+    CHECK(loaded_settings.model.vsync == 1);
+    write_text(unsupported,
+        "{\"format\":\"bongocat/settings\",\"schemaVersion\":1,"
+        "\"rendering\":{\"vsync\":2.5}}");
+    CHECK(bongo_cat_settings_load(unsupported, &loaded_settings, &error) ==
+        BONGO_CAT_ERROR_FORMAT);
     write_text(unsupported,
         "{\"format\":\"bongocat/session\",\"schemaVersion\":1,"
         "\"window\":{\"visible\":123}}");
@@ -218,6 +264,10 @@ void test_config(void) {
     CHECK(bongo_cat_session_load(session_path, &loaded_session, &error) ==
         BONGO_CAT_OK);
     CHECK(loaded_settings.model.max_fps == 60);
+    /* 落盘的是收口后的具体开关状态(0/1), 不是 sentinel: 本版本写过的配置不再依赖
+       "同步跟随最大帧率"那条兼容规则。 */
+    CHECK(contains_text(settings_path, "\"vsync\": 1"));
+    CHECK(loaded_settings.model.vsync == 1);
     CHECK(loaded_session.window.scale_percent == 10.0f);
 
     const char *append_path = "bongocat-append.log";

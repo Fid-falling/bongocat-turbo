@@ -231,6 +231,33 @@ if(BUILD_TESTING)
   add_test(NAME live2d-core-import COMMAND bongo_cat_live2d_core_tests)
   set_tests_properties(live2d-core-import PROPERTIES TIMEOUT 60)
 
+  # 组件 ABI 的坏描述符矩阵: 需要一个"会说谎的组件"作为夹具(只在测试里构建, 不进发行包)。
+  # 它导出 bongo_cat_renderer_module_query, 所以是一个**真的**动态库 —— 校验代码走的是与
+  # 生产完全相同的路径(而不是测试里另写一套)。
+  add_library(bongo_cat_test_component SHARED tests/plugin/test_component.c)
+  # 与生产组件一样, 夹具只拿公共头 + 生成头(version.h 是配置期生成的), 不链宿主运行时 ——
+  # 这样"组件不能依赖宿主内部符号"这条纪律在测试里也是真的。
+  target_include_directories(bongo_cat_test_component PRIVATE include
+    "${BONGO_CAT_GENERATED_INCLUDE_DIR}")
+  target_link_libraries(bongo_cat_test_component PRIVATE bongo_cat_warnings)
+  set_target_properties(bongo_cat_test_component PROPERTIES
+    PREFIX "" OUTPUT_NAME "bongo_test_component")
+  add_executable(bongo_cat_renderer_module_abi_tests
+    tests/plugin/test_renderer_module_abi.c)
+  target_link_libraries(bongo_cat_renderer_module_abi_tests PRIVATE
+    bongo_cat_runtime bongo_cat_warnings)
+  if(MSVC)
+    # 与其它链 bongo_cat_runtime 的 C 测试一样: 运行时头里有 C11 原子, MSVC 需要显式开
+    target_compile_options(bongo_cat_renderer_module_abi_tests PRIVATE
+      $<$<C_COMPILER_ID:MSVC>:/experimental:c11atomics>)
+  endif()
+  # 夹具路径用**命令行参数**传, 不用编译期宏: Windows 原生路径塞进 C 字符串字面量会把
+  # \b \t \R 变成转义序列(踩过: warning C4129 -> /WX 直接失败)。
+  add_dependencies(bongo_cat_renderer_module_abi_tests bongo_cat_test_component)
+  add_test(NAME renderer-module-abi COMMAND bongo_cat_renderer_module_abi_tests
+    "$<TARGET_FILE:bongo_cat_test_component>")
+  set_tests_properties(renderer-module-abi PROPERTIES TIMEOUT 30)
+
   if(BONGO_CAT_CUBISM_ENABLED)
     add_executable(bongo_cat_core_profile_tests tests/live2d/test_core_profile.cpp)
     target_include_directories(bongo_cat_core_profile_tests PRIVATE src/live2d)

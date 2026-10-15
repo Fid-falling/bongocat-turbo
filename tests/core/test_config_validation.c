@@ -14,6 +14,11 @@ static void check_defaults_and_validation(void) {
     bongo_cat_session_defaults(&session);
     CHECK(settings.model.max_fps == 60 && settings.model.mouse_centered &&
         !settings.model.multiple_pets);
+    /* 默认铺底时垂直同步是 sentinel(留待收口按"限帧就开同步"的老规则解), 校验之后
+       必须变成一个具体的开关状态: 默认 60 帧 => 开。 */
+    CHECK(settings.model.vsync == BONGO_CAT_VSYNC_DEFAULT);
+    bongo_cat_settings_validate(&settings);
+    CHECK(settings.model.vsync == 1);
     CHECK(settings.window.always_on_top && !settings.window.keep_in_screen);
     CHECK(!settings.window.obs_background);
     CHECK(!settings.window.random_expression &&
@@ -61,6 +66,27 @@ static void check_defaults_and_validation(void) {
         bongo_cat_settings_validate(&settings);
         CHECK(settings.model.max_fps == new_fps[i]);
     }
+    /* 垂直同步的三态收口: 显式 0/1 原样保留, sentinel 与任何非法值都按老规则/兜底
+       收敛到 0/1 —— 收口之后绝不能再有 sentinel 漏到保存或下发路径上。 */
+    settings.model.max_fps = 30;
+    settings.model.vsync = 1;
+    bongo_cat_settings_validate(&settings);
+    CHECK(settings.model.vsync == 1);
+    settings.model.max_fps = BONGO_CAT_MAX_FPS_UNLIMITED;
+    settings.model.vsync = BONGO_CAT_VSYNC_DEFAULT;
+    bongo_cat_settings_validate(&settings);
+    CHECK(settings.model.vsync == 0);
+    /* 同一条兼容规则反过来: 同样是 sentinel, 帧率限到 60 时应该解成"开" */
+    settings.model.max_fps = 60;
+    settings.model.vsync = BONGO_CAT_VSYNC_DEFAULT;
+    bongo_cat_settings_validate(&settings);
+    CHECK(settings.model.vsync == 1);
+    settings.model.vsync = 7;
+    bongo_cat_settings_validate(&settings);
+    CHECK(settings.model.vsync == 1);
+    settings.model.vsync = -2;
+    bongo_cat_settings_validate(&settings);
+    CHECK(settings.model.vsync == 1);
     CHECK(settings.window.hide_delay_seconds == 0.0f);
     CHECK(settings.window.random_expression_interval_seconds ==
         BONGO_CAT_DEFAULT_RANDOM_EXPRESSION_SECONDS);

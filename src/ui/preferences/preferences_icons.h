@@ -44,6 +44,9 @@ typedef enum BongoCatPrefIcon {
     BONGO_CAT_PREF_ICON_RANDOM_SOUND,
     BONGO_CAT_PREF_ICON_VERTICAL_FLIP,
     BONGO_CAT_PREF_ICON_MOUSE_VERTICAL_FLIP,
+    /* 新增图标一律加在段末: 行图标总表按"枚举 - BONGO_CAT_PREF_ICON_MULTIPLE_MODELS"
+       取下标 (见 preferences_row_icons.c), 插到中间会让后面所有图标的含义整体错位。 */
+    BONGO_CAT_PREF_ICON_VSYNC,
     BONGO_CAT_PREF_ICON_COUNT
 } BongoCatPrefIcon;
 

@@ -65,8 +65,12 @@ void bongo_cat_vk_set_vsync(BongoCatVk *vk, bool vsync) {
         !vk->extent_valid) return;
     bongo_cat_vk_recreate_swapchain(vk, (int)vk->extent.width,
         (int)vk->extent.height);
-    SDL_Log("[vulkan] 垂直同步已%s (present_mode=%d)", vsync ? "开启" : "关闭",
-        (int)vk->present_mode);
+    /*
+     * "已经生效"的那一行由调用方 (frame_clock.c 的 bongo_cat_app_apply_frame_pacing)
+     * 在**每次应用设置**时统一打, 不在这里打: 这条路径只在值与上一次不同时才会走到,
+     * 于是"开关本来就是开、而且交换链天生就是 FIFO"这种最常见的情况一行都不会有,
+     * 用户验收时看不到任何证据。这里换完就返回, 让调用方去打那条权威结论。
+     */
 }
 
 #endif /* BONGO_CAT_HAS_VULKAN */

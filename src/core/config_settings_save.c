@@ -32,6 +32,11 @@ static bool write_model(yyjson_mut_doc *doc, yyjson_mut_val *object,
         yyjson_mut_obj_add_bool(doc, object, "ignorePointerInput",
             value->ignore_mouse) &&
         yyjson_mut_obj_add_int(doc, object, "maximumFps", value->max_fps) &&
+        /* 键名/类型与 config_io.c 的 read_int("vsync") 一一对齐, 取值 0/1 (写盘前
+           必过 bongo_cat_settings_validate, sentinel 已经收口成具体开关状态)。
+           对老版本这是未知键, 它们原样忽略 —— 升级再回退只丢这一项, 不会让配置读取
+           失败(新增键必须满足这条, 见本文件开头的契约)。 */
+        yyjson_mut_obj_add_int(doc, object, "vsync", value->vsync) &&
         yyjson_mut_obj_add_strcpy(doc, object, "renderer",
             bongo_cat_renderer_name(value->renderer));
 }

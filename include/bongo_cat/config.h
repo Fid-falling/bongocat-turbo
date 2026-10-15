@@ -6,6 +6,16 @@
 #define BONGO_CAT_DEFAULT_MAX_FPS 60
 /* max_fps 取这个值时不做帧率节流, 由垂直同步/驱动决定实际上限 */
 #define BONGO_CAT_MAX_FPS_UNLIMITED 0
+/*
+ * "垂直同步"开关的三态取值。0/1 是用户显式选的开关状态, -1 是"老配置里还没有这个键"
+ * 的哨兵值 —— 它只在读取阶段存在, 由 bongo_cat_settings_validate() 按兼容规则收口。
+ * 保留三态的原因见 config_defaults.c 里收口处的注释: 老版本里垂直同步并不是一个独立
+ * 设置, 而是由最大帧率推出来的 (见 frame_clock.c), 不照搬那条规则老用户升级后会突变。
+ */
+#define BONGO_CAT_VSYNC_DEFAULT (-1)
+/* 兼容规则: 没有独立开关时, 限帧(30/60)原本就开同步, "无限"原本就关同步。 */
+#define BONGO_CAT_VSYNC_FOR_MAX_FPS(max_fps) \
+    ((max_fps) != BONGO_CAT_MAX_FPS_UNLIMITED)
 #define BONGO_CAT_DEFAULT_WINDOW_SCALE_PERCENT 100.0f
 #define BONGO_CAT_DEFAULT_WINDOW_OPACITY_PERCENT 100.0f
 #define BONGO_CAT_DEFAULT_RANDOM_EXPRESSION_SECONDS 5.0f
@@ -67,6 +77,12 @@ typedef struct BongoCatModelPreferences {
     bool mouse_centered;
     bool ignore_mouse;
     int max_fps;
+    /*
+     * 垂直同步开关, 取 BONGO_CAT_VSYNC_DEFAULT(未设置) / 0(关) / 1(开)。
+     * 用 int 而不是 bool 就是为了容下"未设置"这个第三态; 校验/保存之后一定收敛到 0/1,
+     * 只有"文件里没有 vsync 键"的那一次读取会短暂带着 -1。
+     */
+    int vsync;
     BongoCatRenderer renderer;
 } BongoCatModelPreferences;
 

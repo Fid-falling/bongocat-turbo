@@ -250,8 +250,11 @@ typedef struct BongoCatApp {
     bool update_install_pending;
     int exit_code;
     bool dirty;
-    /* 已经下发给后端的 max_fps (垂直同步跟随它变化), -1 表示还没下发过 */
+    /* 已经下发给后端的 max_fps / 垂直同步, -1 表示还没下发过(两个都是"先算再比",
+       所以初值只要不等于任何合法结果即可)。垂直同步单独记: 开关一翻, 即使帧率没变
+       也要重新下发一次。 */
     int applied_max_fps;
+    int applied_vsync;
     uint64_t last_frame_ns;
     uint64_t render_retry_ns;
     uint64_t smoke_deadline_ns;
