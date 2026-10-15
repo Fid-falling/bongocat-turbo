@@ -104,6 +104,7 @@ bool bongo_cat_live2d_vulkan_end_frame(void);
 bool bongo_cat_live2d_vulkan_target_info(void **image, void **view, void **sampler,
     int *width, int *height);
 void bongo_cat_live2d_vulkan_release_target(void);
+uint64_t bongo_cat_live2d_vulkan_target_generation(void);
 void *bongo_cat_live2d_vulkan_create_texture(const void *pixels, int width,
     int height);
 void *bongo_cat_live2d_vulkan_create_texture_attached(const void *pixels,
@@ -326,6 +327,9 @@ bool op_vulkan_target_info(void **image, void **view, void **sampler, int *width
     return bongo_cat_live2d_vulkan_target_info(image, view, sampler, width, height);
 }
 void op_vulkan_release_target(void) { bongo_cat_live2d_vulkan_release_target(); }
+uint64_t op_vulkan_target_generation(void) {
+    return bongo_cat_live2d_vulkan_target_generation();
+}
 void *op_vulkan_create_texture(const void *pixels, int width, int height) {
     return bongo_cat_live2d_vulkan_create_texture(pixels, width, height);
 }
@@ -362,6 +366,7 @@ const BongoCatRendererModule module = {
         op_vulkan_shaders_available, op_vulkan_set_shader_root,
         op_vulkan_set_supersample, op_vulkan_begin_frame, op_vulkan_end_frame,
         op_vulkan_target_info, op_vulkan_release_target,
+        op_vulkan_target_generation,
         op_vulkan_create_texture, op_vulkan_create_texture_attached,
         op_vulkan_destroy_texture, op_vulkan_bind_texture
     }

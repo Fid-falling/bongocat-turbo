@@ -67,6 +67,12 @@ void bongo_cat_live2d_vulkan_set_supersample(int mode);
 /* 内存清理: 释放离屏目标 (下次绘制自动重建) */
 void bongo_cat_live2d_vulkan_release_target(void);
 /*
+ * 借用令牌: 每次重建/释放离屏目标都自增。宿主缓存了 target_info 给的 image/view 时**必须
+ * 一起记住它**, 变了就立刻丢弃并重新获取 —— 同尺寸重建时尺寸比较发现不了句柄已换, 继续用
+ * 旧包装会采样失效句柄(实测崩在封面回读)。
+ */
+uint64_t bongo_cat_live2d_vulkan_target_generation(void);
+/*
  * 接管 Vulkan 渲染。参数是**宿主私有 BongoCatVk 的只读快照**(POD, 见 vk_backend.h), 而不是
  * 那个结构体本身 —— 组件不该也不能解释宿主的后端状态; 快照里有 device/物理设备/队列/队列族/
  * 命令池/格式/尺寸以及 loader 的动态入口。传 NULL 表示"用 remember() 记下的那一份"。

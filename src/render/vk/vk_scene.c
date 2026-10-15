@@ -30,6 +30,10 @@
 static BongoCatVkTexture *live2d_target_texture(BongoCatApp *app) {
     static BongoCatVkTexture *texture;
     static int width, height;
+    /* 借用令牌: 组件重建/释放离屏目标时会变。**只按尺寸复用是不够的** —— 内存回收后同尺寸
+       重建、或 resize 又回到原尺寸时, 尺寸没变但句柄已经换了; 继续用旧包装就是采样失效句柄
+       (实测崩在封面回读)。 */
+    static uint64_t generation;
     void *image = NULL, *view = NULL;
     int target_width = 0, target_height = 0;
     if (!app || !app->vk ||
@@ -38,15 +42,20 @@ static BongoCatVkTexture *live2d_target_texture(BongoCatApp *app) {
         if (texture && app && app->vk) bongo_cat_vk_texture_destroy(app->vk, texture);
         texture = NULL;
         width = height = 0;
+        generation = 0;
         return NULL;
     }
-    if (texture && target_width == width && target_height == height) return texture;
+    const uint64_t current_generation =
+        bongo_cat_live2d_vulkan_target_generation();
+    if (texture && target_width == width && target_height == height &&
+        current_generation == generation) return texture;
     if (texture) bongo_cat_vk_texture_destroy(app->vk, texture);
     BongoCatError error = {0};
     texture = bongo_cat_vk_texture_from_external(app->vk, image, view, target_width,
         target_height, "live2d", &error);
     width = target_width;
     height = target_height;
+    generation = current_generation;
     return texture;
 }
 

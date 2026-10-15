@@ -122,6 +122,7 @@ if(EXISTS "${CUBISM_CORE_HEADER}")
       vulkan_attach vulkan_detach vulkan_ready vulkan_shaders_available
       vulkan_set_shader_root vulkan_set_supersample vulkan_begin_frame
       vulkan_end_frame vulkan_target_info vulkan_release_target
+      vulkan_target_generation
       vulkan_create_texture vulkan_create_texture_attached
       vulkan_destroy_texture vulkan_bind_texture)
     set(BONGO_CAT_LIVE2D_STUB_DEFINITIONS "")

@@ -290,6 +290,8 @@ bool bongo_cat_live2d_vulkan_shaders_available(const char *assets_root) {
     return true;
 }
 
+uint64_t bongo_cat_live2d_vulkan_target_generation(void) { return 0; }
+
 void bongo_cat_live2d_vulkan_release_target(void) {
 }
 

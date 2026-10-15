@@ -28,6 +28,15 @@ bool g_attached = false;
    宿主交来的**只读快照**(POD); 需要刷新的字段(尺寸/格式)由 remember/attach 重新送进来。 */
 BongoCatVkNativeInfo g_native = {};
 bool g_native_valid = false;
+/*
+ * 离屏目标的借用令牌: 每次重建/释放离屏目标都自增。
+ *
+ * 为什么需要它: 宿主合成时要用 VkImageView, 而那是组件创建并拥有的(借用语义)。宿主若只按
+ * 尺寸没变来复用自己缓存的纹理包装, 就会在同尺寸重建(内存回收 release_target 之后再建、
+ * 或 resize 回到原尺寸)时拿到已经失效的旧句柄 —— 表现是采样/绑定时访问违例(实测崩在
+ * 封面回读)。令牌一变, 宿主就知道手里的句柄过期了。
+ */
+uint64_t g_target_generation = 1;
 /* remember() 记下的待挂载信息 */
 BongoCatVkNativeInfo g_pending = {};
 bool g_pending_valid = false;
@@ -91,6 +100,8 @@ bool ensure_target_size(int width, int height) {
         if (g_device) vkDeviceWaitIdle(g_device);
         g_target->DestroyRenderTarget();
         CSM_DELETE(g_target);
+        /* 旧句柄作废: 宿主必须重新取(见 g_target_generation 的说明)。 */
+        ++g_target_generation;
     }
     g_target = target;
     g_target_width = width;
@@ -120,12 +131,18 @@ void bongo_cat_live2d_vulkan_set_supersample(int mode) {
 }
 
 /* 内存清理时释放离屏目标; 设备/管线都留着, 下一帧按当前尺寸重建。 */
+uint64_t bongo_cat_live2d_vulkan_target_generation(void) {
+    return g_target_generation;
+}
+
 void bongo_cat_live2d_vulkan_release_target(void) {
     if (!g_target) return;
     if (g_device) vkDeviceWaitIdle(g_device);
     g_target->DestroyRenderTarget();
     CSM_DELETE(g_target);
     g_target = nullptr;
+    /* 释放也是失效: 宿主手里那份句柄从此不能再用。 */
+    ++g_target_generation;
     g_target_width = g_target_height = 0;
     SDL_LogWarn(SDL_LOG_CATEGORY_VIDEO, "[live2d/vk] 已释放离屏目标 (内存清理), 下次绘制会重建");
 }

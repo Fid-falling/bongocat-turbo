@@ -200,6 +200,8 @@ typedef struct BongoCatRendererModuleOps {
     bool (*vulkan_target_info)(void **image, void **view, void **sampler,
         int *width, int *height);
     void (*vulkan_release_target)(void);
+    /* 借用令牌(见 live2d_vulkan.h 的说明): 宿主必须用它判断手里的句柄是否还有效。 */
+    uint64_t (*vulkan_target_generation)(void);
     void *(*vulkan_create_texture)(const void *pixels, int width, int height);
     void *(*vulkan_create_texture_attached)(const void *pixels, int width,
         int height);

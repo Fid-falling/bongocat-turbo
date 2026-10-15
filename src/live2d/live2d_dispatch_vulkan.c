@@ -34,6 +34,7 @@ extern bool STUB_VK(end_frame)(void);
 extern bool STUB_VK(target_info)(void **image, void **view, void **sampler,
     int *width, int *height);
 extern void STUB_VK(release_target)(void);
+extern uint64_t STUB_VK(target_generation)(void);
 extern void *STUB_VK(create_texture)(const void *pixels, int width, int height);
 extern void *STUB_VK(create_texture_attached)(const void *pixels, int width,
     int height);
@@ -50,19 +51,6 @@ static const BongoCatRendererModuleOps *ops(void) {
 bool bongo_cat_live2d_vulkan_remember_backend(struct BongoCatVk *vk, int width,
     int height) {
     if (!vk || width <= 0 || height <= 0) return false;
-    /*
-     * 阶段 2d 尚未收尾: 组件接管 VK 之后**渲染是对的**(强制 VK 下审计为
-     * renderer=cubism-native / assertions=passed), 但封面回读路径会在之后崩(借用句柄的
-     * 生命周期: 宿主缓存了组件重建前的 image/view)。所以默认**不接管**, 保持既有的
-     * "VK 渲染器未登记 -> 回退 OpenGL" 行为; 要试这条实验路径就显式打开这个环境变量。
-     */
-    const char *experimental = SDL_getenv("BONGO_CAT_LIVE2D_VK_COMPONENT");
-    if (!experimental || !experimental[0] || experimental[0] == '0') {
-        SDL_LogInfo(BONGO_CAT_LOG_LIFECYCLE,
-            "[live2d/vk] 组件接管 VK 仍是实验路径(封面回读会崩), 本次不接管: "
-            "设 BONGO_CAT_LIVE2D_VK_COMPONENT=1 可显式启用");
-        return false;
-    }
     /* 私有结构体只在这一行出现: 立刻抽成 POD 快照, 之后一路只传快照。 */
     BongoCatVkNativeInfo info = {0};
     if (!bongo_cat_vk_native_info(vk, &info)) {
@@ -144,6 +132,13 @@ bool bongo_cat_live2d_vulkan_target_info(void **image, void **view, void **sampl
     if (active && active->vulkan_target_info)
         return active->vulkan_target_info(image, view, sampler, width, height);
     return STUB_VK(target_info)(image, view, sampler, width, height);
+}
+
+uint64_t bongo_cat_live2d_vulkan_target_generation(void) {
+    const BongoCatRendererModuleOps *active = ops();
+    if (active && active->vulkan_target_generation)
+        return active->vulkan_target_generation();
+    return STUB_VK(target_generation)();
 }
 
 void bongo_cat_live2d_vulkan_release_target(void) {
