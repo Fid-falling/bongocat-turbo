@@ -36,7 +36,9 @@ if(WIN32)
     src/platform/windows/windows_opacity.c
     src/platform/windows/windows_tray.c
     src/platform/windows/windows_assets.c
-    src/platform/windows/windows_capture_probe.c)
+    src/platform/windows/windows_capture_probe.c
+    # 用户自备 Cubism Core 的加载/校验(LoadLibraryW + 三符号探测 + PE 架构判定)
+    src/platform/windows/windows_live2d_core.c)
   target_include_directories(bongo_cat_runtime PRIVATE
     src/platform/windows)
   target_link_libraries(bongo_cat_runtime PRIVATE

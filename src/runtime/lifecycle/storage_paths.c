@@ -130,6 +130,29 @@ bool bongo_cat_storage_paths_platform_trees(BongoCatStorageTrees *trees) {
     return trees ? platform_trees(trees) : false;
 }
 
+/* 去掉最后一个路径分量(用于从 data 树推出存储根)。根目录自身不算成功: 把插件目录解析到
+   盘符根或 "/" 下会让"删掉插件目录"这种操作变得危险。 */
+static bool parent_directory(char *output, size_t capacity, const char *path) {
+    if (!output || !capacity || !path || !path[0]) return false;
+    size_t length = strlen(path);
+    while (length > 0 && path[length - 1] != '/' && path[length - 1] != '\\') --length;
+    while (length > 1 && (path[length - 1] == '/' || path[length - 1] == '\\')) --length;
+    if (length == 0 || length >= capacity) return false;
+    memcpy(output, path, length);
+    output[length] = '\0';
+    return true;
+}
+
+/* 解析成功后的存储根留一份, 供 <存储根>/plugins 与 <存储根>/live2d-core 使用
+   (六棵树里推不出根: macOS/Linux 的 config 与 data 分属不同 XDG 根)。 */
+static char resolved_storage_root[BONGO_CAT_PATH_CAP];
+
+bool bongo_cat_storage_paths_root(char *output, size_t capacity) {
+    if (!output || !capacity || !resolved_storage_root[0]) return false;
+    int written = snprintf(output, capacity, "%s", resolved_storage_root);
+    return written > 0 && (size_t)written < capacity;
+}
+
 /* 失败时把 settings_path/session_path 清空: 调用方据此判断"配置不可用", 而空路径会让
    config_store 直接跳过读写, 而不是往相对路径里写出一份野生配置。 */
 bool bongo_cat_storage_paths_prepare(BongoCatApp *app,
@@ -157,6 +180,20 @@ bool bongo_cat_storage_paths_prepare(BongoCatApp *app,
         resolved = platform_trees(&trees);
     }
     if (resolved) trees_to_app(&trees, app);
+    if (resolved) {
+        /* 存储根 = data 树的父目录。四种解析路径在这一点上一致: data 永远挂在根下的
+           "data" 子目录(macOS 的 Caches/Logs 分居别处也不影响这个结论), 所以不需要为
+           根再单独走一遍平台分支 —— 也就不会出现"两处解析各说各话"的分叉。
+           --storage-root 显式给了就照抄, 免得将来有人改 trees_under 的子目录名时
+           插件目录悄悄换了地方。 */
+        if (app->storage_root[0]) {
+            snprintf(resolved_storage_root, sizeof(resolved_storage_root),
+                "%s", app->storage_root);
+        } else if (!parent_directory(resolved_storage_root,
+            sizeof(resolved_storage_root), trees.data)) {
+            resolved_storage_root[0] = '\0';
+        }
+    }
     if (resolved && app->cache_root_override[0]) {
         snprintf(app->cache_root, sizeof(app->cache_root),
             "%s", app->cache_root_override);

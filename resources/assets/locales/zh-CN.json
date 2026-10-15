@@ -7,6 +7,12 @@
       }
     },
     "preference": {
+      "live2dSetup": {
+        "title": "Live2D 渲染库 (Cubism Core)",
+        "description": "尚未导入 Live2D Cubism Core。请到 Live2D 官网下载 Cubism SDK for Native, 再在这里选中压缩包或 Core 文件导入。程序不附带、也不代为下载这个运行库。",
+        "installed": "已导入 Cubism Core, Live2D 渲染可用",
+        "choose": "选择 SDK 压缩包或 Core 文件..."
+      },
       "title": "偏好设置",
       "cat": {
         "title": "偏好",
@@ -268,6 +274,10 @@
     }
   },
   "native": {
+    "live2dCoreMissing": "未检测到 Live2D Cubism Core: 在设置里导入 Core 文件或官方 SDK 压缩包即可启用 Live2D 渲染。",
+    "live2dComponentMissing": "缺少 Live2D 渲染组件: 请恢复程序目录下 cores 文件夹里的 bongo_live2d, 或重新安装程序。",
+    "live2dCoreImported": "Live2D Cubism Core 已导入。",
+    "live2dCoreImportFailed": "Live2D Cubism Core 导入失败:",
     "multiplePets": "同时显示多个",
     "multiplePetsLimit": "最多可同时显示 8 个桌宠",
     "removeDesktopPet": "关闭此桌宠",

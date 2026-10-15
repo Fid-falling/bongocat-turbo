@@ -7,6 +7,12 @@
       }
     },
     "preference": {
+      "live2dSetup": {
+        "title": "Live2D-Laufzeit (Cubism Core)",
+        "description": "Live2D Cubism Core ist noch nicht installiert. Lade Cubism SDK for Native von der offiziellen Live2D-Seite herunter und waehle hier die ZIP-Datei oder die Core-Bibliothek aus. Diese Laufzeit wird weder mitgeliefert noch automatisch geladen.",
+        "installed": "Cubism Core installiert; Live2D-Darstellung ist verfuegbar",
+        "choose": "SDK-ZIP oder Core-Datei waehlen..."
+      },
       "title": "Einstellungen",
       "cat": {
         "title": "Einstellungen",
@@ -268,6 +274,10 @@
     }
   },
   "native": {
+    "live2dCoreMissing": "Live2D Cubism Core nicht gefunden: Importiere im Einstellungsfenster die Core-Bibliothek oder das offizielle SDK-ZIP, um die Live2D-Darstellung zu aktivieren.",
+    "live2dComponentMissing": "Die Live2D-Komponente fehlt: Stelle bongo_live2d im Ordner cores neben der Anwendung wieder her oder installiere die Anwendung neu.",
+    "live2dCoreImported": "Live2D Cubism Core importiert.",
+    "live2dCoreImportFailed": "Import von Live2D Cubism Core fehlgeschlagen:",
     "multiplePets": "Mehrere gleichzeitig anzeigen",
     "multiplePetsLimit": "Bis zu 8 Desktop-Begleiter können gleichzeitig angezeigt werden",
     "removeDesktopPet": "Diesen Desktop-Begleiter schließen",

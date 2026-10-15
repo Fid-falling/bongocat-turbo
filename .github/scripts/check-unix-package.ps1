@@ -3,7 +3,11 @@ param(
     [Parameter(Mandatory = $true)][string]$Archive,
     [Parameter(Mandatory = $true)]
     [ValidateSet('linux-x64', 'macos-x64', 'macos-arm64')][string]$Platform,
-    [switch]$SkipSmoke
+    [switch]$SkipSmoke,
+    # 发行包必须带我们自己的 Live2D 渲染组件 cores/bongo_live2d.*(阶段 2 交付)。
+    # 在组件目标建出来之前传这个开关只会得到"包不对"的噪音, 所以默认关闭, 由 release.yml
+    # 在阶段 2 完成后显式开启。
+    [switch]$ExpectLive2DComponent
 )
 
 $ErrorActionPreference = 'Stop'
@@ -49,6 +53,55 @@ try {
         }
         $licenses = @(Get-ChildItem -LiteralPath $root -Recurse -File -Filter LICENSE)
         if ($licenses.Count) { throw "Unexpected loose LICENSE files: $($licenses.FullName -join ', ')" }
+
+        # 规则 3(LIVE2D-PLUGIN-PLAN.md §9.1): 发行包内不得出现 Live2D Cubism Core。
+        # 第一遍按文件名 —— 覆盖"把 SDK 目录整个拷进包"这类最常见的回归。
+        $coreFiles = @(Get-ChildItem -LiteralPath $root -Recurse -File | Where-Object {
+                $_.Name -match '^lib?Live2DCubismCore([._-].*)?\.(dll|so|dylib|lib|a)$'
+            })
+        if ($coreFiles.Count) {
+            throw "Core binary leaked into package: $($coreFiles.FullName -join ', ')"
+        }
+        # 第二遍按**依赖表**扫(而不是按字节里的符号名): 我们的渲染组件里有生成的 shim,
+        # 它必然包含 "csmReviveMocInPlace" 这类字符串(要把符号名转交给宿主的 core_symbol),
+        # 所以按字节扫会把自己的合法组件误报成 Core。真正有法律含义的事实是
+        # "这个二进制链接/加载了 Core", 那在动态依赖表里看得最清楚。
+        # 注: 静态链接进 exe 的 Core 不会出现在依赖表里, 它由构建期的链接级守卫
+        # (cmake/CubismCompliance.cmake 的 bongo_cat_assert_no_cubism_core_link) 拦。
+        $inspector = if ($Platform.StartsWith('macos-')) { 'otool' } else { 'readelf' }
+        foreach ($file in Get-ChildItem -LiteralPath $root -Recurse -File) {
+            if ($file.Length -lt 4 -or $file.Length -gt 256MB) { continue }
+            $head = [IO.File]::ReadAllBytes($file.FullName)[0..3]
+            $isElf = $head[0] -eq 0x7f -and $head[1] -eq 0x45 -and $head[2] -eq 0x4c -and $head[3] -eq 0x46
+            $isMachO = ($head[0] -eq 0xcf -and $head[1] -eq 0xfa -and $head[2] -eq 0xed -and $head[3] -eq 0xfe) -or
+                ($head[0] -eq 0xfe -and $head[1] -eq 0xed -and $head[2] -eq 0xfa -and $head[3] -eq 0xcf) -or
+                ($head[0] -eq 0xca -and $head[1] -eq 0xfe -and $head[2] -eq 0xba -and $head[3] -eq 0xbe)
+            if (-not ($isElf -or $isMachO)) { continue }
+            $dependencies = if ($Platform.StartsWith('macos-')) {
+                & $inspector -L $file.FullName 2>$null
+            } else {
+                & $inspector -d $file.FullName 2>$null
+            }
+            if ($LASTEXITCODE -ne 0) {
+                throw "Cannot inspect package binary '$($file.FullName)' with $inspector"
+            }
+            $leak = @($dependencies | Where-Object { $_ -match 'Live2DCubismCore' })
+            if ($leak.Count) {
+                throw "Package binary '$($file.FullName)' depends on the Cubism Core: $($leak -join '; ')"
+            }
+        }
+        Write-Host "Package contains no Live2D Cubism Core: $Platform"
+
+        if ($ExpectLive2DComponent) {
+            # 组件是程序自身的一部分, 随包放在 exe 同级的 cores/(见 renderer_module.h)。
+            $componentNames = @('cores/libbongo_live2d.so', 'cores/libbongo_live2d.dylib')
+            $components = @($componentNames | ForEach-Object { Join-Path $root $_ } |
+                Where-Object { Test-Path -LiteralPath $_ -PathType Leaf })
+            if ($components.Count -ne 1 -or (Get-Item -LiteralPath $components[0]).Length -eq 0) {
+                throw "Package is missing the Live2D renderer component (expected one of: $($componentNames -join ', '))"
+            }
+            Write-Host "Live2D renderer component present: $($components[0])"
+        }
         Write-Host "Package layout verified: $Platform"
         if (-not $SkipSmoke) {
             $storage = Join-Path $temporaryRoot 'smoke-data'

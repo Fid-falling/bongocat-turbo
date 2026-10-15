@@ -156,9 +156,14 @@ jobs:
           $setupHash = (Get-FileHash -LiteralPath $setup -Algorithm SHA256).Hash.ToLowerInvariant()
           $app = "build-release/Release/BongoCatTurbo.exe"
           $appHash = (Get-FileHash -LiteralPath $app -Algorithm SHA256).Hash.ToLowerInvariant()
-          $cubismArch = if ('${{ matrix.cmake_arch }}' -eq 'Win32') { 'x86' } else { 'x86_64' }
-          $cubismCore = "vendor/CubismSdkForNative/Core/lib/windows/$cubismArch/143/Live2DCubismCore_MT.lib"
-          $cubismHash = (Get-FileHash -LiteralPath $cubismCore -Algorithm SHA256).Hash.ToLowerInvariant()
+          # Live2D Cubism Core 是 Live2D Inc. 的专有库, 不随发行包分发(用户自行从官网取得并导入)。
+          # 这里对产物做一次硬断言: 命中即失败, 防止将来有人把 Core 或 SDK 文件重新带进发行物。
+          # 只公布我们自己产物的哈希 —— 以前这里还公布过 Core 的 SHA-256, 那等于自证分发。
+          $coreLeaks = @(Get-ChildItem -Path build-release/dist, build-release/Release -Recurse -File |
+            Where-Object { $_.Name -match '^lib?Live2DCubismCore([._-].*)?\.(dll|so|dylib|lib|a)$' })
+          if ($coreLeaks.Count) {
+            throw "Live2D Cubism Core leaked into the release output: $($coreLeaks.FullName -join ', ')"
+          }
           $cmakeVersion = (& cmake --version | Select-Object -First 1).Trim()
           $innoInfo = & ./packaging/windows/find-inno.ps1 -PassThru
           $innoVersion = $innoInfo.Version.ToString(3)
@@ -171,10 +176,11 @@ jobs:
           | Runner image | ``$env:ImageOS $env:ImageVersion`` |
           | CMake | ``$cmakeVersion`` |
           | Inno Setup | ``$innoVersion`` at ``$($innoInfo.Path)`` |
-          | Cubism Core SHA-256 | ``$cubismHash`` |
           | BongoCatTurbo.exe SHA-256 | ``$appHash`` |
           | Portable SHA-256 | ``$portableHash`` |
           | Installer SHA-256 | ``$setupHash`` |
+
+          Live2D 渲染由独立插件提供; 包内**不含** Live2D Cubism Core, 需要用户在设置里导入自己取得的 Core。
 
           "@ | Out-File -FilePath $env:GITHUB_STEP_SUMMARY -Append -Encoding utf8
 
@@ -216,6 +222,9 @@ jobs:
             Archive = $archive.FullName
             Platform = '${{ matrix.platform }}'
             SkipSmoke = '${{ matrix.platform }}'.StartsWith('macos-')
+            # 包内不得含 Cubism Core 的判定在脚本里(按文件名 + 动态依赖表)。
+            # 阶段 2 完成后这里再加上 ExpectLive2DComponent = $true(要求包内有 cores/
+            # 下的渲染组件)。
           }
           & ./.github/scripts/check-unix-package.ps1 @packageCheckArgs
           $checksum = "$($archive.FullName).sha256"

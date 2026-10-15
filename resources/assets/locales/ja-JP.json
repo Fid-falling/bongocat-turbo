@@ -7,6 +7,12 @@
       }
     },
     "preference": {
+      "live2dSetup": {
+        "title": "Live2D ランタイム (Cubism Core)",
+        "description": "Live2D Cubism Core はまだ取り込まれていません。Live2D 公式サイトから Cubism SDK for Native をダウンロードし, ここで ZIP か Core ファイルを選んで取り込んでください。このランタイムは同梱も自動ダウンロードもされません。",
+        "installed": "Cubism Core を取り込み済み, Live2D 描画を利用できます",
+        "choose": "SDK の ZIP か Core ファイルを選択..."
+      },
       "title": "設定",
       "cat": {
         "title": "設定",
@@ -268,6 +274,10 @@
     }
   },
   "native": {
+    "live2dCoreMissing": "Live2D Cubism Core が見つかりません: 設定で Core ファイルか公式 SDK の ZIP を取り込むと Live2D 描画が有効になります。",
+    "live2dComponentMissing": "Live2D 描画コンポーネントがありません: アプリと同じ階層の cores フォルダーにある bongo_live2d を復元するか, アプリを再インストールしてください。",
+    "live2dCoreImported": "Live2D Cubism Core を取り込みました。",
+    "live2dCoreImportFailed": "Live2D Cubism Core の取り込みに失敗しました:",
     "multiplePets": "複数を同時に表示",
     "multiplePetsLimit": "一度に表示できるデスクトップペットは 8 体までです",
     "removeDesktopPet": "このデスクトップペットを閉じる",

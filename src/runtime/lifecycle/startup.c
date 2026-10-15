@@ -15,8 +15,10 @@
 #include "runtime.h"
 #include "runtime_state.h"
 #include "bongo_cat/file.h"
+#include "bongo_cat/live2d_core.h"
 #include "bongo_cat/log.h"
 #include "bongo_cat/path.h"
+#include "bongo_cat/renderer_module.h"
 #include "portable_mode.h"
 #include "storage_paths.h"
 
@@ -222,13 +224,20 @@ static void log_storage_root(const BongoCatApp *app) {
             "[portable] 使用便携存储根: %s", portable);
 }
 
-/* 参数 -> 存储路径 -> 日志, 顺序不能反: 日志路径来自 log_root, 而 log_root 可能被
-   --storage-root= 改掉。 */
+/* 参数 -> 存储路径 -> 日志 -> Live2D 组件与 Core, 顺序不能反: 日志路径来自 log_root,
+   而 log_root 可能被 --storage-root= 改掉; 组件/Core 的目录又来自存储根, 且它们的
+   发现结果必须写进日志, 所以只能排在 begin_log 之后。
+   两步都**失败也继续启动**: 缺 Core 或缺组件时程序照常跑, Live2D 走 live2d_stub.c 的
+   兜底实现 —— 这是降级路径的核心, 不能让"没导入 Core"变成启动失败。 */
 bool bongo_cat_startup_prepare(BongoCatApp *app, int argc, char **argv,
     BongoCatError *error) {
     if (!bongo_cat_startup_arguments(app, argc, argv, error) ||
         !bongo_cat_storage_paths_prepare(app, error)) return false;
     begin_log(app); log_storage_root(app);
+    BongoCatRendererModuleInfo modules[8];
+    bongo_cat_renderer_module_scan(modules,
+        sizeof(modules) / sizeof(modules[0]));
+    bongo_cat_live2d_core_initialize();
     bongo_cat_startup_stage(app, "paths-ready"); return true;
 }
 

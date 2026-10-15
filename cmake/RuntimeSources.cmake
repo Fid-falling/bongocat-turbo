@@ -78,6 +78,12 @@ set(BONGO_CAT_RUNTIME_LIFECYCLE_SOURCES
   src/runtime/lifecycle/system_language.c
   src/runtime/lifecycle/storage_paths.c)
 
+# Live2D 渲染组件(<exe>/cores/bongo_live2d.*)的目录解析与启动扫描
+# (见 include/bongo_cat/renderer_module.h): 只做发现与"能不能用/为什么不能用"的判定,
+# 不实例化 —— 实例化要等组件 ABI 与图形上下文就绪, 那是 app.c 里装载时机的事。
+set(BONGO_CAT_RUNTIME_RENDERER_MODULE_SOURCES
+  src/runtime/cores/renderer_module.c)
+
 set(BONGO_CAT_RUNTIME_UPDATE_SOURCES
   src/runtime/update/update_channel.c
   src/runtime/update/update_http.c
@@ -267,6 +273,9 @@ set(BONGO_CAT_UI_THEME_SOURCES
 
 set(BONGO_CAT_UI_PREFERENCES_SOURCES
   src/ui/preferences/preferences.c
+  # Live2D Cubism Core 的设置入口(状态行 + 选择压缩包 + 拖放路由 + 一次性提示)。
+  # 单独成文件: 它是"法律合规流程的用户可见部分", 与渲染/模型页的改动无关。
+  src/ui/preferences/preferences_live2d_setup.c
   src/ui/preferences/preferences_about.c
   src/ui/preferences/preferences_about_community.c
   src/ui/preferences/preferences_about_footer.c
@@ -344,6 +353,7 @@ set(BONGO_CAT_RUNTIME_SOURCES
   ${BONGO_CAT_RUNTIME_DIAGNOSTIC_SOURCES}
   ${BONGO_CAT_RUNTIME_INPUT_SOURCES}
   ${BONGO_CAT_RUNTIME_MODEL_SOURCES}
+  ${BONGO_CAT_RUNTIME_RENDERER_MODULE_SOURCES}
   ${BONGO_CAT_RUNTIME_IMPORT_SOURCES}
   ${BONGO_CAT_RUNTIME_SHELL_SOURCES}
   ${BONGO_CAT_UI_BACKEND_SOURCES}

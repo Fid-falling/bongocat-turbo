@@ -7,6 +7,12 @@
       }
     },
     "preference": {
+      "live2dSetup": {
+        "title": "Среда Live2D (Cubism Core)",
+        "description": "Live2D Cubism Core еще не установлен. Скачайте Cubism SDK for Native с официального сайта Live2D и выберите здесь ZIP-архив или библиотеку Core. Эта среда не входит в поставку и не загружается автоматически.",
+        "installed": "Cubism Core импортирован; отрисовка Live2D доступна",
+        "choose": "Выбрать ZIP SDK или файл Core..."
+      },
       "title": "Настройки",
       "cat": {
         "title": "Настройки",
@@ -268,6 +274,10 @@
     }
   },
   "native": {
+    "live2dCoreMissing": "Live2D Cubism Core не найден: импортируйте библиотеку Core или официальный ZIP SDK в окне настроек, чтобы включить отрисовку Live2D.",
+    "live2dComponentMissing": "Компонент отрисовки Live2D отсутствует: восстановите bongo_live2d в папке cores рядом с программой или переустановите программу.",
+    "live2dCoreImported": "Live2D Cubism Core импортирован.",
+    "live2dCoreImportFailed": "Не удалось импортировать Live2D Cubism Core:",
     "multiplePets": "Показывать несколько",
     "multiplePetsLimit": "Одновременно можно отобразить до 8 питомцев",
     "removeDesktopPet": "Закрыть этого питомца",

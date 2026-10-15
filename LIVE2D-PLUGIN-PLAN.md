@@ -929,3 +929,60 @@ X 是 **AGPL-3.0-only**（`README.md:19`）。若复用其头文件/源码片段
 * 不碰 `%LOCALAPPDATA%\BongoCat`；测试一律 `--storage-root=<副本>`；
 * 只按自己 `Start-Process` 的 PID 杀进程，不碰用户正在跑的实例（PID 50532）；
 * 每阶段一个中文 conventional commit，推送走 `git -c http.proxy=http://127.0.0.1:7897`。
+
+## P0.8 施工中的两项口径修正（追加，不覆盖上文）
+
+> 这两条是施工期间由用户明确定下的口径变更。**上文 §9.1/§9.2/§9.6/§P0.3/§P0.5 的对应写法
+> 已按本节作废**，保留原文只为记录决策过程。
+
+### 修正 1：取消阶段 3（不兼容 X 的插件），目录与命名统一为 `cores`
+
+**决定**：只把 Live2D SDK 拆成我们自己的组件，**不再兼容 `TianMengLucky/BongoCat-X` 的插件**
+（连"描述符发现 + 精确报错"也不做），因此：
+
+* §P0.3 的**阶段 3 整体取消**；§P0.5 的选项 D 也不再实施（该节结论仍然有效，只是不再落地）；
+* §9.2 的 `<存储根>/plugins/`、`<exe>/plugins/`、`$BONGO_CAT_PLUGIN_DIRECTORY` 与
+  §9.1 的 `<存储根>/live2d-core/` **全部改名/合并**为 `cores`；
+* "插件"一词在本项目里不再使用（**没有第三方插件生态**，继续叫插件会误导用户以为可以装别人的东西）。
+
+**修正后的目录约定（唯一口径）**：
+
+| 归属 | 路径 | 说明 |
+| --- | --- | --- |
+| **我们编译的渲染组件** | `<exe 目录>/cores/bongo_live2d.dll`（Linux `libbongo_live2d.so`、macOS `libbongo_live2d.dylib`） | 内含 Cubism **Framework**（现场编译）与我们的 GL/VK 桥接，**不含 Core**；随发行包分发。放 exe 同级而不是用户数据目录，是因为它属于程序自身、版本必须与 exe 同步 —— 放数据目录会出现"换了 exe 但组件还是旧版"的错配 |
+| 组件的回退/覆盖位置 | `$BONGO_CAT_CORES_DIRECTORY` → `<存储根>/cores/` | 排障、CI、绿色版把组件放别处 |
+| **用户自备的 Cubism Core**（专有库） | `<存储根>/cores/<平台>/<架构>/Live2DCubismCore.dll`（`libLive2DCubismCore.so/.dylib`） | 便携模式下即 `BongoCatData\cores\...`，整体拷走仍可用；导入过程在 `<存储根>/cores/.staging/` 里完成，元数据是 `<存储根>/cores/core.json` |
+| Core 的覆盖/投放点 | `$BONGO_CAT_LIVE2D_CORE` → `<存储根>/cores/...` → `<exe 目录>/cores/...` | 每一级都要过"三符号探测"才算命中 |
+
+两个 `cores` 目录的**归属**必须分清：exe 同级那份是我们发的（随版本升级、可被程序替换），
+存储根那份是用户的闭源资产（误删代价高、升级节奏与我们无关）。这也正是"发行包内无 Core"
+与"用户随时换 Core"能同时成立的原因。
+
+**连带改动**：CMake 选项 `BONGO_CAT_REQUIRE_RENDERER_PLUGIN` → `BONGO_CAT_REQUIRE_LIVE2D_COMPONENT`；
+合规审计函数改为断言 `cores/bongo_live2d.*` 存在；包体检查参数 `-ExpectLive2DPlugin` →
+`-ExpectLive2DComponent`；文案键 `native.live2dPluginMissing` → `native.live2dComponentMissing`；
+10 语言文案、日志、CI、打包脚本里的 `plugins` 字样一并改为 `cores`。
+
+**由此产生的一条事实（供以后回答"为什么不支持 X 的插件"）**：我们自己的组件 ABI
+（`bongo_cat_renderer_module_query` + 版本化描述符 + 宿主服务表）与 BongoCat-X 的
+`bongo_cat_model_plugin_query` 那套**互不兼容** —— 两者的宿主服务表内容、跨界类型与图形
+契约都不同；X 编译出的 `bongo_live2d.dll` 放进我们的 `cores` 目录只会被判为"缺导出符号"
+并写进日志，不会被加载。
+
+### 修正 2："包内无 Core"的第二遍扫描改为按**动态依赖表**，不按字节符号名
+
+§9.6 与 §P0.3 原本要求"按内容再扫一遍（magic + `csmReviveMocInPlace` 字符串）以防改名夹带"。
+施工时发现这条会**误报我们自己的合法组件**：组件里的 shim 必须把 `csmReviveMocInPlace`
+这类符号名当字符串交给宿主的 `core_symbol`，所以字节里必然出现这些名字。
+
+**改为**：
+
+1. 按文件名扫（`^lib?Live2DCubismCore([._-].*)?\.(dll|so|dylib|lib|a)$`）—— 命中即失败；
+2. 按**动态依赖表**扫（Linux `readelf -d`、macOS `otool -L`）—— 依赖里出现 `Live2DCubismCore`
+   即失败。这既不会误报，又正好对应"是否链接/加载了专有库"这个有法律含义的事实；
+3. 静态链接这一形态（不出现在依赖表里）由**构建期**的链接级守卫
+   `cmake/CubismCompliance.cmake` 的 `bongo_cat_assert_no_cubism_core_link()` 拦 —— 它递归检查
+   目标链接图，命中即 `FATAL_ERROR`（迁移期由 `BONGO_CAT_CORE_LINK_TRANSITION` 降级为告警，
+   阶段 2 删除该开关后自动变成硬失败）。
+
+分工原则：**构建图归 CMake 管，产物归 CI 管** —— 两处都不重复实现对方的判定。

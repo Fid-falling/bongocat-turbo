@@ -7,6 +7,12 @@
       }
     },
     "preference": {
+      "live2dSetup": {
+        "title": "Runtime Live2D (Cubism Core)",
+        "description": "Live2D Cubism Core n'est pas encore installe. Telechargez Cubism SDK for Native depuis le site officiel de Live2D, puis selectionnez ici le ZIP ou la bibliotheque Core. Ce runtime n'est ni fourni ni telecharge automatiquement.",
+        "installed": "Cubism Core importe; le rendu Live2D est disponible",
+        "choose": "Choisir le ZIP du SDK ou le fichier Core..."
+      },
       "title": "Préférences",
       "cat": {
         "title": "Préférences",
@@ -268,6 +274,10 @@
     }
   },
   "native": {
+    "live2dCoreMissing": "Live2D Cubism Core introuvable: importez la bibliotheque Core ou le ZIP officiel du SDK dans la fenetre des parametres pour activer le rendu Live2D.",
+    "live2dComponentMissing": "Le composant de rendu Live2D est absent: restaurez bongo_live2d dans le dossier cores a cote de l'application, ou reinstallez l'application.",
+    "live2dCoreImported": "Live2D Cubism Core importe.",
+    "live2dCoreImportFailed": "Echec de l'import de Live2D Cubism Core:",
     "multiplePets": "Afficher plusieurs modèles",
     "multiplePetsLimit": "Jusqu'à 8 mascottes peuvent être affichées à la fois",
     "removeDesktopPet": "Fermer cette mascotte de bureau",

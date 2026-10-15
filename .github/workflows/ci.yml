@@ -382,9 +382,13 @@ jobs:
           $setupHash = (Get-FileHash -LiteralPath $setup -Algorithm SHA256).Hash.ToLowerInvariant()
           $app = "build-store/Release/BongoCatTurbo.exe"
           $appHash = (Get-FileHash -LiteralPath $app -Algorithm SHA256).Hash.ToLowerInvariant()
-          $cubismArch = if ('${{ matrix.cmake_arch }}' -eq 'Win32') { 'x86' } else { 'x86_64' }
-          $cubismCore = "vendor/CubismSdkForNative/Core/lib/windows/$cubismArch/143/Live2DCubismCore_MT.lib"
-          $cubismHash = (Get-FileHash -LiteralPath $cubismCore -Algorithm SHA256).Hash.ToLowerInvariant()
+          # Live2D Cubism Core 是专有库, 不随包分发: 命中即失败(见 LIVE2D-PLUGIN-PLAN.md §9.1)。
+          # 以前这里会公布 Core 的 SHA-256, 那等于自证分发, 一并删除。
+          $coreLeaks = @(Get-ChildItem -Path build-store/dist, build-store/Release -Recurse -File |
+            Where-Object { $_.Name -match '^lib?Live2DCubismCore([._-].*)?\.(dll|so|dylib|lib|a)$' })
+          if ($coreLeaks.Count) {
+            throw "Live2D Cubism Core leaked into the release output: $($coreLeaks.FullName -join ', ')"
+          }
           $cmakeVersion = (& cmake --version | Select-Object -First 1).Trim()
           $innoInfo = & ./packaging/windows/find-inno.ps1 -PassThru
           $innoVersion = $innoInfo.Version.ToString(3)
@@ -397,7 +401,6 @@ jobs:
           | Runner image | ``$env:ImageOS $env:ImageVersion`` |
           | CMake | ``$cmakeVersion`` |
           | Inno Setup | ``$innoVersion`` at ``$($innoInfo.Path)`` |
-          | Cubism Core SHA-256 | ``$cubismHash`` |
           | BongoCatTurbo.exe SHA-256 | ``$appHash`` |
           | Portable SHA-256 | ``$portableHash`` |
           | Installer SHA-256 | ``$setupHash`` |

@@ -21,6 +21,7 @@
  *      "不需要切"这一条, 否则排查只能靠猜。
  */
 #include "preferences_internal.h"
+#include "preferences_live2d_setup.h"
 #include "preferences_theme.h"
 #include "preferences_widgets.h"
 #include "runtime.h"
@@ -57,6 +58,9 @@ static void log_availability_once(bool selectable) {
 void bongo_cat_preferences_renderer_row(BongoCatApp *app,
     struct nk_context *context) {
     if (!app || !context) return;
+    /* Live2D 的 Core 状态行与导入入口就放在"渲染后端"旁边: 两者回答的是同一个问题
+       ("现在这台机器能怎么渲染"), 分开放用户会找不到。 */
+    bongo_cat_preferences_live2d_setup_row(app, context);
     BongoCatModelPreferences *model = &app->settings.model;
     const bool vulkan_selectable =
         bongo_cat_renderer_available(BONGO_CAT_RENDERER_VULKAN);

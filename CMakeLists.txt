@@ -8,6 +8,22 @@ option(BONGO_CAT_FETCH_DEPS "Download pinned open-source dependencies" ON)
 option(BONGO_CAT_REQUIRE_CUBISM "Fail configuration when Cubism SDK is absent" OFF)
 option(BONGO_CAT_WARNINGS_AS_ERRORS "Treat native source warnings as errors" OFF)
 option(BONGO_CAT_ENABLE_VULKAN "Build the optional Vulkan rendering backend" OFF)
+# 法律边界开关(见 LIVE2D-PLUGIN-PLAN.md §9.1): Live2D Cubism Core 是 Live2D Inc. 的专有库,
+# 我们不随包分发。Core 只能由用户自行从官网取得动态库, 运行期经宿主服务表 core_symbol 解析。
+# 这个 option 存在的意义是把"有人想回到静态链接"变成一个显式的、会失败的配置 ——
+# 关掉它没有"降级"语义, 只有"违反许可"语义, 所以直接 FATAL_ERROR(照 BongoCat-X 的做法)。
+option(BONGO_CAT_RUNTIME_CORE
+  "由用户自备 Cubism Core 动态库并在运行期加载(发行物不得含 Core)" ON)
+if(NOT BONGO_CAT_RUNTIME_CORE)
+  message(FATAL_ERROR
+    "BONGO_CAT_RUNTIME_CORE=OFF 不受支持: 宿主与渲染插件都不得内嵌或静态链接 "
+    "Live2D Cubism Core(专有库)。请在运行期加载用户自备的 Core。")
+endif()
+# 发行包是否必须包含我们自己的 Live2D 渲染插件。阶段 1 期间插件尚未构建(阶段 2 交付),
+# 因此默认 OFF; 阶段 2 的提交把它改成 ON, 并让 release.yml 显式传 -ExpectLive2DPlugin。
+option(BONGO_CAT_REQUIRE_LIVE2D_COMPONENT
+  "发行产物必须包含 Live2D 渲染插件" OFF)
+include(cmake/CubismCompliance.cmake)
 set(BONGO_CAT_CUBISM_SDK "${CMAKE_CURRENT_SOURCE_DIR}/vendor/CubismSdkForNative"
   CACHE PATH "Path to Cubism SDK for Native")
 set(CMAKE_C_STANDARD 11)
@@ -41,7 +57,16 @@ if(BONGO_CAT_ENABLE_VULKAN)
   bongo_cat_embed_vulkan_shaders(
     "${BONGO_CAT_GENERATED_INCLUDE_DIR}/bongo_cat_vk_shaders.h")
 endif()
-set(BONGO_CAT_LIVE2D_SOURCES src/live2d/live2d_stub.c)
+# 用户自备 Core 的落点解析与安全导入: 与是否编译 Cubism 无关 —— 缺 SDK 的诊断构建
+# 同样要能接收用户导入的 Core, 而且"包内无 Core"的守卫要靠它。单独成一个变量: 下面的
+# Cubism 分支会**替换** BONGO_CAT_LIVE2D_SOURCES(诊断实现与真实实现是同一组符号, 两个
+# 一起编会撞定义), 而这两个文件在两种构建里都必须存在。
+set(BONGO_CAT_LIVE2D_CORE_SOURCES
+  src/live2d/live2d_core_paths.c src/live2d/live2d_core_import.c
+  # 压缩包侧的安全规则单独成文件(不可信输入), 见 live2d_core_internal.h
+  src/live2d/live2d_core_archive.c)
+set(BONGO_CAT_LIVE2D_SOURCES src/live2d/live2d_stub.c
+  ${BONGO_CAT_LIVE2D_CORE_SOURCES})
 set(BONGO_CAT_CUBISM_ENABLED OFF)
 set(CUBISM_CORE_HEADER "${BONGO_CAT_CUBISM_SDK}/Core/include/Live2DCubismCore.h")
 if(EXISTS "${CUBISM_CORE_HEADER}")
@@ -53,6 +78,7 @@ if(EXISTS "${CUBISM_CORE_HEADER}")
   else()
     include(cmake/Cubism.cmake)
     set(BONGO_CAT_LIVE2D_SOURCES
+      ${BONGO_CAT_LIVE2D_CORE_SOURCES}
       src/live2d/cubism_bridge.cpp src/live2d/cubism_bridge_load.cpp
       src/live2d/cubism_bridge_load_session.cpp
       src/live2d/cubism_bridge_visual.cpp
@@ -135,9 +161,17 @@ target_compile_definitions(bongo_cat_runtime PRIVATE
   BONGO_CAT_DEV_LOCALE_ROOT="${CMAKE_CURRENT_SOURCE_DIR}/resources/assets/locales")
 
 include(cmake/PlatformRuntime.cmake)
+if(NOT WIN32)
+  # dlopen/dlsym 版本的 Core 加载器(与 windows_live2d_core.c 语义一一对应)
+  target_sources(bongo_cat_runtime PRIVATE src/live2d/live2d_core_posix.c)
+  target_link_libraries(bongo_cat_runtime PRIVATE ${CMAKE_DL_LIBS})
+endif()
 
 add_executable(bongo_cat src/main.c)
 target_link_libraries(bongo_cat PRIVATE bongo_cat_runtime bongo_cat_warnings)
+# 规则 1 的配置期检查(宿主/插件不得链接或内嵌 Core): 违规在迁移期只告警, 阶段 2 起硬失败。
+bongo_cat_assert_no_cubism_core_link(bongo_cat)
+bongo_cat_assert_no_cubism_core_link(bongo_cat_runtime)
 set_target_properties(bongo_cat PROPERTIES OUTPUT_NAME "BongoCatTurbo")
 bongo_cat_enable_release_ipo(Framework bongo_cat_core bongo_cat_runtime bongo_cat)
 
@@ -193,5 +227,14 @@ add_custom_target(check-cubism-user-model-safety ALL
   COMMAND ${CMAKE_COMMAND}
     -P ${CMAKE_CURRENT_SOURCE_DIR}/cmake/CheckCubismUserModelSafety.cmake
   VERBATIM)
+add_custom_target(check-cubism-compliance ALL
+  COMMAND ${CMAKE_COMMAND}
+    "-DBONGO_CAT_AUDIT_ROOT=$<TARGET_FILE_DIR:bongo_cat>"
+    "-DBONGO_CAT_AUDIT_EXPECT_COMPONENT=${BONGO_CAT_REQUIRE_LIVE2D_COMPONENT}"
+    -P ${CMAKE_CURRENT_SOURCE_DIR}/cmake/CubismCompliance.cmake
+  COMMENT "Auditing the build output for Live2D Cubism Core leaks"
+  VERBATIM)
+add_dependencies(check-cubism-compliance bongo_cat)
 include(cmake/Tests.cmake)
 include(cmake/Packaging.cmake)
+

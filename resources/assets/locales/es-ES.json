@@ -7,6 +7,12 @@
       }
     },
     "preference": {
+      "live2dSetup": {
+        "title": "Runtime de Live2D (Cubism Core)",
+        "description": "Live2D Cubism Core aun no esta instalado. Descarga Cubism SDK for Native desde el sitio oficial de Live2D y elige aqui el ZIP o la biblioteca Core. Este runtime no se incluye ni se descarga por ti.",
+        "installed": "Cubism Core importado; la representacion Live2D esta disponible",
+        "choose": "Elegir ZIP del SDK o archivo Core..."
+      },
       "title": "Preferencias",
       "cat": {
         "title": "Preferencias",
@@ -268,6 +274,10 @@
     }
   },
   "native": {
+    "live2dCoreMissing": "No se encontro Live2D Cubism Core: importa la biblioteca Core o el ZIP oficial del SDK en la ventana de ajustes para activar la representacion Live2D.",
+    "live2dComponentMissing": "Falta el componente de representacion Live2D: restaura bongo_live2d en la carpeta cores junto a la aplicacion o reinstala la aplicacion.",
+    "live2dCoreImported": "Live2D Cubism Core importado.",
+    "live2dCoreImportFailed": "Fallo al importar Live2D Cubism Core:",
     "multiplePets": "Mostrar varias a la vez",
     "multiplePetsLimit": "Se pueden mostrar hasta 8 mascotas a la vez",
     "removeDesktopPet": "Cerrar esta mascota de escritorio",

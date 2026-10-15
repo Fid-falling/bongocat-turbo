@@ -7,6 +7,12 @@
       }
     },
     "preference": {
+      "live2dSetup": {
+        "title": "Live2D 渲染程式庫 (Cubism Core)",
+        "description": "尚未匯入 Live2D Cubism Core。請到 Live2D 官網下載 Cubism SDK for Native, 再在這裡選取壓縮檔或 Core 檔案匯入。本程式不附帶、也不代為下載這個執行階段程式庫。",
+        "installed": "已匯入 Cubism Core, 可使用 Live2D 渲染",
+        "choose": "選擇 SDK 壓縮檔或 Core 檔案..."
+      },
       "title": "偏好設定",
       "cat": {
         "title": "偏好",
@@ -268,6 +274,10 @@
     }
   },
   "native": {
+    "live2dCoreMissing": "未偵測到 Live2D Cubism Core: 在設定中匯入 Core 檔案或官方 SDK 壓縮檔即可啟用 Live2D 渲染。",
+    "live2dComponentMissing": "缺少 Live2D 渲染元件: 請還原程式目錄下 cores 資料夾中的 bongo_live2d, 或重新安裝程式。",
+    "live2dCoreImported": "Live2D Cubism Core 已匯入。",
+    "live2dCoreImportFailed": "Live2D Cubism Core 匯入失敗:",
     "multiplePets": "同時顯示多個",
     "multiplePetsLimit": "最多可同時顯示 8 個桌寵",
     "removeDesktopPet": "關閉此桌寵",

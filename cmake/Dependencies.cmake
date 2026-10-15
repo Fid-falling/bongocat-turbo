@@ -43,7 +43,10 @@ if(BONGO_CAT_FETCH_DEPS)
   set(SDL_POWER OFF CACHE BOOL "" FORCE)
   set(SDL_SENSOR OFF CACHE BOOL "" FORCE)
   if(WIN32)
-    set(SDL_DIALOG OFF CACHE BOOL "" FORCE)
+    # SDL_DIALOG 默认是开的, 这里改成显式写明: Live2D Core 的引导流程要靠
+    # SDL_ShowOpenFileDialog 让用户选中官方 SDK 压缩包或 Core 文件; 关掉它时 SDL 只编出
+    # 一个报错的桩(SDL_DIALOG_DISABLED), 程序能编译但在用户面前没有任何文件选择器。
+    set(SDL_DIALOG ON CACHE BOOL "" FORCE)
   endif()
   set(YYJSON_DISABLE_INCR_READER ON CACHE BOOL "" FORCE)
   set(YYJSON_DISABLE_UTILS ON CACHE BOOL "" FORCE)

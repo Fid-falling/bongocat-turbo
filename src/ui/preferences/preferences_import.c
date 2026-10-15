@@ -12,6 +12,7 @@
  * start_job 里的三处 free 分支。
  */
 #include "preferences_import_internal.h"
+#include "preferences_live2d_setup.h"
 #include "preferences_state.h"
 #include "model_import.h"
 #ifdef _WIN32
@@ -371,6 +372,13 @@ bool bongo_cat_preferences_import_event(BongoCatImportDialog *dialog,
 void bongo_cat_preferences_import_path(BongoCatApp *app,
     SDL_Window *window, const char *path) {
     if (!app || !app->preferences || !window || !path || !path[0]) return;
+    /* 先问 Live2D: 用户从官网下到的 SDK 压缩包与 Core 动态库也常常是"拖进来"的, 它们
+       必须走 Core 导入而不是模型导入。判定只看文件名(见 preferences_live2d_setup.h),
+       普通模型包不受影响。 */
+    if (bongo_cat_preferences_live2d_setup_drop(app, path)) {
+        app->preferences->render_dirty = true;
+        return;
+    }
     BongoCatImportJob *job = copy_path(path);
     if (!job || !start_job(app->preferences->import_dialog, app,
         SDL_GetWindowID(window), job))

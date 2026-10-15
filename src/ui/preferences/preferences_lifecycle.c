@@ -15,6 +15,7 @@
  */
 #include "preferences_controls.h"
 #include "preferences_gl.h"
+#include "preferences_live2d_setup.h"
 #include "preferences_model_cover.h"
 #include "preferences_notice.h"
 #include "preferences_state.h"
@@ -191,6 +192,9 @@ void bongo_cat_preferences_show(BongoCatPreferences *value) {
     bongo_cat_preferences_render(value);
     bongo_cat_platform_raise_window(value->window);
     bongo_cat_app_request_nearby_model_refresh(value->app);
+    /* 缺 Core / 缺渲染组件时每次运行只提示一次: 放在"窗口确实开起来了"之后, 免得
+       窗口创建失败时提示也跟着丢掉, 用户完全不知道 Live2D 为什么没渲染。 */
+    bongo_cat_preferences_live2d_setup_notice(value->app);
 }
 
 /*
