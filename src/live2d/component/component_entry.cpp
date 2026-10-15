@@ -87,6 +87,30 @@ BongoCatLive2DStepResult bongo_cat_live2d_load_session_step(
     const char *setting_file, BongoCatError *error);
 void bongo_cat_live2d_load_session_end(BongoCatLive2DLoadSession *session);
 void bongo_cat_live2d_load_session_abort(BongoCatLive2DLoadSession *session);
+/* Vulkan 桥接的入口也是 C 链接(它们在桥接里是 extern "C") —— 少了这个块, C++ 会去找
+   修饰名, 链接期报"无法解析的外部符号"。 */
+extern "C" {
+bool bongo_cat_live2d_vulkan_remember(const BongoCatVkNativeInfo *info, int width,
+    int height);
+bool bongo_cat_live2d_vulkan_attach(const BongoCatVkNativeInfo *info, int width,
+    int height);
+void bongo_cat_live2d_vulkan_detach(void);
+bool bongo_cat_live2d_vulkan_ready(void);
+bool bongo_cat_live2d_vulkan_shaders_available(const char *assets_root);
+void bongo_cat_live2d_vulkan_set_shader_root(const char *assets_root);
+void bongo_cat_live2d_vulkan_set_supersample(int mode);
+bool bongo_cat_live2d_vulkan_begin_frame(void);
+bool bongo_cat_live2d_vulkan_end_frame(void);
+bool bongo_cat_live2d_vulkan_target_info(void **image, void **view, void **sampler,
+    int *width, int *height);
+void bongo_cat_live2d_vulkan_release_target(void);
+void *bongo_cat_live2d_vulkan_create_texture(const void *pixels, int width,
+    int height);
+void *bongo_cat_live2d_vulkan_create_texture_attached(const void *pixels,
+    int width, int height);
+void bongo_cat_live2d_vulkan_destroy_texture(void *texture);
+bool bongo_cat_live2d_vulkan_bind_texture(void *renderer, void *texture);
+}
 }
 
 namespace {
@@ -277,6 +301,44 @@ void op_load_session_abort(void *session) {
     bongo_cat_live2d_load_session_abort((BongoCatLive2DLoadSession *)session);
 }
 
+/* ---- Vulkan 专有回调(阶段 2d): 全部直接转给桥接, 借用语义见 renderer_module_abi.h ---- */
+bool op_vulkan_remember(const BongoCatVkNativeInfo *info, int width, int height) {
+    return bongo_cat_live2d_vulkan_remember(info, width, height);
+}
+bool op_vulkan_attach(const BongoCatVkNativeInfo *info, int width, int height) {
+    return bongo_cat_live2d_vulkan_attach(info, width, height);
+}
+void op_vulkan_detach(void) { bongo_cat_live2d_vulkan_detach(); }
+bool op_vulkan_ready(void) { return bongo_cat_live2d_vulkan_ready(); }
+bool op_vulkan_shaders_available(const char *assets_root) {
+    return bongo_cat_live2d_vulkan_shaders_available(assets_root);
+}
+void op_vulkan_set_shader_root(const char *assets_root) {
+    bongo_cat_live2d_vulkan_set_shader_root(assets_root);
+}
+void op_vulkan_set_supersample(int mode) {
+    bongo_cat_live2d_vulkan_set_supersample(mode);
+}
+bool op_vulkan_begin_frame(void) { return bongo_cat_live2d_vulkan_begin_frame(); }
+bool op_vulkan_end_frame(void) { return bongo_cat_live2d_vulkan_end_frame(); }
+bool op_vulkan_target_info(void **image, void **view, void **sampler, int *width,
+    int *height) {
+    return bongo_cat_live2d_vulkan_target_info(image, view, sampler, width, height);
+}
+void op_vulkan_release_target(void) { bongo_cat_live2d_vulkan_release_target(); }
+void *op_vulkan_create_texture(const void *pixels, int width, int height) {
+    return bongo_cat_live2d_vulkan_create_texture(pixels, width, height);
+}
+void *op_vulkan_create_texture_attached(const void *pixels, int width, int height) {
+    return bongo_cat_live2d_vulkan_create_texture_attached(pixels, width, height);
+}
+void op_vulkan_destroy_texture(void *texture) {
+    bongo_cat_live2d_vulkan_destroy_texture(texture);
+}
+bool op_vulkan_bind_texture(void *renderer, void *texture) {
+    return bongo_cat_live2d_vulkan_bind_texture(renderer, texture);
+}
+
 const BongoCatRendererModule module = {
     BONGO_CAT_RENDERER_MODULE_ABI,
     sizeof(BongoCatRendererModule),
@@ -295,7 +357,13 @@ const BongoCatRendererModule module = {
         op_set_expression, op_expression, op_visual_state,
         op_prepare_cover_capture, op_prepare_viewer_audit,
         op_load_session_begin, op_load_session_activate, op_load_session_step,
-        op_load_session_end, op_load_session_abort
+        op_load_session_end, op_load_session_abort,
+        op_vulkan_remember, op_vulkan_attach, op_vulkan_detach, op_vulkan_ready,
+        op_vulkan_shaders_available, op_vulkan_set_shader_root,
+        op_vulkan_set_supersample, op_vulkan_begin_frame, op_vulkan_end_frame,
+        op_vulkan_target_info, op_vulkan_release_target,
+        op_vulkan_create_texture, op_vulkan_create_texture_attached,
+        op_vulkan_destroy_texture, op_vulkan_bind_texture
     }
 };
 

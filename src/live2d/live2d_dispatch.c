@@ -104,7 +104,7 @@ const char *bongo_cat_live2d_component_path(void) { return component_path; }
 
 /* 首次需要真实例时装载组件: 这一步需要资源根(着色器), 而资源根只有 create 的调用点知道,
    所以装载放在这里而不是启动期 —— 启动期只做"发现 + 记日志"。 */
-static bool ensure_component(void) {
+bool bongo_cat_live2d_ensure_component(void) {
     if (load_attempted) return component_used;
     load_attempted = true;
     BongoCatRendererModuleInfo *modules = NULL;
@@ -127,7 +127,7 @@ static bool ensure_component(void) {
 
 BongoCatLive2D *bongo_cat_live2d_create(const char *asset_root,
     BongoCatError *error) {
-    if (ensure_component()) {
+    if (bongo_cat_live2d_ensure_component()) {
         const BongoCatRendererModuleOps *active = ops();
         if (active && active->create) {
             void *instance = active->create(bongo_cat_renderer_module_host(),

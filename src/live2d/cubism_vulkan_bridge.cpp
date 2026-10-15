@@ -24,9 +24,13 @@
 namespace {
 
 bool g_attached = false;
-BongoCatVk *g_vk = nullptr;
+/* 阶段 2d: 组件里**不保存宿主的 BongoCatVk**(那是宿主私有结构)。需要设备信息时用
+   宿主交来的**只读快照**(POD); 需要刷新的字段(尺寸/格式)由 remember/attach 重新送进来。 */
+BongoCatVkNativeInfo g_native = {};
+bool g_native_valid = false;
 /* remember() 记下的待挂载信息 */
-BongoCatVk *g_pending_vk = nullptr;
+BongoCatVkNativeInfo g_pending = {};
+bool g_pending_valid = false;
 int g_pending_width = 0;
 int g_pending_height = 0;
 /* 窗口创建时记下的内嵌资源根目录 (assets/), 里面也有一份 FrameworkShaders */
@@ -135,42 +139,47 @@ void bongo_cat_live2d_vulkan_set_shader_root(const char *assets_root) {
     g_assets_root = assets_root ? assets_root : "";
 }
 
-bool bongo_cat_live2d_vulkan_remember(struct BongoCatVk *vk, int width, int height) {
-    if (!vk || width <= 0 || height <= 0) return false;
-    g_pending_vk = vk;
+bool bongo_cat_live2d_vulkan_remember(const BongoCatVkNativeInfo *info, int width, int height) {
+    if (!info || !info->device || width <= 0 || height <= 0) return false;
+    g_pending = *info;
+    g_pending_valid = true;
     g_pending_width = width;
     g_pending_height = height;
     /* 只切工厂开关: 这一步不调用任何 SDK 函数, 可以在框架启动前做 */
     bongo_cat::bongo_cat_cubism_renderer_use_vulkan(true);
     SDL_LogWarn(SDL_LOG_CATEGORY_VIDEO,
-        "[live2d/vk] remember: vk=%p %dx%d (工厂开关已打开)",
-        (void *)vk, width, height);
+        "[live2d/vk] remember: device=%p %dx%d (工厂开关已打开)",
+        info->device, width, height);
     return true;
 }
 
-bool bongo_cat_live2d_vulkan_attach(struct BongoCatVk *vk, int width, int height) {
+bool bongo_cat_live2d_vulkan_attach(const BongoCatVkNativeInfo *info, int width, int height) {
     if (g_attached) return true;
-    /* 模型侧调用时可以不带参数, 用 remember() 记下的值 */
-    if (!vk) { vk = g_pending_vk; width = g_pending_width; height = g_pending_height; }
-    if (!vk || width <= 0 || height <= 0) return false;
-    BongoCatVkNativeInfo info = {0};
-    if (!bongo_cat_vk_native_info(vk, &info)) {
-        SDL_LogWarn(SDL_LOG_CATEGORY_VIDEO, "[live2d/vk] attach: 后端句柄不可用");
-        return false;
+    /* 模型侧调用时可以不带参数, 用 remember() 记下的那一份快照 */
+    if (!info) {
+        if (!g_pending_valid) return false;
+        info = &g_pending;
+        g_pending_valid = false;
+        width = g_pending_width;
+        height = g_pending_height;
     }
-    if (!info.device || !info.physical_device || !info.command_pool || !info.queue) {
+    if (!info->device || width <= 0 || height <= 0) return false;
+    /* 快照只读, 拷一份到本地: 后面既要用它填 g_native(给 target_info/纹理用), 又要读字段。 */
+    const BongoCatVkNativeInfo snapshot = *info;
+    const BongoCatVkNativeInfo &native = snapshot;
+    if (!native.device || !native.physical_device || !native.command_pool || !native.queue) {
         SDL_LogWarn(SDL_LOG_CATEGORY_VIDEO,
             "[live2d/vk] attach: 句柄不完整 (device=%p physical=%p pool=%p queue=%p)",
-            info.device, info.physical_device, info.command_pool, info.queue);
+            native.device, native.physical_device, native.command_pool, native.queue);
         return false;
     }
     SDL_LogWarn(SDL_LOG_CATEGORY_VIDEO,
         "[live2d/vk] attach: 探针 device=%p view=%p extent=%dx%d format=%d images=%d",
-        info.device, info.image_view, info.width, info.height, info.image_format,
-        info.image_count);
-    g_device = (VkDevice)info.device;
-    g_physical = (VkPhysicalDevice)info.physical_device;
-    g_format = (VkFormat)info.image_format;
+        native.device, native.image_view, native.width, native.height,
+        native.image_format, native.image_count);
+    g_device = (VkDevice)native.device;
+    g_physical = (VkPhysicalDevice)native.physical_device;
+    g_format = (VkFormat)native.image_format;
 
     VkExtent2D extent = {(unsigned int)width, (unsigned int)height};
     /*
@@ -180,8 +189,8 @@ bool bongo_cat_live2d_vulkan_attach(struct BongoCatVk *vk, int width, int height
     SDL_LogWarn(SDL_LOG_CATEGORY_VIDEO,
         "[live2d/vk] attach: Step 1 SetConstantSettings (view=%p extent=%dx%d "
         "format=%d depth=%d images=%d)",
-        (void *)info.image_view, width, height, (int)g_format,
-        (int)kDepthFormat, info.image_count);
+        (void *)native.image_view, width, height, (int)g_format,
+        (int)kDepthFormat, native.image_count);
     {
         std::filesystem::path parent = shader_parent_directory();
         if (!parent.empty()) {
@@ -195,8 +204,8 @@ bool bongo_cat_live2d_vulkan_attach(struct BongoCatVk *vk, int width, int height
         }
     }
     Csm::Rendering::CubismRenderer_Vulkan::SetConstantSettings(g_device,
-        (VkPhysicalDevice)info.physical_device, (VkCommandPool)info.command_pool,
-        (VkQueue)info.queue, (unsigned int)info.image_count, extent,
+        (VkPhysicalDevice)native.physical_device, (VkCommandPool)native.command_pool,
+        (VkQueue)native.queue, (unsigned int)native.image_count, extent,
         /*
          * 默认目标视图传 NULL: 我们每帧都用 SetRenderTarget 指向自己的离屏
          * 图像 (配合 EnableChangeRenderTarget), 从不通过 Cubism 渲染到交换链。
@@ -215,7 +224,7 @@ bool bongo_cat_live2d_vulkan_attach(struct BongoCatVk *vk, int width, int height
         "[live2d/vk] attach: Step 3 CreateRenderTarget %dx%d (超采样 %dx%d)",
         width, height, (int)target_size.width, (int)target_size.height);
     auto *target = CSM_NEW Csm::Rendering::CubismRenderTarget_Vulkan();
-    target->CreateRenderTarget(g_device, (VkPhysicalDevice)info.physical_device,
+    target->CreateRenderTarget(g_device, (VkPhysicalDevice)native.physical_device,
         target_size.width, target_size.height, g_format, kDepthFormat);
     if (!target->IsValid()) {
         SDL_LogWarn(SDL_LOG_CATEGORY_VIDEO,
@@ -227,12 +236,19 @@ bool bongo_cat_live2d_vulkan_attach(struct BongoCatVk *vk, int width, int height
     g_target = target;
     g_target_width = width;
     g_target_height = height;
-    g_vk = vk;
+    g_native = native;
+    g_native_valid = true;
     g_attached = true;
     SDL_LogWarn(SDL_LOG_CATEGORY_VIDEO,
         "[live2d/vk] attach: 完成 目标=%dx%d device=%p", width, height,
         (void *)g_device);
     return true;
+}
+
+/* 给同模块的纹理/过渡代码用的只读访问器: 它们也要设备句柄, 但不该各自保存一份快照。
+   未 attach 时返回全零, 调用方按设备不可用处理。 */
+BongoCatVkNativeInfo bongo_cat_live2d_vulkan_native_snapshot(void) {
+    return g_native_valid ? g_native : BongoCatVkNativeInfo{};
 }
 
 bool bongo_cat_live2d_vulkan_ready(void) {
@@ -243,8 +259,8 @@ bool bongo_cat_live2d_vulkan_begin_frame(void) {
     if (!bongo_cat_live2d_vulkan_ready()) return false;
     auto *device_info = Csm::Rendering::CubismDeviceInfo_Vulkan::GetDeviceInfo(g_device);
     if (!device_info || !device_info->GetOffscreenManager()) return false;
-    BongoCatVkNativeInfo current = {0};
-    if (!g_vk || !bongo_cat_vk_native_info(g_vk, &current)) return false;
+    if (!g_native_valid) return false;
+    const BongoCatVkNativeInfo &current = g_native;
     /* 窗口尺寸变了就重建离屏目标, 模型才会跟着"缩放"一起变 */
     if (!ensure_target_size(current.width, current.height)) return false;
     device_info->GetOffscreenManager()->BeginFrameProcess();
@@ -271,9 +287,8 @@ bool bongo_cat_live2d_vulkan_end_frame(void) {
     if (!device_info || !device_info->GetOffscreenManager()) return false;
     device_info->GetOffscreenManager()->EndFrameProcess();
     device_info->GetOffscreenManager()->ReleaseStaleRenderTextures();
-    /* 交给合成着色器之前必须换成可采样布局 */
-    BongoCatVkNativeInfo native = {0};
-    if (g_vk && bongo_cat_vk_native_info(g_vk, &native)) {
+    if (g_native_valid) {
+        const BongoCatVkNativeInfo native = g_native;
         bongo_cat_live2d_vulkan_transition_sampled(&native,
             (void *)g_target->GetTextureImage());
         /*
@@ -291,11 +306,9 @@ void bongo_cat_live2d_vulkan_detach(void) {
         CSM_DELETE(g_target);
         g_target = nullptr;
     }
-    if (g_device != VK_NULL_HANDLE)
-        Csm::Rendering::CubismDeviceInfo_Vulkan::ReleaseDeviceInfo(g_device);
+    g_native_valid = false;
     g_device = VK_NULL_HANDLE;
     g_physical = VK_NULL_HANDLE;
-    g_vk = nullptr;
     g_format = VK_FORMAT_UNDEFINED;
     g_attached = false;
 }
@@ -311,19 +324,19 @@ bool bongo_cat_live2d_vulkan_target_info(void **image, void **view, void **sampl
     return true;
 }
 
-/* 用 attach 时记住的后端建贴图, 省掉把 BongoCatVk* 一路传进模型的管道 */
+/* 用 attach 时记住的快照建贴图: 组件里没有宿主的后端结构体, 也就不需要把任何指针一路传下去 */
 void *bongo_cat_live2d_vulkan_create_texture_attached(const void *pixels, int width,
     int height) {
-    if (!g_vk) return nullptr;
-    return bongo_cat_live2d_vulkan_create_texture(g_vk, pixels, width, height);
+    if (!g_native_valid) return nullptr;
+    return bongo_cat_live2d_vulkan_create_texture(pixels, width, height);
 }
 
 #else /* !BONGO_CAT_HAS_VULKAN */
 
 
 /* 没有编译 Vulkan 后端时, 桥一律不可用, 上层据此回退 OpenGL。 */
-bool bongo_cat_live2d_vulkan_attach(struct BongoCatVk *vk, int width, int height) {
-    (void)vk; (void)width; (void)height;
+bool bongo_cat_live2d_vulkan_attach(const BongoCatVkNativeInfo *info, int width, int height) {
+    (void)info; (void)width; (void)height;
     return false;
 }
 bool bongo_cat_live2d_vulkan_ready(void) { return false; }

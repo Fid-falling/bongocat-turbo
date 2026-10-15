@@ -69,7 +69,7 @@ static bool try_vulkan_window(BongoCatApp *app, BongoCatError *error) {
     {
         BongoCatVkInfo remember_info = {0};
         if (bongo_cat_vk_info(app->vk, &remember_info) &&
-            !bongo_cat_live2d_vulkan_remember(app->vk, remember_info.width,
+            !bongo_cat_live2d_vulkan_remember_backend(app->vk, remember_info.width,
                 remember_info.height))
             SDL_LogWarn(SDL_LOG_CATEGORY_VIDEO,
                 "[vulkan] Live2D 的 Vulkan 渲染器未登记, Live2D 将回退 OpenGL");

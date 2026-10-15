@@ -29,6 +29,11 @@ add_library(bongo_live2d SHARED ${BONGO_CAT_COMPONENT_SOURCES})
 if(WIN32)
   target_include_directories(bongo_live2d PRIVATE src/platform/windows)
 endif()
+# 组件必须自己声明"我编了 Vulkan 渲染器": 这个宏以前只加在宿主运行时上, 组件拿不到就会走
+# cubism_vulkan_bridge.cpp 里的非 Vulkan 分支(那套桩的签名与真实路径不同, 链接期才炸)。
+if(BONGO_CAT_ENABLE_VULKAN)
+  target_compile_definitions(bongo_live2d PRIVATE BONGO_CAT_HAS_VULKAN=1)
+endif()
 # Framework 只提供编译产物: 它的 csm* 引用由生成的 shim 满足(见 cmake/GenCoreShim.cmake)。
 # yyjson 是纯静态库(无全局状态), 组件里的 json/atlas 解析直接用它的 API, 所以链进来 ——
 # 但**不**链 bongo_cat_core: 那会把宿主的配置/缓存实现复制一份, 两份状态必然分叉。

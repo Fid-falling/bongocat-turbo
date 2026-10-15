@@ -249,14 +249,14 @@ bool bongo_cat_live2d_visual_state(const BongoCatLive2D *value,
 }
 
 /* Vulkan 桥的桩: 没有 Cubism (或没有 Vulkan 后端) 时一律失败, 上层回退 OpenGL。 */
-bool bongo_cat_live2d_vulkan_attach(struct BongoCatVk *vk, int width, int height) {
-    (void)vk; (void)width; (void)height;
+bool bongo_cat_live2d_vulkan_attach(const BongoCatVkNativeInfo *info, int width, int height) {
+    (void)info; (void)width; (void)height;
     return false;
 }
 
-void *bongo_cat_live2d_vulkan_create_texture(struct BongoCatVk *vk,
-    const void *pixels, int width, int height) {
-    (void)vk; (void)pixels; (void)width; (void)height;
+void *bongo_cat_live2d_vulkan_create_texture(const void *pixels, int width,
+    int height) {
+    (void)pixels; (void)width; (void)height;
     return NULL;
 }
 

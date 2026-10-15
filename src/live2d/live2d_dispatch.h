@@ -17,5 +17,13 @@
  */
 bool bongo_cat_live2d_native_active(void);
 const char *bongo_cat_live2d_component_path(void);
+/*
+ * 首次需要真实例之前装载组件(幂等)。
+ *
+ * Vulkan 侧要在**窗口创建**时就问"有没有组件"(决定这次走不走 VK 渲染器), 而那时还没建任何
+ * 实例 —— 所以这一步必须能被外部提前触发; 否则懒装载会让宿主误判成"这次没有 VK 渲染器",
+ * 于是静默回退 GL(踩过: 表现就是强制 VK 时模型加载失败)。
+ */
+bool bongo_cat_live2d_ensure_component(void);
 
 #endif

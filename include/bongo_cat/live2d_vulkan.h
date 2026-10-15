@@ -11,6 +11,10 @@ extern "C" {
 
 #include <stdbool.h>
 
+#include "bongo_cat/vk_backend.h"
+
+/* 宿主私有的后端结构体只做前向声明: 阶段 2d 起它不再出现在任何跨界签名里, 只在宿主内部
+   被抽成 BongoCatVkNativeInfo(见 vk_backend.h)后才交给组件。 */
 struct BongoCatVk;
 
 /*
@@ -30,11 +34,22 @@ struct BongoCatVk;
  * 之后 attach() 不带参数调用时会复用这里记下的句柄与尺寸。
  */
 /*
- * 窗口创建时调用: 只记住后端指针与尺寸并打开渲染器工厂开关, 不碰任何 SDK 函数
+ * 窗口创建时调用: 只记住后端**快照**与尺寸并打开渲染器工厂开关, 不碰任何 SDK 函数
  * (SDK 的 csmMap 依赖 CubismFramework::StartUp 设置的全局分配器)。
  * 真正的挂载 attach() 推迟到模型创建渲染器时, 那时框架已经启动。
+ *
+ * 参数是宿主私有 BongoCatVk 的只读快照 —— 阶段 2d 起宿主的那个结构体不再跨界(宿主侧在
+ * live2d_dispatch_vulkan.c 里把 vk 抽成快照后才交给组件)。
  */
-bool bongo_cat_live2d_vulkan_remember(struct BongoCatVk *vk, int width, int height);
+bool bongo_cat_live2d_vulkan_remember(const BongoCatVkNativeInfo *info, int width,
+    int height);
+
+/*
+ * **宿主侧**的入口(阶段 2d): 窗口代码拿到的是自己的 BongoCatVk, 由这一层负责把它抽成
+ * 只读快照再交给组件 —— 于是"宿主私有结构体不跨界"这条纪律只需要在一个地方守住。
+ */
+bool bongo_cat_live2d_vulkan_remember_backend(struct BongoCatVk *vk, int width,
+    int height);
 /*
  * Cubism 的 Vulkan 渲染器按相对路径 "FrameworkShaders/*.spv" 打开着色器, 所以
  * 进程的工作目录必须是这些文件的父目录。发布包把它们放在 exe 旁边, 但"只复制
@@ -51,15 +66,23 @@ void bongo_cat_live2d_vulkan_set_shader_root(const char *assets_root);
 void bongo_cat_live2d_vulkan_set_supersample(int mode);
 /* 内存清理: 释放离屏目标 (下次绘制自动重建) */
 void bongo_cat_live2d_vulkan_release_target(void);
-bool bongo_cat_live2d_vulkan_attach(struct BongoCatVk *vk, int width, int height);
+/*
+ * 接管 Vulkan 渲染。参数是**宿主私有 BongoCatVk 的只读快照**(POD, 见 vk_backend.h), 而不是
+ * 那个结构体本身 —— 组件不该也不能解释宿主的后端状态; 快照里有 device/物理设备/队列/队列族/
+ * 命令池/格式/尺寸以及 loader 的动态入口。传 NULL 表示"用 remember() 记下的那一份"。
+ * 返回 false 表示这次用不了 VK(宿主会沿用既有回退路径)。
+ */
+bool bongo_cat_live2d_vulkan_attach(const BongoCatVkNativeInfo *info, int width,
+    int height);
 bool bongo_cat_live2d_vulkan_ready(void);
 bool bongo_cat_live2d_vulkan_begin_frame(void);
 bool bongo_cat_live2d_vulkan_end_frame(void);
 void bongo_cat_live2d_vulkan_detach(void);
 
-/* 模型贴图: 返回 SDK 的 CubismImageVulkan 句柄 (void*), 失败返回 NULL */
-void *bongo_cat_live2d_vulkan_create_texture(struct BongoCatVk *vk,
-    const void *pixels, int width, int height);
+/* 模型贴图: 返回 SDK 的 CubismImageVulkan 句柄 (void*), 失败返回 NULL。
+   设备来自 attach() 记下的快照 —— 所以这里不再需要 BongoCatVk*。 */
+void *bongo_cat_live2d_vulkan_create_texture(const void *pixels, int width,
+    int height);
 void bongo_cat_live2d_vulkan_destroy_texture(void *texture);
 
 /* 同上, 但用 attach() 时记住的后端 (模型侧不用持有 BongoCatVk*) */

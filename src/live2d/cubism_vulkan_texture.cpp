@@ -13,6 +13,10 @@
 
 #include "bongo_cat/vk_backend.h"
 
+/* 定义在 cubism_vulkan_bridge.cpp: attach() 时记下的宿主快照(阶段 2d 起组件不再持有
+   BongoCatVk*)。 */
+BongoCatVkNativeInfo bongo_cat_live2d_vulkan_native_snapshot(void);
+
 #ifdef BONGO_CAT_HAS_VULKAN
 
 #include <Rendering/Vulkan/CubismClass_Vulkan.hpp>
@@ -61,13 +65,12 @@ bool run_once(VkDevice device, VkCommandPool pool, VkQueue queue,
 
 } // namespace
 
-void *bongo_cat_live2d_vulkan_create_texture(struct BongoCatVk *vk,
-    const void *pixels, int width, int height) {
-    if (!vk || !pixels || width <= 0 || height <= 0) return nullptr;
-    BongoCatVkNativeInfo info = {0};
-    if (!bongo_cat_vk_native_info(vk, &info) || !info.device || !info.command_pool ||
-        !info.queue)
-        return nullptr;
+void *bongo_cat_live2d_vulkan_create_texture(const void *pixels, int width,
+    int height) {
+    if (!pixels || width <= 0 || height <= 0) return nullptr;
+    /* 设备信息来自 attach() 记下的**宿主快照**(g_native), 组件不持有 BongoCatVk*。 */
+    const BongoCatVkNativeInfo info = bongo_cat_live2d_vulkan_native_snapshot();
+    if (!info.device || !info.command_pool || !info.queue) return nullptr;
     VkDevice device = (VkDevice)info.device;
     VkPhysicalDevice physical = (VkPhysicalDevice)info.physical_device;
     VkCommandPool pool = (VkCommandPool)info.command_pool;
@@ -153,9 +156,9 @@ bool bongo_cat_live2d_vulkan_bind_texture(void *renderer, void *texture) {
 #else /* !BONGO_CAT_HAS_VULKAN */
 
 
-void *bongo_cat_live2d_vulkan_create_texture(struct BongoCatVk *vk,
-    const void *pixels, int width, int height) {
-    (void)vk; (void)pixels; (void)width; (void)height;
+void *bongo_cat_live2d_vulkan_create_texture(const void *pixels, int width,
+    int height) {
+    (void)pixels; (void)width; (void)height;
     return nullptr;
 }
 void *bongo_cat_live2d_vulkan_create_texture_attached(const void *pixels, int width,

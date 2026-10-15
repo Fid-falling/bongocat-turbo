@@ -178,6 +178,33 @@ typedef struct BongoCatRendererModuleOps {
         const char *setting_file, BongoCatError *error);
     void (*load_session_end)(void *session);
     void (*load_session_abort)(void *session);
+
+    /*
+     * Vulkan 专有入口(阶段 2d)。**借用语义**: target_info 交出的 image/view/sampler 由组件
+     * 创建并拥有, 宿主只在这一次合成里借用 —— 组件重建离屏目标时旧句柄立即失效, 宿主不得
+     * 缓存、不得销毁; 组件销毁/卸载时由自己释放。
+     *
+     * 传入的 BongoCatVkNativeInfo 是**宿主私有 BongoCatVk 的只读快照**(POD), 组件不得反推
+     * 或持有宿主结构体指针。
+     */
+    bool (*vulkan_remember)(const BongoCatVkNativeInfo *info, int width,
+        int height);
+    bool (*vulkan_attach)(const BongoCatVkNativeInfo *info, int width, int height);
+    void (*vulkan_detach)(void);
+    bool (*vulkan_ready)(void);
+    bool (*vulkan_shaders_available)(const char *assets_root);
+    void (*vulkan_set_shader_root)(const char *assets_root);
+    void (*vulkan_set_supersample)(int mode);
+    bool (*vulkan_begin_frame)(void);
+    bool (*vulkan_end_frame)(void);
+    bool (*vulkan_target_info)(void **image, void **view, void **sampler,
+        int *width, int *height);
+    void (*vulkan_release_target)(void);
+    void *(*vulkan_create_texture)(const void *pixels, int width, int height);
+    void *(*vulkan_create_texture_attached)(const void *pixels, int width,
+        int height);
+    void (*vulkan_destroy_texture)(void *texture);
+    bool (*vulkan_bind_texture)(void *renderer, void *texture);
 } BongoCatRendererModuleOps;
 
 /* 描述符: 组件唯一的导出符号返回它。字段顺序是 ABI 的一部分, 不得重排。 */
