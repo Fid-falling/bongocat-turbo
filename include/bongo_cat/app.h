@@ -265,6 +265,8 @@ typedef struct BongoCatApp {
     uint32_t random_expression_state;
     uint64_t random_motion_due_ns;
     float random_motion_interval_seconds;
+    uint64_t random_sound_due_ns;
+    float random_sound_interval_seconds;
     uint64_t sequential_model_due_ns;
     float sequential_model_interval_seconds;
     uint64_t settings_saved_hash, settings_observed_hash;

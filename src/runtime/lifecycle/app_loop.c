@@ -275,6 +275,7 @@ void bongo_cat_app_loop(BongoCatApp *app) {
         bongo_cat_multi_pet_update(app, now);
         bongo_cat_random_expression_update(app, now);
         bongo_cat_random_motion_update(app, now);
+        bongo_cat_random_sound_update(app, now);
         bongo_cat_sequential_model_update(app, now);
         bongo_cat_audio_update(app->audio);
         bongo_cat_window_update_display_recovery(app, now);

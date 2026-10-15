@@ -214,6 +214,17 @@ static void random_motion(struct nk_command_buffer *c, struct nk_rect b,
     line(c, b, 8, 11, 5, 16, color); line(c, b, 5, 16, 2, 16, color);
 }
 
+static void random_sound(struct nk_command_buffer *c, struct nk_rect b,
+    struct nk_color color) {
+    line(c, b, 3, 7, 7, 7, color); line(c, b, 7, 7, 7, 12, color);
+    line(c, b, 7, 12, 10, 12, color); line(c, b, 10, 12, 10, 14, color);
+    line(c, b, 10, 14, 15, 14, color); line(c, b, 15, 14, 15, 10, color);
+    line(c, b, 15, 10, 15, 6, color); line(c, b, 3, 7, 3, 10, color);
+    line(c, b, 3, 10, 6, 10, color);
+    dot(c, b, 9, 2, 2.0f, color);
+    dot(c, b, 10, 15, 2.0f, color);
+}
+
 /*
  * 行图标总表。下标 = icon - BONGO_CAT_PREF_ICON_MULTIPLE_MODELS, 与枚举顺序**逐项
  * 对应** —— 这就是 preferences_icons.h 里"新图标只能加在段末"那条约束的落地处:
@@ -229,7 +240,7 @@ bool bongo_cat_pref_row_icon_draw(struct nk_command_buffer *canvas,
         random_expression, mirror, mouse_mirror, mouse_centered, ignore_mouse,
         max_fps, autostart, language, theme, shortcut_visibility,
         shortcut_preferences, hide_fade, renderer, frame_bounds,
-        random_motion};
+        random_motion, random_sound};
     int index = icon - BONGO_CAT_PREF_ICON_MULTIPLE_MODELS;
     int count = (int)(sizeof(draws) / sizeof(draws[0]));
     if (index < 0 || index >= count) return false;

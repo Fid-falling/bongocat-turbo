@@ -109,6 +109,7 @@ static bool read_window(yyjson_val *object, BongoCatWindowPreferences *value,
         !read_bool(object, "randomExpression", &value->random_expression,
             error) ||
         !read_bool(object, "randomMotion", &value->random_motion, error) ||
+        !read_bool(object, "randomSound", &value->random_sound, error) ||
         !read_bool(object, "sequentialModel", &value->sequential_model, error) ||
         !read_bool(object, "roundedCorners", &value->rounded_corners, error) ||
         !read_float(object, "cornerRadiusPercent", &value->corner_radius_percent,
@@ -122,6 +123,8 @@ static bool read_window(yyjson_val *object, BongoCatWindowPreferences *value,
             error) ||
         !read_float(object, "randomMotionIntervalSeconds",
             &value->random_motion_interval_seconds, error) ||
+        !read_float(object, "randomSoundIntervalSeconds",
+            &value->random_sound_interval_seconds, error) ||
         !read_float(object, "sequentialModelIntervalSeconds",
             &value->sequential_model_interval_seconds, error)) return false;
     const char *color;

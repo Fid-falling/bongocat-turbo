@@ -56,6 +56,11 @@ void bongo_cat_preferences_behavior_row_draw(BongoCatPreferences *value,
     struct nk_context *context, struct nk_command_buffer *canvas,
     struct nk_rect row, BongoCatBehaviorEntry *entry, BongoCatUIPalette palette,
     float opacity, bool enabled);
+void bongo_cat_preferences_behavior_row_participation_draw(
+    BongoCatPreferences *value, struct nk_context *context,
+    struct nk_command_buffer *canvas, struct nk_rect row,
+    BongoCatBehaviorEntry *entry, BongoCatUIPalette palette, float opacity,
+    bool enabled);
 void bongo_cat_preferences_page_shortcuts(BongoCatPreferences *value,
     struct nk_context *context);
 void bongo_cat_preferences_page_about(BongoCatPreferences *value,

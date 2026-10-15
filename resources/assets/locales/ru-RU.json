@@ -33,6 +33,8 @@
           "secondsUnit": "с",
           "randomSettings": "Случайный",
           "randomMotion": "Случайные движения",
+          "randomSound": "Случайные звуки",
+          "intervalSeconds": "Интервал (с)",
           "sequentialModel": "Последовательные модели",
           "obsBackground": "Однотонный фон",
           "hideOnHover": "Скрывать при наведении",
@@ -142,6 +144,10 @@
         },
         "labels": {
           "deleteModel": "Удалить модель"
+        },
+        "random": {
+          "configuring": "Настройка",
+          "defaultPet": "Текущий питомец"
         },
         "hints": {
           "deleteSuccess": "Модель \"%s\" удалена",

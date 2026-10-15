@@ -74,6 +74,8 @@ static bool write_window(yyjson_mut_doc *doc, yyjson_mut_val *object,
             value->random_expression) &&
         yyjson_mut_obj_add_bool(doc, object, "randomMotion",
             value->random_motion) &&
+        yyjson_mut_obj_add_bool(doc, object, "randomSound",
+            value->random_sound) &&
         yyjson_mut_obj_add_bool(doc, object, "sequentialModel",
             value->sequential_model) &&
         yyjson_mut_obj_add_bool(doc, object, "roundedCorners",
@@ -92,6 +94,8 @@ static bool write_window(yyjson_mut_doc *doc, yyjson_mut_val *object,
             value->random_expression_interval_seconds) &&
         yyjson_mut_obj_add_real(doc, object, "randomMotionIntervalSeconds",
             value->random_motion_interval_seconds) &&
+        yyjson_mut_obj_add_real(doc, object, "randomSoundIntervalSeconds",
+            value->random_sound_interval_seconds) &&
         yyjson_mut_obj_add_real(doc, object, "sequentialModelIntervalSeconds",
             value->sequential_model_interval_seconds);
 }

@@ -10,6 +10,7 @@
 #define BONGO_CAT_DEFAULT_WINDOW_OPACITY_PERCENT 100.0f
 #define BONGO_CAT_DEFAULT_RANDOM_EXPRESSION_SECONDS 5.0f
 #define BONGO_CAT_DEFAULT_RANDOM_MOTION_SECONDS 5.0f
+#define BONGO_CAT_DEFAULT_RANDOM_SOUND_SECONDS 5.0f
 #define BONGO_CAT_DEFAULT_SEQUENTIAL_MODEL_SECONDS 600.0f
 #define BONGO_CAT_DEFAULT_WINDOW_CORNER_PERCENT 6.0f
 #define BONGO_CAT_DEFAULT_HIDE_FADE_SECONDS 0.3f
@@ -129,6 +130,7 @@ typedef struct BongoCatWindowPreferences {
     bool obs_background;
     bool random_expression;
     bool random_motion;
+    bool random_sound;
     bool sequential_model;
     bool rounded_corners;
     BongoCatObsBackgroundColor obs_background_color;
@@ -136,6 +138,7 @@ typedef struct BongoCatWindowPreferences {
     float hide_fade_seconds;
     float random_expression_interval_seconds;
     float random_motion_interval_seconds;
+    float random_sound_interval_seconds;
     float sequential_model_interval_seconds;
     float corner_radius_percent;
 } BongoCatWindowPreferences;

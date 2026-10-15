@@ -292,6 +292,8 @@ void bongo_cat_settings_defaults(BongoCatSettings *config) {
         BONGO_CAT_DEFAULT_RANDOM_EXPRESSION_SECONDS;
     config->window.random_motion_interval_seconds =
         BONGO_CAT_DEFAULT_RANDOM_MOTION_SECONDS;
+    config->window.random_sound_interval_seconds =
+        BONGO_CAT_DEFAULT_RANDOM_SOUND_SECONDS;
     config->window.sequential_model_interval_seconds =
         BONGO_CAT_DEFAULT_SEQUENTIAL_MODEL_SECONDS;
     config->app.tray_visible = true;
@@ -338,6 +340,9 @@ void bongo_cat_settings_validate(BongoCatSettings *config) {
     config->window.random_motion_interval_seconds = clampf_or(
         config->window.random_motion_interval_seconds, 1.0f, 3600.0f,
         BONGO_CAT_DEFAULT_RANDOM_MOTION_SECONDS);
+    config->window.random_sound_interval_seconds = clampf_or(
+        config->window.random_sound_interval_seconds, 1.0f, 3600.0f,
+        BONGO_CAT_DEFAULT_RANDOM_SOUND_SECONDS);
     config->window.sequential_model_interval_seconds = clampf_or(
         config->window.sequential_model_interval_seconds, 1.0f, 3600.0f,
         BONGO_CAT_DEFAULT_SEQUENTIAL_MODEL_SECONDS);

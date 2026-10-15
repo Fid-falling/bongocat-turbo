@@ -148,12 +148,10 @@ void bongo_cat_pref_controls_reset(struct nk_context *context) {
  * 下次点进去会看到和当前值不一致的文字。
  * 返回的 changed 是"值真的变了", 调用方据此决定要不要落盘/重绘窗口。
  */
-static double stepper(struct nk_context *context, const char *id,
+static double stepper_rect(struct nk_context *context, const char *id,
     double minimum, double value, double maximum, double step,
-    double default_value, bool integer, bool *changed) {
-    struct nk_rect bounds;
+    double default_value, bool integer, struct nk_rect bounds, bool *changed) {
     *changed = false;
-    if (nk_widget(&bounds, context) == NK_WIDGET_INVALID) return value;
     const float effect_margin = 2.0f;
     bounds = nk_rect(bounds.x + bounds.w - 122.0f - effect_margin,
         bounds.y, 122.0f, bounds.h);
@@ -230,6 +228,21 @@ static double stepper(struct nk_context *context, const char *id,
 }
 
 /*
+ * 步进器的布局版: 先向当前布局要一格再交给 stepper_rect。
+ */
+static double stepper(struct nk_context *context, const char *id,
+    double minimum, double value, double maximum, double step,
+    double default_value, bool integer, bool *changed) {
+    struct nk_rect bounds;
+    if (nk_widget(&bounds, context) == NK_WIDGET_INVALID) {
+        *changed = false;
+        return value;
+    }
+    return stepper_rect(context, id, minimum, value, maximum, step,
+        default_value, integer, bounds, changed);
+}
+
+/*
  * 浮点包装: 只有"步进结果和原值不同"才算 changed, 免得因为 double/float 舍入
  * 差异每次都报变化, 引发无意义的重绘与落盘。
  */
@@ -239,6 +252,22 @@ bool bongo_cat_pref_control_float(struct nk_context *context, const char *id,
     bool changed;
     double result = stepper(context, id, minimum, *value, maximum, step,
         default_value, false, &changed);
+    changed = changed && *value != (float)result;
+    if (changed) *value = (float)result;
+    return changed;
+}
+
+/*
+ * 浮点包装的"显式矩形"版: 给那些已经用 nk_widget 拿好一整行、需要把步进器挤进表头
+ * 某一块区域的场景 (随机分区表头)。仍走 stepper_rect, 交互状态按 id 归属, 与布局版
+ * 共用同一套步进/连发/双击恢复默认逻辑。
+ */
+bool bongo_cat_pref_control_float_rect(struct nk_context *context,
+    const char *id, float minimum, float *value, float maximum, float step,
+    float default_value, struct nk_rect cell) {
+    bool changed;
+    double result = stepper_rect(context, id, minimum, *value, maximum, step,
+        default_value, false, cell, &changed);
     changed = changed && *value != (float)result;
     if (changed) *value = (float)result;
     return changed;

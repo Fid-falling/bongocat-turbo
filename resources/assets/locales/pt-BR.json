@@ -33,6 +33,8 @@
           "secondsUnit": "s",
           "randomSettings": "Aleatório",
           "randomMotion": "Movimentos Aleatórios",
+          "randomSound": "Sons Aleatórios",
+          "intervalSeconds": "Intervalo (s)",
           "sequentialModel": "Modelos Sequenciais",
           "obsBackground": "Fundo sólido",
           "hideOnHover": "Ocultar ao Passar o Mouse",
@@ -142,6 +144,10 @@
         },
         "labels": {
           "deleteModel": "Excluir modelo"
+        },
+        "random": {
+          "configuring": "Configurando",
+          "defaultPet": "Mascote atual"
         },
         "hints": {
           "deleteSuccess": "Modelo \"%s\" excluído",

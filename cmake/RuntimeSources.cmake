@@ -306,6 +306,8 @@ set(BONGO_CAT_UI_PREFERENCES_SOURCES
   # [应用] 区与 macOS 输入监控区 (从 preferences_pages.c 拆出, 见行数策略)
   src/ui/preferences/preferences_general_page.c
   src/ui/preferences/preferences_pages.c
+  # 模型页的"随机"标签页: 三个随机分区 + 顺序轮换 (从 preferences_pages.c 拆出, 见行数策略)
+  src/ui/preferences/preferences_random_page.c
   src/ui/preferences/preferences_portable.c
   src/ui/preferences/preferences_present.c
   src/ui/preferences/preferences_render.c

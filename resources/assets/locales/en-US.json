@@ -33,6 +33,8 @@
           "secondsUnit": "s",
           "randomSettings": "Random",
           "randomMotion": "Random Motions",
+          "randomSound": "Random Sounds",
+          "intervalSeconds": "Interval (s)",
           "sequentialModel": "Sequential Models",
           "obsBackground": "Solid Background",
           "hideOnHover": "Hide on Hover",
@@ -142,6 +144,10 @@
         },
         "labels": {
           "deleteModel": "Delete Model"
+        },
+        "random": {
+          "configuring": "Configuring",
+          "defaultPet": "Current Pet"
         },
         "hints": {
           "deleteSuccess": "Deleted \"%s\"",

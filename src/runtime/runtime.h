@@ -211,6 +211,8 @@ void bongo_cat_random_expression_update(BongoCatApp *app, uint64_t now);
 void bongo_cat_random_expression_reset(BongoCatApp *app);
 void bongo_cat_random_motion_update(BongoCatApp *app, uint64_t now);
 void bongo_cat_random_motion_reset(BongoCatApp *app);
+void bongo_cat_random_sound_update(BongoCatApp *app, uint64_t now);
+void bongo_cat_random_sound_reset(BongoCatApp *app);
 void bongo_cat_sequential_model_update(BongoCatApp *app, uint64_t now);
 void bongo_cat_sequential_model_reset(BongoCatApp *app);
 bool bongo_cat_system_language(BongoCatLanguage *language);

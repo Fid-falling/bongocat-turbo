@@ -2,9 +2,14 @@
 #include "preferences_state.h"
 #include "preferences_theme.h"
 #include "preferences_widgets.h"
+#include "preferences_controls.h"
 #include "preferences_notice.h"
+#include "ui_icons.h"
+#include "preferences_overlay.h"
 #include "ui_tooltip.h"
 #include "bongo_cat/audio.h"
+#include "bongo_cat/path.h"
+#include "bongo_cat/config.h"
 #include "bongo_cat/i18n.h"
 #include "bongo_cat/log.h"
 #include "bongo_cat/preferences.h"
@@ -302,70 +307,4 @@ void bongo_cat_preferences_page_settings(BongoCatPreferences *value,
     page_display(value, context);
     section_gap(context, 10);
     bongo_cat_preferences_general_page(value, context);
-}
-/* 模型页的"随机"标签页: 随机表情/随机动作/顺序切换模型, 原来在设置页, 现在收纳到
-   模型页顶部分段控件里 (类型 X 的模型商店)。开关右边那个设置按钮各自打开行为弹窗
-   (动作/表情 tab), 顺序切换模型的设置按钮跳到模型页第一个标签重新拖拽顺序。 */
-void bongo_cat_preferences_page_model_random(BongoCatPreferences *value,
-    struct nk_context *context) {
-    BongoCatApp *app = value->app;
-    BongoCatWindowPreferences *window = &app->settings.window;
-    if (bongo_cat_preferences_options_begin(value, context,
-        BONGO_CAT_OPTIONS_RANDOM,
-        tr(app, "pages.preference.cat.labels.randomSettings", "Random"),
-        BONGO_CAT_PREF_ICON_RANDOM_EXPRESSION)) {
-    bongo_cat_pref_row_icon(context, BONGO_CAT_PREF_ICON_RANDOM_EXPRESSION);
-    bool random_expression_config = false;
-    bongo_cat_pref_toggle_float_config(context, "random-expression",
-        tr(app, "pages.preference.cat.labels.randomExpression", "Random Expressions"),
-        tr(app, "pages.preference.cat.labels.secondsUnit", "s"),
-        &window->random_expression, 1.0f,
-        &window->random_expression_interval_seconds, 3600.0f, 1.0f,
-        BONGO_CAT_DEFAULT_RANDOM_EXPRESSION_SECONDS,
-        tr(app, "pages.preference.cat.hints.randomExpression",
-            "Pick a random expression at the set interval. Use the settings button "
-            "to choose participating expressions."),
-        &random_expression_config);
-    if (random_expression_config) {
-        value->behavior_tab = 1; /* 表情 tab */
-        bongo_cat_preferences_behavior_dialog_open(value);
-    }
-
-    bongo_cat_pref_row_icon(context, BONGO_CAT_PREF_ICON_RANDOM_MOTION);
-    bool random_motion_config = false;
-    bongo_cat_pref_toggle_float_config(context, "random-motion",
-        tr(app, "pages.preference.cat.labels.randomMotion", "Random Motions"),
-        tr(app, "pages.preference.cat.labels.secondsUnit", "s"),
-        &window->random_motion, 1.0f,
-        &window->random_motion_interval_seconds, 3600.0f, 1.0f,
-        BONGO_CAT_DEFAULT_RANDOM_MOTION_SECONDS,
-        tr(app, "pages.preference.cat.hints.randomMotion",
-            "Trigger a random motion at the set interval. Use the settings "
-            "button to choose participating motions."),
-        &random_motion_config);
-    if (random_motion_config) {
-        value->behavior_tab = 0; /* motion tab */
-        bongo_cat_preferences_behavior_dialog_open(value);
-    }
-
-    bongo_cat_pref_row_icon(context, BONGO_CAT_PREF_ICON_MULTIPLE_MODELS);
-    bool sequential_model_config = false;
-    bongo_cat_pref_toggle_float_config(context, "sequential-model",
-        tr(app, "pages.preference.cat.labels.sequentialModel",
-            "Sequential Models"),
-        tr(app, "pages.preference.cat.labels.secondsUnit", "s"),
-        &window->sequential_model, 1.0f,
-        &window->sequential_model_interval_seconds, 3600.0f, 1.0f,
-        BONGO_CAT_DEFAULT_SEQUENTIAL_MODEL_SECONDS,
-        tr(app, "pages.preference.cat.hints.sequentialModel",
-            "Switch models in order at the set interval. Use the settings "
-            "button to reorder models on the Model page."),
-        &sequential_model_config);
-    if (sequential_model_config) {
-        value->model_page_tab = 0; /* 模型 tab: 拖拽顺序即轮换顺序 */
-    }
-
-    section_gap(context, 10);
-    bongo_cat_preferences_options_end(value, context);
-    }
 }

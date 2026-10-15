@@ -210,6 +210,7 @@ static void draw_actions(BongoCatPreferences *value,
     bool *action_hover) {
     struct nk_rect actions = nk_rect(bounds.x + 1, bounds.y + bounds.h - 39,
         bounds.w - 2, 38);
+    (void)selected;
     nk_fill_rect(canvas, actions, 0, p.surface);
     bool deletable = !entry->preset && !entry->managed;
     bool delete_enabled = deletable && !storage_busy;
@@ -241,8 +242,12 @@ static void draw_actions(BongoCatPreferences *value,
     *action_hover = region_hover[0] || region_hover[1] || region_hover[2];
     if (hover[0] && nk_input_is_mouse_click_in_rect(&context->input,
         NK_BUTTON_LEFT, items[0])) {
-        if (selected) bongo_cat_preferences_behavior_dialog_open(value);
-        else bongo_cat_preferences_model_select(value, entry);
+        /* 先切换到这张模型, 再打开 "模型页 -> 随机" 标签。 */
+        bongo_cat_preferences_model_select(value, entry);
+        value->page = 1;              /* 模型页 */
+        value->model_page_tab = 1;    /* 随机 tab */
+        value->scroll_target[1] = 0.0f;
+        value->render_dirty = true;
     } else if (hover[1] && nk_input_is_mouse_click_in_rect(&context->input,
         NK_BUTTON_LEFT, items[1])) open_model_directory(value, entry);
     else if (hover[2] && nk_input_is_mouse_click_in_rect(&context->input,

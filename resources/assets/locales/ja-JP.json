@@ -33,6 +33,8 @@
           "secondsUnit": "秒",
           "randomSettings": "ランダム",
           "randomMotion": "ランダムモーション",
+          "randomSound": "ランダムサウンド",
+          "intervalSeconds": "間隔（秒）",
           "sequentialModel": "順次モデル",
           "obsBackground": "単色背景",
           "hideOnHover": "ホバー時に非表示",
@@ -142,6 +144,10 @@
         },
         "labels": {
           "deleteModel": "モデルを削除"
+        },
+        "random": {
+          "configuring": "設定中",
+          "defaultPet": "現在のデスクトップペット"
         },
         "hints": {
           "deleteSuccess": "「%s」を削除しました",
