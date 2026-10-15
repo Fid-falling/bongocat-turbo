@@ -161,7 +161,7 @@ static void destroy_arena(BongoCatVk *vk, BongoCatVkArena *arena) {
 
 bool bongo_cat_vk_draw_overlay_quad(BongoCatVk *vk, BongoCatVkTexture *texture,
     bool mirror, int reference_width, int reference_height, bool erase_left,
-    bool erase_right) {
+    bool erase_right, bool premultiply) {
     if (!vk || !vk->frame_active || !texture) return false;
     if (vk->overlay_pipeline == VK_NULL_HANDLE) return false;
     VkDeviceSize offset = 0;
@@ -174,6 +174,7 @@ bool bongo_cat_vk_draw_overlay_quad(BongoCatVk *vk, BongoCatVkTexture *texture,
     push.mirror = mirror ? 1 : 0;
     push.erase_left = erase_left ? 1 : 0;
     push.erase_right = erase_right ? 1 : 0;
+    push.premultiply = premultiply ? 1 : 0;
     VkCommandBuffer command = vk->frames[vk->frame_index].command;
     vkCmdBindPipeline(command, VK_PIPELINE_BIND_POINT_GRAPHICS, vk->overlay_pipeline);
     vkCmdBindDescriptorSets(command, VK_PIPELINE_BIND_POINT_GRAPHICS,

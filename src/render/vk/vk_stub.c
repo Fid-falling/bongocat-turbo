@@ -109,9 +109,10 @@ int bongo_cat_vk_texture_height(const BongoCatVkTexture *texture) {
 
 bool bongo_cat_vk_draw_overlay_quad(BongoCatVk *vk, BongoCatVkTexture *texture,
     bool mirror, int reference_width, int reference_height, bool erase_left,
-    bool erase_right) {
+    bool erase_right, bool premultiply) {
     (void)vk; (void)texture; (void)mirror; (void)reference_width;
     (void)reference_height; (void)erase_left; (void)erase_right;
+    (void)premultiply;
     return false;
 }
 

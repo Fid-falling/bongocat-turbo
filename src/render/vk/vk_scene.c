@@ -59,13 +59,17 @@ static BongoCatVkTexture *live2d_target_texture(BongoCatApp *app) {
  * 给 draw_overlay_quad: 那等于把身体翻第二次, 净效果是身体不动、而同帧的键盘/
  * 背景却只翻一次, 身体和键盘就错开了。这个"合成不重复翻转"是固定不变式, 集中
  * 在这里, 调用点就不用关心 mirror 该怎么传。
+ *
+ * premultiply 传 false: SDK 的 Vulkan 渲染器输出的就是预乘像素 (贴图在
+ * cubism_vulkan_texture.cpp 里已按预乘上传), 片元里再乘一次 alpha 会把半透明
+ * 边缘压成 a^2 (GL 与 VK 的 alpha 覆盖一致、只有半透明区偏暗的那个 bug)。
  */
 static void draw_live2d_body(BongoCatApp *app) {
     if (!bongo_cat_live2d_vulkan_ready()) return;
     BongoCatVkTexture *live2d = live2d_target_texture(app);
     if (!live2d) return;
     bongo_cat_vk_draw_overlay_quad(app->vk, live2d, false,
-        live2d->width, live2d->height, false, false);
+        live2d->width, live2d->height, false, false, false);
 }
 
 bool bongo_cat_vk_render_main(BongoCatApp *app, bool present) {

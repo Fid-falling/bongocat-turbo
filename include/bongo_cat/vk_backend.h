@@ -121,11 +121,14 @@ int bongo_cat_vk_texture_height(const BongoCatVkTexture *texture);
  * 主机可见顶点缓冲 (每帧自动复位)。
  *  - draw_overlay_quad: 与 OpenGL 后端的叠加层四边形着色器语义一致
  *    (镜像、参考尺寸缩放、擦除脚印圆、预乘 alpha)。
+ *    premultiply 描述贴图本身的像素格式: true = 直通 alpha (叠加层贴图在 Vulkan
+ *    侧就是这样上传的), 片元里会乘一次 alpha; false = 贴图已经是预乘值 (Live2D
+ *    的离屏结果), 不能再乘 —— 多乘一次就是半透明区域偏暗的 a^2 bug。
  *  - draw_triangles: 通用顶点色/纹理三角形列表 (三角形扇/带已由调用方展开)。
  */
 bool bongo_cat_vk_draw_overlay_quad(BongoCatVk *vk, BongoCatVkTexture *texture,
     bool mirror, int reference_width, int reference_height, bool erase_left,
-    bool erase_right);
+    bool erase_right, bool premultiply);
 bool bongo_cat_vk_draw_triangles(BongoCatVk *vk, BongoCatVkTexture *texture,
     const float *vertices, unsigned int vertex_count, bool textured);
 /*

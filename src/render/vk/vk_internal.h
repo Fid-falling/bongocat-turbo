@@ -85,6 +85,9 @@ typedef struct OverlayPush {
     int mirror;
     int erase_left;
     int erase_right;
+    /* 1 = 贴图是直通 alpha, 片元里要预乘; 0 = 贴图已经是预乘值 (Live2D 离屏结果)。
+       多乘一次就是 color*a^2, 所以这个标志由调用点按贴图来源显式给出。 */
+    int premultiply;
 } OverlayPush;
 
 typedef struct PointerPush {
