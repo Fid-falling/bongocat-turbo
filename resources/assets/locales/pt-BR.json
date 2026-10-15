@@ -12,8 +12,10 @@
         "title": "Preferências",
         "labels": {
           "modelSettings": "Modelo",
-          "mirrorMode": "Modo Espelho",
-          "mouseMirror": "Espelho do Mouse",
+          "mirrorMode": "Espelho horizontal do modelo",
+          "verticalMirror": "Espelho vertical do modelo",
+          "mouseMirror": "Espelho horizontal da mão",
+          "mouseVerticalMirror": "Espelho vertical da mão",
           "mouseCentered": "Mouse centrado no mascote de mesa",
           "ignoreMouse": "Ignorar Eventos do Mouse",
           "windowSettings": "Janela",

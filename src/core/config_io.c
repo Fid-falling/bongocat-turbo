@@ -69,7 +69,11 @@ static bool read_model(yyjson_val *object, BongoCatModelPreferences *value,
     BongoCatError *error) {
     if (!read_bool(object, "multiplePets", &value->multiple_pets, error) ||
         !read_bool(object, "modelMirrored", &value->mirror, error) ||
+        !read_bool(object, "modelFlippedVertically", &value->vertical_flip,
+            error) ||
         !read_bool(object, "pointerMirrored", &value->mouse_mirror, error) ||
+        !read_bool(object, "pointerFlippedVertically",
+            &value->mouse_vertical_flip, error) ||
         !read_bool(object, "centerPointerTracking", &value->mouse_centered,
             error) ||
         !read_bool(object, "ignorePointerInput", &value->ignore_mouse, error) ||

@@ -59,6 +59,7 @@ public:
     bool update(float delta_seconds);
     void draw();
     void set_mirror(bool mirror);
+    void set_vertical_flip(bool flipped);
     void set_render_options(const BongoCatLive2DRenderOptions &options);
     void set_dragging(float x, float y, bool angle_z = false);
     void prepare_viewer_audit();
@@ -152,6 +153,7 @@ private:
     void build_projection(Csm::CubismMatrix44 &projection,
         int width, int height);
     void apply_viewport_projection(Csm::CubismMatrix44 &projection) const;
+    void reflect_vertical_flip(Csm::CubismMatrix44 &projection) const;
     void update_viewport();
     void record_visible_state(Csm::CubismMatrix44 &projection);
     void capture_motion_preview();
@@ -252,6 +254,7 @@ private:
     bool suppress_eye_blink_ = false;
     bool automatic_idle_ = true;
     bool mirror_ = false;
+    bool vertical_flip_ = false;
     BongoCatLive2DRenderOptions render_options_{};
     bool direct_textures_ = false;
     bool parameter_overrides_applied_ = false;

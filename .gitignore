@@ -9,6 +9,7 @@
 /CTestTestfile.cmake
 /compile_commands.json
 /build.ninja
+/dist/
 /.ninja_deps
 /.ninja_log
 /Makefile

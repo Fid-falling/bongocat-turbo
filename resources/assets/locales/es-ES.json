@@ -12,8 +12,10 @@
         "title": "Preferencias",
         "labels": {
           "modelSettings": "Modelo",
-          "mirrorMode": "Modo espejo",
-          "mouseMirror": "Invertir ratón",
+          "mirrorMode": "Espejo horizontal del modelo",
+          "verticalMirror": "Espejo vertical del modelo",
+          "mouseMirror": "Espejo horizontal de la mano",
+          "mouseVerticalMirror": "Espejo vertical de la mano",
           "mouseCentered": "Ratón centrado en la mascota",
           "ignoreMouse": "Ignorar eventos del ratón",
           "windowSettings": "Ventana",

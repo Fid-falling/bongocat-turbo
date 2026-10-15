@@ -21,8 +21,12 @@ static bool write_model(yyjson_mut_doc *doc, yyjson_mut_val *object,
         yyjson_mut_obj_add_bool(doc, object, "multiplePets",
             value->multiple_pets) &&
         yyjson_mut_obj_add_bool(doc, object, "modelMirrored", value->mirror) &&
+        yyjson_mut_obj_add_bool(doc, object, "modelFlippedVertically",
+            value->vertical_flip) &&
         yyjson_mut_obj_add_bool(doc, object, "pointerMirrored",
             value->mouse_mirror) &&
+        yyjson_mut_obj_add_bool(doc, object, "pointerFlippedVertically",
+            value->mouse_vertical_flip) &&
         yyjson_mut_obj_add_bool(doc, object, "centerPointerTracking",
             value->mouse_centered) &&
         yyjson_mut_obj_add_bool(doc, object, "ignorePointerInput",

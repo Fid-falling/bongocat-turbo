@@ -71,6 +71,15 @@ void NativeModel::apply_viewport_projection(
     matrix[13] = matrix[13] * scale_y + translate_y;
 }
 
+/* 垂直镜像: 反射完整投影矩阵 (含视口平移) 的 y 行, 让模型绕窗口中心/NDC y=0 上下翻转。
+   必须放在 apply_viewport_projection 之后, 否则视口平移不会被反射, 模型会绕着错误的中心
+   翻转 (水平镜像在 build_projection 里靠 Scale 负号实现, 两者作用点不同)。 */
+void NativeModel::reflect_vertical_flip(Csm::CubismMatrix44 &projection) const {
+    if (!vertical_flip_) return;
+    float *matrix = projection.GetArray();
+    for (int i = 1; i < 16; i += 4) matrix[i] = -matrix[i];
+}
+
 /* 只统计数据、不改渲染: 给自动化测试和"模型到底画出来没有"的诊断用。顺手把可见包络经
  * 投影变换到 NDC 存下来, 渲染路径就不必再算一遍 (visual_state_ready_ 置位后外部才能读到)。 */
 void NativeModel::record_visible_state(Csm::CubismMatrix44 &projection) {

@@ -266,18 +266,29 @@ static void page_display(BongoCatPreferences *value, struct nk_context *context)
         BONGO_CAT_PREF_ICON_SECTION_MODEL)) {
     bongo_cat_pref_row_icon(context, BONGO_CAT_PREF_ICON_MIRROR);
     if (bongo_cat_pref_toggle(context, "mirror", tr(app,
-        "pages.preference.cat.labels.mirrorMode", "Mirror Mode"), "",
-        &model->mirror)) {
+        "pages.preference.cat.labels.mirrorMode",
+        "Model Horizontal Mirror"), "", &model->mirror)) {
         app->model_pointer_anchor_ready = false;
-        app->dirty = true;
-    }
-    bongo_cat_pref_row_icon(context, BONGO_CAT_PREF_ICON_MOUSE_MIRROR);
-    if (bongo_cat_pref_toggle(context, "mouse-mirror", tr(app,
-        "pages.preference.cat.labels.mouseMirror", "Mouse Mirror"), "",
-        &model->mouse_mirror)) {
         app->pointer_known = false;
         app->dirty = true;
     }
+    bongo_cat_pref_row_icon(context, BONGO_CAT_PREF_ICON_VERTICAL_FLIP);
+    if (bongo_cat_pref_toggle(context, "vertical-flip", tr(app,
+        "pages.preference.cat.labels.verticalMirror",
+        "Model Vertical Mirror"), "", &model->vertical_flip))
+        bongo_cat_app_reset_pointer_tracking(app);
+    bongo_cat_pref_row_icon(context, BONGO_CAT_PREF_ICON_MOUSE_MIRROR);
+    if (bongo_cat_pref_toggle(context, "mouse-mirror", tr(app,
+        "pages.preference.cat.labels.mouseMirror",
+        "Hand Horizontal Mirror"), "", &model->mouse_mirror)) {
+        app->pointer_known = false;
+        app->dirty = true;
+    }
+    bongo_cat_pref_row_icon(context, BONGO_CAT_PREF_ICON_MOUSE_VERTICAL_FLIP);
+    if (bongo_cat_pref_toggle(context, "mouse-vertical-flip", tr(app,
+        "pages.preference.cat.labels.mouseVerticalMirror",
+        "Hand Vertical Mirror"), "", &model->mouse_vertical_flip))
+        bongo_cat_app_reset_pointer_tracking(app);
     bongo_cat_pref_row_icon(context, BONGO_CAT_PREF_ICON_MOUSE_CENTERED);
     if (bongo_cat_pref_toggle(context, "mouse-centered", tr(app,
         "pages.preference.cat.labels.mouseCentered", "Mouse Centered on Desktop Pet"),

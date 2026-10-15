@@ -12,8 +12,10 @@
         "title": "Настройки",
         "labels": {
           "modelSettings": "Модель",
-          "mirrorMode": "Зеркальный режим",
-          "mouseMirror": "Отражение мыши",
+          "mirrorMode": "Горизонтальное зеркало модели",
+          "verticalMirror": "Вертикальное зеркало модели",
+          "mouseMirror": "Горизонтальное зеркало руки",
+          "mouseVerticalMirror": "Вертикальное зеркало руки",
           "mouseCentered": "Мышь относительно питомца",
           "ignoreMouse": "Игнорировать события мыши",
           "windowSettings": "Окно",

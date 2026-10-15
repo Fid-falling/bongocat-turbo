@@ -12,8 +12,10 @@
         "title": "환경 설정",
         "labels": {
           "modelSettings": "모델",
-          "mirrorMode": "미러 모드",
-          "mouseMirror": "마우스 반전",
+          "mirrorMode": "모델 가로 미러",
+          "verticalMirror": "모델 세로 미러",
+          "mouseMirror": "손 가로 미러",
+          "mouseVerticalMirror": "손 세로 미러",
           "mouseCentered": "마우스를 데스크톱 펫 중심으로",
           "ignoreMouse": "마우스 이벤트 무시",
           "windowSettings": "창",
