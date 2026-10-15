@@ -31,10 +31,10 @@ void main() {
      *
      *  - 叠加层贴图 (背景/按键/特效) 在 Vulkan 侧是按直通 alpha 上传的 (契约见
      *    render_texture.h: premultiply 只在 GL 侧生效), 必须在这里乘;
-     *  - Live2D 的离屏结果本身已经是预乘值 (CPU 侧预乘见 cubism_vulkan_texture.cpp,
-     *    SDK 的 Vulkan 着色器也是预乘输出), 再乘一次就变成 color*a^2: 模型半透明
-     *    边缘比 OpenGL 暗一档, 而 GL 与 VK 的 alpha 覆盖完全一致 —— 就是实测到的
-     *    "k≈2.0、差异只落在半透明区"的那个 bug。
+     *  - Live2D 的离屏结果本身已经是预乘值 (贴图在 cubism_vulkan_texture.cpp 里按
+     *    预乘上传, SDK 的 Vulkan 着色器也按预乘输出), 再乘一次就变成 color*a^2:
+     *    模型半透明边缘比 OpenGL 暗一档, 而 GL 与 VK 的 alpha 覆盖完全一致 ——
+     *    就是实测到的 "k≈2.0、差异只落在半透明区" 的那个 bug。
      */
     if (params.premultiply != 0)
         color.rgb *= color.a;

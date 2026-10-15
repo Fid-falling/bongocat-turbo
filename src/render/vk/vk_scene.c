@@ -61,8 +61,9 @@ static BongoCatVkTexture *live2d_target_texture(BongoCatApp *app) {
  * 在这里, 调用点就不用关心 mirror 该怎么传。
  *
  * premultiply 传 false: SDK 的 Vulkan 渲染器输出的就是预乘像素 (贴图在
- * cubism_vulkan_texture.cpp 里已按预乘上传), 片元里再乘一次 alpha 会把半透明
- * 边缘压成 a^2 (GL 与 VK 的 alpha 覆盖一致、只有半透明区偏暗的那个 bug)。
+ * cubism_vulkan_texture.cpp 里按预乘上传、SDK 着色器也按预乘输出), 片元里再乘
+ * 一次 alpha 会把半透明边缘压成 a^2 (GL 与 VK 的 alpha 覆盖一致、只有半透明区
+ * 偏暗的那个 bug)。
  */
 static void draw_live2d_body(BongoCatApp *app) {
     if (!bongo_cat_live2d_vulkan_ready()) return;
