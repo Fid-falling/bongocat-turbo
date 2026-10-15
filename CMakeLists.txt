@@ -77,8 +77,10 @@ if(EXISTS "${CUBISM_CORE_HEADER}")
     message(WARNING "Cubism SDK found but MinGW is unsupported; using diagnostic backend")
   else()
     include(cmake/Cubism.cmake)
-    set(BONGO_CAT_LIVE2D_SOURCES
-      ${BONGO_CAT_LIVE2D_CORE_SOURCES}
+    # "Cubism 实现"这一组源文件有两个消费者: 宿主的诊断/过渡实现, 以及渲染组件
+    # (cores/bongo_live2d.*)。**Core 的落点解析与导入不在这一组里** —— 那是宿主独占的职责
+    # (组件连 Core 文件都不该打开), 所以两个列表必须分开, 不能一股脑都塞给组件。
+    set(BONGO_CAT_CUBISM_IMPLEMENTATION_SOURCES
       src/live2d/cubism_bridge.cpp src/live2d/cubism_bridge_load.cpp
       src/live2d/cubism_bridge_load_session.cpp
       src/live2d/cubism_bridge_visual.cpp
@@ -99,6 +101,10 @@ if(EXISTS "${CUBISM_CORE_HEADER}")
       src/live2d/cubism_model_bounds.cpp
       src/live2d/cubism_model_viewport.cpp
       src/live2d/cubism_model_validate.cpp)
+    # 宿主这一侧仍然编译这套实现(过渡期: 没有组件时它就是渲染器); 组件那一侧由
+    # cmake/RendererModule.cmake 单独编同一个列表, 保证两条路径不会分叉。
+    set(BONGO_CAT_LIVE2D_SOURCES ${BONGO_CAT_LIVE2D_CORE_SOURCES}
+      ${BONGO_CAT_CUBISM_IMPLEMENTATION_SOURCES})
     set(BONGO_CAT_CUBISM_ENABLED ON)
   endif()
 elseif(BONGO_CAT_REQUIRE_CUBISM)
@@ -159,6 +165,12 @@ endif()
 target_compile_definitions(bongo_cat_runtime PRIVATE
   BONGO_CAT_DEV_ASSET_ROOT="${CMAKE_CURRENT_SOURCE_DIR}/resources/assets"
   BONGO_CAT_DEV_LOCALE_ROOT="${CMAKE_CURRENT_SOURCE_DIR}/resources/assets/locales")
+
+# 渲染组件 cores/bongo_live2d.*: 只在真有 Cubism Framework 可编时才建 —— 缺 SDK 的诊断
+# 构建里不存在这个组件, 宿主照常启动并走 live2d_stub.c 的兜底实现(这是降级路径的一部分)。
+if(BONGO_CAT_CUBISM_ENABLED)
+  include(cmake/RendererModule.cmake)
+endif()
 
 include(cmake/PlatformRuntime.cmake)
 if(NOT WIN32)

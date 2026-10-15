@@ -84,7 +84,9 @@ set(BONGO_CAT_RUNTIME_LIFECYCLE_SOURCES
 set(BONGO_CAT_RUNTIME_RENDERER_MODULE_SOURCES
   src/runtime/cores/renderer_module.c
   # 组件 ABI 校验与装载(纯函数校验 + dlopen/回滚), 见 renderer_module_abi.h
-  src/runtime/cores/renderer_module_loader.c)
+  src/runtime/cores/renderer_module_loader.c
+  # 宿主服务表(组件唯一入口): 每条都是一份跨界契约, 集中一处便于审计
+  src/runtime/cores/renderer_module_services.c)
 
 set(BONGO_CAT_RUNTIME_UPDATE_SOURCES
   src/runtime/update/update_channel.c
@@ -362,4 +364,5 @@ set(BONGO_CAT_RUNTIME_SOURCES
   ${BONGO_CAT_UI_RENDERING_SOURCES}
   ${BONGO_CAT_UI_THEME_SOURCES}
   ${BONGO_CAT_UI_PREFERENCES_SOURCES})
+
 

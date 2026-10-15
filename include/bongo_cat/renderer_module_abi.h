@@ -2,7 +2,10 @@
 #define BONGO_CAT_RENDERER_MODULE_ABI_H
 
 #include "bongo_cat/common.h"
+#include "bongo_cat/image.h"
+#include "bongo_cat/json.h"
 #include "bongo_cat/model.h"
+#include "bongo_cat/vk_backend.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -63,6 +66,46 @@ typedef struct BongoCatRendererModuleHost {
     /* 目录服务: 组件不该自己拼路径(便携模式/--storage-root 的规则只有宿主知道)。
        kind 取 BongoCatRendererHostDirectory。返回 false 表示该目录不可用。 */
     bool (*directory)(int kind, char *output, size_t capacity);
+
+    /* ---- 以下按"组件实际用到什么"逐项补齐(清单见 LIVE2D-PLUGIN-PLAN.md §P0.9) ---- */
+
+    /* 时间: 与宿主同一时钟(帧节拍/动画都用它), 避免组件自己引入第二套计时实现。 */
+    uint64_t (*ticks_ns)(void);
+    /* 当前生效的图形后端(BONGO_CAT_RENDERER_BACKEND_*): 组件据此选 GL/VK 渲染路径。 */
+    uint32_t (*active_backend)(void);
+    /* Cubism 渲染器是否走 Vulkan(宿主配置层决定, 组件在建渲染器之前问它) */
+    bool (*cubism_renderer_uses_vulkan)(void);
+    /* 组件回报"我这次用的是哪个渲染器": 宿主据此记日志并决定 VK 合成路径。 */
+    void (*cubism_renderer_set_vulkan)(bool enabled);
+    /* GL 能力: 组件不链接 SDL/GLEW, 上下文就绪状态与错误清理由宿主回答。
+       契约: 宿主在调用 ops.draw 之前保证 GL 上下文已 current。
+       window/context 对组件是**不透明句柄**(宿主自己的 SDL 对象), 组件只能比较相等与回传,
+       不得解引用 —— 封面的离屏渲染需要在两个上下文之间来回切。 */
+    bool (*gl_context_ready)(void);
+    bool (*gl_clear_errors)(void);
+    void *(*gl_current_window)(void);
+    void *(*gl_current_context)(void);
+    bool (*gl_make_current)(void *window, void *context);
+    /* 宿主窗口的像素尺寸: window 句柄来自 gl_current_window(), 组件原样回传即可。 */
+    bool (*window_size_pixels)(void *window, int *width, int *height);
+    /* 图像管线: 宿主独占(它带纹理缓存与 alpha mask 语义), 组件只用不实现。
+       约定: 任何产出 BongoCatImage 的调用都必须用 image_free 归还。 */
+    BongoCatResult (*image_fit)(const char *path, int max_width, int max_height,
+        BongoCatImage *out, BongoCatError *error);
+    void (*image_free)(BongoCatImage *image);
+    void (*image_make_alpha_mask)(const BongoCatImage *image,
+        BongoCatImageAlphaMask *mask);
+    unsigned int (*image_texture_model)(const char *path, bool direct_decode,
+        int *width, int *height, BongoCatImageAlphaMask *alpha,
+        BongoCatImageProgress progress, void *userdata, BongoCatError *error);
+    /* 模型 JSON 的兼容性归一化只有一份实现(宿主), 组件不要自己复制一套。 */
+    yyjson_doc *(*model_json_parse)(const char *data, size_t size,
+        bool *normalized);
+    /* 读整个文件(着色器源码/模型资源): 返回宿主分配的缓冲, 用 release 归还。 */
+    void *(*read_file)(const char *path, size_t *size);
+    /* Vulkan 能力面: 设备/队列/命令池等只在宿主手里, 组件拿到的是一份**只读快照**
+       (BongoCatVkNativeInfo 是纯 POD, 不含宿主私有指针)。宿主私有 BongoCatVk* 绝不跨界。 */
+    bool (*vulkan_native_info)(BongoCatVkNativeInfo *info);
 } BongoCatRendererModuleHost;
 
 typedef enum BongoCatRendererHostDirectory {

@@ -88,15 +88,6 @@ bool bongo_cat_renderer_module_validate(const BongoCatRendererModule *module,
     return true;
 }
 
-bool bongo_cat_renderer_module_validate_host(
-    const BongoCatRendererModuleHost *host) {
-    /* 组件侧要做的同一件事(纪律 2): 宿主的表头对不上就别往下走。这里是宿主自查,
-       保证我们交给组件的表永远是自洽的。 */
-    return host && host->abi_version == BONGO_CAT_RENDERER_MODULE_ABI &&
-        host->struct_size == sizeof(*host) && host->core_symbol && host->log &&
-        host->log_format && host->allocate && host->release && host->directory;
-}
-
 /* 当前装载的组件(同一时刻只允许一个 Live2D 渲染组件: 两个实现抢同一块画布没有意义,
    而且会让"用哪个实现渲染"变成不可预测的事)。 */
 typedef struct BongoCatRendererModuleSlot {
@@ -108,69 +99,6 @@ typedef struct BongoCatRendererModuleSlot {
 
 static BongoCatRendererModuleSlot slot;
 
-/* 目录服务要用到的 app。它只在启动期绑定一次, 退出时解绑 —— 服务表是静态的, 留着悬空
-   指针比"目录服务暂时不可用"危险得多。 */
-static const BongoCatApp *host_app;
-
-void bongo_cat_renderer_module_bind_app(const BongoCatApp *app) {
-    host_app = app;
-}
-
-/* 宿主服务表的实现。表是**静态**的: 它的地址会存进组件里, 生命周期必须覆盖组件的整个
-   存活期, 用局部变量会留下悬空指针。 */
-static void *service_core_symbol(const char *name) {
-    return bongo_cat_live2d_core_symbol(name);
-}
-
-static void service_log(int priority, const char *message) {
-    SDL_LogMessage(SDL_LOG_CATEGORY_APPLICATION, (SDL_LogPriority)priority,
-        "[live2d] %s", message ? message : "");
-}
-
-static void service_log_format(int priority, const char *format,
-    const char *argument) {
-    /* 组件给的是**一条**字符串参数而不是可变参数: 跨 DLL 传 va_list 在 Windows 上不可移植
-       (不同 CRT 的 va_list 布局不保证一致)。所以这里只支持 "%s" 形态, 复杂拼接由组件
-       自己用 allocate() 拼好再走 log()。 */
-    SDL_LogMessage(SDL_LOG_CATEGORY_APPLICATION, (SDL_LogPriority)priority,
-        "[live2d] %s", argument && format ? argument : (format ? format : ""));
-}
-
-static void *service_allocate(size_t size) {
-    return size ? SDL_malloc(size) : NULL;
-}
-
-static void service_release(void *memory) { SDL_free(memory); }
-
-static bool service_directory(int kind, char *output, size_t capacity) {
-    /* 六个目录直接问 app: 组件不该知道"六棵树"的布局, 更不该自己拼路径。 */
-    const BongoCatApp *app = host_app;
-    if (!app || !output || !capacity) return false;
-    const char *root = NULL;
-    switch (kind) {
-    case BONGO_CAT_RENDERER_DIR_CONFIG: root = app->config_root; break;
-    case BONGO_CAT_RENDERER_DIR_DATA: root = app->data_root; break;
-    case BONGO_CAT_RENDERER_DIR_MODELS: root = app->models_root; break;
-    case BONGO_CAT_RENDERER_DIR_CACHE: root = app->cache_root; break;
-    case BONGO_CAT_RENDERER_DIR_STATE: root = app->state_root; break;
-    case BONGO_CAT_RENDERER_DIR_LOGS: root = app->log_root; break;
-    default: return false;
-    }
-    if (!root || !root[0]) return false;
-    int written = snprintf(output, capacity, "%s", root);
-    return written > 0 && (size_t)written < capacity;
-}
-
-static const BongoCatRendererModuleHost host_services = {
-    BONGO_CAT_RENDERER_MODULE_ABI, sizeof(BongoCatRendererModuleHost),
-    service_core_symbol, service_log, service_log_format, service_allocate,
-    service_release, service_directory
-};
-
-const BongoCatRendererModuleHost *bongo_cat_renderer_module_host(void) {
-    return &host_services;
-}
-
 bool bongo_cat_renderer_module_open(const char *path,
     const char *asset_root, BongoCatError *error) {
     if (!path || !path[0]) {
@@ -179,7 +107,7 @@ bool bongo_cat_renderer_module_open(const char *path,
         return false;
     }
     if (slot.object) bongo_cat_renderer_module_close();
-    if (!bongo_cat_renderer_module_validate_host(&host_services)) {
+    if (!bongo_cat_renderer_module_validate_host(bongo_cat_renderer_module_host())) {
         bongo_cat_error_set(error, BONGO_CAT_ERROR_PLATFORM,
             "The host service table is inconsistent; refusing to load a component");
         return false;
@@ -200,10 +128,10 @@ bool bongo_cat_renderer_module_open(const char *path,
         return false;
     }
     const BongoCatRendererModule *module = query(BONGO_CAT_RENDERER_MODULE_ABI,
-        &host_services);
+        bongo_cat_renderer_module_host());
     char reason[BONGO_CAT_RENDERER_MODULE_REASON_CAP] = {0};
     BongoCatResult result = BONGO_CAT_ERROR_CUBISM;
-    if (!bongo_cat_renderer_module_validate(module, &host_services, &result, reason,
+    if (!bongo_cat_renderer_module_validate(module, bongo_cat_renderer_module_host(), &result, reason,
             sizeof(reason))) {
         SDL_UnloadObject(object);
         bongo_cat_error_set(error, result, "%s", reason);
@@ -211,7 +139,7 @@ bool bongo_cat_renderer_module_open(const char *path,
     }
     /* 校验通过才建实例: 让"不匹配的组件"在创建任何资源之前就被挡住 —— 否则失败的 create
        可能已经申请了 GPU 资源, 而它的 destroy 未必被调用。 */
-    void *instance = module->ops.create(&host_services, asset_root, error);
+    void *instance = module->ops.create(bongo_cat_renderer_module_host(), asset_root, error);
     if (!instance) {
         SDL_UnloadObject(object);
         if (error && !error->message[0])

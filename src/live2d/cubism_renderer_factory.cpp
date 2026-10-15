@@ -31,6 +31,19 @@ bool bongo_cat_cubism_renderer_uses_vulkan() {
 }
 } // namespace bongo_cat
 
+/*
+ * C 链接的薄包装: 上面两个函数在 namespace bongo_cat 里(名字带 C++ 修饰), 而宿主服务表
+ * (src/runtime/cores/renderer_module_services.c)是 C 文件, 取不到它们的地址。加一层
+ * extern "C" 比在服务表那边拼修饰名可靠, 也让"什么能跨界"一眼可见。
+ */
+extern "C" void bongo_cat_renderer_select_use_vulkan(bool enabled) {
+    bongo_cat::bongo_cat_cubism_renderer_use_vulkan(enabled);
+}
+
+extern "C" bool bongo_cat_renderer_select_uses_vulkan(void) {
+    return bongo_cat::bongo_cat_cubism_renderer_uses_vulkan();
+}
+
 namespace Live2D {
 namespace Cubism {
 namespace Framework {
