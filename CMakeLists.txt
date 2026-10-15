@@ -137,6 +137,9 @@ if(EXISTS "${CUBISM_CORE_HEADER}")
     endforeach()
     set_source_files_properties(src/live2d/live2d_stub.c PROPERTIES
       COMPILE_DEFINITIONS "${BONGO_CAT_LIVE2D_STUB_DEFINITIONS}")
+    # 有 Cubism SDK 的构建就必须有渲染组件: 它是 Live2D 的唯一实现, 缺了它包发出去用户也渲染不了。
+    # 诊断构建(无 SDK)里组件本就不存在, 所以这个开关只在这里打开。
+    set(BONGO_CAT_REQUIRE_LIVE2D_COMPONENT ON)
     set(BONGO_CAT_CUBISM_ENABLED ON)
   endif()
 elseif(BONGO_CAT_REQUIRE_CUBISM)

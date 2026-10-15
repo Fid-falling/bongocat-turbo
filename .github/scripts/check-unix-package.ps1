@@ -4,10 +4,14 @@ param(
     [Parameter(Mandatory = $true)]
     [ValidateSet('linux-x64', 'macos-x64', 'macos-arm64')][string]$Platform,
     [switch]$SkipSmoke,
-    # 发行包必须带我们自己的 Live2D 渲染组件 cores/bongo_live2d.*(阶段 2 交付)。
-    # 在组件目标建出来之前传这个开关只会得到"包不对"的噪音, 所以默认关闭, 由 release.yml
-    # 在阶段 2 完成后显式开启。
-    [switch]$ExpectLive2DComponent
+    # 发行包必须带我们自己的 Live2D 渲染组件 cores/bongo_live2d.*(阶段 2f 起默认要求:
+    # 它是 Live2D 的唯一实现, 缺了它包发出去用户就渲染不了)。
+    [bool]$ExpectLive2DComponent = $true,
+    # 可选: 用户自备 Cubism Core 的路径。给了就在 smoke 之前**按用户的方式**把它投放到
+    # <存储根>/cores/<平台>/<架构>/, 于是 smoke 能验证"导入 Core 后真的渲染"(renderer=
+    # cubism-native); 没给则只验证"没有 Core 也能起来并如实降级"(renderer=diagnostic)。
+    # CI 上 SDK 不一定在场, 所以两种都支持, 而不是假装一定有 Core。
+    [string]$CoreLibrary = ''
 )
 
 $ErrorActionPreference = 'Stop'
@@ -105,6 +109,20 @@ try {
         Write-Host "Package layout verified: $Platform"
         if (-not $SkipSmoke) {
             $storage = Join-Path $temporaryRoot 'smoke-data'
+            # 按**用户的方式**投放 Core: <存储根>/cores/<平台>/<架构>/(与程序里的导入流程同一个
+            # 落点)。给了 -CoreLibrary 才做这一步 —— 见参数说明。
+            $expectNative = $false
+            if ($CoreLibrary -and (Test-Path -LiteralPath $CoreLibrary -PathType Leaf)) {
+                $platformName = if ($Platform.StartsWith('macos-')) { 'macos' } else { 'linux' }
+                $archName = if ($Platform -eq 'macos-arm64') { 'arm64' } else { 'x86_64' }
+                $coreDirectory = Join-Path $storage "cores/$platformName/$archName"
+                New-Item -ItemType Directory -Path $coreDirectory -Force | Out-Null
+                Copy-Item -LiteralPath $CoreLibrary -Destination $coreDirectory -Force
+                $expectNative = $true
+                Write-Host "Placed the user-supplied Core into $coreDirectory"
+            } else {
+                Write-Host 'No Core supplied: the smoke verifies the documented degradation instead'
+            }
             & bash $testRunner env BONGO_CAT_DISABLE_NEARBY_MODEL_SCAN=1 `
                 $executable --ci-smoke --ci-ignore-global-input `
                 --ci-live2d-scenario=visual-consistency "--storage-root=$storage"
@@ -112,11 +130,20 @@ try {
             $audits = @(Get-ChildItem -LiteralPath $storage -Recurse -File -Filter live2d-audit.txt)
             if ($audits.Count -ne 1) { throw 'Packaged application produced no unique Live2D audit' }
             $audit = Get-Content -LiteralPath $audits[0].FullName -Raw
-            if ($audit -notmatch '(?m)^renderer=cubism-native\r?$' -or
-                $audit -notmatch '(?m)^assertions=passed\r?$') {
-                throw "Packaged Live2D verification failed: $audit"
+            if ($expectNative) {
+                if ($audit -notmatch '(?m)^renderer=cubism-native\r?$' -or
+                    $audit -notmatch '(?m)^assertions=passed\r?$') {
+                    throw "Packaged Live2D verification failed (expected native rendering): $audit"
+                }
+                Write-Host "Packaged native Live2D smoke test passed: $Platform"
+            } else {
+                # 没有 Core: 必须**如实**报告降级 —— 审计里写 cubism-native 才是错的(那说明
+                # renderer= 那一行没有跟着运行期事实走)。
+                if ($audit -notmatch '(?m)^renderer=diagnostic') {
+                    throw "Packaged Live2D verification failed (expected the documented degradation): $audit"
+                }
+                Write-Host "Packaged degradation smoke test passed (no Core present): $Platform"
             }
-            Write-Host "Packaged native Live2D smoke test passed: $Platform"
         }
     } finally {
         Pop-Location

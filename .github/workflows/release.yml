@@ -141,7 +141,7 @@ jobs:
             throw 'Windows installer packaging failed'
           }
 
-          $portable = "build-release/dist/$name-portable.exe"
+          $portable = "build-release/dist/$name-portable.zip"
           $portableChecksum = "$portable.sha256"
           $setup = "build-release/dist/$name-setup.exe"
           $setupChecksum = "$setup.sha256"
@@ -222,9 +222,12 @@ jobs:
             Archive = $archive.FullName
             Platform = '${{ matrix.platform }}'
             SkipSmoke = '${{ matrix.platform }}'.StartsWith('macos-')
-            # 包内不得含 Cubism Core 的判定在脚本里(按文件名 + 动态依赖表)。
-            # 阶段 2 完成后这里再加上 ExpectLive2DComponent = $true(要求包内有 cores/
-            # 下的渲染组件)。
+            # 包内不得含 Cubism Core 的判定在脚本里(按文件名 + 动态依赖表); 发行包必须带
+            # cores/ 下的渲染组件(ExpectLive2DComponent 默认就是 true)。
+            # BONGO_CAT_SMOKE_CORE 指向一份用户自备的 Cubism Core 时, 脚本会按**用户的方式**
+            # 把它投放到 <存储根>/cores/<平台>/<架构>/, 于是 smoke 验证的是"导入后真的渲染";
+            # 没给就只验证"没有 Core 也能起来并如实降级"。
+            CoreLibrary = if ($env:BONGO_CAT_SMOKE_CORE) { $env:BONGO_CAT_SMOKE_CORE } else { '' }
           }
           & ./.github/scripts/check-unix-package.ps1 @packageCheckArgs
           $checksum = "$($archive.FullName).sha256"

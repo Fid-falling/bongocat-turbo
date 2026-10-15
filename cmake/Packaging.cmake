@@ -41,17 +41,39 @@ set(CPACK_INSTALL_CMAKE_PROJECTS
   "${CMAKE_BINARY_DIR};${PROJECT_NAME};Runtime;/")
 
 if(WIN32)
-  set(BONGO_CAT_PORTABLE_EXECUTABLE
-    "${CMAKE_BINARY_DIR}/dist/${BONGO_CAT_PACKAGE_NAME}-portable.exe")
-  add_custom_command(OUTPUT "${BONGO_CAT_PORTABLE_EXECUTABLE}"
+  # 便携版从"单个 exe"改成"含 cores/ 的 zip": Live2D 的渲染实现现在是随包分发的组件
+  # (cores/bongo_live2d.dll), 只把 exe 拷走会让 Live2D 失去渲染能力。zip 里保留一层与包名
+  # 同名的目录, 解压后不会把文件散在当前目录。
+  set(BONGO_CAT_PORTABLE_ARCHIVE
+    "${CMAKE_BINARY_DIR}/dist/${BONGO_CAT_PACKAGE_NAME}-portable.zip")
+  set(BONGO_CAT_PORTABLE_STAGE
+    "${CMAKE_BINARY_DIR}/portable/${BONGO_CAT_PACKAGE_NAME}")
+  set(BONGO_CAT_PORTABLE_DEPENDS bongo_cat)
+  if(TARGET bongo_live2d)
+    list(APPEND BONGO_CAT_PORTABLE_DEPENDS bongo_live2d)
+  endif()
+  add_custom_command(OUTPUT "${BONGO_CAT_PORTABLE_ARCHIVE}"
     COMMAND ${CMAKE_COMMAND} -E make_directory "${CMAKE_BINARY_DIR}/dist"
+    COMMAND ${CMAKE_COMMAND} -E make_directory "${CMAKE_BINARY_DIR}/portable"
+    COMMAND ${CMAKE_COMMAND} -E rm -rf "${BONGO_CAT_PORTABLE_STAGE}"
+    COMMAND ${CMAKE_COMMAND} -E make_directory "${BONGO_CAT_PORTABLE_STAGE}"
     COMMAND ${CMAKE_COMMAND} -E copy_if_different "$<TARGET_FILE:bongo_cat>"
-      "${BONGO_CAT_PORTABLE_EXECUTABLE}"
-    DEPENDS bongo_cat
-    COMMENT "Building the BongoCat Windows portable executable"
+      "${BONGO_CAT_PORTABLE_STAGE}/"
+    # 只拷组件本身, **不**整目录拷 cores/: 那个目录里可能有 .staging(导入过程中的临时区,
+    # 见 live2d_core.h)之类的瞬态内容, 不该进发行包。
+    COMMAND ${CMAKE_COMMAND} -E make_directory
+      "${BONGO_CAT_PORTABLE_STAGE}/cores"
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different "$<TARGET_FILE:bongo_live2d>"
+      "${BONGO_CAT_PORTABLE_STAGE}/cores/"
+    COMMAND ${CMAKE_COMMAND} -E rm -f "${BONGO_CAT_PORTABLE_ARCHIVE}"
+    COMMAND ${CMAKE_COMMAND} -E tar cf "${BONGO_CAT_PORTABLE_ARCHIVE}"
+      --format=zip -- "${BONGO_CAT_PACKAGE_NAME}"
+    WORKING_DIRECTORY "${CMAKE_BINARY_DIR}/portable"
+    DEPENDS ${BONGO_CAT_PORTABLE_DEPENDS}
+    COMMENT "Building the BongoCat Windows portable archive (exe + cores/)"
     VERBATIM)
   add_custom_target(package-portable
-    DEPENDS "${BONGO_CAT_PORTABLE_EXECUTABLE}")
+    DEPENDS "${BONGO_CAT_PORTABLE_ARCHIVE}")
 endif()
 
 include(CPack)
