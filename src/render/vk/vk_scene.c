@@ -50,6 +50,24 @@ static BongoCatVkTexture *live2d_target_texture(BongoCatApp *app) {
     return texture;
 }
 
+/*
+ * 把 Live2D 离屏结果合成到主帧。
+ *
+ * 镜像/垂直翻转已经由投影阶段完成 (build_projection 的 mirror_ 与
+ * reflect_vertical_flip, 由 set_mirror/set_vertical_flip 下发), 与 GL 路径的
+ * bongo_cat_live2d_draw 是同一套语义。所以这里合成四边形时**绝不能**再传 mirror
+ * 给 draw_overlay_quad: 那等于把身体翻第二次, 净效果是身体不动、而同帧的键盘/
+ * 背景却只翻一次, 身体和键盘就错开了。这个"合成不重复翻转"是固定不变式, 集中
+ * 在这里, 调用点就不用关心 mirror 该怎么传。
+ */
+static void draw_live2d_body(BongoCatApp *app) {
+    if (!bongo_cat_live2d_vulkan_ready()) return;
+    BongoCatVkTexture *live2d = live2d_target_texture(app);
+    if (!live2d) return;
+    bongo_cat_vk_draw_overlay_quad(app->vk, live2d, false,
+        live2d->width, live2d->height, false, false);
+}
+
 bool bongo_cat_vk_render_main(BongoCatApp *app, bool present) {
     if (!app || !app->vk || !app->window) return false;
     /*
@@ -87,6 +105,8 @@ bool bongo_cat_vk_render_main(BongoCatApp *app, bool present) {
      * 挡住, 就变成"不 ready 不画, 不画永远不 ready"的死锁 —— 桥也就永远挂不上。
      */
     bongo_cat_live2d_set_mirror(app->live2d, app->settings.model.mirror);
+    bongo_cat_live2d_set_vertical_flip(app->live2d,
+        app->settings.model.vertical_flip);
     bongo_cat_live2d_draw(app->live2d);
     if (!bongo_cat_vk_begin_frame(app->vk, width, height)) {
         app->dirty = true;
@@ -122,13 +142,8 @@ bool bongo_cat_vk_render_main(BongoCatApp *app, bool present) {
      * cubism_vulkan_bridge.cpp 的 kSupersample), 于是这里正好做一次线性缩小 ——
      * 抗锯齿就是靠这一步 + 2 倍分辨率渲染。
      */
-    if (bongo_cat_live2d_vulkan_ready()) {
-        BongoCatVkTexture *live2d = live2d_target_texture(app);
-        if (live2d)
-            bongo_cat_vk_draw_overlay_quad(app->vk, live2d,
-                app->settings.model.mirror, live2d->width, live2d->height,
-                false, false);
-    }
+    if (bongo_cat_live2d_vulkan_ready())
+        draw_live2d_body(app);
     if (content_viewport)
         bongo_cat_vk_set_viewport(app->vk, content_x,
             height - content_y - content_height, content_width, content_height);

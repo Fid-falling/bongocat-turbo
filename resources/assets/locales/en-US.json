@@ -12,8 +12,10 @@
         "title": "Preferences",
         "labels": {
           "modelSettings": "Model",
-          "mirrorMode": "Mirror Mode",
-          "mouseMirror": "Mouse Mirror",
+          "mirrorMode": "Model Horizontal Mirror",
+          "verticalMirror": "Model Vertical Mirror",
+          "mouseMirror": "Hand Horizontal Mirror",
+          "mouseVerticalMirror": "Hand Vertical Mirror",
           "mouseCentered": "Mouse Centered on Desktop Pet",
           "ignoreMouse": "Ignore Mouse Events",
           "windowSettings": "Window",

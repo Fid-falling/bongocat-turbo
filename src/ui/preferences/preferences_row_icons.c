@@ -107,6 +107,24 @@ static void mouse_mirror(struct nk_command_buffer *c, struct nk_rect b,
     line(c, b, 9, 2, 9, 6, color); line(c, b, 9, 9, 9, 13, color);
 }
 
+static void vertical_flip(struct nk_command_buffer *c, struct nk_rect b,
+    struct nk_color color) {
+    line(c, b, 1, 9, 17, 9, color);
+    nk_stroke_triangle(c, b.x + 9, b.y + 2, b.x + 4, b.y + 7,
+        b.x + 14, b.y + 7, 1.5f, color);
+    nk_stroke_triangle(c, b.x + 9, b.y + 16, b.x + 4, b.y + 11,
+        b.x + 14, b.y + 11, 1.5f, color);
+}
+
+static void mouse_vertical_flip(struct nk_command_buffer *c, struct nk_rect b,
+    struct nk_color color) {
+    nk_stroke_triangle(c, b.x + 1, b.y + 2, b.x + 2, b.y + 14,
+        b.x + 7, b.y + 10, 1.5f, color);
+    line(c, b, 13, 2, 13, 16, color);
+    line(c, b, 10, 5, 13, 2, color); line(c, b, 13, 2, 16, 5, color);
+    line(c, b, 10, 13, 13, 16, color); line(c, b, 13, 16, 16, 13, color);
+}
+
 static void mouse_centered(struct nk_command_buffer *c, struct nk_rect b,
     struct nk_color color) {
     nk_stroke_circle(c, nk_rect(b.x + 3, b.y + 3, 12, 12), 1.5f, color);
@@ -240,7 +258,7 @@ bool bongo_cat_pref_row_icon_draw(struct nk_command_buffer *canvas,
         random_expression, mirror, mouse_mirror, mouse_centered, ignore_mouse,
         max_fps, autostart, language, theme, shortcut_visibility,
         shortcut_preferences, hide_fade, renderer, frame_bounds,
-        random_motion, random_sound};
+        random_motion, random_sound, vertical_flip, mouse_vertical_flip};
     int index = icon - BONGO_CAT_PREF_ICON_MULTIPLE_MODELS;
     int count = (int)(sizeof(draws) / sizeof(draws[0]));
     if (index < 0 || index >= count) return false;

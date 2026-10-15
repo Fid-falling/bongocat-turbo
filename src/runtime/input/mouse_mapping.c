@@ -73,6 +73,14 @@ void bongo_cat_app_apply_mouse_coordinates(BongoCatApp *app,
         gaze_y_ratio = bongo_cat_mouse_centered_ratio(gaze_y, projection->center_y,
             bounds->top, bounds->top + bounds->height);
     }
+    /* 模型上下翻转时手和视线一起反转。 */
+    if (app->settings.model.vertical_flip) {
+        hand_y_ratio = 1.0f - hand_y_ratio;
+        gaze_y_ratio = 1.0f - gaze_y_ratio;
+    }
+    /* 与水平镜像一致, "鼠标纵向翻转"只影响手/设备, 不动视线。 */
+    if (app->settings.model.mouse_vertical_flip)
+        hand_y_ratio = 1.0f - hand_y_ratio;
     /* 覆盖层用"精确指针"时 ParamMouseX/Y 由覆盖层自己驱动, 这里再写一遍会打架。 */
     bool exact_pointer = bongo_cat_overlay_mver_pointer_enabled(app->overlay);
     bool overlay_left_handed = exact_pointer &&
@@ -83,10 +91,11 @@ void bongo_cat_app_apply_mouse_coordinates(BongoCatApp *app,
        overlay_mirror 再按覆盖层自己的左右手设置翻转一次, 两者不是同一个量。 */
     bool horizontal_mirror = left_handed != app->settings.model.mouse_mirror;
     float drag_x = 0.0f, drag_y = 0.0f;
-    /* 拖拽参数 (眼睛/身体跟随) 用 gaze 比例。窗口拖拽期间两个坐标源都不可信, 跳过写入,
-       否则松手瞬间模型会抽搐一下。 */
+    /* 拖拽参数 (眼睛/身体跟随) 用 gaze 比例, 镜像方向跟着模型的水平镜像开关走, 这样把
+       模型水平翻转后眼睛/身体跟随的方向也会一起翻 (否则"Mirror Mode"看起来无效)。
+       窗口拖拽期间两个坐标源都不可信, 跳过写入, 否则松手瞬间模型会抽搐一下。 */
     bongo_cat_mouse_drag_coordinates(gaze_x_ratio, gaze_y_ratio,
-        horizontal_mirror, &drag_x, &drag_y);
+        app->settings.model.mirror, &drag_x, &drag_y);
     bool overlay_mirror = horizontal_mirror != overlay_left_handed;
     float overlay_x_ratio = overlay_mirror
         ? 1.0f - hand_x_ratio : hand_x_ratio;

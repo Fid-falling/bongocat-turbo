@@ -12,8 +12,10 @@
         "title": "Préférences",
         "labels": {
           "modelSettings": "Modèle",
-          "mirrorMode": "Mode miroir",
-          "mouseMirror": "Miroir de la souris",
+          "mirrorMode": "Miroir horizontal du modèle",
+          "verticalMirror": "Miroir vertical du modèle",
+          "mouseMirror": "Miroir horizontal de la main",
+          "mouseVerticalMirror": "Miroir vertical de la main",
           "mouseCentered": "Souris centrée sur le compagnon",
           "ignoreMouse": "Ignorer les événements de souris",
           "windowSettings": "Fenêtre",

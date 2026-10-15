@@ -116,17 +116,20 @@ void NativeModel::build_projection(Csm::CubismMatrix44 &projection,
             render_options_.projection_scale,
             render_options_.projection_scale * aspect);
         projection.Translate(render_options_.offset_x, render_options_.offset_y);
-    /* 非 Mver 路径: 按窗口长宽比决定在哪个轴上贴合。竖窗口时把画布宽度按 2.0 处理,
-     * 让模型在窄窗口里也不会被横向拉扁。 */
-    } else if (_model->GetCanvasWidth() > 1.0f && width < height) {
-        _modelMatrix->SetWidth(2.0f);
-        projection.Scale(mirror_ ? -1.0f : 1.0f,
-            (float)width / (float)height);
+        projection.MultiplyByMatrix(_modelMatrix);
     } else {
-        projection.Scale((mirror_ ? -1.0f : 1.0f) *
-            (float)height / (float)width, 1.0f);
+        /* 与 X 一致: 只在局部拷贝上 SetWidth, 避免永久污染成员 _modelMatrix。 */
+        Csm::CubismModelMatrix model_matrix(*_modelMatrix);
+        if (_model->GetCanvasWidth() > 1.0f && width < height) {
+            model_matrix.SetWidth(2.0f);
+            projection.Scale(mirror_ ? -1.0f : 1.0f,
+                (float)width / (float)height);
+        } else {
+            projection.Scale((mirror_ ? -1.0f : 1.0f) *
+                (float)height / (float)width, 1.0f);
+        }
+        projection.MultiplyByMatrix(&model_matrix);
     }
-    projection.MultiplyByMatrix(_modelMatrix);
     if (render_options_.mver_projection) {
         // Mver 0.1.6's Core reports canvas units at twice the modern scale.
         // Preserve authored Layout translation while matching its model scale.
@@ -148,6 +151,7 @@ void NativeModel::draw() {
         if (!vulkan || !bongo_cat_live2d_vulkan_begin_frame()) return;
         Csm::CubismMatrix44 projection;
         build_projection(projection, viewport_width_, viewport_height_);
+        reflect_vertical_flip(projection);
         apply_viewport_projection(projection);
         visual_state_ = BongoCatLive2DVisualState{};
         visual_state_.fit_scale = 1.0f;
@@ -168,6 +172,7 @@ void NativeModel::draw() {
     manager->BeginFrameProcess();
     Csm::CubismMatrix44 projection;
     build_projection(projection, viewport_width_, viewport_height_);
+    reflect_vertical_flip(projection);
     apply_viewport_projection(projection);
     visual_state_ = BongoCatLive2DVisualState{};
     visual_state_.fit_scale = 1.0f;
@@ -181,6 +186,8 @@ void NativeModel::draw() {
 }
 
 void NativeModel::set_mirror(bool mirror) { mirror_ = mirror; }
+
+void NativeModel::set_vertical_flip(bool flipped) { vertical_flip_ = flipped; }
 
 void NativeModel::set_render_options(const BongoCatLive2DRenderOptions &options) {
     render_options_ = options;

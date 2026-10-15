@@ -114,6 +114,8 @@ static bool render(BongoCatApp *app, bool present) {
         bongo_cat_live2d_prepare_cover_capture(app->live2d);
     glViewport(0, 0, width, height);
     bongo_cat_live2d_set_mirror(app->live2d, app->settings.model.mirror);
+    bongo_cat_live2d_set_vertical_flip(app->live2d,
+        app->settings.model.vertical_flip);
     bongo_cat_live2d_draw(app->live2d);
     if (content_viewport)
         glViewport(content_x, content_y, content_width, content_height);

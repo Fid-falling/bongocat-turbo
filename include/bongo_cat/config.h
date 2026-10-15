@@ -61,7 +61,9 @@ typedef enum BongoCatRenderer {
 typedef struct BongoCatModelPreferences {
     bool multiple_pets;
     bool mirror;
+    bool vertical_flip;
     bool mouse_mirror;
+    bool mouse_vertical_flip;
     bool mouse_centered;
     bool ignore_mouse;
     int max_fps;

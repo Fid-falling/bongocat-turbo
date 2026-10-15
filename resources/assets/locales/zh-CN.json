@@ -12,8 +12,10 @@
         "title": "偏好",
         "labels": {
           "modelSettings": "模型",
-          "mirrorMode": "镜像模式",
-          "mouseMirror": "鼠标镜像",
+          "mirrorMode": "模型水平镜像",
+          "verticalMirror": "模型垂直镜像",
+          "mouseMirror": "手部水平镜像",
+          "mouseVerticalMirror": "手部垂直镜像",
           "mouseCentered": "鼠标以桌宠为中心",
           "ignoreMouse": "忽略鼠标事件",
           "windowSettings": "窗口",

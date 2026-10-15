@@ -12,8 +12,10 @@
         "title": "設定",
         "labels": {
           "modelSettings": "モデル",
-          "mirrorMode": "ミラーモード",
-          "mouseMirror": "マウスを反転",
+          "mirrorMode": "モデル水平ミラー",
+          "verticalMirror": "モデル垂直ミラー",
+          "mouseMirror": "手の水平ミラー",
+          "mouseVerticalMirror": "手の垂直ミラー",
           "mouseCentered": "マウスをデスクトップペット中心にする",
           "ignoreMouse": "マウスイベントを無視",
           "windowSettings": "ウィンドウ",

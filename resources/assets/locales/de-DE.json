@@ -12,8 +12,10 @@
         "title": "Einstellungen",
         "labels": {
           "modelSettings": "Modell",
-          "mirrorMode": "Spiegelmodus",
-          "mouseMirror": "Maus spiegeln",
+          "mirrorMode": "Modell horizontal spiegeln",
+          "verticalMirror": "Modell vertikal spiegeln",
+          "mouseMirror": "Hand horizontal spiegeln",
+          "mouseVerticalMirror": "Hand vertikal spiegeln",
           "mouseCentered": "Maus auf Desktop-Begleiter zentriert",
           "ignoreMouse": "Mausereignisse ignorieren",
           "windowSettings": "Fenster",
@@ -147,7 +149,7 @@
         },
         "random": {
           "configuring": "Wird konfiguriert",
-          "defaultPet": "Aktueller Begleiter"
+          "defaultPet": "Aktuelles Haustier"
         },
         "hints": {
           "deleteSuccess": "\"%s\" wurde gelöscht",
