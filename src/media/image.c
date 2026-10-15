@@ -77,6 +77,27 @@ void bongo_cat_image_free(BongoCatImage *image) {
     }
     memset(image, 0, sizeof(*image));
 }
+/*
+ * 模型贴图的两个诊断开关 (默认都保持现状, 只在 A/B 排查时用):
+ *
+ *   BONGO_CAT_GL_MODEL_MIP=0   跳过 mip 链, 模型贴图退回 GL_LINEAR —— 也就是"只采 level 0"
+ *                              的采样口径, 用来复现 Vulkan 侧 (mipLevels=1) 的滤波行为,
+ *                              判断 GL/VK 的差异到底是不是"mip+各向异性 vs 单级线性"。
+ *   BONGO_CAT_GL_ANISOTROPY=1  强制各向异性上限 = 1, 关掉 GL_EXT_texture_filter_anisotropic
+ *                              的收益, 用来单独隔离各向异性的贡献。
+ *
+ * 两者都不改变默认行为: 不设变量 (或设成别的值) 时走原来的代码路径。
+ */
+static bool model_mips_enabled(void) {
+    const char *value = SDL_getenv("BONGO_CAT_GL_MODEL_MIP");
+    return !(value && value[0] == '0' && value[1] == '\0');
+}
+
+static bool model_anisotropy_enabled(void) {
+    const char *value = SDL_getenv("BONGO_CAT_GL_ANISOTROPY");
+    return !(value && value[0] == '1' && value[1] == '\0');
+}
+
 static unsigned int upload(const BongoCatImage *image, GLuint texture,
     bool model_texture) {
     /* Premultiply in place before any GPU filtering. Cubism must use its
@@ -91,6 +112,10 @@ static unsigned int upload(const BongoCatImage *image, GLuint texture,
         }
     }
     bool created = texture == 0;
+    /* 只用于下面那行诊断日志: 记下"实际生效"的各向异性上限, 免得再查一次扩展枚举
+     * (没有 GL_EXT_texture_filter_anisotropic 时那次查询会留下一个 GL_INVALID_ENUM,
+     * 污染后面的错误检查)。 */
+    GLfloat applied_anisotropy = 1.0f;
     if (created) glGenTextures(1, &texture);
     glBindTexture(GL_TEXTURE_2D, texture);
     if (created) {
@@ -102,19 +127,21 @@ static unsigned int upload(const BongoCatImage *image, GLuint texture,
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
         /* 模型图集是 1024px 级别、实际只画几百像素, 缩小倍率很大: 没有 mip 链会闪, 斜视时还会
          * 出摩尔纹。各向异性上限取 8 是收益与开销的折中 (再高对 2D 图集没有明显收益)。 */
-        if (model_texture && SDL_GL_ExtensionSupported(
+        if (model_texture && model_anisotropy_enabled() && SDL_GL_ExtensionSupported(
             "GL_EXT_texture_filter_anisotropic")) {
             GLfloat maximum = 1.0f;
             glGetFloatv(GL_MAX_TEXTURE_MAX_ANISOTROPY_EXT, &maximum);
-            if (maximum > 1.0f)
+            if (maximum > 1.0f) {
+                applied_anisotropy = SDL_min(maximum, 8.0f);
                 glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MAX_ANISOTROPY_EXT,
-                    SDL_min(maximum, 8.0f));
+                    applied_anisotropy);
+            }
         }
     }
     /* 行本身是紧打包的 RGBA (宽度*4 天然 4 字节对齐), 设 1 只是为了不受外部遗留状态影响;
      * 结束时恢复成 4, 免得把状态泄漏给同进程里的其它上传者。 */
     glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
-    if (created && model_texture) {
+    if (created && model_texture && model_mips_enabled()) {
         if (!bongo_cat_image_upload_mipmaps(image)) {
             bongo_cat_gl_clear_errors();
             glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
@@ -129,6 +156,16 @@ static unsigned int upload(const BongoCatImage *image, GLuint texture,
             GL_RGBA, GL_UNSIGNED_BYTE, image->pixels);
     }
     glPixelStorei(GL_UNPACK_ALIGNMENT, 4);
+    /* 只有显式设了诊断开关才记一行, 正常运行的日志里不会多出噪声。 */
+    if (model_texture && (SDL_getenv("BONGO_CAT_GL_MODEL_MIP") ||
+        SDL_getenv("BONGO_CAT_GL_ANISOTROPY"))) {
+        GLint min_filter = 0;
+        glGetTexParameteriv(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, &min_filter);
+        SDL_LogWarn(SDL_LOG_CATEGORY_VIDEO,
+            "[gl] 模型贴图 %dx%d mip=%d min_filter=0x%x anisotropy=%.1f",
+            image->width, image->height, model_mips_enabled() ? 1 : 0,
+            (unsigned)min_filter, (double)applied_anisotropy);
+    }
     return texture;
 }
 unsigned int bongo_cat_image_texture(const char *path, int *width, int *height, BongoCatError *error) {

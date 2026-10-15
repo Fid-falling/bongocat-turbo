@@ -43,6 +43,19 @@ void NativeModel::bind_textures() {
         for (void *texture : vulkan_textures_)
             if (texture)
                 bongo_cat_live2d_vulkan_bind_texture((void *)vulkan, texture);
+        /*
+         * Vulkan 分支同样要把"贴图已经预乘"这件事告诉渲染器。SDK 的 Vulkan 渲染器按
+         * 这个标志在两组着色器里选 (CubismRenderer_Vulkan.cpp 的 isPremultipliedAlpha
+         * -> ShaderNames_*PremultipliedAlpha):
+         *   * 未设置 (默认 false): 直通 alpha 的 FragShaderSrc, 片元末尾再做一次
+         *     color.rgb * color.a —— 而贴图在 cubism_vulkan_texture.cpp 里已经预乘过,
+         *     于是半透明像素变成 color*a^2, 模型边缘整体偏暗;
+         *   * 设置之后: FragShaderSrcPremultipliedAlpha, 片元不再乘 alpha, 与 GL 分支
+         *     下面那一行完全同款。
+         * 漏掉这一行的症状很隐蔽: 覆盖 (alpha) 完全一致, 只有 RGB 在半透明处偏暗,
+         * 看起来就像"某个 artmesh 多了一圈暗描边"。
+         */
+        vulkan->IsPremultipliedAlpha(true);
         return;
     }
 #endif
@@ -52,7 +65,7 @@ void NativeModel::bind_textures() {
         if (textures_[i])
             renderer->BindTexture((Csm::csmInt32)i, textures_[i]);
     /* 贴图在 image.c 的 upload() 里已经就地预乘, 这里只是把这一事实告诉 SDK 渲染器,
-     * 让它按预乘混合; Vulkan 分支不需要这一步 —— 它的管线本来就按预乘混合。 */
+     * 让它按预乘混合。Vulkan 分支在上面用同一个标志声明同一件事。 */
     renderer->IsPremultipliedAlpha(true);
 }
 
