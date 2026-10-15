@@ -221,6 +221,16 @@ if(BUILD_TESTING)
     set_tests_properties(preferences-lifecycle PROPERTIES DISABLED TRUE)
   endif()
 
+  # Core 导入链的坏输入矩阵。**刻意不放进上面的 BONGO_CAT_CUBISM_ENABLED 分支**: 它测的是
+  # "用户自备 Core 的导入路径", 与本次构建有没有编 Cubism 无关(诊断构建同样要能安全导入),
+  # 而且它需要 miniz 构造恶意 zip, 所以单独链 bongo_cat_archive。
+  add_executable(bongo_cat_live2d_core_tests tests/live2d/test_core_import.c)
+  target_include_directories(bongo_cat_live2d_core_tests PRIVATE src/live2d)
+  target_link_libraries(bongo_cat_live2d_core_tests PRIVATE
+    bongo_cat_runtime bongo_cat_archive bongo_cat_warnings)
+  add_test(NAME live2d-core-import COMMAND bongo_cat_live2d_core_tests)
+  set_tests_properties(live2d-core-import PROPERTIES TIMEOUT 60)
+
   if(BONGO_CAT_CUBISM_ENABLED)
     add_executable(bongo_cat_core_profile_tests tests/live2d/test_core_profile.cpp)
     target_include_directories(bongo_cat_core_profile_tests PRIVATE src/live2d)
