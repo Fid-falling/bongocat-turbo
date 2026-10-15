@@ -17,6 +17,43 @@
 #include <string.h>
 
 #define BONGO_CAT_LIVE2D_EFFICIENT_TEXTURE_LIMIT BONGO_CAT_LIVE2D_TEXTURE_LIMIT
+
+/*
+ * 上传前 CPU 缓冲的诊断探针 (BONGO_CAT_TEST_DECODE_PROBE=1 才工作, 默认只多一次缓存过的
+ * getenv 判断)。统计量选得少而稳: 尺寸 + 滚动字节和 (对任意一个字节差异都敏感) + alpha 直方图
+ * 12 桶, 按"直通 alpha"口径算 —— 也就是上传前的原始像素。
+ *
+ * 存在的理由: GL 与 VK 的解码入口不是同一个函数 (GL 走 bongo_cat_image_texture_model,
+ * VK 走 bongo_cat_image_fit), 一旦别处再改解码参数, 两个后端可能在 CPU 侧就分叉, 而症状
+ * 会伪装成"渲染差异"。两端各跑一次、比这三行数字, 就能一眼分清是解码还是 GPU 侧。
+ * 实测依据: standard 模型三张贴图两端完全一致 (sum 0x6aaac59fe065af03 / 0xb65a647b1b9cecd9
+ * / 0x24bf5a7cfa84a836), 所以颜色差异只在 GPU 侧, 与解码无关。
+ */
+void bongo_cat_image_log_upload_probe(const BongoCatImage *image, const char *where) {
+    static int enabled = -1;
+    if (enabled < 0) enabled = SDL_getenv("BONGO_CAT_TEST_DECODE_PROBE") ? 1 : 0;
+    if (!enabled || !image || !image->pixels || image->width <= 0 || image->height <= 0)
+        return;
+    unsigned alpha_bins[12] = {0};
+    unsigned long long sum = 0, r = 0, g = 0, b = 0, a = 0;
+    const size_t count = (size_t)image->width * (size_t)image->height;
+    for (size_t i = 0; i < count; ++i) {
+        const unsigned char *pixel = image->pixels + i * 4;
+        for (int c = 0; c < 3; ++c) sum = (sum * 131u + pixel[c]) & 0xffffffffffffffffull;
+        sum = (sum * 131u + pixel[3]) & 0xffffffffffffffffull;
+        r += pixel[0]; g += pixel[1]; b += pixel[2]; a += pixel[3];
+        alpha_bins[pixel[3] * 12u / 256u]++;
+    }
+    SDL_LogWarn(SDL_LOG_CATEGORY_APPLICATION,
+        "DECODE-PROBE %s: %dx%d sum=0x%016llx mean_rgba=%.2f,%.2f,%.2f,%.2f "
+        "alpha_bins(alpha/256*12)=%u,%u,%u,%u,%u,%u,%u,%u,%u,%u,%u,%u",
+        where ? where : "?", image->width, image->height, sum,
+        (double)r / count, (double)g / count, (double)b / count, (double)a / count,
+        alpha_bins[0], alpha_bins[1], alpha_bins[2], alpha_bins[3], alpha_bins[4],
+        alpha_bins[5], alpha_bins[6], alpha_bins[7], alpha_bins[8], alpha_bins[9],
+        alpha_bins[10], alpha_bins[11]);
+}
+
 BongoCatResult bongo_cat_image_load(const char *path, BongoCatImage *image, BongoCatError *error) {
     BongoCatResult result = bongo_cat_image_decode_pixels(path, image, error);
     if (result != BONGO_CAT_OK) return result;
@@ -44,6 +81,7 @@ static unsigned int upload(const BongoCatImage *image, GLuint texture,
     bool model_texture) {
     /* Premultiply in place before any GPU filtering. Cubism must use its
      * premultiplied shader for these model textures, including fallback. */
+    bongo_cat_image_log_upload_probe(image, model_texture ? "gl-model-texture" : "gl-texture");
     if (model_texture) {
         size_t count = (size_t)image->width * image->height;
         for (size_t i = 0; i < count; ++i) {

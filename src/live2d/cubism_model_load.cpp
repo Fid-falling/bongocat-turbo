@@ -4,6 +4,11 @@
 #include "bongo_cat/image.h"
 #include "bongo_cat/json.h"
 
+/* 诊断探针: image.c 里按 BONGO_CAT_TEST_DECODE_PROBE 开关工作, 不对外安装,
+   所以这里只做一次本地声明, 避免 live2d 模块反向依赖 media 的内部头。 */
+extern "C" void bongo_cat_image_log_upload_probe(const BongoCatImage *image,
+    const char *where);
+
 #include <Effect/CubismBreath.hpp>
 #include <Effect/CubismEyeBlink.hpp>
 #include <Id/CubismIdManager.hpp>
@@ -349,6 +354,7 @@ bool NativeModel::textures_step(int index, BongoCatError *error) {
          * 分开之后每一步都更短, 于是主循环更容易在两步之间插进一帧。
          */
         pending_alpha_image_ = image;
+        bongo_cat_image_log_upload_probe(&image, "vk-model-texture");
         vulkan_textures_[(size_t)index] = bongo_cat_live2d_vulkan_create_texture_attached(
             image.pixels, image.width, image.height);
         if (!vulkan_textures_[(size_t)index]) {
