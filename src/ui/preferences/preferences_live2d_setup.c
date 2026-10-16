@@ -21,6 +21,12 @@
 #include "bongo_cat/path.h"
 #include "bongo_cat/preferences.h"
 #include "bongo_cat/renderer_module.h"
+/* "这次到底是谁在渲染"只应该有一处判定: 设置页的状态行问的就是它(见 live2d_dispatch.h)。
+   以前这里问的是 bongo_cat_renderer_module_active(), 而那个函数回答的是
+   bongo_cat_renderer_module_open() 这条便利路径有没有建过实例 —— 生产路径
+   (live2d_dispatch.c 先 load 再直接调 ops->create) 从不走它, 于是状态行永远显示成
+   "已导入, 但渲染不可用", 那句"渲染可用"成了不可达文案。 */
+#include "live2d_dispatch.h"
 
 #include <SDL3/SDL.h>
 
@@ -28,15 +34,45 @@
 #include <string.h>
 
 /*
- * Cubism SDK for Native 的**官方下载/说明页**(Live2D 官网)。刻意只写这一个页面地址, 不写压缩包
- * 直链: 直链主机是"程序自己代下载"才需要的东西, 我们用不到; 打开页面则等于让用户自己在官网上
- * 阅读并同意许可 —— 那是唯一合规的取得方式。
+ * 官方下载页。**同一个页面主机, 只换语言路径** —— 主机永远是官方页面主机(守卫允许的那一个),
+ * 不是压缩包直链。按界面语言给对应语言版本的页面, 用户就不用在自己看不懂的英文页面上找按钮。
  *
- * .github/scripts/check-publish-guards.ps1 有一条可执行策略守着这条区分: 源码里的 live2d 网址
- * 只允许指向官方**页面**主机(本文件下面这一个), 出现别的子域(压缩包直链主机)即失败。所以这个
- * 常量是唯一允许的写法, 别在这里再加"顺手也把直链放上"的地址。
+ * 语言路径是**实测**出来的(2026-10, HTTP 状态 + 页面标题; 官网页脚只提供
+ * 日本語 / English / 简体中文 / 한국어 / ไทย / Español / Indonesia):
+ *   /zh-CHS/sdk/download/native/  -> 200, 标题是中文 ✓
+ *   /ja/sdk/download/native/      -> 200, 标题是日文 ✓
+ *   /ko/sdk/download/native/      -> 200 ✓
+ *   /en/sdk/download/native/      -> 200 ✓
+ *   /zh-CHT/...                   -> 404(没有繁体页面) ⇒ 繁体界面**复用简体页**, 比丢到英文页友好
+ *   /es/sdk/download/native/      -> 404(没有西班牙语下载页); /es/ 是站点根(200)、
+ *                                    /es/sdk/download/ 是**未翻译的日文目录页** —— 都不是
+ *                                    能给西语用户用的下载页 ⇒ 西班牙语界面回退 /en/
+ *   /th/、/id/                    -> 只有站点根(200), 没有对应下载页; 而且本程序也没有泰语/
+ *                                    印尼语界面, 所以没有映射入口(将来加界面语言时, 先实测
+ *                                    该语言**下载页**是否可达, 不可达就继续回退 /en/)
+ * 结论: 只给 zh-CHS / ja / ko 三个专属路径, **其余(含简体之外的西语等)一律回退 en** ——
+ * 宁可用英文页, 也不要把用户送到 404 或一份看不懂的页面。
  */
-#define BONGO_CAT_LIVE2D_SDK_PAGE "https://www.live2d.com/en/sdk/download/native/"
+#define BONGO_CAT_LIVE2D_SDK_PAGE_TEMPLATE \
+    "https://www.live2d.com/%s/sdk/download/native/"
+
+/* 界面语言 -> 官方页面的语言路径(未实测可达的语言一律 en, 见上面的实测记录)。 */
+static const char *sdk_page_language(BongoCatApp *app) {
+    switch (app ? app->settings.app.language : BONGO_CAT_LANG_EN_US) {
+    case BONGO_CAT_LANG_ZH_CN:
+    case BONGO_CAT_LANG_ZH_HANT: return "zh-CHS"; /* 繁体复用简体页(无繁体页) */
+    case BONGO_CAT_LANG_JA_JP: return "ja";
+    case BONGO_CAT_LANG_KO_KR: return "ko";
+    default: return "en";
+    }
+}
+
+/* 唯一的 URL 生成点: 引导弹窗、设置页那一行、以及日志都走它, 免得两处各写一份 URL。 */
+static bool sdk_page_url(BongoCatApp *app, char *output, size_t capacity) {
+    int written = snprintf(output, capacity, BONGO_CAT_LIVE2D_SDK_PAGE_TEMPLATE,
+        sdk_page_language(app));
+    return written > 0 && (size_t)written < capacity;
+}
 
 static const char *tr(BongoCatApp *app, const char *key, const char *fallback) {
     return app && app->i18n ? bongo_cat_i18n_get(app->i18n, key, fallback)
@@ -60,26 +96,31 @@ static bool take_notice_slot(void) {
     return true;
 }
 
-/* 打开官方下载页。失败只记日志: 打开浏览器失败不该影响任何其它功能。 */
+/* 打开官方下载页(按界面语言选语言版本)。失败只记日志: 打开浏览器失败不该影响任何其它功能。 */
 static void open_download_page(BongoCatApp *app) {
-    if (!SDL_OpenURL(BONGO_CAT_LIVE2D_SDK_PAGE)) {
+    char url[192];
+    if (!sdk_page_url(app, url, sizeof(url))) {
+        SDL_LogWarn(BONGO_CAT_LOG_LIFECYCLE,
+            "[live2d] 无法拼出官方下载页地址, 跳过打开浏览器");
+        return;
+    }
+    if (!SDL_OpenURL(url)) {
         SDL_LogWarn(BONGO_CAT_LOG_LIFECYCLE,
             "[live2d] 打开官方 Cubism SDK 下载页失败: %s", SDL_GetError());
         return;
     }
     SDL_LogInfo(BONGO_CAT_LOG_LIFECYCLE,
-        "[live2d] 已在浏览器中打开官方的 Cubism SDK for Native 下载页: %s",
-        BONGO_CAT_LIVE2D_SDK_PAGE);
-    (void)app;
+        "[live2d] 已在浏览器中打开官方的 Cubism SDK for Native 下载页(界面语言 %s): %s",
+        sdk_page_language(app), url);
 }
 
 /* 状态描述: 已导入(带版本) / 组件在但缺 Core / 连组件都没有。 */
 static void status_text(BongoCatApp *app, char *output, size_t capacity) {
     if (bongo_cat_live2d_core_available()) {
-        /* 只有"渲染组件真的活着"才敢说渲染可用。阶段 1 里宿主还没有把渲染切到运行期加载的
-           Core 上(编译进去的 Cubism 桥接仍链着导入库), 此时如果说"渲染可用", 用户导入完
-           看不到模型就会以为是自己下载错了 —— 所以这里退回"已导入"这句实话。 */
-        const char *text = bongo_cat_renderer_module_active()
+        /* 只有"渲染组件真的活着"才敢说渲染可用 —— 判据必须与审计里
+           renderer=cubism-native 那一行同源, 否则会出现"状态行说可用、审计说诊断兜底"
+           这种自相矛盾的输出。 */
+        const char *text = bongo_cat_live2d_native_active()
             ? tr(app, "pages.preference.live2dSetup.installed",
                 "Cubism Core imported; Live2D rendering is available")
             : tr(app, "native.live2dCoreImported", "Live2D Cubism Core imported.");
@@ -98,19 +139,88 @@ static void status_text(BongoCatApp *app, char *output, size_t capacity) {
     snprintf(output, capacity, "%s", tr(app, key, fallback));
 }
 
+/*
+ * "刚导入成功、还没问用户要不要重启"的待办标记。
+ *
+ * 为什么需要它(而不是在导入成功的地方直接弹): SDL 的文件对话框回调**可能在另一个线程**上被
+ * 调用(SDL_dialog.h 的线程契约), 在那里弹模态框、碰应用状态都是错的。文件对话框那条路本来
+ * 也只做"读文件 + 写日志 + 提示"三件事(见文件头)。所以这里只置一个原子标记, 由主线程在
+ * 设置窗口渲染时取走并弹窗 —— 那条路每一帧都会跑到, 且导入入口本来就要开着设置窗口。
+ */
+static SDL_AtomicInt restart_prompt_pending;
+static bool restart_prompt_requested;
+
+/*
+ * 问一句"要不要现在重启"。
+ *
+ * 为什么必须问: 导入会立刻换掉磁盘上的 Core, 但**用哪种方式渲染是启动时定下来的**
+ * (live2d_dispatch.c 的 component_used 是粘性的, 且启动作实例已经在 app.c 里做完了),
+ * 所以这次运行不会当场变身 —— 不重启的话用户导入完看不到猫, 会以为导入失败。
+ * 重启复用既有机制(application_restart.c 的 bongo_cat_app_request_restart): 它负责落盘、
+ * 还回单实例锁、按原样带过提权状态, 这里不自己拉进程。
+ */
+static void offer_restart_after_import(BongoCatApp *app) {
+    const SDL_MessageBoxButtonData buttons[] = {
+        {SDL_MESSAGEBOX_BUTTON_RETURNKEY_DEFAULT, 1,
+            tr(app, "native.live2dCoreRestartNow", "Restart now")},
+        {SDL_MESSAGEBOX_BUTTON_ESCAPEKEY_DEFAULT, 0,
+            tr(app, "pages.preference.live2dSetup.later", "Later")}
+    };
+    SDL_MessageBoxData data;
+    SDL_zero(data);
+    data.flags = SDL_MESSAGEBOX_INFORMATION;
+    data.window = app->preferences ? app->preferences->window : NULL;
+    data.title = tr(app, "pages.preference.live2dSetup.title",
+        "Live2D Cubism Core");
+    data.message = tr(app, "native.live2dCoreRestartRequired",
+        "Cubism Core was imported, but this run still uses the renderer that was "
+        "chosen when it started. Restart once and the model will be drawn with the "
+        "newly imported Core.");
+    data.numbuttons = (int)SDL_arraysize(buttons);
+    data.buttons = buttons;
+    int pressed = -1;
+    if (!SDL_ShowMessageBox(&data, &pressed)) {
+        SDL_LogWarn(BONGO_CAT_LOG_LIFECYCLE,
+            "[live2d] Core 已导入, 但\"立即重启\"提示无法显示: %s —— 请手动重启程序",
+            SDL_GetError());
+        return;
+    }
+    if (pressed != 1) {
+        SDL_LogInfo(BONGO_CAT_LOG_LIFECYCLE,
+            "[live2d] Core 已导入, 用户选择稍后重启(渲染要重启一次才会用它)");
+        return;
+    }
+    if (bongo_cat_app_request_restart(app))
+        SDL_LogInfo(BONGO_CAT_LOG_LIFECYCLE,
+            "[live2d] Core 已导入, 用户选择立即重启: 已请求重启以启用新导入的 Core");
+    else
+        SDL_LogWarn(BONGO_CAT_LOG_LIFECYCLE,
+            "[live2d] Core 已导入, 重启请求未被接受(无人值守运行或已有重启在途): 请手动重启");
+}
+
 static void import_result(BongoCatApp *app, const char *source) {
     BongoCatLive2DCoreImport report = {0};
     BongoCatError error = {0};
     BongoCatResult result = bongo_cat_live2d_core_import(source, &report, &error);
     char message[512];
     if (result == BONGO_CAT_OK) {
-        /* 显示 SHA-256: 用户能拿它和自己下载的文件核对, 也是支持排查时唯一可靠的标识。 */
-        snprintf(message, sizeof(message), "%s SHA-256 %s",
+        /* 显示 SHA-256: 用户能拿它和自己下载的文件核对, 也是支持排查时唯一可靠的标识。
+           末尾一定要说"重启后生效" —— 导入本身不会让正在运行的这次渲染变身。 */
+        snprintf(message, sizeof(message), "%s SHA-256 %s — %s",
             tr(app, "native.live2dCoreImported", "Cubism Core imported successfully."),
-            report.sha256);
+            report.sha256,
+            tr(app, "native.live2dCoreRestartHint", "restart to apply"));
         show(app, message, false);
         SDL_LogInfo(BONGO_CAT_LOG_LIFECYCLE,
-            "[live2d] 用户导入 Core 成功: %s (来源 %s)", report.installed, source);
+            "[live2d] 用户导入 Core 成功: %s (来源 %s); 需要重启一次才会用它渲染",
+            report.installed, source);
+        if (app->automated) {
+            SDL_LogInfo(BONGO_CAT_LOG_LIFECYCLE,
+                "[live2d] 无人值守运行不弹\"立即重启\": 手动启动时导入完会问一次");
+            return;
+        }
+        SDL_SetAtomicInt(&restart_prompt_pending, 1);
+        restart_prompt_requested = true;
         return;
     }
     snprintf(message, sizeof(message), "%s %s",
@@ -146,6 +256,13 @@ static void choose_core_file(BongoCatApp *app) {
     SDL_DialogFileFilter filters[1] = {{title, pattern}};
     SDL_ShowOpenFileDialog(dialog_callback, app, app->window, filters, 1,
         SDL_GetUserFolder(SDL_FOLDER_DOWNLOADS), false);
+}
+
+void bongo_cat_preferences_live2d_restart_prompt_poll(BongoCatApp *app) {
+    if (!app || !restart_prompt_requested) return;
+    if (!SDL_CompareAndSwapAtomicInt(&restart_prompt_pending, 1, 0)) return;
+    restart_prompt_requested = false;
+    offer_restart_after_import(app);
 }
 
 void bongo_cat_preferences_live2d_setup_row(BongoCatApp *app,
@@ -208,6 +325,101 @@ void bongo_cat_preferences_live2d_setup_notice(BongoCatApp *app) {
     }
 }
 
+/*
+ * 引导弹窗的按钮。ID 只在本文件内有意义(窗口系统原样回传), 但必须是稳定的正数。
+ * 顺序即弹窗上的显示顺序: 主要动作在前, 退出类动作在后。
+ */
+enum {
+    BONGO_CAT_ONBOARDING_DOWNLOAD = 1,
+    BONGO_CAT_ONBOARDING_IMPORT = 2,
+    BONGO_CAT_ONBOARDING_LATER = 3,
+    BONGO_CAT_ONBOARDING_DISMISS = 4
+};
+
+/*
+ * 缺 Core 的引导弹窗: 弹窗本身就把"怎么做"分步讲完, 需要动作的地方由用户点按钮。
+ *
+ * 为什么**不自动打开浏览器**: 检测到缺 Core 就 SDL_OpenURL 等于替用户做了一个他没同意的
+ * 动作, 而且发生在他还没读完说明之前 —— 页面莫名其妙弹出来, 用户的第一反应是关掉它。
+ * 现在打开链接只发生在用户点「打开下载页」之后; 点完**回到弹窗**继续, 因为下载完还得回来
+ * 导入, 一次引导要能走完整条路。
+ *
+ * 按钮语义:
+ *   打开下载页 -> 打开官方页面, 然后回到弹窗(还没导入完);
+ *   立即导入…  -> 直接开文件选择器, 省掉"回设置窗口再点一次"这一步, 弹窗到此结束;
+ *   稍后       -> 关掉弹窗(导入入口与状态行一直留在设置里);
+ *   不再提示   -> 关掉并把 live2dCorePromptDismissed 写回配置, 以后不再自动引导。
+ */
+static void onboarding_dialog(BongoCatApp *app) {
+    const char *title = tr(app, "pages.preference.live2dSetup.title",
+        "Live2D Cubism Core");
+    char message[2048];
+    snprintf(message, sizeof(message), "%s", tr(app,
+        "pages.preference.live2dSetup.onboarding",
+        "The model is not shown because the Live2D Cubism Core runtime library "
+        "has not been imported yet. Live2D does not allow us to bundle or download "
+        "it, so please get it yourself:\n\n"
+        "1. Click \"Open download page\" below to open the official Live2D site.\n"
+        "2. Tick the agreement to the software license and privacy policy there.\n"
+        "3. Choose \"First download\", then \"Individual\".\n"
+        "4. Enter your e-mail address - without it the \"Download the latest "
+        "version\" button stays grey and cannot be clicked.\n"
+        "5. Click \"Download the latest version\" (not the beta / preview one).\n"
+        "6. Back here: click \"Import now...\" and pick the ZIP you just got, or "
+        "drag that ZIP straight onto the settings window.\n\n"
+        "This library is neither bundled with the application nor downloaded for "
+        "you."));
+    const SDL_MessageBoxButtonData buttons[] = {
+        {SDL_MESSAGEBOX_BUTTON_RETURNKEY_DEFAULT, BONGO_CAT_ONBOARDING_DOWNLOAD,
+            tr(app, "pages.preference.live2dSetup.downloadButton",
+                "Open download page")},
+        {0, BONGO_CAT_ONBOARDING_IMPORT,
+            tr(app, "pages.preference.live2dSetup.importNow", "Import now...")},
+        {SDL_MESSAGEBOX_BUTTON_ESCAPEKEY_DEFAULT, BONGO_CAT_ONBOARDING_LATER,
+            tr(app, "pages.preference.live2dSetup.later", "Later")},
+        {0, BONGO_CAT_ONBOARDING_DISMISS,
+            tr(app, "pages.preference.live2dSetup.dontAsk", "Don't ask again")}
+    };
+    SDL_MessageBoxData data;
+    SDL_zero(data);
+    data.flags = SDL_MESSAGEBOX_INFORMATION;
+    data.window = app->preferences ? app->preferences->window : NULL;
+    data.title = title;
+    data.message = message;
+    data.numbuttons = (int)SDL_arraysize(buttons);
+    data.buttons = buttons;
+    for (;;) {
+        int pressed = -1;
+        if (!SDL_ShowMessageBox(&data, &pressed)) {
+            SDL_LogWarn(BONGO_CAT_LOG_LIFECYCLE,
+                "[live2d] 缺 Core 的引导弹窗无法显示: %s", SDL_GetError());
+            return;
+        }
+        if (pressed == BONGO_CAT_ONBOARDING_DOWNLOAD) {
+            /* 只有这里会打开浏览器 —— 用户点了才开。开完回到弹窗, 因为还没导入。 */
+            open_download_page(app);
+            continue;
+        }
+        if (pressed == BONGO_CAT_ONBOARDING_IMPORT) {
+            SDL_LogInfo(BONGO_CAT_LOG_LIFECYCLE,
+                "[live2d] 用户在引导弹窗里选了\"立即导入\", 直接打开文件选择器");
+            choose_core_file(app);
+            return;
+        }
+        if (pressed == BONGO_CAT_ONBOARDING_DISMISS) {
+            app->settings.app.live2d_core_prompt_dismissed = true;
+            app->dirty = true;
+            SDL_LogInfo(BONGO_CAT_LOG_LIFECYCLE,
+                "[live2d] 用户在引导弹窗里选了\"不再提示\": 写回 live2dCorePromptDismissed");
+            return;
+        }
+        /* 「稍后」与直接关窗都走到这里: 什么都不写, 导入入口照常留在设置里。 */
+        SDL_LogInfo(BONGO_CAT_LOG_LIFECYCLE,
+            "[live2d] 用户选择稍后处理(按钮 %d): 设置里的入口照常在", pressed);
+        return;
+    }
+}
+
 void bongo_cat_preferences_live2d_core_onboarding(BongoCatApp *app) {
     if (!app || !app->preferences) return;
     /* 已经有能用的 Core: 绝不打扰。 */
@@ -237,9 +449,12 @@ void bongo_cat_preferences_live2d_core_onboarding(BongoCatApp *app) {
      * "无人值守运行一律只记日志"一致。
      */
     if (app->automated) {
+        char url[192];
+        if (!sdk_page_url(app, url, sizeof(url))) url[0] = '\0';
         SDL_LogInfo(BONGO_CAT_LOG_LIFECYCLE,
             "[live2d] 缺 Cubism Core: 无人值守运行不自动打开设置窗口/弹窗/浏览器; "
-            "手动启动时会引导到 %s", BONGO_CAT_LIVE2D_SDK_PAGE);
+            "手动启动时会弹引导(下载页只在用户点按钮后才打开: %s)",
+            url[0] ? url : "(地址拼装失败)");
         return;
     }
     /* 1) 先把提示条塞进去, 再开窗口 —— 这样设置窗口的第一帧就带着它(模态弹窗会挡住后续
@@ -252,26 +467,15 @@ void bongo_cat_preferences_live2d_core_onboarding(BongoCatApp *app) {
     bongo_cat_preferences_show(app->preferences);
     SDL_LogInfo(BONGO_CAT_LOG_LIFECYCLE,
         "[live2d] 缺 Cubism Core: 已自动打开设置窗口(导入入口在 Live2D 那一行)");
-    /* 3) 顺手把用户送到官方页面(只打开页面, 不代下载)。
-       刻意排在模态弹窗**之前**: 模态框会一直阻塞到这里被点掉, 排在它后面的话浏览器要等用户
-       先关掉弹窗才会打开, 上下文就断了(用户点完"确定"什么也没发生, 过一会儿才跳)。 */
-    open_download_page(app);
-    /* 4) 弹一次告知: 为什么模型不显示、去哪里下载、导入入口在哪。 */
-    SDL_ShowSimpleMessageBox(SDL_MESSAGEBOX_INFORMATION,
-        tr(app, "pages.preference.live2dSetup.title", "Live2D Cubism Core"),
-        tr(app, "pages.preference.live2dSetup.onboarding",
-            "The model is not shown because the Live2D Cubism Core runtime "
-            "library is not installed yet. Download Cubism SDK for Native from the "
-            "official Live2D site and agree to its license, then import the ZIP or "
-            "the Core library in the settings window that just opened. This library "
-            "is neither bundled nor downloaded for you."),
-        app->preferences->window);
-    /* 5) 记下"已经引导过一次": 这台机器上不会再自动来一遍。 */
+    /* 3) 弹一次"下载教程": 内容与动作都在弹窗里, 打开链接必须由用户点按钮触发。 */
+    SDL_LogInfo(BONGO_CAT_LOG_LIFECYCLE,
+        "[live2d] 缺 Cubism Core: 显示引导弹窗, 等待用户选择(在此之前不会打开浏览器)");
+    onboarding_dialog(app);
+    /* 4) 记下"已经引导过一次": 这台机器上不会再自动来一遍(与用户在弹窗里选了什么无关)。 */
     app->settings.app.live2d_core_prompt_shown = true;
     app->dirty = true;
     SDL_LogInfo(BONGO_CAT_LOG_LIFECYCLE,
-        "[live2d] 缺 Cubism Core 的引导已完成(设置窗口 + 官方下载页 + 弹窗); "
-        "下次启动不再自动引导");
+        "[live2d] 缺 Cubism Core 的引导已结束(设置窗口 + 弹窗); 下次启动不再自动引导");
 }
 
 /* 判定"这个拖进来的文件是不是 Core 相关"。

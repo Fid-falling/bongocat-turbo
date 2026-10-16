@@ -17,7 +17,10 @@
         "downloadButton": "다운로드 페이지 열기",
         "silence": "다시 표시하지 않기",
         "silenceHint": "Cubism Core 가 없는 동안 설정 창과 알림을 자동으로 열지 않습니다.",
-        "onboarding": "모델이 보이지 않는 이유는 Live2D Cubism Core 런타임이 아직 없기 때문입니다. Live2D 공식 사이트에서 Cubism SDK for Native 를 내려받아 라이선스에 동의한 뒤, 방금 열린 설정 창에서 ZIP 이나 Core 파일을 가져오세요. 이 라이브러리는 함께 배포되지 않으며 자동으로 내려받지도 않습니다."
+        "onboarding": "모델이 보이지 않는 이유는 Live2D Cubism Core 런타임이 아직 없기 때문입니다. Live2D 는 함께 배포하거나 대신 내려받는 것을 허용하지 않으므로 직접 받으셔야 합니다:\n\n1. 아래의 \"다운로드 페이지 열기\"를 눌러 Live2D 공식 사이트를 엽니다.\n2. 공식 사이트에서 소프트웨어 사용권 계약과 개인정보 처리방침에 동의하는 항목을 체크합니다.\n3. \"최초 다운로드\"를 고르고, 이어서 \"개인\"을 고릅니다.\n4. 이메일 주소를 입력합니다 —— 입력하지 않으면 \"최신 버전 다운로드\" 버튼이 회색으로 남아 눌리지 않습니다.\n5. \"최신 버전 다운로드\"를 누릅니다(\"최신 버전 베타\"는 미리보기판이므로 누르지 마세요).\n6. 여기로 돌아와 \"지금 가져오기...\"로 그 ZIP 을 선택하거나, ZIP 을 설정 창에 끌어다 놓으세요.\n\n이 라이브러리는 함께 배포되지 않으며 자동으로 내려받지도 않습니다.",
+        "importNow": "지금 가져오기...",
+        "later": "나중에",
+        "dontAsk": "다시 표시하지 않기"
       },
       "title": "환경 설정",
       "cat": {
@@ -285,6 +288,9 @@
     "live2dCoreMissing": "Live2D Cubism Core 를 찾을 수 없습니다: 설정에서 Core 파일이나 공식 SDK ZIP 을 가져오면 Live2D 렌더링이 켜집니다.",
     "live2dComponentMissing": "Live2D 렌더링 구성 요소가 없습니다: 프로그램 옆 cores 폴더의 bongo_live2d 를 복원하거나 프로그램을 다시 설치하세요.",
     "live2dCoreImported": "Live2D Cubism Core 를 가져왔습니다.",
+    "live2dCoreRestartHint": "다시 시작해야 적용됩니다",
+    "live2dCoreRestartRequired": "Cubism Core 는 가져왔지만, 이번 실행은 시작할 때 정해진 렌더링 방식을 그대로 사용합니다. 프로그램을 한 번 다시 시작하면 가져온 Core 로 모델이 그려집니다.",
+    "live2dCoreRestartNow": "지금 다시 시작",
     "live2dCoreImportFailed": "Live2D Cubism Core 가져오기 실패:",
     "multiplePets": "여러 개 동시에 표시",
     "multiplePetsLimit": "데스크톱 펫은 한 번에 최대 8개까지 표시할 수 있습니다",

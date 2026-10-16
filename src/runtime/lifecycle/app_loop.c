@@ -18,6 +18,7 @@
 #include "bongo_cat/preferences.h"
 #include "bongo_cat/render.h"
 #include "bongo_cat/tray.h"
+#include "preferences_live2d_setup.h"
 
 #include <SDL3/SDL_opengl.h>
 
@@ -282,6 +283,10 @@ void bongo_cat_app_loop(BongoCatApp *app) {
         uint64_t now = SDL_GetTicksNS();
         bongo_cat_preferences_model_watch(app->preferences, now);
         bongo_cat_preferences_poll_imports(app->preferences);
+        /* 导入 Core 成功后的"要不要现在重启"在这里收口。放在主循环而不是设置页的渲染里:
+           文件对话框的回调可能在别的线程上, 而设置页又可能不在当前那一页 —— 那样提示会一直
+           悬着。主循环每一帧都会跑到, 且这是主线程。 */
+        bongo_cat_preferences_live2d_restart_prompt_poll(app);
         bongo_cat_model_refresh_update(app);
         take_instance_wake(app);
         if (take_update_shutdown(app)) continue;

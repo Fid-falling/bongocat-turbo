@@ -17,7 +17,10 @@
         "downloadButton": "ダウンロードページを開く",
         "silence": "今後表示しない",
         "silenceHint": "Cubism Core が無い間, 設定ウィンドウと通知を自動で開かないようにします。",
-        "onboarding": "モデルが表示されないのは, Live2D Cubism Core というランタイムがまだ取り込まれていないためです。Live2D 公式サイトから Cubism SDK for Native をダウンロードしてライセンスに同意したうえで, いま開いた設定ウィンドウで ZIP か Core ファイルを取り込んでください。このライブラリは同梱も自動ダウンロードもされません。"
+        "onboarding": "モデルが表示されないのは, Live2D Cubism Core というランタイムがまだ取り込まれていないためです。Live2D は同梱も代行ダウンロードも認めていないため, お手数ですがご自身で取得してください:\n\n1. 下の\"ダウンロードページを開く\"を押して Live2D 公式サイトを開きます。\n2. 公式サイトでソフトウェア使用許諾契約とプライバシーポリシーへの同意にチェックを入れます。\n3. \"初回ダウンロード\"を選び, 続いて\"個人\"を選びます。\n4. メールアドレスを入力します —— 入力しないと\"最新版をダウンロード\"ボタンが灰色のままで押せません。\n5. \"最新版をダウンロード\"を押します(\"最新版のベータ版\"はプレビュー版なので押さないでください)。\n6. ここに戻って\"今すぐ取り込む...\"でその ZIP を選ぶか, ZIP を設定ウィンドウにドラッグしてください。\n\nこのライブラリは同梱も自動ダウンロードもされません。",
+        "importNow": "今すぐ取り込む...",
+        "later": "後で",
+        "dontAsk": "今後表示しない"
       },
       "title": "設定",
       "cat": {
@@ -285,6 +288,9 @@
     "live2dCoreMissing": "Live2D Cubism Core が見つかりません: 設定で Core ファイルか公式 SDK の ZIP を取り込むと Live2D 描画が有効になります。",
     "live2dComponentMissing": "Live2D 描画コンポーネントがありません: アプリと同じ階層の cores フォルダーにある bongo_live2d を復元するか, アプリを再インストールしてください。",
     "live2dCoreImported": "Live2D Cubism Core を取り込みました。",
+    "live2dCoreRestartHint": "再起動後に有効になります",
+    "live2dCoreRestartRequired": "Cubism Core は取り込み済みですが, 今回の実行では起動時に選ばれた描画方法のままです。一度アプリを再起動すると, 取り込んだ Core でモデルが描画されます。",
+    "live2dCoreRestartNow": "今すぐ再起動",
     "live2dCoreImportFailed": "Live2D Cubism Core の取り込みに失敗しました:",
     "multiplePets": "複数を同時に表示",
     "multiplePetsLimit": "一度に表示できるデスクトップペットは 8 体までです",

@@ -86,9 +86,16 @@ bool bongo_cat_renderer_module_validate(const BongoCatRendererModule *module,
     char *reason, size_t capacity);
 bool bongo_cat_renderer_module_validate_host(
     const BongoCatRendererModuleHost *host);
-/* 只装载(不建实例): 宿主可能有多个 Live2D 实例(主窗口 + 封面), 而组件只有一份实现。 */
+/* 只装载(不建实例): 宿主可能有多个 Live2D 实例(主窗口 + 封面), 而组件只有一份实现。
+   **这是生产路径**: live2d_dispatch.c 的 ensure_component 调它拿到描述符, 然后自己建实例。 */
 bool bongo_cat_renderer_module_load(const char *path, BongoCatError *error);
-/* 装载 + 建一个实例(测试与单实例路径用)。 */
+/*
+ * 装载 + 建一个实例的便利封装, **只有测试用**(tests/plugin/test_renderer_module_abi.c)。
+ * 生产不走它: 实例由分发层建, 因为"组件 create 失败就回落诊断实现"这条降级只有分发层知道。
+ * 这也意味着 bongo_cat_renderer_module_active() 回答的是"这条便利路径建过实例没有", 而不是
+ * "这次运行真的在用组件渲染" —— 后者要问 live2d_dispatch.h 的
+ * bongo_cat_live2d_native_active()(设置页状态行与审计的 renderer= 都用它, 两者必须同源)。
+ */
 bool bongo_cat_renderer_module_open(const char *path, const char *asset_root,
     BongoCatError *error);
 /* 已装载组件的描述符(未装载为 NULL): 分发层据此取 ops。 */

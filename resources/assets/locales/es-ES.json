@@ -17,7 +17,10 @@
         "downloadButton": "Abrir la pagina de descarga",
         "silence": "No volver a avisar",
         "silenceHint": "Mientras falte Cubism Core, no abrir esta ventana ni mostrar el aviso automaticamente.",
-        "onboarding": "El modelo no se muestra porque aun no se ha importado el runtime Live2D Cubism Core. Descarga Cubism SDK for Native desde el sitio oficial de Live2D, acepta su licencia y elige el ZIP o la biblioteca Core en la ventana de ajustes que se acaba de abrir. Esta biblioteca no se incluye ni se descarga por ti."
+        "onboarding": "El modelo no se muestra porque aun no se ha importado el runtime Live2D Cubism Core. Live2D no nos permite incluirlo ni descargarlo, asi que consiguelo tu:\n\n1. Pulsa \"Abrir la pagina de descarga\" abajo para abrir el sitio oficial de Live2D.\n2. Marca alli la aceptacion del contrato de licencia y de la politica de privacidad.\n3. Elige \"Primera descarga\" y luego \"Particular\".\n4. Escribe tu direccion de correo electronico: sin ella, el boton \"Descargar la ultima version\" sigue en gris y no se puede pulsar.\n5. Pulsa \"Descargar la ultima version\" (no la version beta, que es una version preliminar).\n6. Vuelve aqui y pulsa \"Importar ahora...\" para elegir ese ZIP, o arrastralo a la ventana de ajustes.\n\nEsta biblioteca no se incluye ni se descarga por ti.",
+        "importNow": "Importar ahora...",
+        "later": "Mas tarde",
+        "dontAsk": "No volver a avisar"
       },
       "title": "Preferencias",
       "cat": {
@@ -285,6 +288,9 @@
     "live2dCoreMissing": "No se encontro Live2D Cubism Core: importa la biblioteca Core o el ZIP oficial del SDK en la ventana de ajustes para activar la representacion Live2D.",
     "live2dComponentMissing": "Falta el componente de representacion Live2D: restaura bongo_live2d en la carpeta cores junto a la aplicacion o reinstala la aplicacion.",
     "live2dCoreImported": "Live2D Cubism Core importado.",
+    "live2dCoreRestartHint": "requiere reiniciar",
+    "live2dCoreRestartRequired": "Cubism Core se ha importado, pero esta ejecucion sigue usando el modo de dibujo elegido al arrancar. Reinicia la aplicacion una vez y el modelo se dibujara con el Core importado.",
+    "live2dCoreRestartNow": "Reiniciar ahora",
     "live2dCoreImportFailed": "Fallo al importar Live2D Cubism Core:",
     "multiplePets": "Mostrar varias a la vez",
     "multiplePetsLimit": "Se pueden mostrar hasta 8 mascotas a la vez",

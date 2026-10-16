@@ -17,7 +17,10 @@
         "downloadButton": "開啟下載頁",
         "silence": "不再提示",
         "silenceHint": "缺少 Cubism Core 時, 不再自動開啟設定視窗與提示。",
-        "onboarding": "模型目前不顯示, 是因為尚未匯入 Live2D Cubism Core 這個執行階段程式庫。請前往 Live2D 官網自行下載 Cubism SDK for Native 並同意其授權條款後, 在剛開啟的設定視窗裡選取壓縮檔或 Core 檔案匯入。本程式不附帶、也不代為下載這個程式庫。"
+        "onboarding": "模型目前不顯示, 是因為尚未匯入 Live2D Cubism Core 這個執行階段程式庫。Live2D 不允許我們附帶或代下它, 所以要麻煩你自己去取得:\n\n1. 點下面的\"開啟下載頁\", 開啟 Live2D 官網;\n2. 在官網勾選\"同意軟體使用授權協議以及隱私政策\";\n3. 選\"首次下載\", 再選\"個人\";\n4. 填上你的電子郵件 —— 不填的話\"下載最新版\"按鈕是灰的, 點不動;\n5. 點\"下載最新版\"(不要點\"下載最新版的測試版本\", 那是預覽版);\n6. 回到這裡點\"立即匯入...\"選取剛下到的壓縮檔, 也可以直接把壓縮檔拖進設定視窗。\n\n本程式不附帶、也不代為下載這個程式庫。",
+        "importNow": "立即匯入...",
+        "later": "稍後",
+        "dontAsk": "不再提示"
       },
       "title": "偏好設定",
       "cat": {
@@ -285,6 +288,9 @@
     "live2dCoreMissing": "未偵測到 Live2D Cubism Core: 在設定中匯入 Core 檔案或官方 SDK 壓縮檔即可啟用 Live2D 渲染。",
     "live2dComponentMissing": "缺少 Live2D 渲染元件: 請還原程式目錄下 cores 資料夾中的 bongo_live2d, 或重新安裝程式。",
     "live2dCoreImported": "Live2D Cubism Core 已匯入。",
+    "live2dCoreRestartHint": "重啟後生效",
+    "live2dCoreRestartRequired": "Cubism Core 已經匯入好了, 但這次執行用的還是啟動時選定的繪製方式。重啟一次程式, 模型就會用剛匯入的 Core 畫出來。",
+    "live2dCoreRestartNow": "立即重啟",
     "live2dCoreImportFailed": "Live2D Cubism Core 匯入失敗:",
     "multiplePets": "同時顯示多個",
     "multiplePetsLimit": "最多可同時顯示 8 個桌寵",

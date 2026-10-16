@@ -63,7 +63,15 @@ typedef struct BongoCatLive2DCoreImport {
 BongoCatResult bongo_cat_live2d_core_import(const char *source,
     BongoCatLive2DCoreImport *report, BongoCatError *error);
 
-/* 回滚到最近一次被替换的 Core(report->previous)。没有可回滚的文件返回 FORMAT。 */
+/*
+ * 回滚到最近一次被替换的 Core(report->previous)。没有可回滚的文件返回 FORMAT。
+ *
+ * **目前没有 UI 入口**(2026-10 的决定, 见 docs/live2d-core.md 第 4 节: 教程里如实写着
+ * "设置里还没有回滚按钮")。保留实现是因为"导入了一份不能用的 Core"确实是用户会遇到的
+ * 情况, 而回滚本身(改名换回 + 重写 core.json)已经在这里实现并测过, 将来接 UI 只差一个
+ * 按钮与"有没有 .bak"的查询。在那之前**不要在任何用户可见文案里承诺"一键回滚"** ——
+ * 宁可说"把 .bak 改回原名", 也不要说一个不存在的按钮。
+ */
 BongoCatResult bongo_cat_live2d_core_rollback(BongoCatError *error);
 
 /* 读取 <存储根>/cores/core.json 里记录的元数据(上一次成功导入的结果)。 */

@@ -17,7 +17,10 @@
         "downloadButton": "打开下载页",
         "silence": "不再提示",
         "silenceHint": "缺 Cubism Core 时, 不再自动打开设置窗口和提示。",
-        "onboarding": "模型现在不显示, 是因为还没有导入 Live2D Cubism Core 这个运行库。请前往 Live2D 官网自行下载 Cubism SDK for Native 并同意其许可后, 在刚打开的设置窗口里选中压缩包或 Core 文件导入。程序不附带、也不代为下载这个运行库。"
+        "onboarding": "模型现在不显示, 是因为还没有导入 Live2D Cubism Core 这个运行库。Live2D 不允许我们附带或代下它, 所以要麻烦你自己去取:\n\n1. 点下面的\"打开下载页\", 打开 Live2D 官网;\n2. 在官网上勾选\"同意软件使用授权协议以及隐私政策\";\n3. 选\"首次下载\", 再选\"个人\";\n4. 填上你的电子邮箱 —— 不填的话\"下载最新版\"按钮是灰的, 点不动;\n5. 点\"下载最新版\"(不要点\"下载最新版的测试版本\", 那是预览版);\n6. 回到这里点\"立即导入...\"选中刚下到的压缩包, 也可以直接把压缩包拖进设置窗口。\n\n程序不附带、也不代为下载这个运行库。",
+        "importNow": "立即导入...",
+        "later": "稍后",
+        "dontAsk": "不再提示"
       },
       "title": "偏好设置",
       "cat": {
@@ -285,6 +288,9 @@
     "live2dCoreMissing": "未检测到 Live2D Cubism Core: 在设置里导入 Core 文件或官方 SDK 压缩包即可启用 Live2D 渲染。",
     "live2dComponentMissing": "缺少 Live2D 渲染组件: 请恢复程序目录下 cores 文件夹里的 bongo_live2d, 或重新安装程序。",
     "live2dCoreImported": "Live2D Cubism Core 已导入。",
+    "live2dCoreRestartHint": "重启后生效",
+    "live2dCoreRestartRequired": "Cubism Core 已经导入好了, 但这次运行用的还是启动时选定的渲染方式。重启一次程序, 模型就会用刚导入的 Core 画出来。",
+    "live2dCoreRestartNow": "立即重启",
     "live2dCoreImportFailed": "Live2D Cubism Core 导入失败:",
     "multiplePets": "同时显示多个",
     "multiplePetsLimit": "最多可同时显示 8 个桌宠",
