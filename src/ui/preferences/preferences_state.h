@@ -50,8 +50,16 @@
  */
 enum BongoCatOptionsSection {
     BONGO_CAT_OPTIONS_WINDOW,
+    /* 宠物页的[行为]子区 (穿透/置顶/隐藏/吸附/滑动), 与 [画面] 同属原"窗口"拆分而来 */
+    BONGO_CAT_OPTIONS_BEHAVIOR,
+    /* 窗口页再拆为 位置/样式/背景 三个可折叠分区 (原 [画面]+[行为] 重组) */
+    BONGO_CAT_OPTIONS_POSITION,
+    BONGO_CAT_OPTIONS_STYLE,
+    BONGO_CAT_OPTIONS_BACKGROUND,
     BONGO_CAT_OPTIONS_PERFORMANCE,
     BONGO_CAT_OPTIONS_MODEL,
+    /* 从 [模型] 区拆出的组合镜像 (模型水平/垂直 + 手势水平/垂直) */
+    BONGO_CAT_OPTIONS_MIRROR,
     BONGO_CAT_OPTIONS_APPLICATION,
     BONGO_CAT_OPTIONS_APPEARANCE,
     BONGO_CAT_OPTIONS_RANDOM,

@@ -19,12 +19,14 @@ void bongo_cat_preferences_draw_page(BongoCatPreferences *value,
 }
 
 /*
- * 偏好设置页顶部的切页条: 两个子页 —— 左 (应用/外观/性能) 与 右 (窗口/模型/权限)。
+ * 偏好设置页顶部的切页条: 三个子页 —— 应用 (App: 应用/界面) · 性能 (Performance) ·
+ * 宠物 (Pet: 画面/模型/行为/权限)。
  *
  * 它只切 value->preferences_tab 这一个子页下标, 刻意不改 value->page: 侧栏仍然是原来的
  * 四项, 点一下切页条也不会跳到侧栏别的页的设置内容上 (这正是最初要解除的行为)。
- * 样式与模型页顶部那条一致 (见 bongo_cat_pref_page_tabs)。左子页的文案沿用这一页自己的
- * 标题 key, 右子页是新增的一条 (pages.preference.cat.tabs.interaction)。
+ * 样式与模型页顶部那条一致 (见 bongo_cat_pref_page_tabs)。
+ * 应用页用 tabs.application, 性能页用 tabs.performance, 窗口页用新增键 tabs.window,
+ * 互动页用新增键 tabs.interaction。
  *
  * 返回 true 表示"占了一行 (44 + 余量)", 调用方要把内容区高度减掉 50。
  * interactive 为假 (有模态弹窗时) 只画不响应点击, 免得点穿到弹窗底下的页面上。
@@ -43,12 +45,16 @@ bool bongo_cat_preferences_subnavigation(BongoCatPreferences *value,
         return false;
     }
     const char *labels[] = {
-        bongo_cat_i18n_get(value->app->i18n, "pages.preference.cat.title",
-            "Preferences"),
+        bongo_cat_i18n_get(value->app->i18n,
+            "pages.preference.cat.tabs.application", "Application"),
+        bongo_cat_i18n_get(value->app->i18n,
+            "pages.preference.cat.tabs.performance", "Performance"),
+        bongo_cat_i18n_get(value->app->i18n,
+            "pages.preference.cat.tabs.window", "Window"),
         bongo_cat_i18n_get(value->app->i18n,
             "pages.preference.cat.tabs.interaction", "Interaction")};
     int selected = bongo_cat_pref_page_tabs(context, "preferences-sections",
-        labels, 2, value->preferences_tab, interactive);
+        labels, 4, value->preferences_tab, interactive);
     if (interactive && selected != value->preferences_tab) {
         value->preferences_tab = selected;
         /* 换了子页就从顶部看起, 否则会把上一子页的滚动位置带过去 */

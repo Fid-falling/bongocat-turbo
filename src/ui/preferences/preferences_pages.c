@@ -29,28 +29,15 @@ static void section_gap(struct nk_context *context, float pixels) {
     context->current->layout->at_y += pixels;
 }
 
-/* [窗口] 区 (右子页)。 */
-static void window_section(BongoCatPreferences *value, struct nk_context *context) {
+/* [位置] 区 (窗口页): 置顶 / 穿透 / 悬停 / 屏内 / 吸附 / 惯性。 */
+static void window_position_section(BongoCatPreferences *value,
+    struct nk_context *context) {
     BongoCatApp *app = value->app;
     BongoCatWindowPreferences *window = &app->settings.window;
-    BongoCatWindowState *window_state = &app->session.window;
     if (bongo_cat_preferences_options_begin(value, context,
-        BONGO_CAT_OPTIONS_WINDOW,
-        tr(app, "pages.preference.cat.labels.windowSettings", "Window"),
-        BONGO_CAT_PREF_ICON_SECTION_WINDOW)) {
-    bongo_cat_ui_question_tooltip(context, tr(app,
-        "pages.preference.cat.hints.gameInput", "Pet not responding in games?"),
-        tr(app, "pages.preference.cat.hints.gameInputHelp",
-            "Try running BongoCat as administrator and setting the game to windowed mode."));
-    bongo_cat_pref_row_icon(context, BONGO_CAT_PREF_ICON_PASS_THROUGH);
-    if (bongo_cat_pref_toggle(context, "pass-through", tr(app,
-        "composables.useAppMenu.labels.passThrough", "Pass Through"), tr(app,
-        "pages.preference.cat.hints.passThrough",
-        "You can also turn this off by right-clicking the tray icon"),
-        &window->pass_through)) {
-        bongo_cat_window_mark_hit_dirty(app);
-        bongo_cat_window_sync_click_through(app);
-    }
+        BONGO_CAT_OPTIONS_POSITION,
+        tr(app, "pages.preference.cat.labels.positionSettings", "Position"),
+        BONGO_CAT_PREF_ICON_SECTION_MODEL)) {
     bongo_cat_pref_row_icon(context, BONGO_CAT_PREF_ICON_ALWAYS_ON_TOP);
     if (bongo_cat_pref_toggle(context, "always-top", tr(app,
         "composables.useAppMenu.labels.alwaysOnTop", "Always on Top"), "",
@@ -59,6 +46,10 @@ static void window_section(BongoCatPreferences *value, struct nk_context *contex
         bongo_cat_window_mark_hit_dirty(app);
         bongo_cat_window_sync_click_through(app);
     }
+    bongo_cat_ui_question_tooltip(context, tr(app,
+        "pages.preference.cat.hints.gameInput", "Pet not responding in games?"),
+        tr(app, "pages.preference.cat.hints.gameInputHelp",
+            "Try running BongoCat as administrator and setting the game to windowed mode."));
     if (window->pass_through && window->always_on_top &&
         app->platform.hover_hide_unavailable) {
         bongo_cat_pref_row_icon(context, BONGO_CAT_PREF_ICON_SHORTCUT_VISIBILITY);
@@ -138,32 +129,19 @@ static void window_section(BongoCatPreferences *value, struct nk_context *contex
             app->dirty = true;
         }
     }
-    /* 只在录屏/直播软件里显示: 仅 Windows 有等价机制 (DWM 隐藏), 其它平台不显示
-       这一项, 免得给用户一个点了没反应的开关。 */
-    if (bongo_cat_platform_capture_only_supported()) {
-        bongo_cat_pref_row_icon(context, BONGO_CAT_PREF_ICON_SOLID_BACKGROUND);
-        if (bongo_cat_pref_toggle(context, "capture-only", tr(app,
-            "pages.preference.cat.labels.captureOnly", "Capture Only"), tr(app,
-            "pages.preference.cat.hints.captureOnly", "Hidden on the desktop, "
-            "still visible in OBS"), &window->capture_only)) {
-            bongo_cat_window_apply_capture_only(app);
-            app->dirty = true;
-        }
+    bongo_cat_preferences_options_end(value, context);
     }
-    /* 透明背景: 实现在 preferences_window_transparency.c, 只有 Windows 有等价机制,
-       其它平台连定义都没有, 所以调用点也要跟着条件编译。 */
-#ifdef _WIN32
-    bongo_cat_preferences_window_transparency(app, context);
-#endif
-    bongo_cat_pref_row_icon(context, BONGO_CAT_PREF_ICON_SOLID_BACKGROUND);
-    if (bongo_cat_pref_obs_background(context, "obs-background", tr(app,
-        "pages.preference.cat.labels.obsBackground", "Solid Background"), tr(app,
-        "pages.preference.cat.hints.obsBackground", "Window capture is black?"), tr(app,
-        "pages.preference.cat.hints.obsBackgroundHelp", "OBS: enable this option, use "
-        "the Windows 7 compatibility method, and remove the background with a "
-        "color key filter."),
-        &window->obs_background, &window->obs_background_color))
-        app->dirty = true;
+}
+/* [样式] 区 (窗口页): 尺寸 / 圆角 / 不透明度。 */
+static void window_style_section(BongoCatPreferences *value,
+    struct nk_context *context) {
+    BongoCatApp *app = value->app;
+    BongoCatWindowPreferences *window = &app->settings.window;
+    BongoCatWindowState *window_state = &app->session.window;
+    if (bongo_cat_preferences_options_begin(value, context,
+        BONGO_CAT_OPTIONS_STYLE,
+        tr(app, "pages.preference.cat.labels.styleSettings", "Style"),
+        BONGO_CAT_PREF_ICON_SECTION_WINDOW)) {
     float old_scale = window_state->scale_percent;
     bongo_cat_pref_row_icon(context, BONGO_CAT_PREF_ICON_WINDOW_SIZE);
     bongo_cat_pref_float(context, "window-size", tr(app,
@@ -207,6 +185,54 @@ static void window_section(BongoCatPreferences *value, struct nk_context *contex
     }
 }
 
+/* [背景] 区 (窗口页): 窗口在桌面上怎么呈现 —— 仅录屏显示 / 实体背景 / 透明背景。 */
+static void window_background_section(BongoCatPreferences *value,
+    struct nk_context *context) {
+    BongoCatApp *app = value->app;
+    BongoCatWindowPreferences *window = &app->settings.window;
+    if (bongo_cat_preferences_options_begin(value, context,
+        BONGO_CAT_OPTIONS_BACKGROUND,
+        tr(app, "pages.preference.cat.labels.backgroundSettings", "Background"),
+        BONGO_CAT_PREF_ICON_SECTION_WINDOW)) {
+    /* 只在录屏/直播软件里显示: 仅 Windows 有等价机制 (DWM 隐藏), 其它平台不显示
+       这一项, 免得让用户点一个没反应的开关。 */
+    if (bongo_cat_platform_capture_only_supported()) {
+        bongo_cat_pref_row_icon(context, BONGO_CAT_PREF_ICON_SOLID_BACKGROUND);
+        if (bongo_cat_pref_toggle(context, "capture-only", tr(app,
+            "pages.preference.cat.labels.captureOnly", "Capture Only"), tr(app,
+            "pages.preference.cat.hints.captureOnly", "Hidden on the desktop, "
+            "still visible in OBS"), &window->capture_only)) {
+            bongo_cat_window_apply_capture_only(app);
+            app->dirty = true;
+        }
+    }
+    bongo_cat_pref_row_icon(context, BONGO_CAT_PREF_ICON_SOLID_BACKGROUND);
+    if (bongo_cat_pref_obs_background(context, "obs-background", tr(app,
+        "pages.preference.cat.labels.obsBackground", "Solid Background"), tr(app,
+        "pages.preference.cat.hints.obsBackground", "Window capture is black?"), tr(app,
+        "pages.preference.cat.hints.obsBackgroundHelp", "OBS: enable this option, use "
+        "the Windows 7 compatibility method, and remove the background with a "
+        "color key filter."),
+        &window->obs_background, &window->obs_background_color))
+        app->dirty = true;
+    /* 透明背景: 只有 Windows 有等价机制, 其它平台连定义都没有, 调用点跟着条件编译。 */
+#ifdef _WIN32
+    bongo_cat_preferences_window_transparency(app, context);
+#endif
+    /* 鼠标穿透: 透明背景的下方。 */
+    bongo_cat_pref_row_icon(context, BONGO_CAT_PREF_ICON_PASS_THROUGH);
+    if (bongo_cat_pref_toggle(context, "pass-through", tr(app,
+        "composables.useAppMenu.labels.passThrough", "Pass Through"), tr(app,
+        "pages.preference.cat.hints.passThrough",
+        "You can also turn this off by right-clicking the tray icon"),
+        &window->pass_through)) {
+        bongo_cat_window_mark_hit_dirty(app);
+        bongo_cat_window_sync_click_through(app);
+    }
+    bongo_cat_preferences_options_end(value, context);
+    }
+}
+
 /* [性能] 区 (左子页)。 */
 static void performance_section(BongoCatPreferences *value,
     struct nk_context *context) {
@@ -215,6 +241,30 @@ static void performance_section(BongoCatPreferences *value,
         BONGO_CAT_OPTIONS_PERFORMANCE,
         tr(app, "pages.preference.cat.labels.performanceSettings", "Performance"),
         BONGO_CAT_PREF_ICON_SECTION_APPEARANCE)) {
+    /* 渲染后端: 实现在 preferences_renderer_row.c (它要同时管"写配置 -> 确认框 ->
+       重启"和"被拒也要留痕", 与托盘那一项共用 runtime 里的同一份实现)。
+       放最前: 选哪个后端渲是最底层的决定, 之后的帧率/垂直同步都跑在这个后端上。 */
+    bongo_cat_preferences_renderer_row(app, context);
+    /* 帧节奏: 这一帧怎么出来。按什么节奏出帧 (最大帧率)、跟不跟显示器刷新 (垂直同步),
+       细细地为上面选的后端定出帧节奏。语义的唯一权威在 frame_clock.c 的
+       bongo_cat_app_apply_frame_pacing(), 这里的提示文案必须和它一致。 */
+    bongo_cat_pref_row_icon(context, BONGO_CAT_PREF_ICON_MAX_FPS);
+    app->settings.model.max_fps = bongo_cat_pref_fps(context, "max-fps",
+        tr(app, "pages.preference.cat.labels.maxFPS", "Max Frame Rate"),
+        app->settings.model.max_fps,
+        tr(app, "pages.preference.cat.labels.unlimitedFps", "Unlimited"));
+    bool perf_vsync = app->settings.model.vsync != 0;
+    bongo_cat_pref_row_icon(context, BONGO_CAT_PREF_ICON_VSYNC);
+    if (bongo_cat_pref_toggle(context, "vsync", tr(app,
+            "pages.preference.cat.labels.vsync", "V-Sync"),
+            tr(app, "pages.preference.cat.hints.vsync",
+                "让画面与显示器刷新同步, 减少撕裂; 关闭后按上面的最大帧率运行"),
+            &perf_vsync)) {
+        app->settings.model.vsync = perf_vsync ? 1 : 0;
+        app->dirty = true;
+    }
+
+    /* 画质取舍: 每一帧要画多精致、花多少资源 —— 三档都能下调来省显存。 */
     {
         /* 超采样: 质量档 2x 边缘更干净; 2x 是 4 倍面积, 大窗口很吃显存 */
         const char *const labels[] = {
@@ -268,13 +318,13 @@ static void performance_section(BongoCatPreferences *value,
     }
 }
 
-/* [模型] 区 (右子页)。 */
-static void model_section(BongoCatPreferences *value, struct nk_context *context) {
+/* [镜像] 区 (右子页)。模型水平/垂直镜像、手势水平/垂直镜像, 从 [模型] 区单独拆出的组合镜像。 */
+static void mirror_section(BongoCatPreferences *value, struct nk_context *context) {
     BongoCatApp *app = value->app;
     BongoCatModelPreferences *model = &app->settings.model;
     if (bongo_cat_preferences_options_begin(value, context,
-        BONGO_CAT_OPTIONS_MODEL,
-        tr(app, "pages.preference.cat.labels.modelSettings", "Model"),
+        BONGO_CAT_OPTIONS_MIRROR,
+        tr(app, "pages.preference.cat.labels.mirrorSection", "Mirror"),
         BONGO_CAT_PREF_ICON_SECTION_MODEL)) {
     bongo_cat_pref_row_icon(context, BONGO_CAT_PREF_ICON_MIRROR);
     if (bongo_cat_pref_toggle(context, "mirror", tr(app,
@@ -301,6 +351,18 @@ static void model_section(BongoCatPreferences *value, struct nk_context *context
         "pages.preference.cat.labels.mouseVerticalMirror",
         "Hand Vertical Mirror"), "", &model->mouse_vertical_flip))
         bongo_cat_app_reset_pointer_tracking(app);
+    bongo_cat_preferences_options_end(value, context);
+    }
+}
+
+/* [输入] 区 (右子页)。镜像相关已拆到 [镜像] 分区, 这里只留指针/输入相关的选项。 */
+static void input_section(BongoCatPreferences *value, struct nk_context *context) {
+    BongoCatApp *app = value->app;
+    BongoCatModelPreferences *model = &app->settings.model;
+    if (bongo_cat_preferences_options_begin(value, context,
+        BONGO_CAT_OPTIONS_MODEL,
+        tr(app, "pages.preference.cat.labels.inputSettings", "Input"),
+        BONGO_CAT_PREF_ICON_SECTION_MODEL)) {
     bongo_cat_pref_row_icon(context, BONGO_CAT_PREF_ICON_MOUSE_CENTERED);
     if (bongo_cat_pref_toggle(context, "mouse-centered", tr(app,
         "pages.preference.cat.labels.mouseCentered", "Mouse Centered on Desktop Pet"),
@@ -350,45 +412,19 @@ static void model_section(BongoCatPreferences *value, struct nk_context *context
             }
         }
     }
-    bongo_cat_pref_row_icon(context, BONGO_CAT_PREF_ICON_MAX_FPS);
-    model->max_fps = bongo_cat_pref_fps(context, "max-fps", tr(app,
-        "pages.preference.cat.labels.maxFPS", "Max Frame Rate"), model->max_fps,
-        tr(app, "pages.preference.cat.labels.unlimitedFps", "Unlimited"));
-    /*
-     * 垂直同步: 排在「最大帧率」与「渲染后端」之间 —— 这三行回答的是同一个问题("这一帧怎么
-     * 出来"), 用户调整顺序时也是连着看的, 所以紧挨着放。开=锁在显示器刷新率上(FIFO /
-     * swap interval 1), 关=按上面的"最大帧率"限帧(IMMEDIATE / swap interval 0); 两种状态下
-     * "最大帧率"都仍然是天花板。语义的唯一权威在 frame_clock.c 的
-     * bongo_cat_app_apply_frame_pacing(), 这里的提示文案必须和它一致。
-     *
-     * 显示的是**收口后**的值: 老配置里 sentinel(-1)已经由 settings_validate 按"同步跟随帧率"
-     * 的老规则解成了 0/1, 所以界面看到的就是当前真实生效的状态; 用户一拨动就写成显式 0/1,
-     * 从此不再依赖那条兼容规则。
-     */
-    bool vsync = app->settings.model.vsync != 0;
-    bongo_cat_pref_row_icon(context, BONGO_CAT_PREF_ICON_VSYNC);
-    if (bongo_cat_pref_toggle(context, "vsync", tr(app,
-            "pages.preference.cat.labels.vsync", "V-Sync"),
-            tr(app, "pages.preference.cat.hints.vsync",
-                "让画面与显示器刷新同步, 减少撕裂; 关闭后按上面的最大帧率运行"),
-            &vsync)) {
-        app->settings.model.vsync = vsync ? 1 : 0;
-        app->dirty = true;
-    }
-    /* 渲染后端: 实现在 preferences_renderer_row.c (它要同时管"写配置 -> 确认框 ->
-       重启"和"被拒也要留痕", 与托盘那一项共用 runtime 里的同一份实现)。 */
-    bongo_cat_preferences_renderer_row(app, context);
     bongo_cat_preferences_options_end(value, context);
     }
 }
 
 /*
- * 偏好设置页正文 (侧栏「偏好设置」那一页)。页顶的切页条把它分成两个子页, 由
+ * 偏好设置页正文 (侧栏「偏好设置」那一页)。页顶的切页条把它分成三个子页, 由
  * value->preferences_tab 选择 (切页逻辑见 preferences_page_dispatch.c):
- *   0 = 左子页: 应用 / 外观 / 性能 —— 程序怎么跑、长什么样、跑多快;
- *   1 = 右子页: 窗口 / 模型 / 权限 —— 桌宠窗口与模型本身怎么显示、怎么响应输入。
- * 两个子页共用同一个页面组与滚动槽 (下标 0), 切子页时由切页条把滚动复位到顶部。
- * [应用]/[外观]/[权限] 三区定义在 preferences_general_page.c (见那里的行数策略说明)。
+ *   0 = 应用页 (App): 应用 / 界面 —— 程序怎么跑、长什么样;
+ *   1 = 性能页 (Perf): 超采样 / UI效果 / 字体锐化 / 最大帧率 / 垂直同步 / 渲染后端;
+ *   2 = 窗口页 (Window): 位置 / 样式 / 背景 —— 桌宠窗口的位置、观感与背景;
+ *   3 = 互动页 (Interaction): 输入 / 镜像 / 权限 —— 桌宠本身怎么响应交互、怎么显示。
+ * 三个子页共用同一个页面组与滚动槽 (下标 0), 切子页时由切页条把滚动复位到顶部。
+ * [应用]/[界面]/[权限] 三区定义在 preferences_general_page.c (见那里的行数策略说明)。
  */
 void bongo_cat_preferences_page_settings(BongoCatPreferences *value,
     struct nk_context *context) {
@@ -396,13 +432,23 @@ void bongo_cat_preferences_page_settings(BongoCatPreferences *value,
         bongo_cat_preferences_application_section(value, context);
         section_gap(context, 10);
         bongo_cat_preferences_appearance_section(value, context);
-        section_gap(context, 10);
+        return;
+    }
+    if (value->preferences_tab == 1) {
         performance_section(value, context);
         return;
     }
-    window_section(value, context);
+    if (value->preferences_tab == 2) {
+        window_position_section(value, context);
+        section_gap(context, 10);
+        window_style_section(value, context);
+        section_gap(context, 10);
+        window_background_section(value, context);
+        return;
+    }
+    input_section(value, context);
     section_gap(context, 10);
-    model_section(value, context);
+    mirror_section(value, context);
     section_gap(context, 10);
     bongo_cat_preferences_permissions_section(value, context);
 }

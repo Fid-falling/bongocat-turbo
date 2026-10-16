@@ -26,10 +26,18 @@
       "cat": {
         "title": "Einstellungen",
         "tabs": {
+          "application": "Anwendung",
+          "performance": "Leistung",
+          "window": "Fenster",
           "interaction": "Interaktion"
         },
         "labels": {
-          "modelSettings": "Modell",
+          "inputSettings": "Eingabe",
+          "positionSettings": "Position",
+          "styleSettings": "Stil",
+          "backgroundSettings": "Hintergrund",
+          "mirrorSection": "Spiegel",
+          "behaviorSettings": "Verhalten",
           "mirrorMode": "Modell horizontal spiegeln",
           "verticalMirror": "Modell vertikal spiegeln",
           "mouseMirror": "Hand horizontal spiegeln",

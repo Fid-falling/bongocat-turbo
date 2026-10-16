@@ -26,10 +26,18 @@
       "cat": {
         "title": "Preferences",
         "tabs": {
+          "application": "Application",
+          "performance": "Performance",
+          "window": "Window",
           "interaction": "Interaction"
         },
         "labels": {
-          "modelSettings": "Model",
+          "inputSettings": "Input",
+          "positionSettings": "Position",
+          "styleSettings": "Style",
+          "backgroundSettings": "Background",
+          "mirrorSection": "Mirror",
+          "behaviorSettings": "Behavior",
           "mirrorMode": "Model Horizontal Mirror",
           "verticalMirror": "Model Vertical Mirror",
           "mouseMirror": "Hand Horizontal Mirror",

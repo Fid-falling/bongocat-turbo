@@ -26,10 +26,18 @@
       "cat": {
         "title": "設定",
         "tabs": {
-          "interaction": "操作"
+          "application": "アプリ",
+          "performance": "パフォーマンス",
+          "window": "ウィンドウ",
+          "interaction": "インタラクション"
         },
         "labels": {
-          "modelSettings": "モデル",
+          "inputSettings": "入力",
+          "positionSettings": "位置",
+          "styleSettings": "スタイル",
+          "backgroundSettings": "背景",
+          "mirrorSection": "ミラー",
+          "behaviorSettings": "動作",
           "mirrorMode": "モデル水平ミラー",
           "verticalMirror": "モデル垂直ミラー",
           "mouseMirror": "手の水平ミラー",

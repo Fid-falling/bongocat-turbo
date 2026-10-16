@@ -26,10 +26,18 @@
       "cat": {
         "title": "환경 설정",
         "tabs": {
-          "interaction": "상호 작용"
+          "application": "앱",
+          "performance": "성능",
+          "window": "창",
+          "interaction": "상호작용"
         },
         "labels": {
-          "modelSettings": "모델",
+          "inputSettings": "입력",
+          "positionSettings": "위치",
+          "styleSettings": "스타일",
+          "backgroundSettings": "배경",
+          "mirrorSection": "미러",
+          "behaviorSettings": "동작",
           "mirrorMode": "모델 가로 미러",
           "verticalMirror": "모델 세로 미러",
           "mouseMirror": "손 가로 미러",

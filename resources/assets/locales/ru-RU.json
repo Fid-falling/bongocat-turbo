@@ -26,10 +26,18 @@
       "cat": {
         "title": "Настройки",
         "tabs": {
+          "application": "Приложение",
+          "performance": "Производительность",
+          "window": "Окно",
           "interaction": "Взаимодействие"
         },
         "labels": {
-          "modelSettings": "Модель",
+          "inputSettings": "Ввод",
+          "positionSettings": "Позиция",
+          "styleSettings": "Стиль",
+          "backgroundSettings": "Фон",
+          "mirrorSection": "Зеркало",
+          "behaviorSettings": "Поведение",
           "mirrorMode": "Горизонтальное зеркало модели",
           "verticalMirror": "Вертикальное зеркало модели",
           "mouseMirror": "Горизонтальное зеркало руки",

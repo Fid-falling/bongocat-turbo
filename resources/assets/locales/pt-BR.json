@@ -26,10 +26,18 @@
       "cat": {
         "title": "Preferências",
         "tabs": {
+          "application": "Aplicativo",
+          "performance": "Desempenho",
+          "window": "Janela",
           "interaction": "Interação"
         },
         "labels": {
-          "modelSettings": "Modelo",
+          "inputSettings": "Entrada",
+          "positionSettings": "Posição",
+          "styleSettings": "Estilo",
+          "backgroundSettings": "Fundo",
+          "mirrorSection": "Espelho",
+          "behaviorSettings": "Comportamento",
           "mirrorMode": "Espelho horizontal do modelo",
           "verticalMirror": "Espelho vertical do modelo",
           "mouseMirror": "Espelho horizontal da mão",

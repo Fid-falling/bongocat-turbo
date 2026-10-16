@@ -1,5 +1,5 @@
 /*
- * 设置窗口 [窗口] 区里的"透明背景"开关 (window.transparentBackground)。
+ * 设置窗口 [画面] 区 (宠物页的子区) 里的"透明背景"开关 (window.transparentBackground)。
  *
  * 为什么单独一个文件: preferences_pages.c 已经贴着 500 行的策略上限 (见
  * cmake/CheckLines.cmake), 而这一项从文案到"改完立刻生效"都自成一块, 正好搬出来。

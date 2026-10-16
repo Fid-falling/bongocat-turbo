@@ -26,10 +26,18 @@
       "cat": {
         "title": "偏好",
         "tabs": {
+          "application": "應用",
+          "performance": "效能",
+          "window": "視窗",
           "interaction": "互動"
         },
         "labels": {
-          "modelSettings": "模型",
+          "inputSettings": "輸入",
+          "positionSettings": "位置",
+          "styleSettings": "樣式",
+          "backgroundSettings": "背景",
+          "mirrorSection": "鏡像",
+          "behaviorSettings": "行為",
           "mirrorMode": "模型水平鏡像",
           "verticalMirror": "模型垂直鏡像",
           "mouseMirror": "手部水平鏡像",

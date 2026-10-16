@@ -26,10 +26,18 @@
       "cat": {
         "title": "Préférences",
         "tabs": {
+          "application": "Application",
+          "performance": "Performance",
+          "window": "Fenêtre",
           "interaction": "Interaction"
         },
         "labels": {
-          "modelSettings": "Modèle",
+          "inputSettings": "Saisie",
+          "positionSettings": "Position",
+          "styleSettings": "Style",
+          "backgroundSettings": "Arrière-plan",
+          "mirrorSection": "Miroir",
+          "behaviorSettings": "Comportement",
           "mirrorMode": "Miroir horizontal du modèle",
           "verticalMirror": "Miroir vertical du modèle",
           "mouseMirror": "Miroir horizontal de la main",
