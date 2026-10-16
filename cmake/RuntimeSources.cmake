@@ -283,6 +283,9 @@ set(BONGO_CAT_UI_PREFERENCES_SOURCES
   # Live2D Cubism Core 的设置入口(状态行 + 选择压缩包 + 拖放路由 + 一次性提示)。
   # 单独成文件: 它是"法律合规流程的用户可见部分", 与渲染/模型页的改动无关。
   src/ui/preferences/preferences_live2d_setup.c
+  # 启动期的缺 Core 引导(弹窗即教程 + 官方页面 URL 策略)拆在另一个文件: 上面那个已经贴着
+  # 500 行的策略上限(见 cmake/CheckLines.cmake), 而这一块从 URL 策略到按钮语义自成一体。
+  src/ui/preferences/preferences_live2d_onboarding.c
   src/ui/preferences/preferences_about.c
   src/ui/preferences/preferences_about_community.c
   src/ui/preferences/preferences_about_footer.c

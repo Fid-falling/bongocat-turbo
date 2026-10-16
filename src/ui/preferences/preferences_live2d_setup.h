@@ -49,6 +49,17 @@ void bongo_cat_preferences_live2d_core_onboarding(BongoCatApp *app);
  * 放在主循环而不是设置页渲染里, 是因为设置页可能不在当前那一页, 那样提示会一直悬着。
  */
 void bongo_cat_preferences_live2d_restart_prompt_poll(BongoCatApp *app);
+/*
+ * 下面三个是"设置行(preferences_live2d_setup.c)"与"启动期引导
+ * (preferences_live2d_onboarding.c)"共用的动作。拆成两个文件只是因为设置那个文件已经贴着
+ * 500 行的策略上限(见 cmake/CheckLines.cmake), 不是分层 —— 所以接口刻意保持最小。
+ */
+/* 打开官方下载页(按界面语言选语言版本, 只打开页面、不代下载)。 */
+void bongo_cat_preferences_live2d_open_download_page(BongoCatApp *app);
+/* 打开文件选择器让用户选 SDK 压缩包 / Core 文件(导入的入口)。 */
+void bongo_cat_preferences_live2d_choose_core_file(BongoCatApp *app);
+/* "这一次运行的提示机会": 缺 Core 的短提示与引导弹窗共用一次, 抢到返回 true。 */
+bool bongo_cat_preferences_live2d_take_prompt_slot(void);
 /* 拖放入口: 返回真表示这个文件是"Core 相关"(SDK 压缩包或 Core 动态库)并且已被处理,
    调用方不要再把它当模型压缩包去解。判定只看文件名特征, 保守取值 —— 宁可让普通模型包
    继续走模型导入, 也不要把用户的模型 zip 当成 SDK 包去解析。 */
