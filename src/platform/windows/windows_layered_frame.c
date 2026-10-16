@@ -97,6 +97,65 @@ bool bongo_cat_windows_layered_capture(BongoCatWindowsLayered *value,
         read_frame(value, width, height, display_width, display_height);
 }
 
+/* 把一行 RGBA -> BGRA 拷到 dst, dst_pitch 为单字节步幅。只换 R/B, 不碰 alpha:
+   与 GL 路径一致, ULW_ALPHA 要求调用者喂的就是"渲染出来的那种 alpha 语义"
+   (预乘), 这里不多做一次预乘, 避免把半透明边缘压成 a^2。 */
+static void swap_rgba_row(const unsigned char *src, unsigned char *dst,
+    int width, int pitch) {
+    for (int x = 0; x < width; ++x) {
+        dst[x * 4 + 0] = src[x * 4 + 2];
+        dst[x * 4 + 1] = src[x * 4 + 1];
+        dst[x * 4 + 2] = src[x * 4 + 0];
+        dst[x * 4 + 3] = src[x * 4 + 3];
+    }
+    (void)pitch;
+}
+
+/*
+ * Vulkan 专用抓帧: 把整帧回读 (RGBA, 第 0 行为视觉上方) 换进内存 DC。
+ *
+ * 与 read_frame 对齐但方向相反: 回读是 RGBA 且自下而上翻转 (Vulkan 图像第 0 行在
+ * 视觉上方), DIB 是底上方的 BGRA —— 所以除了 R/B 交换还要把行翻转回去。缩放分支与
+ * GL 一致 (先翻进 readback, 再用 STBIR_BGRA_PM 重采样到 pixels), 约定已在 read_frame
+ * 上方说明; 命中测试走 Vulkan 自己的 vk_hit_alpha (vk_readback.c), 不走这里的
+ * frame_alpha, 所以 readback_valid 恒为 false。
+ */
+static bool read_frame_rgba(BongoCatWindowsLayered *value, int width, int height,
+    int display_width, int display_height, const unsigned char *rgba) {
+    value->source_width = width; value->source_height = height;
+    if (!resize_bitmap(value, display_width, display_height)) return false;
+    value->readback_valid = false;
+    if (width <= 0 || height <= 0 || !rgba) return false;
+    if (display_width == width && display_height == height) {
+        for (int y = 0; y < height; ++y)
+            swap_rgba_row(rgba + (size_t)y * width * 4u,
+                value->pixels + (size_t)(height - 1 - y) * width * 4u,
+                width, width * 4);
+        return true;
+    }
+    size_t bytes = (size_t)width * (size_t)height * 4u;
+    if (bytes / 4 != (size_t)width * (size_t)height) return false;
+    if (value->readback_capacity < bytes) {
+        unsigned char *next = realloc(value->readback, bytes);
+        if (!next) return false;
+        value->readback = next;
+        value->readback_capacity = bytes;
+    }
+    for (int y = 0; y < height; ++y)
+        swap_rgba_row(rgba + (size_t)y * width * 4u,
+            value->readback + (size_t)(height - 1 - y) * width * 4u,
+            width, width * 4);
+    return stbir_resize_uint8_linear(value->readback, width, height, width * 4,
+        value->pixels, display_width, display_height, display_width * 4,
+        STBIR_BGRA_PM) != NULL;
+}
+
+bool bongo_cat_windows_layered_capture_rgba(BongoCatWindowsLayered *value,
+    int width, int height, int display_width, int display_height,
+    const unsigned char *rgba) {
+    return read_frame_rgba(value, width, height, display_width, display_height, rgba);
+}
+
 /*
  * 把"完全透明"的像素抬成 alpha=1, 让整块窗口矩形都参与命中测试(只给模态菜单用)。
  *

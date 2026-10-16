@@ -178,6 +178,14 @@ bool bongo_cat_platform_frame_alpha(const BongoCatPlatform *platform,
     (void)platform; (void)width; (void)height; (void)x; (void)y; (void)alpha;
     return false;
 }
+bool bongo_cat_platform_layered_active(BongoCatPlatform *platform) {
+    (void)platform; return false;
+}
+bool bongo_cat_platform_submit_layered_rgba(BongoCatPlatform *platform,
+    int width, int height, const unsigned char *rgba) {
+    (void)platform; (void)width; (void)height; (void)rgba;
+    return false;
+}
 void bongo_cat_platform_set_visible(BongoCatPlatform *platform, bool visible) {
     if (!platform || !platform->window) return;
     visible ? SDL_ShowWindow(platform->window) : SDL_HideWindow(platform->window);

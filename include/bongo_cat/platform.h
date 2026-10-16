@@ -19,12 +19,12 @@ typedef struct BongoCatPlatform {
     /* 只在采集软件里可见 (见 bongo_cat_platform_set_capture_only) */
     bool capture_only;
     /*
-     * window.glTransparency 的镜像: "让背景真正透明"这个设置项 (仅 Windows + OpenGL
-     * 后端有意义)。平台层看不到 BongoCatSettings, 而每帧的穿透同步
-     * (bongo_cat_window_sync_click_through) 又要用到它, 所以由运行时把它同步进来。
-     * 其它平台忽略这个字段。
+     * "让背景真正透明"这个开关的镜像 (持久化键 window.transparentBackground 与之同名):
+     * Windows 的 OpenGL 与 Vulkan 后端共用 (两者都走代理分层呈现)。平台层
+     * 看不到 BongoCatSettings, 而每帧的穿透同步 (bongo_cat_window_sync_click_through)
+     * 又要用到它, 所以由运行时把它同步进来。其它平台忽略这个字段。
      */
-    bool gl_transparency;
+    bool transparent_background;
 } BongoCatPlatform;
 
 typedef enum BongoCatMenuAction {
@@ -104,7 +104,7 @@ void bongo_cat_platform_shutdown(BongoCatPlatform *platform);
 void bongo_cat_platform_set_click_through(BongoCatPlatform *platform,
     bool forced, bool pointer_transparent);
 /*
- * 下发"透明背景"设置 (平台层读 platform->gl_transparency 这个镜像)。
+ * 下发"透明背景"设置 (平台层读 platform->transparent_background 这个镜像)。
  *
  * 只在设置/环境变量强制覆盖/采集模式真的变化时调用 —— 这是代理分层呈现的总开关,
  * 绝不能放进每帧的命中测试或点击穿透同步里: 那些路径的参数逐帧都在变(光标在猫身上
@@ -117,6 +117,17 @@ float bongo_cat_platform_get_opacity(const BongoCatPlatform *platform);
 bool bongo_cat_platform_present(BongoCatPlatform *platform, int width, int height);
 bool bongo_cat_platform_frame_alpha(const BongoCatPlatform *platform,
     int width, int height, int x, int y, uint8_t *alpha);
+/*
+ * Vulkan 后端的代理分层呈现 (仅 Windows, 其它平台 no-op)。
+ *  - layered_active: 是否在走"透明背景"设置的代理分层路径。Vulkan 没有可读的 GL 前
+ *    缓冲, 画面只能靠整帧回读喂给平台; vk_scene.c 用它在"开透明时才排整帧回读",
+ *    不给普通 Vulkan 模式添负担。
+ *  - submit_layered_rgba: 把一帧 RGBA (第 0 行为视觉上方) 提交给代理分层呈现。
+ *    未启用代理时是 no-op 返回 false。
+ */
+bool bongo_cat_platform_layered_active(BongoCatPlatform *platform);
+bool bongo_cat_platform_submit_layered_rgba(BongoCatPlatform *platform,
+    int width, int height, const unsigned char *rgba);
 void bongo_cat_platform_set_visible(BongoCatPlatform *platform, bool visible);
 /* 只在采集软件里可见: 桌面上隐藏窗口, 但仍参与渲染与采集 (Windows: DWM 隐藏)。
    返回 false 表示当前平台不支持。 */

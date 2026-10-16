@@ -175,7 +175,8 @@ bool dial_window_create(Dial *d) {
      * 菜单背景仍然是恒定的黑(普通窗口的 GL 缓冲 alpha 会被 DWM 忽略)。
      * Vulkan 有自己的 alpha 合成, 开关关闭时一律保持原样(照旧 SDL_GL_SwapWindow)。
      */
-    if (!dial_vulkan && bongo_cat_windows_layered_requested(d->gl_transparency))
+    if (!dial_vulkan &&
+        bongo_cat_windows_layered_requested(d->transparent_background))
         d->layered = bongo_cat_windows_layered_window_attach(d->window,d->owner,true);
 #endif
     if (!dial_paint_init(d)) return false;

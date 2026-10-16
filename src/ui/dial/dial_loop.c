@@ -61,7 +61,7 @@ static BongoCatMenuAction menu_run(BongoCatPlatform *platform,
     if (!d) return BONGO_CAT_MENU_NONE;
     d->owner = platform->window; d->labels = labels; d->dark = labels->dark_theme;
     /* 设置项的快照: 菜单是模态的, 打开期间设置不会变, 所以取一次就够(见 dial_internal.h)。 */
-    d->gl_transparency = platform->gl_transparency;
+    d->transparent_background = platform->transparent_background;
     d->force_opengl = force_opengl;
     d->previous_window = SDL_GL_GetCurrentWindow();
     d->previous_context = SDL_GL_GetCurrentContext();

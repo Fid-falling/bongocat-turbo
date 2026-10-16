@@ -298,6 +298,9 @@ void bongo_cat_settings_defaults(BongoCatSettings *config) {
     config->window.slide_slowdown_percent = BONGO_CAT_DEFAULT_SLIDE_SLOWDOWN_PERCENT;
     /* 默认关闭: "永不停止的滑行"是刻意选的玩法, 不能替用户打开 (它会让宠物一直动)。 */
     config->window.slide_no_decay = false;
+    /* 默认开启透明背景: 这是 GL/Vulkan 共用的开关, 用户要的就是"桌面上的透明宠物",
+       不该默认说它不透明。代价是录屏软件得采代理窗口, 见 setting 说明。 */
+    config->window.transparent_background = 1;
     config->window.obs_background_color = BONGO_CAT_OBS_BACKGROUND_GREEN;
     config->window.corner_radius_percent = BONGO_CAT_DEFAULT_WINDOW_CORNER_PERCENT;
     config->window.hide_fade_seconds = BONGO_CAT_DEFAULT_HIDE_FADE_SECONDS;
@@ -381,6 +384,9 @@ void bongo_cat_settings_validate(BongoCatSettings *config) {
     if ((unsigned)config->window.obs_background_color >=
         BONGO_CAT_OBS_BACKGROUND_COLOR_COUNT)
         config->window.obs_background_color = BONGO_CAT_OBS_BACKGROUND_GREEN;
+    /* 0/1 布尔开关的钳制: 手改文件填 0/1 以外的值一律按关闭处理。 */
+    config->window.transparent_background =
+        !!config->window.transparent_background;
     if ((unsigned)config->app.theme > BONGO_CAT_THEME_DARK)
         config->app.theme = BONGO_CAT_THEME_AUTO;
     if ((unsigned)config->app.language >= BONGO_CAT_LANG_COUNT)

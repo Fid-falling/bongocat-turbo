@@ -5,6 +5,7 @@
 
 #ifdef _WIN32
 #include <stdlib.h>
+#include <SDL3/SDL.h>
 
 /*
  * 无边框窗口的窗口过程与状态标记。
@@ -100,11 +101,22 @@ static LRESULT CALLBACK borderless_window_proc(HWND window, UINT message,
     } else if (message == WM_NCHITTEST) {
         INT_PTR click_through = (INT_PTR)GetPropW(
             window, click_through_property);
-        if (bongo_cat_windows_borderless_hit_transparent(
+        bool hit_trans = bongo_cat_windows_borderless_hit_transparent(
                 click_through == BONGO_CAT_CLICK_THROUGH_FORCED,
                 click_through == BONGO_CAT_CLICK_THROUGH_TRANSPARENT_PIXEL,
                 bongo_cat_windows_right_button_down() ||
-                    GetCapture() == window)) return HTTRANSPARENT;
+                    GetCapture() == window);
+        static ULONGLONG last_nchit_log_ms;
+        ULONGLONG nchit_now = GetTickCount64();
+        if (nchit_now - last_nchit_log_ms > 300ull) {
+            last_nchit_log_ms = nchit_now;
+            SDL_LogInfo(SDL_LOG_CATEGORY_VIDEO,
+                "NCHITTEST prop=%d rbtn=%d capture=%d -> %s",
+                (int)click_through, bongo_cat_windows_right_button_down() ? 1 : 0,
+                GetCapture() == window ? 1 : 0,
+                hit_trans ? "HTTRANSPARENT" : "HTCLIENT");
+        }
+        if (hit_trans) return HTTRANSPARENT;
     } else if (message == WM_RBUTTONDOWN &&
         (INT_PTR)GetPropW(window, click_through_property) ==
             BONGO_CAT_CLICK_THROUGH_TRANSPARENT_PIXEL) {
@@ -273,5 +285,31 @@ void bongo_cat_windows_borderless_set_click_through(HWND window,
         style & ~WS_EX_TRANSPARENT;
     /* The hit-test property is immediate; a frame refresh flickers OpenGL windows. */
     if (next != style) SetWindowLongPtrW(window, GWL_EXSTYLE, next);
+}
+
+/* 直接呈现(无代理窗口, 即 Vulkan)的逐像素穿透: 只切换 WS_EX_TRANSPARENT。
+   为什么不能让上面的 set_click_through 里的 pointer_transparent 也加这个样式: 那个函数
+   还要服务代理分层(OpenGL透明)路径, 代理窗口靠 WM_NCHITTEST/HTTRANSPARENT 按像素判定,
+   加了这个整窗"失明"的样式, 判定就断了。而 Vulkan 直接呈现没有任何代理窗口, HTTRANSPARENT
+   只能在同一线程/窗口链里向下转发, 无法把点击真真落到桌面或其它进程 —— 唯一能让点击穿到
+   系统层的是 WS_EX_TRANSPARENT。应用每帧都用全局轮询重新算 pointer_transparent (见
+   window_hit.c 的 sync_click_through), 所以主窗口短暂"失明"没关系, 光标回到猫上下一帧就
+   会清掉。
+
+   只改 GWL_EXSTYLE 不够: SetWindowLongPtrW 只是写入样式位, 窗口管理器要等到下一次
+   "框架重新计算"(SWP_FRAMECHANGED) 才会真正按其跳过命中测试 —— 否则样式位已设(DWM 日志
+   里 exstyle=0x28), 但窗口照样收到 WM_NCHITTEST, 点击落不到桌面/其它进程。这与
+   windows_layered.c / windows_capture.c 里切换 WS_EX_TRANSPARENT 后紧跟
+   SWP_FRAMECHANGED 的做法一致。仅当样式实际变化时才刷新, 避免每帧都触发框架重算。 */
+void bongo_cat_windows_borderless_set_pixel_transparent(HWND window, bool enabled) {
+    if (!window || !IsWindow(window)) return;
+    LONG_PTR style = GetWindowLongPtrW(window, GWL_EXSTYLE);
+    LONG_PTR next = enabled ? style | WS_EX_TRANSPARENT : style & ~WS_EX_TRANSPARENT;
+    if (next == style) return;
+    SetWindowLongPtrW(window, GWL_EXSTYLE, next);
+    /* 让窗口管理器立即重新评估命中测试: 加上/去掉 WS_EX_TRANSPARENT 都要刷新框架,
+       否则样式改动不会生效(见上面的注释)。 */
+    SetWindowPos(window, NULL, 0, 0, 0, 0,
+        SWP_NOMOVE | SWP_NOSIZE | SWP_NOZORDER | SWP_NOACTIVATE | SWP_FRAMECHANGED);
 }
 #endif
