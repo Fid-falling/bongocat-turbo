@@ -25,6 +25,9 @@
       "title": "Einstellungen",
       "cat": {
         "title": "Einstellungen",
+        "tabs": {
+          "interaction": "Interaktion"
+        },
         "labels": {
           "modelSettings": "Modell",
           "mirrorMode": "Modell horizontal spiegeln",

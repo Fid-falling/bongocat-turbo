@@ -25,6 +25,9 @@
       "title": "Preferências",
       "cat": {
         "title": "Preferências",
+        "tabs": {
+          "interaction": "Interação"
+        },
         "labels": {
           "modelSettings": "Modelo",
           "mirrorMode": "Espelho horizontal do modelo",

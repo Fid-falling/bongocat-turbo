@@ -1,5 +1,7 @@
 /*
- * 设置页 [应用] 区 + macOS 的输入监控授权区 (从 preferences_pages.c 拆出来)。
+ * 设置页 [应用] / [外观] 两区 + macOS 的输入监控授权区 ([权限] 区), 从
+ * preferences_pages.c 拆出来, 供偏好设置页的两个子页各自取用
+ * (左子页 = 应用/外观/性能, 右子页 = 窗口/模型/权限)。
  *
  * 为什么单独一个文件: preferences_pages.c 在并入拖动惯性那一版之后超过了 500 行的策略
  * 上限 (见 cmake/CheckLines.cmake), 而"应用/外观"这一页从开关副作用到提权重启都自成
@@ -176,19 +178,13 @@ static void input_monitoring_section(BongoCatApp *app,
 #endif
 
 /*
- * [应用]/[外观] 两区现在各自是一个可折叠分区 (bongo_cat_preferences_options_begin/end,
- * 单击分区头收起/展开)。缓存目录与便携模式搬进 [应用] 区: 它们跟开机自启一样属于
- * "程序怎么跑/数据放哪", 不再是 [外观] 的一部分; 而 [外观] 只剩下语言与主题。
+ * [应用] 区 (可折叠分区, 照 X): 开机自启 / 以管理员身份运行 / 便携模式 / 缓存目录 —— 都是
+ * "程序怎么跑、数据放哪"。
  */
-void bongo_cat_preferences_general_page(BongoCatPreferences *value,
+void bongo_cat_preferences_application_section(BongoCatPreferences *value,
     struct nk_context *context) {
     BongoCatApp *app = value->app;
     BongoCatApplicationPreferences *options = &app->settings.app;
-    // Keep each option in its own native language so the list is recognizable
-    // regardless of the language currently used by the settings window.
-    const char *ui_languages[] = {"简体中文", "繁體中文", "English",
-        "Français", "Deutsch", "日本語", "한국어", "Português",
-        "Русский", "Español"};
     if (bongo_cat_preferences_options_begin(value, context,
         BONGO_CAT_OPTIONS_APPLICATION,
         tr(app, "pages.preference.general.labels.appSettings", "Application"),
@@ -209,7 +205,20 @@ void bongo_cat_preferences_general_page(BongoCatPreferences *value,
     bongo_cat_preferences_portable_draw(value, context);
     bongo_cat_preferences_cache_path_draw(value, context);
     bongo_cat_preferences_options_end(value, context);
-    }    section_gap(context, 7);
+    }
+}
+
+/*
+ * [外观] 区 (可折叠): 语言与主题。语言列表刻意用各自的母语写, 这样无论当前界面是哪
+ * 一种语言, 用户都能认出自己要选的是哪一项。
+ */
+void bongo_cat_preferences_appearance_section(BongoCatPreferences *value,
+    struct nk_context *context) {
+    BongoCatApp *app = value->app;
+    BongoCatApplicationPreferences *options = &app->settings.app;
+    const char *ui_languages[] = {"简体中文", "繁體中文", "English",
+        "Français", "Deutsch", "日本語", "한국어", "Português",
+        "Русский", "Español"};
     if (bongo_cat_preferences_options_begin(value, context,
         BONGO_CAT_OPTIONS_APPEARANCE,
         tr(app, "pages.preference.general.labels.appearanceSettings", "Appearance"),
@@ -238,8 +247,18 @@ void bongo_cat_preferences_general_page(BongoCatPreferences *value,
         "Theme"), themes, options->theme);
     bongo_cat_preferences_options_end(value, context);
     }
+}
+
+/*
+ * [权限] 区 (右子页): 目前只有 macOS 的输入监控授权。其它平台没有任何等价机制, 函数体
+ * 是空的 —— 调用点因此不必跟着条件编译, 区别只在"这一区有没有内容"。
+ */
+void bongo_cat_preferences_permissions_section(BongoCatPreferences *value,
+    struct nk_context *context) {
 #ifdef __APPLE__
-    section_gap(context, 7);
-    input_monitoring_section(app, context);
+    input_monitoring_section(value->app, context);
+#else
+    (void)value;
+    (void)context;
 #endif
 }

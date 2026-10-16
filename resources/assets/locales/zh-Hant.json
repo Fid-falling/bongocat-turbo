@@ -25,6 +25,9 @@
       "title": "偏好設定",
       "cat": {
         "title": "偏好",
+        "tabs": {
+          "interaction": "互動"
+        },
         "labels": {
           "modelSettings": "模型",
           "mirrorMode": "模型水平鏡像",

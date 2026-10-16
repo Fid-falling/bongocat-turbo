@@ -25,6 +25,9 @@
       "title": "Настройки",
       "cat": {
         "title": "Настройки",
+        "tabs": {
+          "interaction": "Взаимодействие"
+        },
         "labels": {
           "modelSettings": "Модель",
           "mirrorMode": "Горизонтальное зеркало модели",

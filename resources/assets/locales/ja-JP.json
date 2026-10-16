@@ -25,6 +25,9 @@
       "title": "設定",
       "cat": {
         "title": "設定",
+        "tabs": {
+          "interaction": "操作"
+        },
         "labels": {
           "modelSettings": "モデル",
           "mirrorMode": "モデル水平ミラー",

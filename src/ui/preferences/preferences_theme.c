@@ -237,3 +237,58 @@ int bongo_cat_pref_fps(struct nk_context *context, const char *id,
     return picked == 0 ? 30 : (picked == 1 ? BONGO_CAT_DEFAULT_MAX_FPS
         : BONGO_CAT_MAX_FPS_UNLIMITED);
 }
+
+/*
+ * 页面顶部的切页条。画法与模型页顶部那条 (preferences_model.c 的 model_page_segments)
+ * 一致: 一个 field 底色的圆角槽, 里面等宽的几段按钮, 选中项朝 accent 混色并带投影,
+ * 悬停朝 hover 混色 —— 这样两个页面的顶部看起来是同一个控件。
+ *
+ * 左右各内缩 24px: 这一行排在页面组之前, 排的是内容组的行, 而内容组的 group_padding
+ * 是 0 (页面组的 24 是画页面内容前才设的, 见 preferences_render.c), 不自己收进来就
+ * 会比下面的卡片宽出 48px。整行 44 高, 调用方按 50 预留内容区高度。
+ *
+ * id 只用来拼每段的动画键 (形如 "<id>-0"), 所以必须是字符串字面量; interactive 为假
+ * (有模态弹窗) 时只画不响应 —— 这一行画在页面组之前, 弹窗那边清空点击发生在它之后。
+ */
+int bongo_cat_pref_page_tabs(struct nk_context *context, const char *id,
+    const char *const *labels, int count, int selected, bool interactive) {
+    if (count <= 0) return selected;
+    nk_layout_row_dynamic(context, 44, 1);
+    struct nk_rect wrapper;
+    if (nk_widget(&wrapper, context) == NK_WIDGET_INVALID) return selected;
+    wrapper.x += 24.0f;
+    wrapper.w -= 48.0f;
+    BongoCatUIPalette p = bongo_cat_ui_palette(bongo_cat_ui_dark(context));
+    struct nk_command_buffer *canvas = nk_window_get_canvas(context);
+    const struct nk_user_font *font = bongo_cat_ui_caption_font(context);
+    nk_fill_rect(canvas, wrapper, 10, p.field);
+    float width = (wrapper.w - 6.0f) / (float)count;
+    for (int i = 0; i < count; ++i) {
+        struct nk_rect button = nk_rect(wrapper.x + 3.0f + width * (float)i,
+            wrapper.y + 3.0f, width, wrapper.h - 6.0f);
+        bool hover = interactive &&
+            nk_input_is_mouse_hovering_rect(&context->input, button);
+        char key[64];
+        snprintf(key, sizeof(key), "%s-%d", id, i);
+        float active = bongo_cat_ui_animate_eased(context, key,
+            selected == i ? 1.0f : 0.0f, 200.0f, BONGO_CAT_UI_EASE_STANDARD);
+        if (active > .01f && p.effects) bongo_cat_ui_paint_shadow(context,
+            button, 8, 0, 2, 10, 0,
+            nk_rgba(p.accent.r, p.accent.g, p.accent.b, 89));
+        nk_fill_rect(canvas, button, 8,
+            bongo_cat_ui_color_mix(hover ? p.hover : p.field, p.accent,
+                active));
+        int length = nk_strlen(labels[i]);
+        float text = font->width(font->userdata, font->height, labels[i],
+            length);
+        nk_draw_text(canvas, nk_rect(button.x + (button.w - text) * .5f,
+            button.y + (button.h - font->height) * .5f, text + 1.0f,
+            font->height), labels[i], length, font, nk_rgba(0, 0, 0, 0),
+            bongo_cat_ui_color_mix(p.muted, nk_rgb(255, 255, 255), active));
+        if (hover) bongo_cat_ui_cursor_hover_rect(context, button,
+            BONGO_CAT_UI_CURSOR_POINTER);
+        if (hover && selected != i && nk_input_is_mouse_click_in_rect(
+            &context->input, NK_BUTTON_LEFT, button)) selected = i;
+    }
+    return selected;
+}

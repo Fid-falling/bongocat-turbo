@@ -28,9 +28,9 @@ static void section_gap(struct nk_context *context, float pixels) {
     context->current->layout->at_y += pixels;
 }
 
-static void page_display(BongoCatPreferences *value, struct nk_context *context) {
+/* [窗口] 区 (右子页)。 */
+static void window_section(BongoCatPreferences *value, struct nk_context *context) {
     BongoCatApp *app = value->app;
-    BongoCatModelPreferences *model = &app->settings.model;
     BongoCatWindowPreferences *window = &app->settings.window;
     BongoCatWindowState *window_state = &app->session.window;
     if (bongo_cat_preferences_options_begin(value, context,
@@ -202,9 +202,14 @@ static void page_display(BongoCatPreferences *value, struct nk_context *context)
         bongo_cat_platform_set_opacity(&app->platform,
             window_state->opacity_percent / 100.0f);
     }
-    section_gap(context, 10);
     bongo_cat_preferences_options_end(value, context);
     }
+}
+
+/* [性能] 区 (左子页)。 */
+static void performance_section(BongoCatPreferences *value,
+    struct nk_context *context) {
+    BongoCatApp *app = value->app;
     if (bongo_cat_preferences_options_begin(value, context,
         BONGO_CAT_OPTIONS_PERFORMANCE,
         tr(app, "pages.preference.cat.labels.performanceSettings", "Performance"),
@@ -258,10 +263,14 @@ static void page_display(BongoCatPreferences *value, struct nk_context *context)
             app->dirty = true;
         }
     }
-    {
-    }    section_gap(context, 10);
     bongo_cat_preferences_options_end(value, context);
     }
+}
+
+/* [模型] 区 (右子页)。 */
+static void model_section(BongoCatPreferences *value, struct nk_context *context) {
+    BongoCatApp *app = value->app;
+    BongoCatModelPreferences *model = &app->settings.model;
     if (bongo_cat_preferences_options_begin(value, context,
         BONGO_CAT_OPTIONS_MODEL,
         tr(app, "pages.preference.cat.labels.modelSettings", "Model"),
@@ -336,9 +345,27 @@ static void page_display(BongoCatPreferences *value, struct nk_context *context)
     }
 }
 
+/*
+ * 偏好设置页正文 (侧栏「偏好设置」那一页)。页顶的切页条把它分成两个子页, 由
+ * value->preferences_tab 选择 (切页逻辑见 preferences_page_dispatch.c):
+ *   0 = 左子页: 应用 / 外观 / 性能 —— 程序怎么跑、长什么样、跑多快;
+ *   1 = 右子页: 窗口 / 模型 / 权限 —— 桌宠窗口与模型本身怎么显示、怎么响应输入。
+ * 两个子页共用同一个页面组与滚动槽 (下标 0), 切子页时由切页条把滚动复位到顶部。
+ * [应用]/[外观]/[权限] 三区定义在 preferences_general_page.c (见那里的行数策略说明)。
+ */
 void bongo_cat_preferences_page_settings(BongoCatPreferences *value,
     struct nk_context *context) {
-    page_display(value, context);
+    if (value->preferences_tab == 0) {
+        bongo_cat_preferences_application_section(value, context);
+        section_gap(context, 10);
+        bongo_cat_preferences_appearance_section(value, context);
+        section_gap(context, 10);
+        performance_section(value, context);
+        return;
+    }
+    window_section(value, context);
     section_gap(context, 10);
-    bongo_cat_preferences_general_page(value, context);
+    model_section(value, context);
+    section_gap(context, 10);
+    bongo_cat_preferences_permissions_section(value, context);
 }

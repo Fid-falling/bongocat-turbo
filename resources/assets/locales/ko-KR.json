@@ -25,6 +25,9 @@
       "title": "환경 설정",
       "cat": {
         "title": "환경 설정",
+        "tabs": {
+          "interaction": "상호 작용"
+        },
         "labels": {
           "modelSettings": "모델",
           "mirrorMode": "모델 가로 미러",
