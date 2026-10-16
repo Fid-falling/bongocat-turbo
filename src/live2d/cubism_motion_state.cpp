@@ -61,10 +61,6 @@ static bool curve_returns_to_default(yyjson_val *segments, float normal) {
     return deviates;
 }
 
-static bool curve_has_state_target(const NativeModel::MotionStateCurve &curve) {
-    return curve.parameter >= 0 || curve.part >= 0 || curve.model_opacity;
-}
-
 /* 逐条曲线解析。Target 决定恢复到哪一类对象 (参数 / 部件不透明度 / 整模型不透明度),
  * normal 是该对象当前的"常态"值, 端点值留到动作结束时写回。同时把"这条动作碰过哪些
  * target:id"累进 motion_signatures_ —— 配对时先用签名做粗筛, 签名不同就不可能是一对。 */
@@ -103,7 +99,7 @@ void NativeModel::load_motion_state(const std::string &key, const char *group,
             value.model_opacity = true;
             value.normal = _model->GetModelOpacity();
         }
-        if (curve_has_state_target(value) &&
+        if (motion_curve_has_state_target(value) &&
             curve_returns_to_default(segments, value.normal))
             state.self_contained = true;
         if (curve_endpoints(segments, &value.start, &value.end))
@@ -119,46 +115,6 @@ void NativeModel::load_motion_state(const std::string &key, const char *group,
             return a.target == b.target ? a.id < b.id : a.target < b.target;
         });
     motion_states_[key] = std::move(state);
-}
-
-/* 判定两个动作是不是一对开关: 必须在同一组、曲线条数与 target 一一对应, 且每条曲线
- * 要么两端完全相同 (这条曲线与开关无关), 要么端点对调 (互为反向)。此外必须恰好有一侧
- * 停在默认值 —— 停在默认值的那侧就是"关"。所有反向曲线给出的方向还得一致, 否则它们
- * 只是碰巧相似的两个独立动作, 不能当成开关。 */
-bool motion_toggle_pair(const NativeModel::MotionState &a,
-    const NativeModel::MotionState &b, bool *first_enabled) {
-    if (!first_enabled || a.group != b.group ||
-        a.curves.size() != b.curves.size() || a.curves.empty()) return false;
-    bool direction_known = false;
-    for (size_t i = 0; i < a.curves.size(); ++i) {
-        const auto &left = a.curves[i];
-        const auto &right = b.curves[i];
-        if (left.target != right.target || left.id != right.id) return false;
-        bool same = std::fabs(left.start - right.start) <= .0001f &&
-            std::fabs(left.end - right.end) <= .0001f;
-        bool reversed = std::fabs(left.start - right.end) <= .0001f &&
-            std::fabs(left.end - right.start) <= .0001f;
-        if (!same && !reversed) return false;
-        if (!reversed || same) continue;
-        if (!curve_has_state_target(left) || !curve_has_state_target(right))
-            return false;
-        bool left_normal = std::fabs(left.end - left.normal) <= .0001f;
-        bool right_normal = std::fabs(right.end - right.normal) <= .0001f;
-        if (left_normal == right_normal) return false;
-        bool enabled = !left_normal;
-        if (direction_known && enabled != *first_enabled) return false;
-        *first_enabled = enabled;
-        direction_known = true;
-    }
-    return direction_known;
-}
-
-bool motion_enables_state(const NativeModel::MotionState &state) {
-    if (state.self_contained) return false;
-    for (const auto &curve : state.curves)
-        if (curve_has_state_target(curve) &&
-            std::fabs(curve.end - curve.normal) > .0001f) return true;
-    return false;
 }
 
 static bool same_signature(const NativeModel::MotionSignatures &signatures,

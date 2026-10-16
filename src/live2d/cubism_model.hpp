@@ -19,6 +19,7 @@
 #include <Rendering/Vulkan/CubismRenderer_Vulkan.hpp>
 #endif
 #include <SDL3/SDL_opengl.h>
+#include <cmath>
 #include <map>
 #include <set>
 #include <string>
@@ -271,11 +272,67 @@ private:
     bool motion_preview_completed_ = false;
 };
 
-bool motion_toggle_pair(const NativeModel::MotionState &left,
-    const NativeModel::MotionState &right, bool *left_enabled);
-bool motion_enables_state(const NativeModel::MotionState &state);
-bool motion_run_clears_selection(bool one_shot, bool committed,
-    bool replacement_running);
+/*
+ * 动作"开/关"配对的**纯规则**, 刻意定义在头文件里(inline)而不是某个 .cpp 里。
+ *
+ * 原因有两个, 都是踩出来的:
+ *   1. 这三条只依赖 MotionState 里的数值, 不碰 GL、不碰宿主服务表 —— 它们是"规则", 不是"实现";
+ *   2. 阶段 2c 把 Live2D 实现整体搬进渲染组件(cores/bongo_live2d.*)之后, 单元测试
+ *      (tests/live2d/test_motion_state.cpp)再也**链接不到**它们: 组件是隐藏可见性的 .dll,
+ *      而把 cubism_motion_state.cpp 编进测试又会连带拖进整个 NativeModel 实现图。
+ *      放在头里, 组件与测试用的是**同一份**定义, 两边都不会漂。
+ *
+ * 判定两个动作是不是一对开关: 必须在同一组、曲线条数与 target 一一对应, 且每条曲线要么两端
+ * 完全相同(这条曲线与开关无关), 要么端点对调(互为反向)。此外必须恰好有一侧停在默认值 ——
+ * 停在默认值的那侧就是"关"。所有反向曲线给出的方向还得一致, 否则它们只是碰巧相似的两个独立
+ * 动作, 不能当成开关。
+ */
+inline bool motion_curve_has_state_target(const NativeModel::MotionStateCurve &curve) {
+    return curve.parameter >= 0 || curve.part >= 0 || curve.model_opacity;
+}
+
+inline bool motion_toggle_pair(const NativeModel::MotionState &a,
+    const NativeModel::MotionState &b, bool *first_enabled) {
+    if (!first_enabled || a.group != b.group ||
+        a.curves.size() != b.curves.size() || a.curves.empty()) return false;
+    bool direction_known = false;
+    for (size_t i = 0; i < a.curves.size(); ++i) {
+        const auto &left = a.curves[i];
+        const auto &right = b.curves[i];
+        if (left.target != right.target || left.id != right.id) return false;
+        bool same = std::fabs(left.start - right.start) <= .0001f &&
+            std::fabs(left.end - right.end) <= .0001f;
+        bool reversed = std::fabs(left.start - right.end) <= .0001f &&
+            std::fabs(left.end - right.start) <= .0001f;
+        if (!same && !reversed) return false;
+        if (!reversed || same) continue;
+        if (!motion_curve_has_state_target(left) ||
+            !motion_curve_has_state_target(right)) return false;
+        bool left_normal = std::fabs(left.end - left.normal) <= .0001f;
+        bool right_normal = std::fabs(right.end - right.normal) <= .0001f;
+        if (left_normal == right_normal) return false;
+        bool enabled = !left_normal;
+        if (direction_known && enabled != *first_enabled) return false;
+        *first_enabled = enabled;
+        direction_known = true;
+    }
+    return direction_known;
+}
+
+inline bool motion_enables_state(const NativeModel::MotionState &state) {
+    if (state.self_contained) return false;
+    for (const auto &curve : state.curves)
+        if (motion_curve_has_state_target(curve) &&
+            std::fabs(curve.end - curve.normal) > .0001f) return true;
+    return false;
+}
+
+/* 一次性动作播完就该把勾选清掉; 但如果此刻还有另一个"同签名"的动作在播(替换播放), 就不能清
+   —— 那是同一条链上的后继, 清掉会让 UI 上的勾选闪一下。 */
+inline bool motion_run_clears_selection(bool one_shot, bool committed,
+    bool replacement_running) {
+    return one_shot && committed && !replacement_running;
+}
 
 } // namespace bongo_cat
 

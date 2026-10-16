@@ -118,15 +118,19 @@ int main() {
         CHECK(outer.vao == 0 && outer.buffers[0] == 0);
         CHECK(glGetError() == GL_NO_ERROR);
     }
+    /*
+     * 2c 起宿主的 bongo_cat_live2d_update() 是**分发层**: 没有可用的渲染组件/Core 时它必须
+     * 如实返回假(审计里 renderer=diagnostic 那一行就靠这个), 而且**不再**去排空退休队列 ——
+     * 模型寿命与 GPU 资源的管理已经整体搬进渲染组件(cubism_bridge_load.cpp 的 retire_previous),
+     * 宿主手里这个 BongoCatLive2D{} 只是诊断兜底的空壳。
+     * 所以这里断言的是分发层的契约, 而不是当年"宿主自己会 3 帧后回收旧模型"的行为。
+     */
     BongoCatLive2D runtime{};
     runtime.retired_count = 1;
     runtime.retired[0].frames_remaining = 3;
-    for (int frame = 0; frame < 3; ++frame) {
-        CHECK(bongo_cat_live2d_update(&runtime, 1.0f / 60.0f));
-        bongo_cat_live2d_draw(&runtime);
-    }
-    CHECK(runtime.retired_count == 0);
     CHECK(!bongo_cat_live2d_update(&runtime, 1.0f / 60.0f));
+    bongo_cat_live2d_draw(&runtime);
+    CHECK(runtime.retired_count == 1); /* 宿主不碰组件的东西 */
     glDeleteVertexArrays(1, &host_vao);
     glDeleteBuffers(2, host_buffers);
     glDeleteProgram(program);

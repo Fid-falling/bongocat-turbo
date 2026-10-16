@@ -239,7 +239,11 @@ if(BUILD_TESTING)
   # 这样"组件不能依赖宿主内部符号"这条纪律在测试里也是真的。
   target_include_directories(bongo_cat_test_component PRIVATE include
     "${BONGO_CAT_GENERATED_INCLUDE_DIR}")
-  target_link_libraries(bongo_cat_test_component PRIVATE bongo_cat_warnings)
+  # 但它**必须**能看见 yyjson 的头: renderer_module_abi.h 会把 bongo_cat/json.h 带进来, 而后者
+  # `#include <yyjson.h>`, 那是个第三方头, 不在公共 include 里。生产组件链的就是 yyjson
+  # (见 RendererModule.cmake), 夹具照抄同一份头可见性 —— 少了它夹具连编译都过不去。
+  # (仍然不链宿主运行时: 加的是第三方头库, 不是宿主的内部实现。)
+  target_link_libraries(bongo_cat_test_component PRIVATE yyjson bongo_cat_warnings)
   set_target_properties(bongo_cat_test_component PROPERTIES
     PREFIX "" OUTPUT_NAME "bongo_test_component")
   add_executable(bongo_cat_renderer_module_abi_tests
@@ -279,6 +283,10 @@ if(BUILD_TESTING)
       tests/live2d/test_motion_state.cpp)
     target_include_directories(bongo_cat_motion_state_tests PRIVATE
       src/live2d tests/support)
+    # 它测的三条纯规则(motion_toggle_pair / motion_enables_state /
+    # motion_run_clears_selection)现在**定义在 cubism_model.hpp 里**(inline): 2c 之后这批实现
+    # 只编进渲染组件(隐藏可见性的 .dll), 测试既链接不到它、把实现 .cpp 编进来又会拖进整个
+    # NativeModel 实现图。放头里两边共用同一份定义, 于是这个目标照旧只链 bongo_cat_runtime。
     target_link_libraries(bongo_cat_motion_state_tests PRIVATE
       bongo_cat_runtime bongo_cat_warnings)
     add_test(NAME live2d-motion-state COMMAND bongo_cat_motion_state_tests)
@@ -337,4 +345,27 @@ if(BUILD_TESTING)
       "-DBUNDLE=$<TARGET_BUNDLE_DIR:bongo_cat>"
       -P "${CMAKE_CURRENT_SOURCE_DIR}/cmake/CheckMacOSBundleIcon.cmake")
   endif()
+endif()
+
+# "跑 ctest 之前先把测试目标重建一遍"。
+#
+# 为什么需要它: ctest **只执行已经存在的**测试二进制, 它不构建任何东西。于是一个"只构建了主目标"
+# 的构建目录里可能躺着很久以前的旧测试 exe —— 那时"测试其实编不过"或"断言早已过时"在本地看起来
+# 都是**通过**。这不是假设: 阶段 2c 把 Live2D 实现整体搬进渲染组件之后, 有三条测试(两个链接失败 +
+# 一个断言过时)就一直被陈旧二进制掩盖着, 直到有人在全新构建目录里跑 ctest 才暴露出来。
+#
+# 这里用 BUILDSYSTEM_TARGETS 自动收集本目录下所有 bongo_cat_*_tests 目标, 所以将来新增测试不用
+# 记得回来改这个列表; CI 的 Windows 测试步骤在 ctest 之前调用它(见 .github/workflows/ci.yml),
+# 任何一个测试目标编不过都会在那里直接变红。
+get_property(_bongo_cat_buildsystem_targets DIRECTORY PROPERTY BUILDSYSTEM_TARGETS)
+set(_bongo_cat_test_targets "")
+foreach(_bongo_cat_target IN LISTS _bongo_cat_buildsystem_targets)
+  if(_bongo_cat_target MATCHES "^bongo_cat_.*_tests$")
+    list(APPEND _bongo_cat_test_targets "${_bongo_cat_target}")
+  endif()
+endforeach()
+if(_bongo_cat_test_targets)
+  add_custom_target(build-tests DEPENDS ${_bongo_cat_test_targets})
+  list(LENGTH _bongo_cat_test_targets _bongo_cat_test_count)
+  message(STATUS "Test rebuild target 'build-tests' covers ${_bongo_cat_test_count} test target(s)")
 endif()

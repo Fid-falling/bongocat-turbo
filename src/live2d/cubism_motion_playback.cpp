@@ -14,13 +14,6 @@
 
 namespace bongo_cat {
 
-/* 一次性动作播完就该把勾选清掉; 但如果此刻还有另一个"同签名"的动作在播 (替换播放),
- * 就不能清 —— 那是同一条链上的后继, 清掉会让 UI 上的勾选闪一下。 */
-bool motion_run_clears_selection(bool one_shot, bool committed,
-    bool replacement_running) {
-    return one_shot && committed && !replacement_running;
-}
-
 bool NativeModel::start_motion(const char *group, int index) {
     if (!group || index < 0) return false;
     std::string key = std::string(group) + "_" + std::to_string(index);

@@ -175,6 +175,14 @@ jobs:
           version: '23.3.3'
           deployment-choice: '1'
 
+      - name: Rebuild Windows test executables
+        if: runner.os == 'Windows'
+        # 跑 ctest **之前**必须先把测试目标重建一遍: ctest 只执行已经存在的测试二进制, 而
+        # "只构建了主目标"的构建目录里可能躺着很久以前的旧测试 exe —— 那会让"编不过"或"断言已过时"
+        # 在本地看起来是**通过**。本仓库真实踩过: 2c 之后有三条测试其实已经编不过/断言过时, 却被
+        # 陈旧二进制掩盖了很久(build-tests 依赖所有 bongo_cat_*_tests 目标, 任何一个编不过这里就红)。
+        run: cmake --build build --config Release --target build-tests --parallel 2
+
       - name: Test Windows release
         if: runner.os == 'Windows'
         shell: pwsh
