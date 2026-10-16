@@ -201,6 +201,7 @@ if(BONGO_CAT_ENABLE_VULKAN)
   target_compile_definitions(bongo_cat_runtime PUBLIC BONGO_CAT_HAS_VULKAN=1)
 endif()
 target_compile_definitions(bongo_cat_runtime PRIVATE
+  BONGO_CAT_DEV_ROOT="${CMAKE_CURRENT_SOURCE_DIR}"
   BONGO_CAT_DEV_ASSET_ROOT="${CMAKE_CURRENT_SOURCE_DIR}/resources/assets"
   BONGO_CAT_DEV_LOCALE_ROOT="${CMAKE_CURRENT_SOURCE_DIR}/resources/assets/locales")
 
@@ -287,4 +288,3 @@ add_custom_target(check-cubism-compliance ALL
 add_dependencies(check-cubism-compliance bongo_cat)
 include(cmake/Tests.cmake)
 include(cmake/Packaging.cmake)
-

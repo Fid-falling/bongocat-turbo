@@ -12,6 +12,7 @@
 #include "bongo_cat/config.h"
 #include "bongo_cat/i18n.h"
 #include "bongo_cat/log.h"
+#include "bongo_cat/overlay.h"
 #include "bongo_cat/preferences.h"
 #include "bongo_cat/render.h"
 #include "bongo_cat/tray.h"
@@ -312,6 +313,42 @@ static void model_section(BongoCatPreferences *value, struct nk_context *context
         &model->ignore_mouse)) {
         app->pointer_known = false;
         app->dirty = true;
+    }
+    {
+        /*
+         * 多键显示: 同一侧同时按住的键全部画出来 (一只手 + N 个高亮键帽), 而不是只留
+         * 最后按下的那一个。关掉即退回旧行为 —— 每侧只画最早按下的键。
+         */
+        bool multi = model->multi_key_display != 0;
+        bongo_cat_pref_row_icon(context, BONGO_CAT_PREF_ICON_MULTIPLE_MODELS);
+        if (bongo_cat_pref_toggle(context, "multi-key-display", tr(app,
+                "pages.preference.cat.labels.multiKeyDisplay",
+                "Show multiple keys per hand"),
+                tr(app, "pages.preference.cat.labels.multiKeyDisplayHint",
+                    "同侧多键时显示所有按下的键帽"), &multi)) {
+            model->multi_key_display = multi ? 1 : 0;
+            app->dirty = true;
+            bongo_cat_overlay_set_key_display(app->overlay, multi,
+                model->multi_key_limit);
+        }
+        /*
+         * 多键显示的画法: 合并成一个气泡 (里面用 "+" 连起键名) 还是每个键各占一个气泡。
+         * 关掉多键显示时这一行没有意义, 不画 —— 只对自带气泡素材的模型有区别, 内置模型
+         * 两种取值下都是"一只手 + N 块彩色键帽", 但选项本身仍然可调。
+         */
+        if (multi) {
+            bool merge = model->bubble_merge != 0;
+            bongo_cat_pref_row_icon(context, BONGO_CAT_PREF_ICON_MULTIPLE_MODELS);
+            if (bongo_cat_pref_toggle(context, "bubble-merge", tr(app,
+                    "pages.preference.cat.labels.bubbleMerge",
+                    "Merge into one bubble"),
+                    tr(app, "pages.preference.cat.labels.bubbleMergeHint",
+                        "同侧多键只画一个气泡, 用 + 连接键名"), &merge)) {
+                model->bubble_merge = merge ? 1 : 0;
+                app->dirty = true;
+                bongo_cat_overlay_set_bubble_merge(app->overlay, merge);
+            }
+        }
     }
     bongo_cat_pref_row_icon(context, BONGO_CAT_PREF_ICON_MAX_FPS);
     model->max_fps = bongo_cat_pref_fps(context, "max-fps", tr(app,

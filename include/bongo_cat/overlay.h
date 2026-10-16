@@ -13,6 +13,9 @@ BongoCatResult bongo_cat_overlay_load(BongoCatOverlay *overlay,
     const BongoCatLive2DRenderOptions *render_options, BongoCatError *error);
 int bongo_cat_overlay_key(BongoCatOverlay *overlay, const char *name, bool pressed);
 bool bongo_cat_overlay_effect(BongoCatOverlay *overlay, const char *path);
+void bongo_cat_overlay_set_key_display(BongoCatOverlay *overlay, bool multi,
+    int limit);
+void bongo_cat_overlay_set_bubble_merge(BongoCatOverlay *overlay, bool merge);
 bool bongo_cat_overlay_hand_active(const BongoCatOverlay *overlay, bool right);
 bool bongo_cat_overlay_mver_pointer_enabled(const BongoCatOverlay *overlay);
 bool bongo_cat_overlay_mver_pointer_left_handed(const BongoCatOverlay *overlay);

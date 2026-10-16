@@ -33,6 +33,7 @@
 #endif
 
 static char runtime_log_path[BONGO_CAT_PATH_CAP];
+static char dev_log_path[BONGO_CAT_PATH_CAP];
 static char log_source[BONGO_CAT_ID_CAP + 8] = "unknown";
 static bool startup_is_ready;
 static SDL_Mutex *log_mutex;
@@ -76,7 +77,8 @@ static void append_log(const char *path, const char *timestamp,
 }
 
 /* 挂到 SDL 的日志钩子上: 先过 bongo_cat_log_enabled 的过滤 (避免重复落盘), 再上锁 ——
-   日志可能来自音频/网络线程。 */
+   日志可能来自音频/网络线程。若 dev_log_path 已被 begin_log 设置 (开发根目录日志镜像
+   开启), 则额外落一份 BongoCat.log, 便于开发时直接在源码根目录查看。 */
 static void SDLCALL log_output(void *userdata, int category,
     SDL_LogPriority priority, const char *message) {
     (void)userdata;
@@ -85,6 +87,8 @@ static void SDLCALL log_output(void *userdata, int category,
     char timestamp[64];
     bongo_cat_runtime_timestamp(timestamp, sizeof(timestamp));
     append_log(runtime_log_path, timestamp, category, priority, message);
+    if (dev_log_path[0])
+        append_log(dev_log_path, timestamp, category, priority, message);
     fprintf(stderr, "%s [%s] [%s:%d] %s\n", timestamp, log_source,
         priority_name(priority), category, message ? message : "");
     if (log_mutex) SDL_UnlockMutex(log_mutex);
@@ -99,6 +103,9 @@ void bongo_cat_runtime_clean_shutdown(BongoCatApp *app, int exit_code) {
         "[runtime] Shutdown complete: exit_code=%d", exit_code);
     append_log(runtime_log_path, timestamp, BONGO_CAT_LOG_LIFECYCLE,
         SDL_LOG_PRIORITY_INFO, message);
+    if (dev_log_path[0])
+        append_log(dev_log_path, timestamp, BONGO_CAT_LOG_LIFECYCLE,
+            SDL_LOG_PRIORITY_INFO, message);
     fprintf(stderr, "%s [%s] [%s:%d] %s\n", timestamp, log_source,
         priority_name(SDL_LOG_PRIORITY_INFO),
         BONGO_CAT_LOG_LIFECYCLE, message);
@@ -159,8 +166,18 @@ static void begin_log(BongoCatApp *app) {
     char unexpected[256] = {0};
     bongo_cat_runtime_state_previous(app, unexpected, sizeof(unexpected));
     runtime_log_path[0] = '\0';
+    dev_log_path[0] = '\0';
     bongo_cat_path_join(runtime_log_path, sizeof(runtime_log_path),
         app->log_root, "BongoCat.log");
+    /* Debug 构建在开发根目录 (BONGO_CAT_DEV_ROOT) 再落一份 BongoCat.log, 方便开发时
+       直接在源码根目录查看; Release 构建不启用。 */
+#ifndef NDEBUG
+    if (bongo_cat_path_join(dev_log_path, sizeof(dev_log_path),
+        BONGO_CAT_DEV_ROOT, "BongoCat.log")) {
+        FILE *fresh_dev = bongo_cat_file_open(dev_log_path, "wb");
+        if (fresh_dev) fclose(fresh_dev);
+    }
+#endif
     /* The primary process owns the session log. Secondary pets append to it
        instead of erasing diagnostics already written by the primary. */
     if (runtime_log_path[0] && !app->secondary_pet) {
@@ -185,10 +202,15 @@ static void begin_log(BongoCatApp *app) {
     }
     if (!log_mutex) log_mutex = SDL_CreateMutex();
     SDL_SetLogOutputFunction(log_output, NULL);
+#ifdef NDEBUG
     SDL_SetLogPriorities(SDL_LOG_PRIORITY_WARN);
     SDL_SetLogPriority(BONGO_CAT_LOG_LIFECYCLE, SDL_LOG_PRIORITY_INFO);
     SDL_SetLogPriority(BONGO_CAT_LOG_UPDATE, SDL_LOG_PRIORITY_INFO);
     SDL_SetLogPriority(BONGO_CAT_LOG_INPUT, SDL_LOG_PRIORITY_INFO);
+#else
+    /* Debug 构建把日志级别压到 DEBUG, 与 log.h 的过滤策略保持一致。 */
+    SDL_SetLogPriorities(SDL_LOG_PRIORITY_DEBUG);
+#endif
     SDL_LogInfo(BONGO_CAT_LOG_LIFECYCLE,
         "[runtime] Process started: version=%s platform=%s",
         BONGO_CAT_VERSION, SDL_GetPlatform());
