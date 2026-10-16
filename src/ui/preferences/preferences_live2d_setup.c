@@ -114,20 +114,16 @@ static void open_download_page(BongoCatApp *app) {
         sdk_page_language(app), url);
 }
 
-/* 状态描述: 已导入(带版本) / 组件在但缺 Core / 连组件都没有。 */
+/*
+ * 状态文案。**只在"还没有可用的 Core"时被调用**(Core 就位时整行不显示, 见
+ * bongo_cat_preferences_live2d_setup_row), 所以这里只剩两种"缺"的说法。
+ *
+ * 刻意**不**保留"已导入 Cubism Core, Live2D 渲染可用 (csm N)"那条分支: 需求是 Core 就位时
+ * 这几行整行不出现, 那条文案因此不会被创建 —— 留一个永远走不到的分支, 正是"看起来查过了、
+ * 其实不会发生"的那种代码(这类不可达文案我们刚修过一次)。文案本身仍留在 10 份 locale 里,
+ * 将来若要在别处(例如"关于"页)给一句"渲染就绪"的正向确认, 直接拿来用即可。
+ */
 static void status_text(BongoCatApp *app, char *output, size_t capacity) {
-    if (bongo_cat_live2d_core_available()) {
-        /* 只有"渲染组件真的活着"才敢说渲染可用 —— 判据必须与审计里
-           renderer=cubism-native 那一行同源, 否则会出现"状态行说可用、审计说诊断兜底"
-           这种自相矛盾的输出。 */
-        const char *text = bongo_cat_live2d_native_active()
-            ? tr(app, "pages.preference.live2dSetup.installed",
-                "Cubism Core imported; Live2D rendering is available")
-            : tr(app, "native.live2dCoreImported", "Live2D Cubism Core imported.");
-        snprintf(output, capacity, "%s (%s %u)", text, "csm",
-            (unsigned)bongo_cat_live2d_core_version());
-        return;
-    }
     const char *key = bongo_cat_renderer_module_live2d_available()
         ? "pages.preference.live2dSetup.description"
         : "native.live2dComponentMissing";
@@ -268,18 +264,46 @@ void bongo_cat_preferences_live2d_restart_prompt_poll(BongoCatApp *app) {
 void bongo_cat_preferences_live2d_setup_row(BongoCatApp *app,
     struct nk_context *context) {
     if (!app || !context) return;
-    char status[512];
-    status_text(app, status, sizeof(status));
+    /*
+     * 这几行只在**还没导入 Cubism Core** 时才画。
+     *
+     * 为什么: Core 就位之后它们全是无用信息 —— 状态行只说一句"已导入"、下载页按钮指向一个
+     * 已经不需要的页面、"不再提示"更是失去了对象(没有可提示的东西了)。设置页每多一行不产生
+     * 动作的行, 真正要用的行就越难被看见。所以 Core 就位时这三行**整行不出现**(而不是置灰)。
+     *
+     * 判定用的是既有的运行期事实 `bongo_cat_live2d_core_available()`(别新造一套)。
+     * 它是"这一帧"的状态, 刻意**不做**动态热切换: Core 只在程序启动时被采用(导入成功也要
+     * 重启一次才参与渲染, 见 live2d_dispatch.h 的 bongo_cat_live2d_native_active 说明), 所以
+     * 一次会话里这个判定本来就稳定; 唯一的中间态是"本次运行里刚导入成功"—— 那时 Core 已经
+     * 可用, 三行随之消失, 而"要不要现在重启"的弹窗会接手把下一步讲清楚。
+     *
+     * 缺**渲染组件**是另一回事: 那种情况只给一行纯状态提示, **不**给导入按钮、也不引导去下
+     * Core —— 导入 Core 解决不了程序文件缺失(用户该做的是恢复程序文件或重装)。
+     */
     const char *title = tr(app, "pages.preference.live2dSetup.title",
         "Live2D Cubism Core");
+    if (bongo_cat_live2d_core_available()) return;
+    if (!bongo_cat_renderer_module_live2d_available()) {
+        bongo_cat_pref_status(context, "live2d-component", title,
+            tr(app, "native.live2dComponentMissing",
+                "The Live2D renderer component is missing: restore the cores folder "
+                "next to the application, or reinstall the application."));
+        return;
+    }
+    char status[512];
+    status_text(app, status, sizeof(status));
     const char *button = tr(app, "pages.preference.live2dSetup.choose",
         "Choose SDK zip or Core file...");
     if (bongo_cat_pref_button(context, "live2d-core", title, status, button))
         choose_core_file(app);
     /*
-     * 下面两行**始终**在: 已经导入好 Core 的用户同样需要"打开下载页"这个入口(升级 SDK、
-     * 换一台机器), 而一个会自己消失的控件会让人以为设置项丢了。状态行与导入按钮更是一直保留
-     * —— 这条流程里唯一会"安静下来"的只有自动引导本身。
+     * 下面两行跟着上面那一行一起出现: 它们的对象都是"缺 Core"这件事 —— 打开下载页是为了去
+     * 取 Core, "不再提示"是为了让缺 Core 的自动引导别再烦人。
+     *
+     * 已经导入好 Core 的用户怎么再导入一次(换版本、换一台机器)? 靠**拖放**: 把官方的 SDK
+     * 压缩包或 Core 文件直接拖进设置窗口就会走 Core 导入(见 preferences_import.c 的
+     * bongo_cat_preferences_import_path)。刻意**不**再加一个显眼的"更换 Core"按钮 —— 那条路
+     * 一年用不到一次, 不值得在设置页上常驻。
      */
     const char *download_title = tr(app, "pages.preference.live2dSetup.download",
         "Cubism SDK for Native");
