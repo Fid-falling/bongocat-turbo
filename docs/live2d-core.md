@@ -56,12 +56,13 @@
 
 ### 3.1 打开官方页面
 
-- 官方页面：<https://www.live2d.com/en/sdk/download/native/>
+- **简体中文页面（看到的就是这个）**：
+  <https://www.live2d.com/zh-CHS/sdk/download/native/>
 - 也可以直接用设置里的按钮：**「打开下载页」**（"Live2D 渲染库 (Cubism Core)" 那一行的
-  下面就是它）。
-- 页面底部可以切换语言，官方也提供**简体中文**版本的同一个页面。
+  下面就是它）—— 程序会**按你的界面语言**打开对应的官方页面（简中 / 繁中 / 日 / 韩 / 英）。
+- 页面底部随时可以切换语言：几个语言是同一个页面的不同版本，内容一样。
 
-> 图：Live2D 官方的 Cubism SDK for Native 下载页
+> 图：Live2D 官方的 Cubism SDK for Native 下载页（简体中文）
 
 ### 3.2 为什么只认官网
 
@@ -80,14 +81,24 @@ Core 是 Live2D 公司的专有运行库，**官网是唯一合规、可信的�
 
 > 图：下载页上的 "Cubism SDK for Native" 标题
 
-### 3.4 先同意许可，才有下载按钮
+### 3.4 在页面上走完下载流程（同意许可 + 填邮箱）
 
-1. 阅读页面上的 "Live2D Proprietary Software License Agreement" 与
-   "Live2D Open Software License Agreement"（页面上有链接）；
-2. 勾选 **"I consent to the Software License Agreement."**；
-3. 再点 **"Download the latest version"** 下载最新版。
+打开页面后按顺序做，**每一步都不能跳**：
 
-> 图：许可勾选框与 "Download the latest version" 按钮
+1. 勾选 **「同意软件使用授权协议以及隐私政策」**。页面上有《Live2D Proprietary Software
+   使用授权协议》与《Live2D Open Software 使用授权协议》两个链接，请先点开阅读
+   （不勾选就没有后面的下载选项）。
+2. 选 **「首次下载」**（以前下过、这次只是要换新版本时选「下载更新」）。
+3. 选 **「个人」** 或 **「公司」**（按你的实际身份选；普通用户选「个人」）。
+4. 填一个**电子邮箱地址**。
+5. 点 **DOWNLOAD**。
+6. 在出现的下载列表里找到 **Cubism SDK for Native** 这一项，选 **Windows 版**下载。
+
+> ⚠️ **邮箱是必填的**：官网要求填邮箱才给下载，这一步最容易卡住 —— 填一个你能正常收信的
+> 邮箱即可，填完继续点 DOWNLOAD 就会进入下载列表。
+
+> 图：勾选同意 →「首次下载」→「个人」→ 填邮箱 → DOWNLOAD 的完整流程
+> 图：下载列表里的 "Cubism SDK for Native"（选 Windows 版）
 
 ### 3.5 下哪个文件
 
@@ -311,7 +322,7 @@ Core 会跟着走**。
 ```
 Live2D 模型不显示？程序不附带、也不代下 Live2D Cubism Core（Live2D 的专有运行库），需要你自己去官网取得并导入一次：
 1) 设置 → 偏好 → 模型 → 「Live2D 渲染库 (Cubism Core)」这一行，点「打开下载页」；
-2) 在官网同意许可后下载 Cubism SDK for Native（整个 zip 即可，不用解压）；
+2) 在中文官网勾选「同意软件使用授权协议以及隐私政策」→「首次下载」→「个人」→ 填邮箱 → DOWNLOAD，在列表里下 Cubism SDK for Native 的 Windows 版（整个 zip 即可，不用解压）；
 3) 回到设置点「选择 SDK 压缩包或 Core 文件...」选中它，或把 zip 直接拖进设置窗口；
 4) 导入成功后按提示点「立即重启」（或自己重启一次 BongoCat），模型就显示出来了。
 提示里若说"缺少 Live2D 渲染组件"，那是程序文件不全，重装程序即可，不是下 Core。
