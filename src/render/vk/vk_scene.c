@@ -79,7 +79,7 @@ static void draw_live2d_body(BongoCatApp *app) {
     BongoCatVkTexture *live2d = live2d_target_texture(app);
     if (!live2d) return;
     bongo_cat_vk_draw_overlay_quad(app->vk, live2d, false,
-        live2d->width, live2d->height, false, false, false);
+        live2d->width, live2d->height, false, false, false, false);
 }
 
 bool bongo_cat_vk_render_main(BongoCatApp *app, bool present) {

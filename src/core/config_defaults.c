@@ -282,6 +282,12 @@ void bongo_cat_settings_defaults(BongoCatSettings *config) {
      * (默认 60 帧 => 开同步), 只有用户真的动过这个开关才会覆盖它。
      */
     config->model.vsync = BONGO_CAT_VSYNC_DEFAULT;
+    /* 多键显示默认打开: 同侧多键本来就"能连上", 只是旧实现每侧只留最后一个键, 用户
+       看不到自己按了什么。关掉它才需要理由, 所以默认值是 1。 */
+    config->model.multi_key_display = 1;
+    config->model.multi_key_limit = BONGO_CAT_MULTI_KEY_LIMIT_DEFAULT;
+    /* 默认合并: 一个气泡里 "A + S" 比并排 N 个气泡更接近"用户按了什么"的直觉读法 */
+    config->model.bubble_merge = 1;
     /* 默认走 OpenGL: Vulkan 现在是显式选项 (见 render_backend.c 的 resolve) */
     config->model.renderer = BONGO_CAT_RENDERER_OPENGL;
     config->window.always_on_top = true;
@@ -341,6 +347,11 @@ void bongo_cat_settings_validate(BongoCatSettings *config) {
             BONGO_CAT_VSYNC_FOR_MAX_FPS(max_fps) : 1;
     if ((unsigned)config->model.renderer >= BONGO_CAT_RENDERER_COUNT)
         config->model.renderer = BONGO_CAT_RENDERER_OPENGL;
+    config->model.multi_key_display = config->model.multi_key_display != 0;
+    config->model.bubble_merge = config->model.bubble_merge != 0;
+    if (config->model.multi_key_limit < 1 ||
+        config->model.multi_key_limit > BONGO_CAT_MULTI_KEY_LIMIT_MAX)
+        config->model.multi_key_limit = BONGO_CAT_MULTI_KEY_LIMIT_DEFAULT;
     config->window.hide_delay_seconds = clampf_or(
         config->window.hide_delay_seconds, 0.0f, 60.0f, 0.0f);
     config->window.hide_fade_seconds = clampf_or(

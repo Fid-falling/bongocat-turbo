@@ -124,11 +124,14 @@ int bongo_cat_vk_texture_height(const BongoCatVkTexture *texture);
  *    premultiply 描述贴图本身的像素格式: true = 直通 alpha (叠加层贴图在 Vulkan
  *    侧就是这样上传的), 片元里会乘一次 alpha; false = 贴图已经是预乘值 (Live2D
  *    的离屏结果), 不能再乘 —— 多乘一次就是半透明区域偏暗的 a^2 bug。
+ *    keycap_only = true 时只保留"按键提示"像素 (多键显示里非首个按键的第二通道),
+ *    与 OpenGL 侧同一套规则 (见 overlay.frag): 只留"够亮 + 够彩"的像素。自带气泡素材的
+ *    模型不走这条通道 —— 它的多键画法在 CPU 侧合成 (见 src/render/overlay_bubble.c)。
  *  - draw_triangles: 通用顶点色/纹理三角形列表 (三角形扇/带已由调用方展开)。
  */
 bool bongo_cat_vk_draw_overlay_quad(BongoCatVk *vk, BongoCatVkTexture *texture,
     bool mirror, int reference_width, int reference_height, bool erase_left,
-    bool erase_right, bool premultiply);
+    bool erase_right, bool premultiply, bool keycap_only);
 bool bongo_cat_vk_draw_triangles(BongoCatVk *vk, BongoCatVkTexture *texture,
     const float *vertices, unsigned int vertex_count, bool textured);
 /*

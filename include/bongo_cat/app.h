@@ -210,6 +210,15 @@ typedef struct BongoCatApp {
         uint64_t due_ns;
         char ids[BONGO_CAT_SMOKE_SWITCH_CAP][BONGO_CAT_ID_CAP];
     } smoke_switch;
+    /*
+     * --ci-keys=KeyA,KeyS,... 的启动注入清单: 初始化的最后推进输入队列 (注入点见
+     * lifecycle/app.c), 与真实按键走同一条 drain -> apply -> overlay 路径。
+     * 存在的理由: "同侧多键按住"这类场景依赖物理键盘, 脚本合成的系统级注入又会被
+     * Raw Input 接收层的设备去重/对账吞掉, 无人值守下复现不了 —— 从队列入口注入
+     * 才能稳定地端到端验证下游渲染。
+     */
+    char smoke_keys[BONGO_CAT_SMOKE_SWITCH_CAP][BONGO_CAT_ID_CAP];
+    unsigned smoke_keys_count;
     int smoke_language;
     int smoke_theme;
     int smoke_preference_page;

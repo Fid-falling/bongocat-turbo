@@ -141,7 +141,7 @@ bool bongo_cat_app_initialize(BongoCatApp *app, int argc, char **argv,
      * 副宠/冒烟不主动提权 (它们是被主进程/自动化拉起来的)。用户取消 UAC 或
      * 提权失败时返回 false, 照常运行。
      */
-    if (!app->secondary_pet && !app->smoke &&
+if (!app->secondary_pet && !app->smoke &&
         app->settings.app.run_as_admin &&
         bongo_cat_platform_relaunch_elevated_if_needed())
         return true;
@@ -280,6 +280,17 @@ bool bongo_cat_app_initialize(BongoCatApp *app, int argc, char **argv,
         !app->autostart_launch && app->session.window.visible ?
         app->last_frame_ns + 250000000ull : 0;
     if (app->smoke_deadline_ns) app->smoke_deadline_ns += app->last_frame_ns;
+    /*
+     * --ci-keys= 的注入点: 作为 KEY_DOWN 事件推进输入队列, 主循环第一轮 drain 时
+     * 与真实按键走同一条路径 (shortcuts -> apply_input -> overlay)。放在初始化的
+     * 最后, 是因为这里模型/输入/渲染都已就绪, 而主循环还没开始 —— 队列里的注入
+     * 事件一定赶在第一批真实输入之前被消费, 时序完全确定。
+     */
+    for (unsigned i = 0; i < app->smoke_keys_count; ++i) {
+        BongoCatInputEvent key = {.kind = BONGO_CAT_INPUT_KEY_DOWN};
+        snprintf(key.name, sizeof(key.name), "%s", app->smoke_keys[i]);
+        bongo_cat_input_push(&app->input, &key);
+    }
     if (!app->session.window.visible) bongo_cat_startup_ready(app);
     return true;
 }

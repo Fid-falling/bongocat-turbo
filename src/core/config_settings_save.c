@@ -37,6 +37,14 @@ static bool write_model(yyjson_mut_doc *doc, yyjson_mut_val *object,
            对老版本这是未知键, 它们原样忽略 —— 升级再回退只丢这一项, 不会让配置读取
            失败(新增键必须满足这条, 见本文件开头的契约)。 */
         yyjson_mut_obj_add_int(doc, object, "vsync", value->vsync) &&
+        /* 键名/类型与 config_io.c 的 read_int("multiKeyDisplay"/"multiKeyLimit") 一一对齐。
+           对老版本这是未知键, 它们原样忽略, 所以升级再回退只丢这一项。 */
+        yyjson_mut_obj_add_int(doc, object, "multiKeyDisplay",
+            value->multi_key_display) &&
+        yyjson_mut_obj_add_int(doc, object, "multiKeyLimit",
+            value->multi_key_limit) &&
+        /* 键名/类型与 config_io.c 的 read_int("bubbleMerge") 一一对齐 */
+        yyjson_mut_obj_add_int(doc, object, "bubbleMerge", value->bubble_merge) &&
         yyjson_mut_obj_add_strcpy(doc, object, "renderer",
             bongo_cat_renderer_name(value->renderer));
 }

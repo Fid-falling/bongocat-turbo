@@ -209,6 +209,13 @@ bool bongo_cat_app_commit_model_switch(BongoCatApp *app,
             SDL_LogWarn(SDL_LOG_CATEGORY_APPLICATION, "%s", optional.message);
         bongo_cat_overlay_clear(app->overlay);
     }
+    /* 把设置里的多键显示开关/上限与"气泡合并"模式下发给叠加层。overlay 创建时的默认值
+       (开/5/合并) 与设置默认一致, 但用户改过设置之后换模型必须重新下发, 否则新模型仍按旧值画。 */
+    bongo_cat_overlay_set_key_display(app->overlay,
+        app->settings.model.multi_key_display != 0,
+        app->settings.model.multi_key_limit);
+    bongo_cat_overlay_set_bubble_merge(app->overlay,
+        app->settings.model.bubble_merge != 0);
     snprintf(app->loaded_model, sizeof(app->loaded_model), "%s", entry->id);
     size_t saved_behaviors = bongo_cat_app_saved_behavior_count(app, entry->id);
     bongo_cat_app_restore_behavior_state(app, entry->id);
