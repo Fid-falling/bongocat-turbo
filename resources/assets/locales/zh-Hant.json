@@ -11,7 +11,13 @@
         "title": "Live2D 渲染程式庫 (Cubism Core)",
         "description": "尚未匯入 Live2D Cubism Core。請到 Live2D 官網下載 Cubism SDK for Native, 再在這裡選取壓縮檔或 Core 檔案匯入。本程式不附帶、也不代為下載這個執行階段程式庫。",
         "installed": "已匯入 Cubism Core, 可使用 Live2D 渲染",
-        "choose": "選擇 SDK 壓縮檔或 Core 檔案..."
+        "choose": "選擇 SDK 壓縮檔或 Core 檔案...",
+        "download": "Cubism SDK for Native",
+        "downloadHint": "在瀏覽器裡開啟 Live2D 官方的下載頁。本程式不附帶、也不代為下載這個執行階段程式庫。",
+        "downloadButton": "開啟下載頁",
+        "silence": "不再提示",
+        "silenceHint": "缺少 Cubism Core 時, 不再自動開啟設定視窗與提示。",
+        "onboarding": "模型目前不顯示, 是因為尚未匯入 Live2D Cubism Core 這個執行階段程式庫。請前往 Live2D 官網自行下載 Cubism SDK for Native 並同意其授權條款後, 在剛開啟的設定視窗裡選取壓縮檔或 Core 檔案匯入。本程式不附帶、也不代為下載這個程式庫。"
       },
       "title": "偏好設定",
       "cat": {

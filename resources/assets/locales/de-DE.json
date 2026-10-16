@@ -11,7 +11,13 @@
         "title": "Live2D-Laufzeit (Cubism Core)",
         "description": "Live2D Cubism Core ist noch nicht installiert. Lade Cubism SDK for Native von der offiziellen Live2D-Seite herunter und waehle hier die ZIP-Datei oder die Core-Bibliothek aus. Diese Laufzeit wird weder mitgeliefert noch automatisch geladen.",
         "installed": "Cubism Core installiert; Live2D-Darstellung ist verfuegbar",
-        "choose": "SDK-ZIP oder Core-Datei waehlen..."
+        "choose": "SDK-ZIP oder Core-Datei waehlen...",
+        "download": "Cubism SDK for Native",
+        "downloadHint": "Oeffnet die offizielle Live2D-Downloadseite im Browser. Diese Laufzeit wird weder mitgeliefert noch automatisch geladen.",
+        "downloadButton": "Downloadseite oeffnen",
+        "silence": "Nicht mehr erinnern",
+        "silenceHint": "Solange Cubism Core fehlt, dieses Fenster und den Hinweis nicht mehr automatisch oeffnen.",
+        "onboarding": "Das Modell wird nicht angezeigt, weil die Laufzeit Live2D Cubism Core noch nicht installiert ist. Lade Cubism SDK for Native von der offiziellen Live2D-Seite herunter, stimme der Lizenz zu und waehle dann im gerade geoeffneten Einstellungsfenster die ZIP-Datei oder die Core-Bibliothek aus. Diese Bibliothek wird weder mitgeliefert noch automatisch geladen."
       },
       "title": "Einstellungen",
       "cat": {

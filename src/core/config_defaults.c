@@ -304,6 +304,10 @@ void bongo_cat_settings_defaults(BongoCatSettings *config) {
     config->window.sequential_model_interval_seconds =
         BONGO_CAT_DEFAULT_SEQUENTIAL_MODEL_SECONDS;
     config->app.tray_visible = true;
+    /* 缺 Core 的一次性引导还没发生过, 用户也没说过"别再提示"。两条都必须是 false:
+       有一个 true 就会让全新安装的机器再也看不到导入引导。 */
+    config->app.live2d_core_prompt_shown = false;
+    config->app.live2d_core_prompt_dismissed = false;
     /* 默认以管理员身份运行 (与 BongoCat-X 一致, 但 turbo 的默认值是开): 启动时
        请求提权。因此每次启动 (含开机自启) 都会弹一次 UAC, 用户可在设置里关掉。 */
     config->app.run_as_admin = true;

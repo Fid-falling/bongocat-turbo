@@ -11,7 +11,13 @@
         "title": "Live2D 런타임 (Cubism Core)",
         "description": "Live2D Cubism Core 가 아직 없습니다. Live2D 공식 사이트에서 Cubism SDK for Native 를 내려받은 뒤 여기에서 ZIP 이나 Core 파일을 선택해 가져오세요. 이 런타임은 함께 배포되지 않으며 자동으로 내려받지도 않습니다.",
         "installed": "Cubism Core 를 가져왔습니다. Live2D 렌더링을 사용할 수 있습니다",
-        "choose": "SDK ZIP 또는 Core 파일 선택..."
+        "choose": "SDK ZIP 또는 Core 파일 선택...",
+        "download": "Cubism SDK for Native",
+        "downloadHint": "브라우저에서 Live2D 공식 다운로드 페이지를 엽니다. 이 런타임은 함께 배포되지 않으며 자동으로 내려받지도 않습니다.",
+        "downloadButton": "다운로드 페이지 열기",
+        "silence": "다시 표시하지 않기",
+        "silenceHint": "Cubism Core 가 없는 동안 설정 창과 알림을 자동으로 열지 않습니다.",
+        "onboarding": "모델이 보이지 않는 이유는 Live2D Cubism Core 런타임이 아직 없기 때문입니다. Live2D 공식 사이트에서 Cubism SDK for Native 를 내려받아 라이선스에 동의한 뒤, 방금 열린 설정 창에서 ZIP 이나 Core 파일을 가져오세요. 이 라이브러리는 함께 배포되지 않으며 자동으로 내려받지도 않습니다."
       },
       "title": "환경 설정",
       "cat": {

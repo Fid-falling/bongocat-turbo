@@ -11,7 +11,13 @@
         "title": "Live2D ランタイム (Cubism Core)",
         "description": "Live2D Cubism Core はまだ取り込まれていません。Live2D 公式サイトから Cubism SDK for Native をダウンロードし, ここで ZIP か Core ファイルを選んで取り込んでください。このランタイムは同梱も自動ダウンロードもされません。",
         "installed": "Cubism Core を取り込み済み, Live2D 描画を利用できます",
-        "choose": "SDK の ZIP か Core ファイルを選択..."
+        "choose": "SDK の ZIP か Core ファイルを選択...",
+        "download": "Cubism SDK for Native",
+        "downloadHint": "ブラウザーで Live2D 公式のダウンロードページを開きます。このランタイムは同梱も自動ダウンロードもされません。",
+        "downloadButton": "ダウンロードページを開く",
+        "silence": "今後表示しない",
+        "silenceHint": "Cubism Core が無い間, 設定ウィンドウと通知を自動で開かないようにします。",
+        "onboarding": "モデルが表示されないのは, Live2D Cubism Core というランタイムがまだ取り込まれていないためです。Live2D 公式サイトから Cubism SDK for Native をダウンロードしてライセンスに同意したうえで, いま開いた設定ウィンドウで ZIP か Core ファイルを取り込んでください。このライブラリは同梱も自動ダウンロードもされません。"
       },
       "title": "設定",
       "cat": {

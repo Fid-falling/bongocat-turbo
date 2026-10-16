@@ -118,6 +118,11 @@ static bool write_app(yyjson_mut_doc *doc, yyjson_mut_val *object,
             value->run_as_admin) &&
         yyjson_mut_obj_add_bool(doc, object, "showTrayIcon",
             value->tray_visible) &&
+        /* 键名/语义与 config_io.c 的 read_bool 一一对齐。 */
+        yyjson_mut_obj_add_bool(doc, object, "live2dCorePromptShown",
+            value->live2d_core_prompt_shown) &&
+        yyjson_mut_obj_add_bool(doc, object, "live2dCorePromptDismissed",
+            value->live2d_core_prompt_dismissed) &&
         yyjson_mut_obj_add_strcpy(doc, object, "theme",
             bongo_cat_theme_name(value->theme)) &&
         yyjson_mut_obj_add_strcpy(doc, object, "language",

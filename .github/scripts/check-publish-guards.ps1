@@ -34,8 +34,27 @@ $cubismSdkFetchMarkers = @(
     'cubism.live2d.com',
     'CubismSdkForNative-'
 )
-# 应用源码里出现这个主机名 = 有人写了"程序自己下载官方 SDK"的代码路径。
-$cubismInAppDownloadMarker = 'cubism.live2d.com'
+# 应用源码里出现**除官方页面主机之外**的 live2d.com = 有人写了"程序自己下载官方 SDK/Core"的
+# 代码路径。这条判据从"出现域名即失败"收紧/放宽成下面这一对, 因为引导用户去官网这件事本身
+# 就需要一个官方链接:
+#   * **允许** www.live2d.com —— 官方**页面**主机。应用只用 SDL_OpenURL 把用户送到那个页面,
+#     由用户自己在官网上阅读并同意许可, 这是唯一合规的取得方式;
+#   * **禁止** 其它 live2d.com 主机(典型是 cubism.live2d.com) —— 那是官方压缩包的**直链**主机,
+#     只有"程序代下载"才会用到, 正常路径(打开页面 / 读用户自己选中的文件)一个都不需要;
+#   * **禁止** 代下载的实现特征(见 $cubismDownloadLogicMarkers);
+#   * **禁止** 把 Core 二进制放进源码树/资源树(见 Get-EmbeddedCoreFailures)。
+# 下面这个判据因此不再"看到域名就报", 而是"摘掉允许的主机后还剩下 live2d.com 就报"。
+$cubismAllowedPageHost = 'www.live2d.com'
+# "程序自己下载"的代码路径特征: 代下载实现才会出现, 打开页面与读用户选的文件都不需要。
+$cubismDownloadLogicMarkers = @(
+    'CUBISM_SDK_ARCHIVE_URL',
+    'Live2DCubismCore.zip'
+)
+# Core 二进制的文件名特征(与 cmake/CubismCompliance.cmake 的判定一致)。
+# 写成 `^(lib)?` 而不是 `^lib?`: 后者是"li + 可选的 b", 于是永远匹配不到裸名
+# Live2DCubismCore.dll (最可能在 Windows 上泄漏的那个名字), 只能匹配 libLive2DCubismCore.so。
+# -SelfTest 里的"内嵌 Core"反例就是为了让这个洞不会再回来。
+$cubismCoreFilePattern = '^(lib)?Live2DCubismCore([._-].*)?\.(dll|so|dylib|lib|a)$'
 
 # 某个工作流是否偷偷还原/下载了 SDK。抽成函数是为了让 -SelfTest 能拿反例验证它真的会拒。
 function Get-CubismRestoreFailures {
@@ -143,19 +162,43 @@ foreach ($path in $workflowPaths) {
     }
 }
 
-# 应用源码侧的策略: 不得出现"程序自己下载官方 SDK"的代码路径(见 LIVE2D-PLUGIN-PLAN.md §14)。
-# 引导页只会打开浏览器(www.live2d.com 的下载页), 而 cubism.live2d.com 是官方 SDK 压缩包的
-# 直链主机 —— 只有实现代下载才会用到它, 所以它是一条精确的判据而不是泛泛的域名匹配。
+# 应用源码侧的策略: 不得出现"程序自己下载官方 SDK/Core"的代码路径, 也不得内嵌 Core 二进制。
+# 注意这里**不是**"出现 live2d.com 即失败": 打开官方页面是允许的用途(见上面的说明), 判据是
+# "允许的页面主机摘掉之后, 还有没有别的 live2d.com 主机"。
 function Get-InAppDownloadFailures {
     param(
         [Parameter(Mandatory = $true)][string]$Text,
         [Parameter(Mandatory = $true)][string]$Label
     )
-    if ($Text.Contains($cubismInAppDownloadMarker)) {
-        return @("$Label contains '$cubismInAppDownloadMarker': the application must not " +
-            'download the proprietary Cubism SDK itself')
+    $failures = @()
+    if ($Text.Replace($cubismAllowedPageHost, '').Contains('live2d.com')) {
+        $failures += "$Label references a live2d.com host other than " +
+        "$cubismAllowedPageHost`: only the official *page* may be opened (with " +
+        'SDL_OpenURL); downloading the proprietary Cubism SDK/Core from a direct ' +
+        'host is not allowed'
     }
-    return @()
+    $matched = @($cubismDownloadLogicMarkers | Where-Object { $Text.Contains($_) })
+    if ($matched.Count -gt 0) {
+        $failures += "$Label contains in-app download logic for the proprietary " +
+        "Cubism SDK (matched $($matched -join ', '))"
+    }
+    return $failures
+}
+
+# 源码树/资源树里不得出现 Core 二进制: 内嵌一份等于随包分发专有库。
+function Get-EmbeddedCoreFailures {
+    param([Parameter(Mandatory = $true)][string]$Root)
+    $failures = @()
+    foreach ($tree in 'src', 'resources') {
+        $directory = Join-Path $Root $tree
+        if (-not (Test-Path -LiteralPath $directory)) { continue }
+        $found = @(Get-ChildItem -LiteralPath $directory -Recurse -File |
+            Where-Object { $_.Name -match $cubismCoreFilePattern })
+        if ($found.Count -gt 0) {
+            $failures += "embedded Cubism Core binary in $tree/: $($found.FullName -join ', ')"
+        }
+    }
+    return $failures
 }
 
 $sourceRoot = Join-Path (Split-Path $PSScriptRoot -Parent) '..'
@@ -165,6 +208,7 @@ foreach ($file in $sourceFiles) {
     $failures += @(Get-InAppDownloadFailures -Text (Get-Content -LiteralPath $file.FullName -Raw) `
         -Label ("src/" + $file.Name))
 }
+$failures += @(Get-EmbeddedCoreFailures -Root $sourceRoot)
 
 if ($SelfTest) {
     if (-not $selfTestText) {
@@ -195,12 +239,48 @@ if ($SelfTest) {
         if ($restoreCaught.Count -eq 0) {
             $failures += 'Self-test did not reject a Cubism SDK restore in an untrusted workflow.'
         }
-        # 反例 2: 应用源码里出现官方 SDK 直链主机, 必须被拒。
+        # 反例 2: 应用源码里出现 SDK 压缩包的**直链主机**, 必须被拒。
         $downloadCaught = @(Get-InAppDownloadFailures `
-            -Text "fetch https://$cubismInAppDownloadMarker/sdk-native/bin/x.zip" `
+            -Text "fetch https://cubism.live2d.com/sdk-native/bin/x.zip" `
             -Label 'self-test')
         if ($downloadCaught.Count -eq 0) {
             $failures += 'Self-test did not reject an in-app SDK download.'
+        }
+        # 正例(反向自检): 打开官方**页面**是允许的用途, 不能被上一条误伤 —— 少了这条,
+        # 以后有人把判据改回"看到 live2d.com 就失败"也不会有任何测试报错。
+        $pageAllowed = @(Get-InAppDownloadFailures `
+            -Text 'SDL_OpenURL("https://www.live2d.com/en/sdk/download/native/")' `
+            -Label 'self-test')
+        if ($pageAllowed.Count -ne 0) {
+            $failures += 'Self-test rejected opening the official Live2D page.'
+        }
+        # 正例: 同一段文本里再出现别的 live2d.com 主机(直链) 就必须被拒。
+        $pagePlusDirect = @(Get-InAppDownloadFailures `
+            -Text ("https://www.live2d.com/en/sdk/download/native/" +
+                " and https://cubism.live2d.com/sdk-native/bin/x.zip") `
+            -Label 'self-test')
+        if ($pagePlusDirect.Count -eq 0) {
+            $failures += 'Self-test allowed a direct download host next to the page host.'
+        }
+        # 反例 3: 代下载的实现特征, 必须被拒。
+        $logicCaught = @(Get-InAppDownloadFailures `
+            -Text 'const char *url = CUBISM_SDK_ARCHIVE_URL;' -Label 'self-test')
+        if ($logicCaught.Count -eq 0) {
+            $failures += 'Self-test did not reject in-app download logic.'
+        }
+        # 内嵌 Core 二进制的自检: 用临时目录造一份假 Core, 命中才算过。
+        $coreProbe = Join-Path ([IO.Path]::GetTempPath()) ("BongoCatCoreProbe_" + [guid]::NewGuid())
+        New-Item -ItemType Directory -Path $coreProbe | Out-Null
+        New-Item -ItemType Directory -Path (Join-Path $coreProbe 'src') | Out-Null
+        Set-Content -LiteralPath (Join-Path $coreProbe 'src/Live2DCubismCore_MT.lib') -Value 'x'
+        try {
+            $embeddedCaught = @(Get-EmbeddedCoreFailures -Root $coreProbe)
+            if ($embeddedCaught.Count -eq 0) {
+                $failures += 'Self-test did not reject an embedded Core binary.'
+            }
+        }
+        finally {
+            Remove-Item -LiteralPath $coreProbe -Recurse -Force
         }
     }
 }

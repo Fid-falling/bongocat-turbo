@@ -11,7 +11,13 @@
         "title": "Live2D runtime (Cubism Core)",
         "description": "Live2D Cubism Core is not installed yet. Download Cubism SDK for Native from the official Live2D site, then select the ZIP or the Core library here to import it. This runtime library is neither bundled nor downloaded for you.",
         "installed": "Cubism Core imported; Live2D rendering is available",
-        "choose": "Choose SDK zip or Core file..."
+        "choose": "Choose SDK zip or Core file...",
+        "download": "Cubism SDK for Native",
+        "downloadHint": "Opens the official Live2D download page in your browser. This runtime library is neither bundled nor downloaded for you.",
+        "downloadButton": "Open download page",
+        "silence": "Don't prompt again",
+        "silenceHint": "While Cubism Core is missing, stop opening this window and showing a notice automatically at startup.",
+        "onboarding": "The model is not shown because the Live2D Cubism Core runtime library is not installed yet. Please download Cubism SDK for Native from the official Live2D site and agree to its license, then import the ZIP or the Core library in the settings window that just opened. We neither bundle nor download this library for you."
       },
       "title": "Preferences",
       "cat": {

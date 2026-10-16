@@ -11,7 +11,13 @@
         "title": "Runtime do Live2D (Cubism Core)",
         "description": "O Live2D Cubism Core ainda nao foi instalado. Baixe o Cubism SDK for Native no site oficial do Live2D e escolha aqui o ZIP ou a biblioteca Core. Este runtime nao acompanha o programa nem e baixado por ele.",
         "installed": "Cubism Core importado; a renderizacao Live2D esta disponivel",
-        "choose": "Escolher ZIP do SDK ou arquivo Core..."
+        "choose": "Escolher ZIP do SDK ou arquivo Core...",
+        "download": "Cubism SDK for Native",
+        "downloadHint": "Abre no navegador a pagina oficial de download do Live2D. Este runtime nao acompanha o programa nem e baixado por ele.",
+        "downloadButton": "Abrir a pagina de download",
+        "silence": "Nao avisar novamente",
+        "silenceHint": "Enquanto o Cubism Core estiver faltando, nao abrir esta janela nem mostrar o aviso automaticamente.",
+        "onboarding": "O modelo nao aparece porque o runtime Live2D Cubism Core ainda nao foi importado. Baixe o Cubism SDK for Native no site oficial do Live2D, aceite a licenca e escolha o ZIP ou a biblioteca Core na janela de configuracoes que acabou de abrir. Esta biblioteca nao acompanha o programa nem e baixada por ele."
       },
       "title": "Preferências",
       "cat": {

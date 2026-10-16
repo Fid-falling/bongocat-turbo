@@ -185,6 +185,16 @@ typedef struct BongoCatApplicationPreferences {
      */
     bool run_as_admin;
     bool tray_visible;
+    /*
+     * 缺 Cubism Core 的一次性引导 (见 preferences_live2d_setup.c)。
+     *
+     * 为什么记两条而不是一条: "已经自动引导过一次" 与 "用户明确说别再提示" 是两件事 ——
+     * 前者是我们自己为了不骚扰而收手, 后者是用户的意愿, 界面上要如实显示成勾选状态。
+     * 合成一条会让"不再提示"这个勾在用户没勾过的时候就是勾上的。
+     * 两者都是可选读: 老配置里没有这两个键时取默认值 (false), 于是一次性引导照常发生。
+     */
+    bool live2d_core_prompt_shown;
+    bool live2d_core_prompt_dismissed;
     BongoCatTheme theme;
     BongoCatLanguage language;
 } BongoCatApplicationPreferences;

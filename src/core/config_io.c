@@ -152,7 +152,12 @@ static bool read_app(yyjson_val *object, BongoCatApplicationPreferences *value,
     BongoCatError *error) {
     if (!read_bool(object, "launchAtLogin", &value->autostart, error) ||
         !read_bool(object, "runAsAdmin", &value->run_as_admin, error) ||
-        !read_bool(object, "showTrayIcon", &value->tray_visible, error))
+        !read_bool(object, "showTrayIcon", &value->tray_visible, error) ||
+        /* 可选读: 老配置里没有这两个键时保留 config_defaults 的默认值(false)。 */
+        !read_bool(object, "live2dCorePromptShown",
+            &value->live2d_core_prompt_shown, error) ||
+        !read_bool(object, "live2dCorePromptDismissed",
+            &value->live2d_core_prompt_dismissed, error))
         return false;
     const char *text;
     size_t length;

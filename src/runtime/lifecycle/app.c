@@ -22,6 +22,7 @@
 #include "bongo_cat/overlay.h"
 #include "bongo_cat/preferences.h"
 #include "bongo_cat/tray.h"
+#include "preferences_live2d_setup.h"
 #include "ui_backend.h"
 #include <SDL3/SDL_opengl.h>
 #include <stdio.h>
@@ -218,6 +219,14 @@ bool bongo_cat_app_initialize(BongoCatApp *app, int argc, char **argv,
         SDL_LogWarn(SDL_LOG_CATEGORY_APPLICATION,
             "The update checker could not be initialized");
     bongo_cat_update_start_automatic(app->update);
+    /*
+     * 缺 Cubism Core 的一次性引导: 自动打开设置窗口 + 弹一次告知 + 把用户送到官方下载页。
+     * 位置在设置对象建好之后、主循环之前 —— 这一步需要设置窗口才能把"导入入口在哪"讲清楚,
+     * 又必须早于用户看到空白的猫(否则他先看到的是"模型不显示"而不是原因)。
+     * 已有 Core / 缺的是组件 / 用户勾过"不再提示" / 无人值守运行 都不做任何事, 判据见
+     * preferences_live2d_setup.c。
+     */
+    bongo_cat_preferences_live2d_core_onboarding(app);
     if (!app->secondary_pet && !app->tray && !app->session.window.visible) {
         bongo_cat_window_set_visible(app, true);
     }
