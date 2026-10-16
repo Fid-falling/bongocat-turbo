@@ -350,6 +350,12 @@ USB stick just copy the program together with that folder — nothing else is
 needed. Delete `portable.json` to fall back to the default location. The
 settings window always shows the folder that is actually in use.
 
+### 🎭 The Live2D model does not show up. Where is the Cubism Core runtime?
+
+BongoCat neither bundles nor downloads it: get Cubism SDK for Native from the
+official Live2D site and import it once — see the
+[Live2D Cubism Core download and import guide](docs/live2d-core.md) (Chinese).
+
 ### Linux Wayland Input
 
 X11 uses XInput2 by default. Experimental evdev input for Wayland is off by
