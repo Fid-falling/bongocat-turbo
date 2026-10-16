@@ -197,6 +197,17 @@ BongoCatMenuAction bongo_cat_platform_context_menu(BongoCatPlatform *platform,
     const BongoCatMenuLabels *labels);
 BongoCatResult bongo_cat_platform_embedded_assets(const char *target, BongoCatError *error);
 /*
+ * 把内嵌在 exe 里的 Live2D 渲染组件按需释放到 directory(即 <存储根>/cores/)。
+ *
+ * 存在的理由: 发行形态要回到"只发单个 exe", 而组件必须落在 <存储根>/cores/ 才会被现有的
+ * 目录解析看见。已存在且与内嵌字节一致时不做任何写入; 不一致时先写临时文件再原子改名。
+ * 返回 BONGO_CAT_ERROR_PLATFORM 表示"这个平台没有内嵌组件"(Linux/macOS 资源随包落盘,
+ * 或者这是没有 SDK 的诊断构建), 调用方按"没什么可释放"处理, **不是**错误。
+ * 任何真实失败都只是降级: 组件缺失时 Live2D 走诊断兜底, 绝不能让启动失败。
+ */
+BongoCatResult bongo_cat_platform_embedded_assets_release_component(
+    const char *directory, BongoCatError *error);
+/*
  * 用同一份可执行文件重新启动本进程 (切换渲染后端 / 启停便携模式之后)。
  * arguments 是附加的命令行参数 (可为 NULL 或空串), 调用方保证它安全。
  * 调用方必须**先**把单实例互斥体还回去 (bongo_cat_platform_single_instance_end),

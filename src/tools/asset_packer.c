@@ -101,6 +101,14 @@ done:
     return ok;
 }
 
+/*
+ * 包内路径 = 相对 ROOT 的路径, 原样存下来, **不再**硬编码 "assets/" 前缀。
+ *
+ * 以前打包器只吃资源目录, 所以前缀写死也无所谓; 现在同一个包还要装 exe 自解出来的
+ * 渲染组件(cores/bongo_live2d.dll), 靠路径首段区分"解到资源缓存"与"解到 <存储根>/cores"。
+ * 前缀由调用方 (cmake/ApplicationResources.cmake 传入的 ROOT) 决定: ROOT 下面怎么摆,
+ * 包内就是什么路径。
+ */
 static int append_asset(AssetList *list, const wchar_t *file,
     const char *relative) {
     Asset *asset;
@@ -108,12 +116,10 @@ static int append_asset(AssetList *list, const wchar_t *file,
     unsigned char *data = NULL;
     size_t size = 0;
     size_t relative_length = strlen(relative);
-    size_t path_length = 7 + relative_length;
-    if (path_length > UINT16_MAX || !read_file(file, &data, &size)) return 0;
-    path = (char *)malloc(path_length + 1);
+    if (relative_length > UINT16_MAX || !read_file(file, &data, &size)) return 0;
+    path = (char *)malloc(relative_length + 1);
     if (!path) { free(data); return 0; }
-    memcpy(path, "assets/", 7);
-    memcpy(path + 7, relative, relative_length + 1);
+    memcpy(path, relative, relative_length + 1);
     if (list->count == list->capacity && !reserve_assets(list)) {
         free(path); free(data); return 0;
     }
@@ -303,6 +309,8 @@ static int write_pack(const wchar_t *output, AssetList *list) {
     return 1;
 }
 
+/* ROOT 下的目录结构就是包内结构: assets/ 解到资源缓存, cores/ 是启动时按需释放到
+   <存储根>/cores 的渲染组件(见 windows_assets.c)。 */
 int wmain(int argc, wchar_t **argv) {
     AssetList list = {0};
     int result = 1;

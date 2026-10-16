@@ -53,22 +53,72 @@ function(bongo_cat_audit_no_cubism_core_files root)
   message(STATUS "Cubism 合规审计通过(无 Core 文件): ${root}")
 endfunction()
 
-# 目录级断言: 发行包必须带我们自己的 Live2D 渲染组件 cores/bongo_live2d.*。
-# 组件缺失时 Live2D 模型永远渲染不出来, 而这个失败在"能启动"的假象下很难被发现。
-# 位置是 exe 同级的 cores/(随包分发): 它内含 Framework 但**不含** Core, 所以它存在
-# 与"包内无 Core"两条断言并不冲突, 而是一起把发行物的边界钉死。
+# 在文件里找一段 ASCII 字面量, 找到就把偏移写进 output, 否则写 -1。
+# 为什么要分块: 单文件发布形态下要在一个十兆级的 exe 里找"内嵌资源包中有没有这个条目",
+# 把整个文件读成一个二十多兆的十六进制串会让脚本模式的审计明显变慢、内存也难看。每次读
+# 1 MiB, 相邻两块重叠 (needle 长度 - 1) 字节, 于是跨块边界的匹配也不会漏。
+function(bongo_cat_find_ascii output path needle)
+  set(${output} -1 PARENT_SCOPE)
+  string(HEX "${needle}" _needle)
+  string(TOLOWER "${_needle}" _needle)
+  string(LENGTH "${_needle}" _needle_length)
+  file(SIZE "${path}" _size)
+  set(_chunk 1048576)
+  # 单位是十六进制字符, 所以重叠长度是字节数 * 2
+  math(EXPR _overlap "${_needle_length} - 2")
+  if(_overlap GREATER_EQUAL _chunk)
+    message(FATAL_ERROR "bongo_cat_find_ascii: 待查字符串过长")
+  endif()
+  set(_offset 0)
+  while(_offset LESS _size)
+    file(READ "${path}" _data OFFSET ${_offset} LIMIT ${_chunk} HEX)
+    string(TOLOWER "${_data}" _data)
+    string(FIND "${_data}" "${_needle}" _position)
+    if(NOT _position EQUAL -1)
+      # 只会落在偶数位(十六进制按字节成对), 所以除以 2 就是块内字节偏移
+      math(EXPR _absolute "${_offset} + ${_position} / 2")
+      set(${output} ${_absolute} PARENT_SCOPE)
+      return()
+    endif()
+    math(EXPR _offset "${_offset} + ${_chunk} - ${_overlap}")
+  endwhile()
+endfunction()
+
+# 目录级断言: 发行物必须带我们自己的 Live2D 渲染组件。两种形态都算数 ——
+#   * 形态 1: 包内直接带组件文件 cores/bongo_live2d.*  (Linux/macOS 发行包, 以及构建目录);
+#   * 形态 2: 组件内嵌在可执行文件里, 首次启动按需释放到 <存储根>/cores/
+#             (Windows 的单文件发布形态, 见 src/platform/windows/windows_assets.c)。
+# 为什么要接受两种: 单文件形态下包内**本来就没有** cores/ 目录, 只认形态 1 会让"包是对的"
+# 被判成违规, 而漏判才是真正危险的 —— 组件缺失时 Live2D 模型永远渲染不出来, 却因为"能启动"
+# 而很难被发现。
+#
+# 形态 2 的判定用的是"内嵌资源包里有这个条目路径": 打包器把条目路径原样写进 pak(未压缩),
+# 所以这串字节出现在 exe 里就说明该条目确实被打进去了。这是**发布门禁**级别的检查(拦住
+# "忘了把组件打进去"), 不是防伪: 防伪是下面那条"包内不得含 Core"的双向扫描 + 链接级硬守卫
+# 的职责。判定放在 1 MiB 分块扫描里, 所以对十兆级的 exe 也是常数级开销。
 function(bongo_cat_audit_live2d_component root)
-  set(_found FALSE)
   foreach(_name IN ITEMS bongo_live2d.dll libbongo_live2d.so libbongo_live2d.dylib)
     if(EXISTS "${root}/cores/${_name}")
-      set(_found TRUE)
+      message(STATUS
+        "Cubism 合规审计通过(Live2D 渲染组件在包内): ${root}/cores/${_name}")
+      return()
     endif()
   endforeach()
-  if(NOT _found)
-    message(FATAL_ERROR
-      "发行包里没有 Live2D 渲染组件(应有 cores/bongo_live2d.dll|libbongo_live2d.so|.dylib): ${root}")
-  endif()
-  message(STATUS "Cubism 合规审计通过(Live2D 渲染组件存在): ${root}/cores")
+  file(GLOB _executables "${root}/*.exe" "${root}/BongoCatTurbo")
+  foreach(_executable IN LISTS _executables)
+    if(IS_DIRECTORY "${_executable}")
+      continue()
+    endif()
+    bongo_cat_find_ascii(_position "${_executable}" "cores/bongo_live2d.dll")
+    if(NOT _position EQUAL -1)
+      message(STATUS
+        "Cubism 合规审计通过(Live2D 渲染组件内嵌在可执行文件里): ${_executable}")
+      return()
+    endif()
+  endforeach()
+  message(FATAL_ERROR
+    "发行物里没有 Live2D 渲染组件: 既没有 cores/bongo_live2d.dll|libbongo_live2d.so|.dylib, "
+    "也没有内嵌进可执行文件(单文件发布形态): ${root}")
 endfunction()
 
 # target 级断言: 目标的链接列表(含 INTERFACE 传递)里不得出现 Core。

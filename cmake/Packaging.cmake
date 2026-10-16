@@ -41,39 +41,28 @@ set(CPACK_INSTALL_CMAKE_PROJECTS
   "${CMAKE_BINARY_DIR};${PROJECT_NAME};Runtime;/")
 
 if(WIN32)
-  # 便携版从"单个 exe"改成"含 cores/ 的 zip": Live2D 的渲染实现现在是随包分发的组件
-  # (cores/bongo_live2d.dll), 只把 exe 拷走会让 Live2D 失去渲染能力。zip 里保留一层与包名
-  # 同名的目录, 解压后不会把文件散在当前目录。
-  set(BONGO_CAT_PORTABLE_ARCHIVE
-    "${CMAKE_BINARY_DIR}/dist/${BONGO_CAT_PACKAGE_NAME}-portable.zip")
-  set(BONGO_CAT_PORTABLE_STAGE
-    "${CMAKE_BINARY_DIR}/portable/${BONGO_CAT_PACKAGE_NAME}")
-  set(BONGO_CAT_PORTABLE_DEPENDS bongo_cat)
-  if(TARGET bongo_live2d)
-    list(APPEND BONGO_CAT_PORTABLE_DEPENDS bongo_live2d)
-  endif()
-  add_custom_command(OUTPUT "${BONGO_CAT_PORTABLE_ARCHIVE}"
+  # 便携版就是**那一个 exe**: 渲染组件已经内嵌进 exe 的资源包里, 首次启动按需释放到
+  # <存储根>/cores/ (见 src/platform/windows/windows_assets.c 的 release_component 与
+  # cmake/CubismAssets.cmake 的 bongo_cat_configure_embedded_renderer_component)。
+  # 所以 2f 那个"含 cores/ 的 zip"被撤掉了 —— 单文件才是用户要的发布形态, 也少一层
+  # "解压到哪、目录里还有别的什么"的解释成本。
+  #
+  # 保留 package-portable 这个目标名: CI/发布脚本与 update.h 里的自动更新载荷都按名字引用它,
+  # 改名的收益只是好看一点, 代价是动到跨脚本契约。
+  # 只拷 exe 本身, **不**拷 <构建目录>/cores/(那是开发期 stage 出来的副本): 目录里可能有
+  # .staging(导入过程中的临时区)、旧版本组件之类不该进发行物的东西, 而且它会盖掉内嵌释放
+  # 这条路径 —— 便携版里出现一个磁盘上的 cores/ 会让"组件到底从哪来"变得不可判定。
+  set(BONGO_CAT_PORTABLE_BINARY
+    "${CMAKE_BINARY_DIR}/dist/${BONGO_CAT_PACKAGE_NAME}-portable.exe")
+  add_custom_command(OUTPUT "${BONGO_CAT_PORTABLE_BINARY}"
     COMMAND ${CMAKE_COMMAND} -E make_directory "${CMAKE_BINARY_DIR}/dist"
-    COMMAND ${CMAKE_COMMAND} -E make_directory "${CMAKE_BINARY_DIR}/portable"
-    COMMAND ${CMAKE_COMMAND} -E rm -rf "${BONGO_CAT_PORTABLE_STAGE}"
-    COMMAND ${CMAKE_COMMAND} -E make_directory "${BONGO_CAT_PORTABLE_STAGE}"
     COMMAND ${CMAKE_COMMAND} -E copy_if_different "$<TARGET_FILE:bongo_cat>"
-      "${BONGO_CAT_PORTABLE_STAGE}/"
-    # 只拷组件本身, **不**整目录拷 cores/: 那个目录里可能有 .staging(导入过程中的临时区,
-    # 见 live2d_core.h)之类的瞬态内容, 不该进发行包。
-    COMMAND ${CMAKE_COMMAND} -E make_directory
-      "${BONGO_CAT_PORTABLE_STAGE}/cores"
-    COMMAND ${CMAKE_COMMAND} -E copy_if_different "$<TARGET_FILE:bongo_live2d>"
-      "${BONGO_CAT_PORTABLE_STAGE}/cores/"
-    COMMAND ${CMAKE_COMMAND} -E rm -f "${BONGO_CAT_PORTABLE_ARCHIVE}"
-    COMMAND ${CMAKE_COMMAND} -E tar cf "${BONGO_CAT_PORTABLE_ARCHIVE}"
-      --format=zip -- "${BONGO_CAT_PACKAGE_NAME}"
-    WORKING_DIRECTORY "${CMAKE_BINARY_DIR}/portable"
-    DEPENDS ${BONGO_CAT_PORTABLE_DEPENDS}
-    COMMENT "Building the BongoCat Windows portable archive (exe + cores/)"
+      "${BONGO_CAT_PORTABLE_BINARY}"
+    DEPENDS bongo_cat
+    COMMENT "Building the BongoCat Windows portable executable (single file)"
     VERBATIM)
   add_custom_target(package-portable
-    DEPENDS "${BONGO_CAT_PORTABLE_ARCHIVE}")
+    DEPENDS "${BONGO_CAT_PORTABLE_BINARY}")
 endif()
 
 include(CPack)

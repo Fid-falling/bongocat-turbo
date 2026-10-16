@@ -42,6 +42,8 @@ if(WIN32)
   file(GLOB_RECURSE BONGO_CAT_ASSET_INPUTS CONFIGURE_DEPENDS
     "${CMAKE_CURRENT_SOURCE_DIR}/resources/assets/*")
   bongo_cat_configure_embedded_cubism_assets()
+  # 渲染组件也进内嵌资源包(cores/bongo_live2d.dll): 发行形态因此回到"只发单个 exe"。
+  bongo_cat_configure_embedded_renderer_component()
   add_custom_command(OUTPUT "${BONGO_CAT_ASSET_PACK}"
     COMMAND ${CMAKE_COMMAND} -E rm -rf "${BONGO_CAT_ASSET_STAGE}"
     COMMAND ${CMAKE_COMMAND} -E make_directory
@@ -53,16 +55,21 @@ if(WIN32)
       "${CMAKE_CURRENT_SOURCE_DIR}/LICENSE"
       "${BONGO_CAT_ASSET_STAGE}/assets/LICENSE"
     ${BONGO_CAT_ASSET_EXTRA_COMMANDS}
+    # 打包器吃的根目录是**暂存根**, 不再是 <暂存根>/assets: ROOT 下的结构就是包内结构
+    # (assets/ 解到资源缓存, cores/ 按需释放到 <存储根>/cores)。
     COMMAND "$<TARGET_FILE:bongo_cat_asset_packer>"
-      "${BONGO_CAT_ASSET_STAGE}/assets" "${BONGO_CAT_ASSET_PACK}"
+      "${BONGO_CAT_ASSET_STAGE}" "${BONGO_CAT_ASSET_PACK}"
     DEPENDS ${BONGO_CAT_ASSET_INPUTS} "${CMAKE_CURRENT_SOURCE_DIR}/LICENSE"
-      bongo_cat_asset_packer
+      bongo_cat_asset_packer ${BONGO_CAT_ASSET_EXTRA_DEPENDS}
     VERBATIM)
   add_custom_target(bongo_cat_asset_pack DEPENDS "${BONGO_CAT_ASSET_PACK}")
   # 内嵌资源里也放一份编译好的 Cubism Vulkan 着色器, 所以先让 FrameworkShaders
   # 目标把 .spv 生成出来, 否则打包时会拷到一个还不存在的目录。
   if(TARGET FrameworkShaders)
     add_dependencies(bongo_cat_asset_pack FrameworkShaders)
+  endif()
+  if(TARGET bongo_live2d)
+    add_dependencies(bongo_cat_asset_pack bongo_live2d)
   endif()
   file(TO_CMAKE_PATH "${BONGO_CAT_ASSET_PACK}" BONGO_CAT_ASSET_PACK_RC)
   file(TO_CMAKE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/resources/icons/icon.ico"

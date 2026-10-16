@@ -141,7 +141,7 @@ jobs:
             throw 'Windows installer packaging failed'
           }
 
-          $portable = "build-release/dist/$name-portable.zip"
+          $portable = "build-release/dist/$name-portable.exe"
           $portableChecksum = "$portable.sha256"
           $setup = "build-release/dist/$name-setup.exe"
           $setupChecksum = "$setup.sha256"
@@ -149,6 +149,17 @@ jobs:
             if (-not (Test-Path -LiteralPath $file)) {
               throw "Release file is missing: $file"
             }
+          }
+          # 包体断言(2f 起, 这里按**单文件形态**改过一次): 便携产物就是一个 exe, 组件内嵌在
+          # 它的资源包里, 首次启动按需释放到 <存储根>/cores/ —— 所以不能再要求"包内有
+          # cores/bongo_live2d.dll", 但也不能不查: 判定改成"包内有组件文件, **或**组件已内嵌
+          # 进 exe"。同一份 CubismCompliance.cmake 既做"不得含 Core"的扫描, 也做这条组件断言,
+          # 于是构建期与发布期用的是同一套规则(不会出现"构建期查一套、CI 查另一套")。
+          cmake "-DBONGO_CAT_AUDIT_ROOT=build-release/dist" `
+            -DBONGO_CAT_AUDIT_EXPECT_COMPONENT=ON `
+            -P cmake/CubismCompliance.cmake
+          if ($LASTEXITCODE -ne 0) {
+            throw 'Release artifact compliance audit failed'
           }
           $portableHash = (Get-FileHash -LiteralPath $portable -Algorithm SHA256).Hash.ToLowerInvariant()
           "$portableHash  $([IO.Path]::GetFileName($portable))" |
@@ -159,8 +170,9 @@ jobs:
           # Live2D Cubism Core 是 Live2D Inc. 的专有库, 不随发行包分发(用户自行从官网取得并导入)。
           # 这里对产物做一次硬断言: 命中即失败, 防止将来有人把 Core 或 SDK 文件重新带进发行物。
           # 只公布我们自己产物的哈希 —— 以前这里还公布过 Core 的 SHA-256, 那等于自证分发。
+          # 判据写成 `^(lib)?`: `^lib?` 是"li + 可选的 b", 匹配不到裸名 Live2DCubismCore.dll。
           $coreLeaks = @(Get-ChildItem -Path build-release/dist, build-release/Release -Recurse -File |
-            Where-Object { $_.Name -match '^lib?Live2DCubismCore([._-].*)?\.(dll|so|dylib|lib|a)$' })
+            Where-Object { $_.Name -match '^(lib)?Live2DCubismCore([._-].*)?\.(dll|so|dylib|lib|a)$' })
           if ($coreLeaks.Count) {
             throw "Live2D Cubism Core leaked into the release output: $($coreLeaks.FullName -join ', ')"
           }

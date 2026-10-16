@@ -318,4 +318,10 @@ void bongo_cat_platform_single_instance_end(void) {
 BongoCatResult bongo_cat_platform_embedded_assets(const char *target, BongoCatError *error) {
     (void)target; (void)error; return BONGO_CAT_ERROR_PLATFORM;
 }
+/* 同理: 没有内嵌资源就没有内嵌组件。macOS 发行包把 cores/libbongo_live2d.dylib 直接放在
+   磁盘上, 由既有的目录解析发现, 不需要"释放"这一步。 */
+BongoCatResult bongo_cat_platform_embedded_assets_release_component(
+    const char *directory, BongoCatError *error) {
+    (void)directory; (void)error; return BONGO_CAT_ERROR_PLATFORM;
+}
 #endif

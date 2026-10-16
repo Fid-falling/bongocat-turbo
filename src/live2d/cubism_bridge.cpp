@@ -162,12 +162,33 @@ bool start_framework(BongoCatError *error) {
     return true;
 }
 
-/* 只有最后一个运行时对象销毁时才真正收摊: Dispose/CleanUp 会释放 Id 管理器与全局分配器
- * 的内部状态, 提前做会让仍然活着的模型下一次分配就崩。 */
+/*
+ * 收摊。只 Dispose, **不** CleanUp —— 这是本文件里唯一一处"反直觉但必须如此"的地方。
+ *
+ * CubismFramework::CleanUp() 会把框架内部的 s_allocator 置成 NULL
+ * (SDK 的 CubismFramework.cpp:100), 而 SDK 里还有一批**静态对象**要到 DLL 分离 (或进程退出)
+ * 才析构, 它们的析构函数要经 s_allocator 释放自己持有的内存。两件事撞在一起就是空指针解
+ * 引用: 实测崩在 bongo_live2d.dll+0x1e85b 的 `mov rcx,[s_allocator] / mov rax,[rcx]` 上,
+ * Vulkan 路径下退出码 0xC0000005 (GL 路径正常)。
+ *
+ * 为什么只有 Vulkan 中招: GL 后端的 CubismRenderer_OpenGLES2::DoStaticRelease() 会在
+ * Dispose() 内部就把静态着色器单例删掉(CubismShader_OpenGLES2::DeleteInstance()), 于是没有
+ * 静态对象活到分离阶段; 而 CubismRenderer_Vulkan::DoStaticRelease() 是**空实现**
+ * (SDK 的 CubismRenderer_Vulkan.cpp:904), 那些静态资源一直留到 DLL 分离 —— 那时分配器已经
+ * 被 CleanUp 清空了。
+ *
+ * 不调 CleanUp 的代价只是"框架的分配器与选项指针保持有效", 而它们指向的就是本文件里的静态
+ * 对象(allocator / framework_option), 生命周期本来就覆盖整个 DLL —— 这正是我们想要的效果:
+ * 让最后一个静态析构仍然拿得到一个有效的分配器。
+ *
+ * Dispose() 之后补一次 Initialize(): Dispose 删掉了 Id 管理器, 但 SDK 只由 CleanUp 负责把那个
+ * 指针置空, 跳过 CleanUp 会留下悬空指针。重新 Initialize 会建一个新的, 于是框架在分离阶段
+ * 处于"完整可用"而不是"半拆"状态 —— 之后若要再建实例也能直接复用, 不会读到悬空指针。
+ */
 void stop_framework() {
     if (--runtime_count > 0) return;
     CubismFramework::Dispose();
-    CubismFramework::CleanUp();
+    CubismFramework::Initialize();
     runtime_count = 0;
 }
 

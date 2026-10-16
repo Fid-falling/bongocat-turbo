@@ -4,8 +4,11 @@ param(
     [Parameter(Mandatory = $true)]
     [ValidateSet('linux-x64', 'macos-x64', 'macos-arm64')][string]$Platform,
     [switch]$SkipSmoke,
-    # 发行包必须带我们自己的 Live2D 渲染组件 cores/bongo_live2d.*(阶段 2f 起默认要求:
-    # 它是 Live2D 的唯一实现, 缺了它包发出去用户就渲染不了)。
+    # 发行包必须能提供我们自己的 Live2D 渲染组件。判据是"两者之一"(阶段 2f 起默认要求,
+    # 单文件形态落地时改成 either/or, 与 cmake/CubismCompliance.cmake 同一套):
+    #   * 包内有 cores/libbongo_live2d.(so|dylib) 文件;
+    #   * 或者组件已内嵌进可执行文件(Windows 单文件发布形态, 首次启动释放到 <存储根>/cores/)。
+    # 组件是 Live2D 的唯一实现, 缺了它包发出去用户就渲染不了, 所以必须查。
     [bool]$ExpectLive2DComponent = $true,
     # 可选: 用户自备 Cubism Core 的路径。给了就在 smoke 之前**按用户的方式**把它投放到
     # <存储根>/cores/<平台>/<架构>/, 于是 smoke 能验证"导入 Core 后真的渲染"(renderer=
@@ -60,8 +63,9 @@ try {
 
         # 规则 3(LIVE2D-PLUGIN-PLAN.md §9.1): 发行包内不得出现 Live2D Cubism Core。
         # 第一遍按文件名 —— 覆盖"把 SDK 目录整个拷进包"这类最常见的回归。
+        # 判据写成 `^(lib)?`: `^lib?` 是"li + 可选的 b", 匹配不到裸名 Live2DCubismCore.dll。
         $coreFiles = @(Get-ChildItem -LiteralPath $root -Recurse -File | Where-Object {
-                $_.Name -match '^lib?Live2DCubismCore([._-].*)?\.(dll|so|dylib|lib|a)$'
+                $_.Name -match '^(lib)?Live2DCubismCore([._-].*)?\.(dll|so|dylib|lib|a)$'
             })
         if ($coreFiles.Count) {
             throw "Core binary leaked into package: $($coreFiles.FullName -join ', ')"
@@ -97,14 +101,34 @@ try {
         Write-Host "Package contains no Live2D Cubism Core: $Platform"
 
         if ($ExpectLive2DComponent) {
-            # 组件是程序自身的一部分, 随包放在 exe 同级的 cores/(见 renderer_module.h)。
+            # 组件是程序自身的一部分。两种形态都算数(与 cmake/CubismCompliance.cmake 的
+            # bongo_cat_audit_live2d_component 同一套判据):
+            #   * 包内有组件文件 cores/ —— Linux/macOS 发行包的形态(资源与组件随包落盘);
+            #   * 组件内嵌在可执行文件里 —— Windows 单文件发布形态(首次启动按需释放到
+            #     <存储根>/cores/)。Linux/macOS 目前不走这条路, 所以这里实际上仍然要求
+            #     包内有文件; 接受内嵌形态是为了不把两个平台的规则写成两套。
             $componentNames = @('cores/libbongo_live2d.so', 'cores/libbongo_live2d.dylib')
             $components = @($componentNames | ForEach-Object { Join-Path $root $_ } |
                 Where-Object { Test-Path -LiteralPath $_ -PathType Leaf })
-            if ($components.Count -ne 1 -or (Get-Item -LiteralPath $components[0]).Length -eq 0) {
-                throw "Package is missing the Live2D renderer component (expected one of: $($componentNames -join ', '))"
+            if ($components.Count -eq 1 -and (Get-Item -LiteralPath $components[0]).Length -gt 0) {
+                Write-Host "Live2D renderer component present: $($components[0])"
             }
-            Write-Host "Live2D renderer component present: $($components[0])"
+            else {
+                $embedded = @()
+                foreach ($candidate in Get-ChildItem -LiteralPath $root -Recurse -File |
+                    Where-Object { $_.Extension -eq '.exe' -or $_.Name -eq 'BongoCatTurbo' }) {
+                    # 资源包里的条目路径是未压缩的纯文本, 所以"这串字节在 exe 里"就等价于
+                    # "该条目确实被打进去了"(见 cmake/asset_packer 的条目表格式)。
+                    $bytes = [IO.File]::ReadAllBytes($candidate.FullName)
+                    $text = [Text.Encoding]::Latin1.GetString($bytes)
+                    if ($text.Contains('cores/bongo_live2d.dll')) { $embedded += $candidate.FullName }
+                }
+                if ($embedded.Count -eq 0) {
+                    throw ("Package has no Live2D renderer component: neither a cores/ file " +
+                        "($($componentNames -join ', ')) nor an embedded copy inside the executable")
+                }
+                Write-Host "Live2D renderer component embedded in: $($embedded -join ', ')"
+            }
         }
         Write-Host "Package layout verified: $Platform"
         if (-not $SkipSmoke) {

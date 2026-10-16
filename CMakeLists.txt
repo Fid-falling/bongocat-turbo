@@ -19,10 +19,13 @@ if(NOT BONGO_CAT_RUNTIME_CORE)
     "BONGO_CAT_RUNTIME_CORE=OFF 不受支持: 宿主与渲染插件都不得内嵌或静态链接 "
     "Live2D Cubism Core(专有库)。请在运行期加载用户自备的 Core。")
 endif()
-# 发行包是否必须包含我们自己的 Live2D 渲染插件。阶段 1 期间插件尚未构建(阶段 2 交付),
-# 因此默认 OFF; 阶段 2 的提交把它改成 ON, 并让 release.yml 显式传 -ExpectLive2DPlugin。
+# 发行物是否必须能提供我们自己的 Live2D 渲染组件。两种形态都算"有":
+#   * 组件文件随包分发(cores/bongo_live2d.*, Linux/macOS 发行包);
+#   * 组件内嵌在 exe 的资源包里, 首次启动按需释放到 <存储根>/cores/(Windows 单文件形态)。
+# 有 Cubism SDK 的构建里它被打开(见下面的 SDK 分支); 无 SDK 的诊断构建里组件本就不存在,
+# 所以那里的审计不会要求它 —— 否则诊断构建会被自己的审计挡住。
 option(BONGO_CAT_REQUIRE_LIVE2D_COMPONENT
-  "发行产物必须包含 Live2D 渲染插件" OFF)
+  "发行产物必须能提供 Live2D 渲染组件(包内文件或内嵌)" OFF)
 include(cmake/CubismCompliance.cmake)
 set(BONGO_CAT_CUBISM_SDK "${CMAKE_CURRENT_SOURCE_DIR}/vendor/CubismSdkForNative"
   CACHE PATH "Path to Cubism SDK for Native")

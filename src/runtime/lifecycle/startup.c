@@ -18,6 +18,7 @@
 #include "bongo_cat/live2d_core.h"
 #include "bongo_cat/log.h"
 #include "bongo_cat/path.h"
+#include "bongo_cat/platform.h"
 #include "bongo_cat/renderer_module.h"
 #include "portable_mode.h"
 #include "storage_paths.h"
@@ -224,6 +225,31 @@ static void log_storage_root(const BongoCatApp *app) {
             "[portable] 使用便携存储根: %s", portable);
 }
 
+/* 把内嵌在 exe 里的渲染组件按需释放到 <存储根>/cores/。
+ *
+ * 位置很关键: 必须在 bongo_cat_renderer_module_scan() **之前** —— 释放的目的就是让现有的
+ * 目录解析能看见组件, 所以这里不重写任何发现逻辑, 只是把文件摆到它要看的那个位置上。
+ * 也必须在 begin_log() 之后, 否则"释放失败"这类只发生一次的事在日志里一个字都留不下。
+ *
+ * 失败一律只降级: 目录只读、目标被别的实例加载着、包里没有组件(无 SDK 的诊断构建) 都不是
+ * 启动失败的理由 —— Live2D 走诊断兜底, 其余功能不受影响。 */
+static void release_embedded_component(void) {
+    char root[BONGO_CAT_PATH_CAP], directory[BONGO_CAT_PATH_CAP];
+    if (!bongo_cat_storage_paths_root(root, sizeof(root)) ||
+        !bongo_cat_path_join(directory, sizeof(directory), root, "cores")) {
+        SDL_LogWarn(BONGO_CAT_LOG_LIFECYCLE,
+            "[live2d] 存储根未解析, 跳过内嵌渲染组件的释放");
+        return;
+    }
+    BongoCatError component = {0};
+    BongoCatResult result =
+        bongo_cat_platform_embedded_assets_release_component(directory, &component);
+    if (result == BONGO_CAT_OK || result == BONGO_CAT_ERROR_PLATFORM) return;
+    SDL_LogWarn(BONGO_CAT_LOG_LIFECYCLE,
+        "[live2d] 释放内嵌渲染组件失败, Live2D 将以诊断兜底继续: %s",
+        component.message[0] ? component.message : "unknown reason");
+}
+
 /* 参数 -> 存储路径 -> 日志 -> Live2D 组件与 Core, 顺序不能反: 日志路径来自 log_root,
    而 log_root 可能被 --storage-root= 改掉; 组件/Core 的目录又来自存储根, 且它们的
    发现结果必须写进日志, 所以只能排在 begin_log 之后。
@@ -234,6 +260,7 @@ bool bongo_cat_startup_prepare(BongoCatApp *app, int argc, char **argv,
     if (!bongo_cat_startup_arguments(app, argc, argv, error) ||
         !bongo_cat_storage_paths_prepare(app, error)) return false;
     begin_log(app); log_storage_root(app);
+    release_embedded_component();
     BongoCatRendererModuleInfo modules[8];
     bongo_cat_renderer_module_scan(modules,
         sizeof(modules) / sizeof(modules[0]));
