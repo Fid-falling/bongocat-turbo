@@ -14,7 +14,7 @@
 
 - **不导入会怎样**：其它功能**全都正常** —— 桌宠窗口、按键/手柄动作、快捷键、托盘菜单、
   模型导入与管理、设置、自动更新都能用；**只有 Live2D 模型不显示**（看不到猫）。
-- 导入**一次**就够了，以后升级程序不用重做（换电脑、换系统、或者要换一个新版本的 Core
+- 导入**一次**就够了，以后升级程序不用重做（换电脑、重装系统、或者要换一个新版本的 Core
   时才需要再来一次）。
 
 ---
@@ -92,14 +92,11 @@ Core 是 Live2D 公司的专有运行库，**官网是唯一合规、可信的�
 ### 3.5 下哪个文件
 
 - **整个 SDK 压缩包就行**：文件名形如 `CubismSdkForNative-5-r.x.zip`（几百 MB）。
-  **不需要手动解压，也不要只从里面挑某个文件** —— 程序会自己在包里找到"和你系统匹配的
+  **不需要手动解压，也不要只从里面挑某个文件** —— 程序会自己在包里找到"和这台电脑匹配的
   那一个 Core"，并且**只把它一个文件**放到你的磁盘上，包里其它上万个文件一个都不会写出来。
-- 如果你手头只有单独的核心文件，也可以直接导入它，官方文件名是：
-  - Windows：`Live2DCubismCore.dll`
-  - macOS：`libLive2DCubismCore.dylib`
-  - Linux：`libLive2DCubismCore.so`
-- 程序接受的文件类型：`.zip` 压缩包，或上面这三种核心文件（Windows 的文件选择框默认只列出
-  `.zip` 和 `.dll`，选"所有文件"也能选别的，但选错类型会导入失败）。
+- 如果你手头只有单独的核心文件，也可以直接导入它，官方文件名是 `Live2DCubismCore.dll`。
+- 程序接受的文件类型：`.zip` 压缩包，或这个核心文件（文件选择框默认只列出 `.zip` 和
+  `.dll`，选"所有文件"也能选别的，但选错类型会导入失败）。
 
 > 图：下载完成的 `CubismSdkForNative-*.zip`
 
@@ -130,21 +127,23 @@ Core 是 Live2D 公司的专有运行库，**官网是唯一合规、可信的�
 
 ### 导入时程序会做什么
 
-- **只取一个**：从压缩包里只取出"和你当前系统 + 架构匹配"的那一个核心文件；包里其它内容
+- **只取一个**：从压缩包里只取出"和你这台电脑匹配"的那一个核心文件；包里其它内容
   一个字节都不落盘。
-- **校验**：先看是不是你这个系统 + 架构能用的库，再看它是不是**真的** Cubism Core（不是
-  同名的其它库），最后算一遍 SHA-256 并在提示里给你看。
-- **落盘 + 留记录**：放到 `<存储根>/cores/<平台>/<架构>/`（具体路径见第 5 节），并在 `cores`
+- **校验**：先看是不是你这台电脑能用的库（是 64 位的 Windows 版），再看它是不是**真的**
+  Cubism Core（不是同名的其它库），最后算一遍 SHA-256 并在提示里给你看。
+- **落盘 + 留记录**：放到 `<存储根>\cores\windows\x86_64\`（具体路径见第 5 节），并在 `cores`
   目录里留一份记录（来源文件、哈希、版本、导入时间），方便日后排查。
 - **失败不动你现有的东西**：任何一步不过，**原来的 Core 和记录完全不变**，只弹一条失败
   提示（提示里是英文原因，怎么读见第 8.1 节）。
 - **旧 Core 不会被删**：会被改名成 `Live2DCubismCore.dll.<旧哈希前 8 位>.bak`
-  （macOS / Linux 是对应的库名）留在同一个目录里。目前设置里**还没有**"回滚"按钮，真要用
-  的时候把 `.bak` 改回原名即可。
+  留在同一个目录里。目前设置里**还没有**"回滚"按钮，真要用的时候把 `.bak` 改回原名即可。
 - **导入完立刻重新读取**：不需要重装程序，也不需要重新下载。
 
 > ⚠️ **重要**：正在运行的这一份程序不会当场变身 —— 用哪种方式渲染是在程序**启动时**定下来
-> 的。所以导入完成后请**退出并重新启动一次 BongoCat**，模型才会显示出来。
+> 的。所以导入成功后，程序会弹一个小窗口问你要不要**现在重启**：
+>
+> - 点 **「立即重启」**：程序自动重启，模型直接显示出来；
+> - 点 **「稍后」**：你自己退出再打开一次，效果一样（导入成功的提示条末尾也写着"重启后生效"）。
 
 ---
 
@@ -153,27 +152,24 @@ Core 是 Live2D 公司的专有运行库，**官网是唯一合规、可信的�
 导入后的落点固定是：
 
 ```
-<存储根>/cores/<平台>/<架构>/<核心文件名>
+<存储根>\cores\windows\x86_64\Live2DCubismCore.dll
 ```
 
-| 你的情况 | 存储根 | 完整落点示例 |
-| --- | --- | --- |
-| Windows（安装版 / 绿色版） | `%LOCALAPPDATA%\BongoCat` | `%LOCALAPPDATA%\BongoCat\cores\windows\x86_64\Live2DCubismCore.dll` |
-| Windows + 便携模式 | 程序旁边的 `BongoCatData` | `<程序目录>\BongoCatData\cores\windows\x86_64\Live2DCubismCore.dll` |
-| Windows（Microsoft Store 版） | 商店包自己的数据目录 | `%LOCALAPPDATA%\Packages\<包族名>\LocalCache\Local\BongoCat Turbo\cores\windows\x86_64\Live2DCubismCore.dll` |
-| macOS | `~/Library/Application Support/BongoCat` | `~/Library/Application Support/BongoCat/cores/macos/arm64/libLive2DCubismCore.dylib` |
-| Linux | `~/.local/share/bongocat`（或 `$XDG_DATA_HOME/bongocat`） | `~/.local/share/bongocat/cores/linux/x86_64/libLive2DCubismCore.so` |
+（BongoCat 目前只有 Windows 版，所以平台目录固定是 `windows`，架构目录是 64 位版的
+`x86_64`。）
 
-其中 `<平台>` 只会是 `windows` / `linux` / `macos`，`<架构>` 只会是 `x86_64` / `x86` /
-`arm64`；**程序只认和它自己一致的那一组**。
+| 你的情况 | 存储根 | 完整落点 |
+| --- | --- | --- |
+| 安装版 / 绿色版 | `%LOCALAPPDATA%\BongoCat` | `%LOCALAPPDATA%\BongoCat\cores\windows\x86_64\Live2DCubismCore.dll` |
+| 便携模式 | 程序旁边的 `BongoCatData` | `<程序目录>\BongoCatData\cores\windows\x86_64\Live2DCubismCore.dll` |
 
 程序启动时按这个顺序找 Core，用第一个能用的：
 
 1. 环境变量 `BONGO_CAT_LIVE2D_CORE` 指向的文件或目录（给愿意折腾的用户）；
-2. `<存储根>/cores/<平台>/<架构>/`（也就是导入的落点）；
-3. `<存储根>/cores/`（核心文件直接平铺在这里）；
-4. 程序目录下的 `cores/<平台>/<架构>/`；
-5. 程序目录下的 `cores/`。
+2. `<存储根>\cores\windows\x86_64\`（也就是导入的落点）；
+3. `<存储根>\cores\`（核心文件直接平铺在这里）；
+4. 程序目录下的 `cores\windows\x86_64\`；
+5. 程序目录下的 `cores\`。
 
 架构不匹配的那一份会被**跳过**（日志里会写明"架构不匹配的 Core 被跳过"），不会导致崩溃。
 
@@ -187,11 +183,11 @@ Core 是 Live2D 公司的专有运行库，**官网是唯一合规、可信的�
 | --- | --- |
 | `尚未导入 Live2D Cubism Core。请到 Live2D 官网下载 Cubism SDK for Native, 再在这里选中压缩包或 Core 文件导入。程序不附带、也不代为下载这个运行库。` | 还没导入成功。导入按钮就在这一行。 |
 | `缺少 Live2D 渲染组件: 请恢复程序目录下 cores 文件夹里的 bongo_live2d, 或重新安装程序。` | 缺的**不是** Core，而是程序自带的渲染组件 —— 见第 8.2 节，**别去下 Core**。 |
-| `Live2D Cubism Core 已导入。 (csm <一串数字>)` | Core 已经就位（这是导入成功后你会看到的那句）。 |
-| `已导入 Cubism Core, Live2D 渲染可用 (csm <一串数字>)` | 程序同时确认了渲染组件在工作（部分版本会显示这句，含义同上）。 |
+| `Live2D Cubism Core 已导入。 (csm <一串数字>)` | Core 已经就位（刚导入成功、还没重启时你会看到这句）。 |
+| `已导入 Cubism Core, Live2D 渲染可用 (csm <一串数字>)` | 重启之后、程序确实在用这份 Core 渲染时显示这句 —— 看到它就说明一切就绪。 |
 
-导入成功时还会弹一条短提示：`Live2D Cubism Core 已导入。 SHA-256 <一串十六进制>` ——
-这串 SHA-256 就是你导入文件的指纹，可以拿去和别人核对，反馈问题时也可以一并贴上。
+导入成功时还会弹一条短提示：`Live2D Cubism Core 已导入。 SHA-256 <一串十六进制> — 重启后生效`
+—— 那串 SHA-256 就是你导入文件的指纹，可以拿去和别人核对，反馈问题时也可以一并贴上。
 
 最终的成功标志很简单：**重启程序后模型显示出来了**。
 
@@ -212,8 +208,6 @@ Core 是 Live2D 公司的专有运行库，**官网是唯一合规、可信的�
 | 缺渲染组件 | `[live2d] 组件目录里没有可用的渲染组件; 应用照常启动, Live2D 渲染走诊断兜底` |
 | 目录里那份 Core 没被用上 | `[live2d] 架构不匹配的 Core 被跳过(本机 windows/x86_64): <那个文件的路径>` |
 
-（`Live2DCubismCore.dll` 在 macOS / Linux 上是对应的库名。）
-
 ---
 
 ## 7. 没有网络的电脑，或者想在另一台电脑上弄
@@ -227,7 +221,7 @@ Core 是 Live2D 公司的专有运行库，**官网是唯一合规、可信的�
 如果你已经在另一台电脑上导入好了，也可以直接搬文件，两种都行：
 
 - **把压缩包拿过去导入**（最省事，推荐）；
-- **只搬 `cores` 里的平台/架构子目录**：例如把另一台电脑上的
+- **只搬 `cores` 里的那一层子目录**：例如把另一台电脑上的
   `...\BongoCat\cores\windows\x86_64\`（里面是 `Live2DCubismCore.dll`）整个拷到这台电脑的
   `<存储根>\cores\windows\x86_64\`，然后重启程序即可，不用再导入一次。
 
@@ -245,8 +239,8 @@ Core 是 Live2D 公司的专有运行库，**官网是唯一合规、可信的�
 
 | 英文原因（原文） | 意思与怎么办 |
 | --- | --- |
-| `No Cubism Core for windows/x86_64 was found inside the archive (it contains: macos/arm64,linux/x86_64)` | 这个压缩包里**没有**你能用的那份核心文件；括号里列出的就是"包里到底有什么"。请确认你下的是 **Cubism SDK for Native**（不是 Unity / Web / Java 版），并且**没有**解压后只挑了一个子文件夹。 |
-| `The selected file is not a windows/x86_64 Cubism Core (architecture mismatch)` | 你选的核心文件和你系统架构不一致（例如 64 位程序配了 32 位的库）。到官网重下对应版本，或从压缩包里换对架构那一份。 |
+| `No Cubism Core for windows/x86_64 was found inside the archive (it contains: …)` | 这个压缩包里**没有**你这台电脑能用的那份核心文件；括号里列出的就是"包里到底有什么"（例如只有 32 位那份）。请确认你下的是 **Cubism SDK for Native**（不是 Unity / Web / Java 版），并且**没有**解压后只挑了一个子文件夹。 |
+| `The selected file is not a windows/x86_64 Cubism Core (architecture mismatch)` | 你选的核心文件和你这台电脑不一致（例如 64 位程序配了 32 位的库）。到官网重下对应版本，或从压缩包里换对那一份。 |
 | `The selected file is not a usable Cubism Core: missing core symbols` | 这个文件不是能用的 Cubism Core（可能是同名文件、下载不完整或被替换过）。换官方原包重试。 |
 | `The selected file is not a readable ZIP archive: <路径>` | 这个文件不是能读的 zip（下载没完成 / 被改过名 / 其实是解压过的文件夹）。重新下一遍，把**整个** `.zip` 原样选中。 |
 
@@ -281,10 +275,9 @@ Core 是 Live2D 公司的专有运行库，**官网是唯一合规、可信的�
 
 按顺序检查：
 
-1. **层级对不对**：推荐 `cores\<平台>\<架构>\`（例如 `cores\windows\x86_64\`）；
-2. **架构对不对**：64 位程序要 64 位的库，放错会被跳过（日志会写"架构不匹配的 Core 被跳过"）；
-3. **文件名对不对**：必须是 `Live2DCubismCore.dll` / `libLive2DCubismCore.dylib` /
-   `libLive2DCubismCore.so`，改了名就找不到；
+1. **层级对不对**：推荐 `cores\windows\x86_64\`（也就是导入时的落点）；
+2. **位数对不对**：64 位程序要 64 位的库，放错了会被跳过（日志会写"架构不匹配的 Core 被跳过"）；
+3. **文件名对不对**：必须是 `Live2DCubismCore.dll`，改了名就找不到；
 4. **重启了吗**：用哪种方式渲染是启动时定下来的，拷完文件要重启程序；
 5. 还是不行就打开日志搜 `[live2d]`，那里会写明它有没有看到文件、为什么跳过。
 
@@ -293,11 +286,11 @@ Core 是 Live2D 公司的专有运行库，**官网是唯一合规、可信的�
 便携模式的"存储根"就是程序旁边的 `BongoCatData`，所以 Core 落在：
 
 ```
-<程序目录>\BongoCatData\cores\<平台>\<架构>\<核心文件名>
+<程序目录>\BongoCatData\cores\windows\x86_64\Live2DCubismCore.dll
 ```
 
-也就是说：**程序 + `BongoCatData` 整个文件夹拷到 U 盘或另一台同系统的电脑上，导入过的
-Core 会跟着走**（换系统要重新导入，因为格式/架构不同）。
+也就是说：**程序 + `BongoCatData` 整个文件夹拷到 U 盘或另一台 Windows 电脑上，导入过的
+Core 会跟着走**。
 
 ---
 
@@ -320,7 +313,7 @@ Live2D 模型不显示？程序不附带、也不代下 Live2D Cubism Core（Liv
 1) 设置 → 偏好 → 模型 → 「Live2D 渲染库 (Cubism Core)」这一行，点「打开下载页」；
 2) 在官网同意许可后下载 Cubism SDK for Native（整个 zip 即可，不用解压）；
 3) 回到设置点「选择 SDK 压缩包或 Core 文件...」选中它，或把 zip 直接拖进设置窗口；
-4) 重启一次 BongoCat，模型就显示出来了。
+4) 导入成功后按提示点「立即重启」（或自己重启一次 BongoCat），模型就显示出来了。
 提示里若说"缺少 Live2D 渲染组件"，那是程序文件不全，重装程序即可，不是下 Core。
 不导入也不影响其它功能。详细图文教程：docs/live2d-core.md
 ```
