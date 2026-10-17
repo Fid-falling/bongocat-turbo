@@ -13,6 +13,8 @@
 #include "bongo_cat/i18n.h"
 #include "bongo_cat/overlay.h"
 #include "bongo_cat/preferences.h"
+#include "bongo_cat/renderer_module.h"
+#include "bongo_cat/live2d_vulkan.h"
 #include "bongo_cat/tray.h"
 
 #include <stdlib.h>
@@ -44,6 +46,18 @@ void bongo_cat_app_shutdown(BongoCatApp *app, const char *stage,
     bongo_cat_audio_destroy(app->audio);
     bongo_cat_overlay_destroy(app->overlay);
     bongo_cat_live2d_destroy(app->live2d);
+    app->live2d = NULL;
+    /*
+     * Vulkan 后端: 组件拥有 SDK 的静态管线/离屏资源, 而它们只在组件自己的 detach 里
+     * 释放。必须在 bongo_cat_window_destroy 销毁 VkDevice 之前做 —— 否则那些对象会活到
+     * bongo_live2d.dll 分离期, 由 CRT 静态析构拿着已失效的设备句柄去 vkDestroyPipeline,
+     * 进程就在 vulkan-1.dll 里崩掉(VK 退出阶段崩溃的根因)。
+     *
+     * close() 再把组件卸载掉: 它自己的静态析构也要在设备还活着的时候跑完。顺序与
+     * cores/renderer_module_loader.c 文件头写明的"先 destroy 实例, 再释放库"一致。
+     */
+    bongo_cat_live2d_vulkan_detach();
+    bongo_cat_renderer_module_close();
 /* behavior_cache 由 app 直接持有 (不属于任何子模块), 所以在这里单独释放。 */
     free(app->behavior_cache);
     app->behavior_cache = NULL;

@@ -318,10 +318,34 @@ bool bongo_cat_live2d_vulkan_end_frame(void) {
 }
 
 void bongo_cat_live2d_vulkan_detach(void) {
+    if (g_device) vkDeviceWaitIdle(g_device);
     if (g_target) {
         g_target->DestroyRenderTarget();
         CSM_DELETE(g_target);
         g_target = nullptr;
+    }
+    /*
+     * SDK 的 Vulkan 静态资源必须先于宿主销毁 VkDevice 释放。
+     *
+     * CubismDeviceInfo_Vulkan 把每台设备的管线/离屏管理器存进函数内的静态 csmMap;
+     * CubismRenderer_Vulkan::DoStaticRelease() 是空实现(OpenGL 那边会删静态着色器单例),
+     * 所以这些对象一直活到本 DLL 分离, 由 CRT 静态析构去 vkDestroyPipeline。宿主退出时
+     * 先销毁 VkDevice, 于是那次调用拿到的是失效设备句柄: 进程在 vulkan-1.dll 里以
+     * 0xC0000005/0xC0000409 崩溃(loader 会打印 vkDestroyPipeline: Invalid device)。
+     *
+     * 这里在设备仍有效时把本设备的静态资源清掉, 让它们不再留到 DLL 分离期。这也是
+     * "组件释放 GPU 资源、宿主再拆设备"这条顺序契约的一部分 —— 只靠 DLL 分离太晚。
+     */
+    if (g_device) {
+        /*
+         * 组件日志经宿主服务表走 APPLICATION 分类, Release 构建下 INFO 会被过滤; 这里用
+         * WARN 只是为了把"静态资源确实在设备销毁前释放了"留在日志里, 正常退出也会出现
+         * 一条 —— 与 attach 的几条 WARN 同一惯例。
+         */
+        Csm::Rendering::CubismDeviceInfo_Vulkan::ReleaseDeviceInfo(g_device);
+        SDL_LogWarn(SDL_LOG_CATEGORY_VIDEO,
+            "[live2d/vk] detach: 已释放 SDK 静态 Vulkan 资源 device=%p (先于宿主销毁设备)",
+            (void *)g_device);
     }
     g_native_valid = false;
     g_device = VK_NULL_HANDLE;
