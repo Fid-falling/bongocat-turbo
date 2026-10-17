@@ -55,6 +55,19 @@ static uint64_t settings_hash(const BongoCatSettings *settings) {
         removed_count = BONGO_CAT_MODEL_CAP;
     hash = hash_bytes(hash, settings->removed_models,
         removed_count * sizeof(settings->removed_models[0]));
+    /* 隐藏模型与随机/顺序切换的参与集合也是用户设置, 而且都是"点一下就变"的交互。
+       它们不在 model/window/app 这些大结构里, 漏掉就会出现"改完不落盘、重启即丢"。 */
+    HASH_FIELD(settings->hidden_model_count);
+    size_t hidden_count = settings->hidden_model_count;
+    if (hidden_count > BONGO_CAT_MODEL_CAP) hidden_count = BONGO_CAT_MODEL_CAP;
+    hash = hash_bytes(hash, settings->hidden_models,
+        hidden_count * sizeof(settings->hidden_models[0]));
+    HASH_FIELD(settings->random_disabled_count);
+    size_t disabled_count = settings->random_disabled_count;
+    if (disabled_count > BONGO_CAT_RANDOM_DISABLED_CAP)
+        disabled_count = BONGO_CAT_RANDOM_DISABLED_CAP;
+    hash = hash_bytes(hash, settings->random_disabled,
+        disabled_count * sizeof(settings->random_disabled[0]));
     HASH_FIELD(settings->extensions_json);
 #undef HASH_FIELD
     return hash;

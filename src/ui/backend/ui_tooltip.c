@@ -121,5 +121,18 @@ void bongo_cat_ui_question_tooltip(struct nk_context *context,
 void bongo_cat_ui_plain_tooltip(struct nk_context *context,
     const char *text, struct nk_color color) {
     if (!context || !text || !text[0]) return;
+    /*
+     * 设置窗口为了透明会把 window 背景设成全透明 (见 root_style_apply), 气泡复用同一份
+     * 样式, 不临时补一块不透明底就会变成"字浮在封面/卡片上", 在有画面的地方读不清。
+     * 只覆盖这一帧的气泡绘制, 画完立刻还原, 不影响其它窗口。
+     */
+    struct nk_style_item saved_fixed = context->style.window.fixed_background;
+    struct nk_color saved_background = context->style.window.background;
+    BongoCatUIPalette palette = bongo_cat_ui_palette(bongo_cat_ui_dark(context));
+    context->style.window.fixed_background =
+        nk_style_item_color(palette.surface);
+    context->style.window.background = palette.surface;
     tooltip_multiline(context, text, color);
+    context->style.window.fixed_background = saved_fixed;
+    context->style.window.background = saved_background;
 }
