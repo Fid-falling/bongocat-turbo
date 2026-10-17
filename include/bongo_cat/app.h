@@ -186,6 +186,14 @@ typedef struct BongoCatApp {
     bool smoke_frame_series;
     bool smoke_runtime_flow;
     bool smoke_freeze_model;
+    /*
+     * --ci-sound-test / --ci-sound-toggle=N: 音效管理的可测性钩子。
+     * 启动期模型加载完成后按真实播放路径走一遍所有音效, 用 INFO 日志输出
+     * "id / 音量 / 有效增益 / 是否被静音或禁用" —— 不需要真的听声音, 也不依赖
+     * 调试构建的 DEBUG 级别。toggle 是 1 基的清单序号, 用来验证"改了会落盘"。
+     */
+    bool smoke_sound_test;
+    unsigned smoke_sound_toggle;
     unsigned smoke_runtime_stage;
     unsigned model_load_runtime_stage;
     unsigned model_selection_serial;

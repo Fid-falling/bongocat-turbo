@@ -67,6 +67,8 @@ enum BongoCatOptionsSection {
     BONGO_CAT_OPTIONS_RANDOM_MOTION,
     BONGO_CAT_OPTIONS_RANDOM_SOUND,
     BONGO_CAT_OPTIONS_RANDOM_SEQUENTIAL,
+    /* 互动页的[音效]区: 总音量 / 全部静音 / 当前模型的逐条开关 */
+    BONGO_CAT_OPTIONS_SOUND,
     BONGO_CAT_OPTIONS_SECTION_COUNT
 };
 
@@ -165,6 +167,13 @@ struct BongoCatPreferences {
     bool pending_model_active;
     bool pending_model_hidden_toggle;
     bool pending_behavior_toggle;
+    /*
+     * 音效清单里"逐个开关"的待处理请求。与 pending_behavior_toggle 同一个理由:
+     * 设置窗口一帧会画两次, 在点击当帧直接改 settings 会被第二次重放翻回去,
+     * 所以只登记 id, 由 app_loop 在两次渲染之间翻转一次。
+     */
+    bool pending_sound_toggle;
+    char pending_sound_id[BONGO_CAT_SOUND_ID_CAP];
     bool model_loading;
     bool model_load_visual_active;
     float model_load_progress;

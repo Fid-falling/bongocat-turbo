@@ -46,6 +46,9 @@ BongoCatResult bongo_cat_audio_play_sound(BongoCatAudio *audio, const char *path
             return BONGO_CAT_ERROR_PLATFORM;
         }
         audio->initialized = true;
+        /* 引擎重建后必须立刻补上当前增益: 用户可能是在引擎空闲卸载之后才拖的音量
+           滑杆 (那时 set_volume 只更新了字段), 漏掉这一步会以满音量播第一条。 */
+        ma_engine_set_volume(&audio->engine, audio->volume);
     }
     /* 三段式选槽: 同一个文件且允许打断则复用 (顺带 seek 回起点重播) -> 否则取一个空闲的 ->
      * 都不空闲就抢 order 最小的那一个 (sequence 单调递增, 所以 order 最小即最久未用)。 */

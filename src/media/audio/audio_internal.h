@@ -30,6 +30,9 @@ struct BongoCatAudio {
     uint64_t sequence;
     uint64_t last_play;
     uint64_t next_collect;
+    /* 引擎级播放增益 (0..1)。默认 1.0 = 与加入音量设置之前完全一致; 引擎重建
+       (空闲卸载后再次起播) 时必须重新下发, 否则第一次播放会突然变回满音量。 */
+    float volume;
     bool initialized;
     bool enabled;
 };

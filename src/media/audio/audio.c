@@ -30,7 +30,21 @@ BongoCatAudio *bongo_cat_audio_create(BongoCatError *error) {
         return NULL;
     }
     audio->enabled = true;
+    audio->volume = 1.0f;
     return audio;
+}
+
+/*
+ * 全局增益: 记在 audio 上并 (若引擎已初始化) 立刻下发。用引擎级音量而不是逐个 voice,
+ * 是为了让"正在播的声音"也实时跟随滑杆, 而且不需要在播放路径上反复设值。
+ * 只影响本程序的 miniaudio 引擎 —— 系统音量与其它进程完全不受影响。
+ */
+void bongo_cat_audio_set_volume(BongoCatAudio *audio, float volume) {
+    if (!audio) return;
+    if (!(volume >= 0.0f)) volume = 0.0f;
+    if (volume > 1.0f) volume = 1.0f;
+    audio->volume = volume;
+    if (audio->initialized) ma_engine_set_volume(&audio->engine, volume);
 }
 
 void bongo_cat_audio_stop(BongoCatAudio *audio) {

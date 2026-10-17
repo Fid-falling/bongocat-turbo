@@ -17,6 +17,7 @@
 #include "storage_paths.h"
 #include "bongo_cat/audio.h"
 #include "bongo_cat/file.h"
+#include "bongo_cat/sound.h"
 #include "bongo_cat/i18n.h"
 #include "bongo_cat/path.h"
 #include "bongo_cat/overlay.h"
@@ -181,12 +182,20 @@ bool bongo_cat_app_initialize(BongoCatApp *app, int argc, char **argv,
         "Overlay disabled: %s", optional.message);
     optional = (BongoCatError){0}; app->audio = bongo_cat_audio_create(&optional);
     if (!app->audio) SDL_LogWarn(SDL_LOG_CATEGORY_AUDIO, "%s", optional.message);
-    else bongo_cat_audio_set_enabled(app->audio, true);
+    else {
+        /* 先把保存的音量交给播放器, 第一条音效就不会是满音量。默认 100 时这一步
+           与老版本完全等价 (引擎默认也是满音量)。 */
+        bongo_cat_audio_set_volume(app->audio,
+            (float)bongo_cat_settings_sound_volume(&app->settings) / 100.0f);
+        bongo_cat_audio_set_enabled(app->audio, true);
+    }
 /* 扫描 + 选模型是 model-ready 的全部前提: 走到这里才算"有画面可画"; 这一步失败
    就整个启动失败, 因为它没有可降级的替代路径。 */
     scan_models(app);
     if (!load_selected_model(app, error)) return false;
     bongo_cat_startup_stage(app, "model-ready");
+    /* --ci-sound-test: 模型已就绪, 用真实播放路径把音效策略走一遍 (无参数时零开销) */
+    bongo_cat_sound_self_test(app);
 /* CI 专用: --ci-import= 会走一次真实导入 (顺带验证导入器), 失败立刻按 CI 失败退出;
    --ci-remove-imported 紧接着把它删掉, 用来验证"导入 -> 删除"这条路径。 */
     if (app->smoke_import_path[0]) {

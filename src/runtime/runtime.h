@@ -157,6 +157,9 @@ bool bongo_cat_window_geometry_self_test(BongoCatApp *app);
 void bongo_cat_window_show_context_menu(BongoCatApp *app);
 /* --- 诊断与冒烟: 只在 --ci-* 下真的有动作, 实现见 diagnostics/ --- */
 void bongo_cat_live2d_audit_run(BongoCatApp *app);
+/* --ci-sound-test 的音效管理诊断: 用真实播放入口跑一遍当前模型的所有音效, 把
+   id/判定/有效增益写成 INFO 日志 (实现见 diagnostics/sound_audit.c)。 */
+void bongo_cat_sound_self_test(BongoCatApp *app);
 bool bongo_cat_live2d_visual_audit_run(BongoCatApp *app);
 bool bongo_cat_live2d_viewer_audit_run(BongoCatApp *app);
 void bongo_cat_frame_audit(BongoCatApp *app, int width, int height);

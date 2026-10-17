@@ -243,6 +243,9 @@ bool bongo_cat_startup_arguments(BongoCatApp *app, int argc, char **argv,
         else if (strcmp(arg, "--ci-frame-series") == 0) app->smoke_frame_series = true;
         else if (strcmp(arg, "--ci-runtime-flow") == 0) app->smoke_runtime_flow = true;
         else if (strcmp(arg, "--ci-freeze-model") == 0) app->smoke_freeze_model = true;
+        else if (strcmp(arg, "--ci-sound-test") == 0) app->smoke_sound_test = true;
+        else if (strncmp(arg, "--ci-sound-toggle=", 18) == 0)
+            app->smoke_sound_toggle = (unsigned)atoi(arg + 18);
         else if (strncmp(arg, "--ci-preference-page=", 21) == 0) {
             int page = atoi(arg + 21);
             if (page >= 0 && page < 4) app->smoke_preference_page = page;
@@ -311,8 +314,11 @@ bool bongo_cat_startup_arguments(BongoCatApp *app, int argc, char **argv,
                 sizeof(app->smoke_live2d_scenario), arg + 21,
                 "Scenario", error)) return false;
     }
-/* 没显式给 --ci-exit-ms= 的冒烟运行统一 1.5s 后自动退出, 免得 CI 挂住。 */
-    if (app->smoke && !app->smoke_deadline_ns)
+/* 没显式给 --ci-exit-ms= 的冒烟运行统一 1.5s 后自动退出, 免得 CI 挂住。
+   --ci-sound-test 也按这个规则: 它是一个"跑完就退"的诊断, 不能要求调用方再给一个
+   退出时间, 否则忘写一次就留下一个常驻进程。 */
+    if (!app->smoke_deadline_ns &&
+        (app->smoke || app->smoke_sound_test))
         app->smoke_deadline_ns = 1500000000ull;
     return true;
 }

@@ -32,6 +32,9 @@ void bongo_cat_preferences_process_model_hidden(
     BongoCatPreferences *preferences);
 void bongo_cat_preferences_process_behavior_toggle(
     BongoCatPreferences *preferences);
+/* 音效清单逐项开关的 pending 处理 (设置窗口一帧画两次, 只在这里翻转一次)。 */
+void bongo_cat_preferences_process_sound_toggle(
+    BongoCatPreferences *preferences);
 void bongo_cat_preferences_model_load_progress(
     BongoCatPreferences *preferences, float progress);
 void bongo_cat_preferences_models_changed(BongoCatPreferences *preferences);

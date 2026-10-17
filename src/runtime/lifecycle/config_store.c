@@ -38,6 +38,18 @@ static uint64_t settings_hash(const BongoCatSettings *settings) {
     HASH_FIELD(settings->window);
     HASH_FIELD(settings->app);
     HASH_FIELD(settings->shortcuts);
+    /* 音效设置也是用户点一下就变的交互, 必须逐字段进哈希 —— 漏掉就会出现
+       "关掉一个音效、重启又全开" (这个坑在别的字段上踩过)。
+       刻意不 HASH_FIELD(settings->sound): 那个结构里带着 256 条定长 id (约 128KB),
+       每帧哈希一遍纯属浪费; 标量 + 实际条目已经覆盖全部可改内容。 */
+    HASH_FIELD(settings->sound.volume);
+    HASH_FIELD(settings->sound.muted);
+    HASH_FIELD(settings->sound.disabled_count);
+    size_t sound_count = settings->sound.disabled_count;
+    if (sound_count > BONGO_CAT_SOUND_DISABLED_CAP)
+        sound_count = BONGO_CAT_SOUND_DISABLED_CAP;
+    hash = hash_bytes(hash, settings->sound.disabled,
+        sound_count * sizeof(settings->sound.disabled[0]));
     HASH_FIELD(settings->behavior_shortcut_count);
     size_t behavior_count = settings->behavior_shortcut_count;
     if (behavior_count > BONGO_CAT_BEHAVIOR_BINDING_CAP)

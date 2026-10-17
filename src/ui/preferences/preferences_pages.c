@@ -483,5 +483,8 @@ void bongo_cat_preferences_page_settings(BongoCatPreferences *value,
     section_gap(context, 10);
     mirror_section(value, context);
     section_gap(context, 10);
+    /* 音效紧跟在输入/镜像之后: 这三块回答"桌宠怎么响应我", 权限则是可选的补充。 */
+    bongo_cat_preferences_sound_section(value, context);
+    section_gap(context, 10);
     bongo_cat_preferences_permissions_section(value, context);
 }

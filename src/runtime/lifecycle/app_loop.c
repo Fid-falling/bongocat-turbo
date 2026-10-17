@@ -355,6 +355,7 @@ void bongo_cat_app_loop(BongoCatApp *app) {
         bongo_cat_preferences_process_model_selection(app->preferences);
         bongo_cat_preferences_process_model_hidden(app->preferences);
         bongo_cat_preferences_process_behavior_toggle(app->preferences);
+        bongo_cat_preferences_process_sound_toggle(app->preferences);
         if (app->session.window.visible && !app->window_minimized && app->dirty) {
             render(app, true);
         }

@@ -219,6 +219,41 @@ static bool read_shortcuts(yyjson_val *object,
 }
 
 /*
+ * 音效设置。整个 "sound" 对象可选: 老配置没有它时保留 defaults (音量 100 / 不静音 /
+ * 不禁用)，行为与加入本功能之前逐字节一致。
+ * disabled 数组与 randomDisabled 同一条约定: 数组缺省属正常情况; 存在则先清零 count
+ * 再逐项填充; 超限报错而不是静默截断。
+ */
+static bool read_sound(yyjson_val *object, BongoCatSoundPreferences *value,
+    BongoCatError *error) {
+    if (!read_int(object, "volume", &value->volume, error) ||
+        !read_int(object, "muted", &value->muted, error)) return false;
+    yyjson_val *disabled = NULL;
+    if (!read_array(object, "disabled", &disabled, error)) return false;
+    if (!disabled) return true;
+    if (yyjson_arr_size(disabled) > BONGO_CAT_SOUND_DISABLED_CAP)
+        return type_error(error, "sound.disabled", "a smaller array");
+    value->disabled_count = 0;
+    size_t index, count;
+    yyjson_val *item;
+    yyjson_arr_foreach(disabled, index, count, item) {
+        const char *id = yyjson_get_str(item);
+        size_t length = yyjson_get_len(item);
+        if (!yyjson_is_str(item) || !id || strlen(id) != length)
+            return type_error(error, "sound.disabled[]",
+                "a string without embedded nulls");
+        /* 空串/重复项在 validate 的 compact_sound_disabled 里会被清掉, 这里只跳过
+           空串 —— 手改文件多留一个逗号不该让整份设置判死。 */
+        if (!length) continue;
+        char *entry = value->disabled[value->disabled_count++];
+        memset(entry, 0, BONGO_CAT_SOUND_ID_CAP);
+        if (!copy_text(entry, BONGO_CAT_SOUND_ID_CAP, id, length,
+                "sound.disabled[]", error)) return false;
+    }
+    return true;
+}
+
+/*
  * 三个数组字段(behaviorOverrides / modelOverrides / removedModels)共用一条
  * 约定: 数组整体缺省(!array)属正常情况, 直接成功返回; 数组存在则先清零
  * count 再逐项填充, 这样重复 load 不会把上一次的条目追加进来。容量检查放在
@@ -408,6 +443,7 @@ BongoCatResult bongo_cat_settings_load(const char *path,
     yyjson_val *window = NULL;
     yyjson_val *application = NULL;
     yyjson_val *shortcuts = NULL;
+    yyjson_val *sound = NULL;
     yyjson_val *behaviors = NULL;
     yyjson_val *models = NULL;
     yyjson_val *removed_models = NULL;
@@ -418,6 +454,7 @@ BongoCatResult bongo_cat_settings_load(const char *path,
         read_object(root, "window", &window, error) &&
         read_object(root, "application", &application, error) &&
         read_object(root, "shortcuts", &shortcuts, error) &&
+        read_object(root, "sound", &sound, error) &&
         read_array(root, "behaviorOverrides", &behaviors, error) &&
         read_array(root, "modelOverrides", &models, error) &&
         read_array(root, "removedModels", &removed_models, error) &&
@@ -428,6 +465,7 @@ BongoCatResult bongo_cat_settings_load(const char *path,
         (!window || read_window(window, &loaded.window, error)) &&
         (!application || read_app(application, &loaded.app, error)) &&
         (!shortcuts || read_shortcuts(shortcuts, &loaded.shortcuts, error)) &&
+        (!sound || read_sound(sound, &loaded.sound, error)) &&
         read_behaviors(behaviors, &loaded, error) &&
         read_model_labels(models, &loaded, error) &&
         read_removed_models(removed_models, &loaded, error) &&

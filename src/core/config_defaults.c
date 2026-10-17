@@ -283,6 +283,40 @@ static void compact_random_disabled(BongoCatSettings *config) {
     config->random_disabled_count = output_count;
 }
 
+/*
+ * 音效禁用集合: 与 random_disabled 同一套收口 —— 截断超长 id、丢弃空/非法条目、
+ * 按字符串去重、把剩余槽位清零。写盘前必过, 所以文件里不会留下上次的垃圾。
+ */
+static void compact_sound_disabled(BongoCatSettings *config) {
+    size_t input_count = config->sound.disabled_count;
+    if (input_count > BONGO_CAT_SOUND_DISABLED_CAP)
+        input_count = BONGO_CAT_SOUND_DISABLED_CAP;
+    size_t output_count = 0;
+    for (size_t i = 0; i < input_count; ++i) {
+        char temp[BONGO_CAT_SOUND_ID_CAP];
+        memcpy(temp, config->sound.disabled[i], BONGO_CAT_SOUND_ID_CAP);
+        temp[BONGO_CAT_SOUND_ID_CAP - 1] = '\0';
+        if (!temp[0] || !bongo_cat_utf8_valid(temp)) continue;
+        bool duplicate = false;
+        for (size_t j = 0; j < output_count; ++j)
+            if (!strcmp(config->sound.disabled[j], temp)) {
+                duplicate = true;
+                break;
+            }
+        if (duplicate) continue;
+        if (output_count != i) {
+            memset(config->sound.disabled[output_count], 0,
+                BONGO_CAT_SOUND_ID_CAP);
+            memcpy(config->sound.disabled[output_count], temp,
+                BONGO_CAT_SOUND_ID_CAP);
+        }
+        output_count++;
+    }
+    for (size_t i = output_count; i < BONGO_CAT_SOUND_DISABLED_CAP; ++i)
+        memset(config->sound.disabled[i], 0, BONGO_CAT_SOUND_ID_CAP);
+    config->sound.disabled_count = output_count;
+}
+
 /* 全新配置的初值: 首次运行、没有配置文件时由调用方用它铺底。
    由于读取是可选读(缺键保留原值), 这里给出的初值同时就是那些键的默认值,
    改动它会直接改变老配置的行为。 */
@@ -344,6 +378,10 @@ void bongo_cat_settings_defaults(BongoCatSettings *config) {
     config->app.theme = BONGO_CAT_THEME_AUTO;
     config->app.language = BONGO_CAT_LANG_EN_US;
     config->cache_root[0] = '\0';
+    /* 音效: 默认满音量、不静音、不禁用任何一条 —— 与加入本设置之前的版本完全一致。
+       disabled 数组由 memset 清零, 这里只写标量 (全是 0 的槽位就是"空")。 */
+    config->sound.volume = BONGO_CAT_SOUND_VOLUME_DEFAULT;
+    config->sound.muted = 0;
     memcpy(config->extensions_json, "{}", sizeof("{}"));
 }
 
@@ -444,11 +482,18 @@ void bongo_cat_settings_validate(BongoCatSettings *config) {
         config->app.theme = BONGO_CAT_THEME_AUTO;
     if ((unsigned)config->app.language >= BONGO_CAT_LANG_COUNT)
         config->app.language = BONGO_CAT_LANG_EN_US;
+    /* 音效: 音量钳到 0-100 (手改文件写 -5/999 都收口到边界), muted 归一成 0/1。
+       越界不写 WARN: 音量的边界本身就是有意义的取值 (0 = 听不见, 100 = 满), 用户
+       看到设置页上的数字就知道发生了什么。 */
+    if (config->sound.volume < 0) config->sound.volume = 0;
+    if (config->sound.volume > 100) config->sound.volume = 100;
+    config->sound.muted = config->sound.muted != 0;
     compact_behavior_overrides(config);
     compact_model_overrides(config);
     compact_removed_models(config);
     compact_hidden_models(config);
     compact_random_disabled(config);
+    compact_sound_disabled(config);
     validate_shortcuts(config);
     compact_behavior_overrides(config);
 }

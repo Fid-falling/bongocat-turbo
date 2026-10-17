@@ -28,6 +28,10 @@ void bongo_cat_preferences_appearance_section(BongoCatPreferences *value,
     struct nk_context *context);
 void bongo_cat_preferences_permissions_section(BongoCatPreferences *value,
     struct nk_context *context);
+/* 互动页的 [音效] 区: 总音量 / 全部静音 / 当前模型逐条开关 (实现见
+   preferences_sound_section.c)。 */
+void bongo_cat_preferences_sound_section(BongoCatPreferences *value,
+    struct nk_context *context);
 void bongo_cat_preferences_page_model(BongoCatPreferences *value,
     struct nk_context *context);
 void bongo_cat_preferences_page_model_random(BongoCatPreferences *value,

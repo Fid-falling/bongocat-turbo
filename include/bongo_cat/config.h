@@ -27,6 +27,8 @@
 #define BONGO_CAT_MAX_HIDE_FADE_SECONDS 3.0f
 #define BONGO_CAT_DEFAULT_EDGE_SNAP_PX 20
 #define BONGO_CAT_MAX_EDGE_SNAP_PX 64
+/* 音效总音量 (0-100)。100 = 与加入这个设置之前完全一致 (miniaudio 引擎默认满音量)。 */
+#define BONGO_CAT_SOUND_VOLUME_DEFAULT 100
 /* 每拍速度乘 (100-值)/100: 0 表示不衰减 —— 恒速滑行且撞边不损失速度 (就是设置页里
    "一直滑动"打开时的效果), 越大人越快停下。合并 PR#4 后默认从 0 改成 15。 */
 #define BONGO_CAT_DEFAULT_SLIDE_SLOWDOWN_PERCENT 15
@@ -303,11 +305,32 @@ typedef struct BongoCatActiveBehavior {
 
 #define BONGO_CAT_SETTINGS_EXTENSIONS_CAP 4096
 
+/*
+ * 音效设置 (settings.json 的 "sound" 对象)。
+ *
+ * 三个字段解决的是同一件事的三个层次, 全部可选读:
+ *   volume  总体音量 0-100。100 是默认值, 也是加入本设置之前的行为 —— 老配置缺键时
+ *           读出来就是 100, 逐字节等价于"引擎默认满音量"。
+ *   muted   "全部静音": 一次关掉所有模型音效, 但保留每个音效原来的开关状态 (关掉
+ *           全部静音就能恢复), 所以它是独立字段而不是把 disabled 清空。
+ *   disabled 被逐个关掉的音效 id 集合。默认空 = 全开。
+ *
+ * id 规则见 bongo_cat_sound_id(): "<模型id>:<模型目录内相对路径>", 不用会随排序变化的
+ * 下标 —— 模型重新导出后 bindings 顺序可能变, 用下标会让"用户关掉的那个音效"指向别人。
+ */
+typedef struct BongoCatSoundPreferences {
+    int volume;
+    int muted;
+    char disabled[BONGO_CAT_SOUND_DISABLED_CAP][BONGO_CAT_SOUND_ID_CAP];
+    size_t disabled_count;
+} BongoCatSoundPreferences;
+
 typedef struct BongoCatSettings {
     BongoCatModelPreferences model;
     BongoCatWindowPreferences window;
     BongoCatApplicationPreferences app;
     BongoCatShortcutPreferences shortcuts;
+    BongoCatSoundPreferences sound;
     /* Optional override for the cache directory. Empty means the platform
        default cache location is used. Written to settings.json. */
     char cache_root[BONGO_CAT_PATH_CAP];

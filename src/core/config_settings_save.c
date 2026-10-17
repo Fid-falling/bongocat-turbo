@@ -159,6 +159,30 @@ static bool write_shortcuts(yyjson_mut_doc *doc, yyjson_mut_val *object,
             value->always_on_top);
 }
 
+/*
+ * 音效设置。对老版本是未知对象, 它们原样忽略 —— 升级再回退只丢这一项, 不会让配置
+ * 读取失败 (新增键必须满足这条, 见本文件开头的契约)。
+ * volume/muted 始终写全 (哪怕等于默认值): 设置页要能手改, 而"缺键"与"显式 100"
+ * 读出来是同一个值。disabled 只写实际条目, 空数组保留, 让用户一眼看出结构。
+ */
+static bool write_sound(yyjson_mut_doc *doc, yyjson_mut_val *object,
+    const BongoCatSoundPreferences *value) {
+    if (!object || !yyjson_mut_obj_add_int(doc, object, "volume",
+            value->volume) ||
+        !yyjson_mut_obj_add_int(doc, object, "muted", value->muted))
+        return false;
+    yyjson_mut_val *array = yyjson_mut_arr(doc);
+    if (!array || !yyjson_mut_obj_add_val(doc, object, "disabled", array))
+        return false;
+    size_t count = value->disabled_count;
+    if (count > BONGO_CAT_SOUND_DISABLED_CAP)
+        count = BONGO_CAT_SOUND_DISABLED_CAP;
+    for (size_t i = 0; i < count; ++i)
+        if (!yyjson_mut_arr_add_strcpy(doc, array, value->disabled[i]))
+            return false;
+    return true;
+}
+
 /* 这三个数组字段按需写键: shortcutDisabled 只在为真时写, shortcut /
    displayName 只在非空时写。于是磁盘上的条目保持最小, 也保证读回来时
    "缺键"正好等于"用默认值"(见 config_fields.c 的可选读约定)。 */
@@ -321,6 +345,8 @@ BongoCatResult bongo_cat_settings_save(const char *path,
             &canonical.app) &&
         write_shortcuts(doc, yyjson_mut_obj_add_obj(doc, root, "shortcuts"),
             &canonical.shortcuts) &&
+        write_sound(doc, yyjson_mut_obj_add_obj(doc, root, "sound"),
+            &canonical.sound) &&
         write_behaviors(doc, root, &canonical) &&
         write_model_labels(doc, root, &canonical) &&
         write_removed_models(doc, root, &canonical) &&

@@ -27,5 +27,12 @@ bool bongo_cat_audio_any_playing(const BongoCatAudio *audio);
 bool bongo_cat_audio_is_playing(const BongoCatAudio *audio, const char *path);
 void bongo_cat_audio_stop_path(BongoCatAudio *audio, const char *path);
 void bongo_cat_audio_set_enabled(BongoCatAudio *audio, bool enabled);
+/*
+ * 全局播放增益 (0.0 - 1.0)。作用在**本程序自己的 miniaudio 引擎**上, 不碰系统音量,
+ * 也不影响其它进程; 已经起播的 voice 也会立刻跟着变 (引擎级音量), 面板上拖动滑杆
+ * 时不会出现"旧声音还按老音量放完"。
+ * 引擎是懒初始化的: 未初始化时只记下值, 首次起播时补下发 (见 audio_playback.c)。
+ */
+void bongo_cat_audio_set_volume(BongoCatAudio *audio, float volume);
 
 #endif

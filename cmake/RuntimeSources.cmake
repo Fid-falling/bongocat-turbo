@@ -124,7 +124,9 @@ set(BONGO_CAT_RUNTIME_DIAGNOSTIC_SOURCES
   src/runtime/diagnostics/live2d_audit_scenario.c
   src/runtime/diagnostics/live2d_viewer_audit.c
   src/runtime/diagnostics/live2d_viewer_timing.c
-  src/runtime/diagnostics/live2d_visual_audit.c)
+  src/runtime/diagnostics/live2d_visual_audit.c
+  # --ci-sound-test: 音效管理的判定/增益/禁用证据 (不需要真听声音)
+  src/runtime/diagnostics/sound_audit.c)
 
 set(BONGO_CAT_RUNTIME_INPUT_SOURCES
   src/runtime/input/gamepad.c
@@ -137,6 +139,8 @@ set(BONGO_CAT_RUNTIME_INPUT_SOURCES
 
 set(BONGO_CAT_RUNTIME_MODEL_SOURCES
   src/runtime/model/model_behavior.c
+  # 音效策略: 播放前统一判"全部静音 / 逐项禁用", 并下发总音量增益
+  src/runtime/model/model_sound.c
   src/runtime/model/model_behavior_cache.c
   src/runtime/model/model_behavior_state.c
   src/runtime/model/model_catalog_runtime.c
@@ -336,6 +340,8 @@ set(BONGO_CAT_UI_PREFERENCES_SOURCES
   src/ui/preferences/preferences_pages.c
   # 模型页的"随机"标签页: 三个随机分区 + 顺序轮换 (从 preferences_pages.c 拆出, 见行数策略)
   src/ui/preferences/preferences_random_page.c
+  # 互动页的 [音效] 区: 总音量 / 全部静音 / 当前模型逐条开关
+  src/ui/preferences/preferences_sound_section.c
   src/ui/preferences/preferences_portable.c
   src/ui/preferences/preferences_present.c
   src/ui/preferences/preferences_render.c

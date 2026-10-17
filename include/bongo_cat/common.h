@@ -43,6 +43,13 @@
 /* 随机/顺序切换的"参与集合": 本质是一组被排除(不参与)的行为 id 字符串, 默认全参与、
    列在名单里才排除。容量取 "最多模型数 + 若干其它行为" 的余量。 */
 #define BONGO_CAT_RANDOM_DISABLED_CAP (BONGO_CAT_MODEL_CAP * 2)
+/*
+ * 音效管理 (settings.sound):
+ *   - SOUND_ID_CAP: 音效 id = "<模型id>:<模型内相对路径>", 比行为 id 多留一点给长路径;
+ *   - SOUND_DISABLED_CAP: 被逐个关掉的音效上限。行为目录本身最多 128 条, 取两倍余量。
+ */
+#define BONGO_CAT_SOUND_ID_CAP 512
+#define BONGO_CAT_SOUND_DISABLED_CAP 256
 #define BONGO_CAT_MENU_LABEL_CAP (BONGO_CAT_ID_CAP + BONGO_CAT_SHORTCUT_CAP + 4)
 #define BONGO_CAT_SCHEDULED_RELEASE_CAP 64
 #define BONGO_CAT_UPDATE_VERSION_CAP 32

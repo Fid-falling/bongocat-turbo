@@ -101,6 +101,7 @@ if(BUILD_TESTING)
     tests/core/test_mver_pointer.c
     tests/core/test_shortcut.c
     tests/core/test_sound_shortcut.c
+    tests/core/test_sound.c
     tests/core/test_update.c
     src/platform/windows/windows_keys.c)
   target_link_libraries(bongo_cat_core_tests PRIVATE

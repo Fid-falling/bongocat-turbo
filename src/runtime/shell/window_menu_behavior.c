@@ -5,6 +5,7 @@
  * 快捷键的条目要一起执行, 但配对的隐藏项要跳过; 3) 执行语义以 model_behavior.c 为准 ——
  * 返回 false 表示这次没生效, 调用方不要回滚已经改变的状态。 */
 #include "window_menu.h"
+#include "model_sound.h"
 #include "bongo_cat/audio.h"
 #include "bongo_cat/i18n.h"
 #include "bongo_cat/shortcut.h"
@@ -214,10 +215,8 @@ bool bongo_cat_window_behavior_commit_preview(BongoCatApp *app,
         (size_t)(action - BONGO_CAT_MENU_MOTION_FIRST));
     if (!entry || !bongo_cat_live2d_commit_motion_preview(app->live2d,
         entry->group, entry->index)) return false;
-    if (entry->sound[0]) {
-        BongoCatError error = {0};
-        bongo_cat_audio_play(app->audio, entry->sound, &error);
-    }
+    if (entry->sound[0])
+        bongo_cat_app_play_sound(app, entry->sound, false);
     const char *shortcut = behavior_shortcut(app, entry->id);
     if (shortcut && shortcut[0]) for (size_t i = 0; i < app->behaviors.count; ++i) {
         const BongoCatBehaviorEntry *companion = &app->behaviors.entries[i];
