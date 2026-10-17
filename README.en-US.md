@@ -163,7 +163,6 @@ cmake -S . -B build -G Ninja \
 
 * Graphics: Vulkan by default (OpenGL available as a fallback), both built and exercised on every change.
 
-
 ## 📜 License
 
 The BongoCat source code and native runtime are licensed under
@@ -174,7 +173,6 @@ bundled model assets in `resources/assets/models/standard`, `keyboard`, and
 `gamepad` are covered by the separate [MIT license notice](LICENSE-MIT).
 That MIT license applies to the model assets and their accompanying artwork
 only; it does not relicense the BongoCat source code or native runtime.
-
 
 ## 🧭 Technical Architecture
 
