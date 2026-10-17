@@ -19,11 +19,12 @@
 #include "ui_backend.h"
 #include "ui_icons.h"
 #include "ui_paint.h"
+#include "ui_tooltip.h"
 #include "bongo_cat/i18n.h"
 #include "bongo_cat/path.h"
 #include "bongo_cat/platform.h"
+#include "bongo_cat/config.h"
 
-#include <math.h>
 #include <stdio.h>
 #include <string.h>
 
@@ -256,6 +257,55 @@ static void draw_actions(BongoCatPreferences *value,
 }
 
 /*
+ * 卡片左上角"顺序切换模型"的参与/跳过三角形标记。粉色 = 参与轮换; 灰色 = 跳过。
+ * 只用颜色区分, 不画图标。状态由 random_disabled 里的 "switch:<id>" 决定。
+ * 点击只写 pending (pending_behavior_id / pending_behavior_toggle), 由帧末
+ * bongo_cat_preferences_process_behavior_toggle 翻转, 不在点击当帧直接改 settings
+ * (设置窗口一帧画两次, 直接改会被第二次渲染重放再翻回去)。返回鼠标是否悬停在标记上。
+ */
+static bool draw_random_marker(BongoCatPreferences *value,
+    struct nk_context *context, struct nk_command_buffer *canvas,
+    const BongoCatModelEntry *entry, struct nk_rect preview,
+    BongoCatUIPalette p) {
+    char switch_id[BONGO_CAT_BEHAVIOR_ID_CAP];
+    snprintf(switch_id, sizeof(switch_id), "switch:%s", entry->id);
+    bool participating = !bongo_cat_settings_random_disabled(
+        &value->app->settings, switch_id);
+    float size = 26.0f;
+    struct nk_rect mark = nk_rect(preview.x, preview.y, size, size);
+    bool hover = nk_input_is_mouse_hovering_rect(&context->input, mark);
+    char animation_id[BONGO_CAT_ID_CAP + 28];
+    snprintf(animation_id, sizeof(animation_id), "model-random-%s", entry->id);
+    float amount = bongo_cat_ui_animate_eased(context, animation_id,
+        hover ? 1.0f : 0.0f, 150.0f, BONGO_CAT_UI_EASE_STANDARD);
+    struct nk_color color = participating ?
+        bongo_cat_ui_color_alpha(p.pink, .85f + .15f * amount) :
+        bongo_cat_ui_color_alpha(p.muted, .6f + .2f * amount);
+    /* 圆角三角角标: 贴左上角、斜边沿预览圆角弧线收口 (实现见 paint.c)。 */
+    bongo_cat_preferences_model_card_draw_corner_marker(canvas,
+        preview.x, preview.y, size, 12.0f, color);
+    if (hover) {
+        bongo_cat_ui_cursor_hover_rect(context, mark,
+            BONGO_CAT_UI_CURSOR_POINTER);
+        bongo_cat_ui_plain_tooltip(context,
+            participating
+                ? tr(value->app, "pages.preference.model.random.include",
+                    "Include in sequential rotation")
+                : tr(value->app, "pages.preference.model.random.skip",
+                    "Skip in sequential rotation"),
+            participating ? p.pink : p.muted);
+    }
+    if (nk_input_is_mouse_click_in_rect(&context->input,
+        NK_BUTTON_LEFT, mark)) {
+        snprintf(value->pending_behavior_id,
+            sizeof(value->pending_behavior_id), "%s", switch_id);
+        value->pending_behavior_toggle = true;
+        value->render_dirty = true;
+    }
+    return hover;
+}
+
+/*
  * 一张模型卡片。
  * 三个状态要分清: selected (在多宠集合里) / primary (主模型) / visual_target
  * (正在加载的那张)。selected_visual 特意排除了正在加载的卡片: 加载中的卡片由
@@ -315,6 +365,8 @@ void bongo_cat_preferences_model_card(BongoCatPreferences *value,
     if (app->settings.model.multiple_pets)
         bongo_cat_preferences_model_card_draw_selection_badge(
             value, canvas, preview, p, selection_amount);
+    bool random_marker_hover = draw_random_marker(value, context,
+        canvas, entry, preview, p);
     float info_y = preview.y + preview.h + 8;
     struct nk_rect name_bounds = nk_rect(bounds.x + 9, info_y + 1,
         bounds.w - 18, 30);
@@ -323,7 +375,7 @@ void bongo_cat_preferences_model_card(BongoCatPreferences *value,
     bool action_hover = false;
     draw_actions(value, context, canvas, bounds, entry, p, selected, primary,
         storage_busy, &action_hover);
-    bool blocked = action_hover;
+    bool blocked = action_hover || random_marker_hover;
     float outline_width = 1.0f + selection_amount;
     struct nk_rect outline = bongo_cat_preferences_model_card_outline_bounds(
         bounds, outline_width);

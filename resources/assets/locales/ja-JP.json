@@ -188,7 +188,9 @@
         },
         "random": {
           "configuring": "設定中",
-          "defaultPet": "現在のデスクトップペット"
+          "defaultPet": "現在のデスクトップペット",
+          "include": "順次切り替えに含める",
+          "skip": "順次切り替えをスキップ"
         },
         "hints": {
           "deleteSuccess": "「%s」を削除しました",

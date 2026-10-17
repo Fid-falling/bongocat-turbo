@@ -128,3 +128,20 @@ void bongo_cat_preferences_model_card_draw_selection_badge(
         nk_rect(badge.x + 5, badge.y + 5, badge.w - 10, badge.h - 10),
         bongo_cat_ui_color_alpha(nk_rgb(255, 255, 255), amount));
 }
+
+/*
+ * 左上角的"靠边梯形"角标 (顺序切换模型的参与/跳过标记)。两条平行斜边是
+ * 45° 对角线, 另两条边分别沿预览的顶边和左边。斜边取在预览圆角的起始点
+ * (距角点 radius 处), 不再画圆弧 —— 从圆弧开始的地方各往顶边/左边延伸出
+ * 一个直角梯形, 既贴合圆角又不尖锐、不与角之间留间隔。size 是两直边长度。
+ */
+void bongo_cat_preferences_model_card_draw_corner_marker(
+    struct nk_command_buffer *canvas, float x, float y, float size,
+    float radius, struct nk_color color) {
+    struct nk_vec2 pts[4];
+    pts[0] = nk_vec2(x, y + size + 6.0f);   /* 左下, 沿左边向下并多探一段 */
+    pts[1] = nk_vec2(x, y + radius);        /* 圆角在左边的起点 (贴左边) */
+    pts[2] = nk_vec2(x + radius, y);        /* 圆角在顶边的起点 (贴顶边) */
+    pts[3] = nk_vec2(x + size + 6.0f, y);   /* 沿顶边向右 (贴顶边) */
+    nk_fill_polygon(canvas, (const float *)pts, 4, color);
+}

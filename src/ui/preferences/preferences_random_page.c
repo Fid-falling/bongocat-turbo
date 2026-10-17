@@ -128,60 +128,6 @@ static void draw_random_category(BongoCatPreferences *value,
     }
 }
 
-/* 顺序模型展开后的"当前顺序"列表: 按模型目录顺序逐行显示, 每行 = 序号 + 模型名 +
-   一个"跳过"开关。开着 = 顺序轮换时跳过这个模型 (写入 switch:<id> 参与集合); 模型
-   文件不存在时开关置灰且不可点。 */
-static void draw_sequential_order_rows(BongoCatPreferences *value,
-    struct nk_context *context) {
-    BongoCatApp *app = value->app;
-    BongoCatUIPalette p = bongo_cat_ui_palette(bongo_cat_ui_dark(context));
-    const BongoCatSettings *settings = &app->settings;
-    struct nk_command_buffer *canvas = nk_window_get_canvas(context);
-    const struct nk_user_font *font = value->ui.caption_font;
-    nk_layout_row_dynamic(context, 56, 1);
-    for (size_t i = 0; i < app->models.count; ++i) {
-        const BongoCatModelEntry *entry = &app->models.entries[i];
-        struct nk_rect row;
-        if (nk_widget(&row, context) == NK_WIDGET_INVALID) continue;
-        bool exists =
-            (entry->setting_file[0] &&
-             bongo_cat_path_is_file(entry->setting_file)) ||
-            (entry->directory[0] &&
-             bongo_cat_path_is_dir(entry->directory));
-        char switch_id[128];
-        snprintf(switch_id, sizeof(switch_id), "switch:%s", entry->id);
-        bool skip = bongo_cat_settings_random_disabled(settings, switch_id);
-        bool collides = exists &&
-            nk_input_is_mouse_hovering_rect(&context->input, row);
-        nk_fill_rect(canvas, row, 10, collides ? p.hover : p.surface);
-        char num[8]; snprintf(num, sizeof(num), "%zu", i + 1);
-        struct nk_rect badge = nk_rect(row.x + 14, row.y + 18, 20, 20);
-        nk_fill_rect(canvas, badge, 10, exists ? p.field : p.border_subtle);
-        float numw = font->width(font->userdata, font->height, num, 1);
-        nk_draw_text(canvas, nk_rect(badge.x + (badge.w - numw) * .5f,
-            badge.y + (badge.h - font->height) * .5f, numw + 1, font->height),
-            num, 1, font, nk_rgba(0, 0, 0, 0), p.muted);
-        const char *name = entry->display_name[0] ? entry->display_name
-            : entry->id;
-        struct nk_rect name_rect = nk_rect(row.x + 46, row.y + 9,
-            row.w - 130, 38);
-        nk_draw_text(canvas, name_rect, name, nk_strlen(name), font,
-            nk_rgba(0, 0, 0, 0), exists ? p.text : p.muted);
-        struct nk_rect sw_cell = nk_rect(row.x + row.w - 56, row.y - 6,
-            56, 68);
-        if (bongo_cat_pref_control_toggle_rect(context, switch_id, &skip,
-            sw_cell, exists)) {
-            snprintf(value->pending_behavior_id,
-                sizeof(value->pending_behavior_id), "%s", switch_id);
-            value->pending_behavior_toggle = true;
-            value->render_dirty = true;
-        }
-    }
-    section_gap(context, 8);
-    nk_layout_row_dynamic(context, 6, 1);
-    nk_spacing(context, 1);
-}
-
 /* 随机页顶部的"正在配置哪只桌宠"标识: 随机页下方的参与清单跟随当前定焦模型
    (app->behaviors 就是当前模型的行为目录), 多宠同时显示时用它明示当前在编辑谁。 */
 static void draw_focus_pet_indicator(BongoCatPreferences *value,
@@ -222,13 +168,12 @@ static void draw_focus_pet_indicator(BongoCatPreferences *value,
         nk_rgba(0, 0, 0, 0), p.accent);
 }
 
-/* 顺序模型分区 (新式表头): 图标 + 标题 + 间隔步进器 + 启用开关, 展开后列出当前
-   轮换顺序并可在每一项上单独"跳过"。 */
+/* 顺序模型分区: 图标 + 标题 + 间隔步进器 + 启用开关, 不再列出可逐项"跳过"的子项。 */
 static void draw_sequential_model_category(BongoCatPreferences *value,
     struct nk_context *context) {
     BongoCatApp *app = value->app;
     BongoCatWindowPreferences *window = &app->settings.window;
-    bool open = draw_category_header(value, context,
+    draw_category_header(value, context,
         BONGO_CAT_OPTIONS_RANDOM_SEQUENTIAL,
         BONGO_CAT_PREF_ICON_MULTIPLE_MODELS,
         tr(app, "pages.preference.cat.labels.sequentialModel",
@@ -236,12 +181,10 @@ static void draw_sequential_model_category(BongoCatPreferences *value,
         "sequential-model", &window->sequential_model,
         &window->sequential_model_interval_seconds,
         BONGO_CAT_DEFAULT_SEQUENTIAL_MODEL_SECONDS);
-    if (open) draw_sequential_order_rows(value, context);
 }
 
 /* 模型页的"随机"标签页: 表情/动作/声音 三个可展开分区, 每个展开后内嵌逐条可勾选的
-   参与子项列表, 直接在页内改参与项; 底部是"顺序切换模型"分区, 展开后列出轮换顺序
-   并可逐项"跳过"。 */
+   参与子项列表, 直接在页内改参与项; 底部是"顺序切换模型"分区, 只保留启动开关。 */
 void bongo_cat_preferences_page_model_random(BongoCatPreferences *value,
     struct nk_context *context) {
     BongoCatApp *app = value->app;

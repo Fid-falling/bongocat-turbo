@@ -188,7 +188,9 @@
         },
         "random": {
           "configuring": "Configurando",
-          "defaultPet": "Mascote atual"
+          "defaultPet": "Mascote atual",
+          "include": "Incluir na rotação sequencial",
+          "skip": "Pular na rotação sequencial"
         },
         "hints": {
           "deleteSuccess": "Modelo \"%s\" excluído",

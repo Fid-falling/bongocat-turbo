@@ -8,4 +8,9 @@
 void bongo_cat_ui_question_tooltip(struct nk_context *context,
     const char *question, const char *reply);
 
+/* 画一个纯文本气泡: 悬停时按鼠标位置显示 text, '\n' 硬换行, 过长自动折行。
+   color 是气泡文字颜色, text 必须以 '\0' 结尾。 */
+void bongo_cat_ui_plain_tooltip(struct nk_context *context,
+    const char *text, struct nk_color color);
+
 #endif
