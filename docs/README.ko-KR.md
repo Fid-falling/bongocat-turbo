@@ -12,13 +12,15 @@
 </p>
 <p align="center">
   <a href="https://github.com/Fid-falling/bongocat-turbo/blob/main/LICENSE"><img src="https://img.shields.io/badge/AGPL--3.0-1fa669?style=flat&logo=gnu&logoColor=white"></a>
-  <a href="https://github.com/Fid-falling/bongocat-turbo"><img src="https://img.shields.io/badge/C-A8B9CC?style=flat&logo=c&logoColor=white"></a>
-  <a href="https://discord.gg/vf8jqnattk"><img src="https://img.shields.io/badge/dynamic/json?url=https%3A%2F%2Fdiscord.com%2Fapi%2Finvites%2Fvf8jqnattk%3Fwith_counts%3Dtrue&query=%24.approximate_member_count&suffix=%20members&logo=discord&logoColor=white&label=%20&color=7389D8&labelColor=6A7EC2"></a>
+  <a href="https://github.com/Fid-falling/bongocat-turbo"><img src="https://img.shields.io/badge/C-54AEFF?style=flat&logo=c&logoColor=white"></a>
+<a href="https://discord.gg/vf8jqnattk"><img src="https://img.shields.io/badge/Discord-F77DAA?logo=discord&logoColor=white"></a>
   <a href="https://github.com/Fid-falling/bongocat-turbo/blob/main/docs/wechat.png"><img src="https://img.shields.io/badge/WeChat-%2307C160?logo=wechat&logoColor=%2307C160&labelColor=FFFFFF"></a>
-  <a href="https://qm.qq.com/q/cYlRBbvuda"><img src="https://img.shields.io/badge/QQ-%2312B7F5?logo=qq&labelColor=FFFFFF"></a>
+  <a href="https://qm.qq.com/q/cYlRBbvuda"><img src="https://img.shields.io/badge/422616922-12B7F5?logo=qq&logoColor=12B7F5&labelColor=FFFFFF"></a>
 </p>
 
 <div align="center"><video src="https://github.com/user-attachments/assets/75719230-9e49-4124-ae5a-8e35592c5d49" autoplay loop style="border-radius: 8px; max-width: 800px;"></video></div>
+
+<img width="1149" height="904" alt="BongoCat Turbo 인터페이스" src="https://github.com/user-attachments/assets/aa376965-539e-4bbd-827d-bb9a29006069" />
 
 > [!TIP]
 > 데모에 사용된 모델은 [宇痕冫](https://space.bilibili.com/348616056)님의 작품입니다.
@@ -52,7 +54,7 @@ BongoCat은 CMake를 사용하며, C11 컴파일러, C++17 컴파일러, CMake 3
   ```bash
   sudo apt-get update
   sudo apt-get install -y build-essential cmake ninja-build \
-    libgl1-mesa-dev libx11-dev libxi-dev libxfixes-dev libcurl4-openssl-dev
+    libgl1-mesa-dev libx11-dev libxi-dev libxfixes-dev
   ```
 
 ### 🔧 구성 및 빌드
@@ -125,7 +127,6 @@ cmake -S . -B build -G Ninja \
 
 ## 📌 프로젝트 상태
 
-
 * 그래픽 백엔드: 기본 Vulkan(OpenGL은 대체), 변경할 때마다 둘 다 빌드하고 검증합니다.
 ![Alt](https://repobeats.axiom.co/api/embed/74334755a589dea40c5d31f8d2bcdc6c2bd39d87.svg "Repobeats analytics image")
 
@@ -159,7 +160,7 @@ BongoCat 소스 코드 및 로컬 런타임은 [AGPL-3.0-only](../LICENSE) 라�
   모델 업데이트 -> OpenGL 합성 -> 플랫폼 프레젠테이션
 ```
 
-Windows Raw Input 수신기, macOS Quartz 이벤트 탭, Linux XInput2 리스너는 메인 루프 외부에서 실행됩니다. 키와 마우스 버튼 이벤트는 유계 원자 큐에 전달하고, 이동량은 별도로 합치며 SDL 이벤트로 메인 스레드를 깨웁니다. Windows는 메시지 전용 창에 `RIDEV_INPUTSINK | RIDEV_DEVNOTIFY`를 등록하여 일반 창 메시지를 유지하면서 백그라운드 입력을 받습니다. 다른 프로그램이 커서를 숨기거나 잠그면 모델은 장치가 보고한 이동량을 사용하고, 바탕 화면에서는 SDL이 시스템 커서 위치를 제공합니다. 장치를 분리하거나 입력 데스크톱을 전환하면 눌림 상태를 정리합니다. Windows는 더 이상 입력 훅이나 DirectInput을 사용하지 않습니다. SDL3 창, 환경 설정 및 게임패드 이벤트는 메인 스레드에서 처리하며 플랫폼 리스너는 Live2D, 오버레이 또는 UI 코드를 직접 호출하지 않습니다.
+Windows Raw Input 수신기, macOS Quartz 이벤트 탭, Linux XInput2 리스너는 메인 루프 외부에서 실행됩니다. 타임스탬프가 붙은 키와 마우스 버튼 에지를 유계 원자 큐에 게시하고 포인터 이동은 별도로 병합하므로, 잦은 이동이 순서가 보장된 키와 버튼 에지를 밀어내지 않습니다. SDL 이벤트가 메인 스레드를 깨웁니다. Windows는 메시지 전용 창에 `RIDEV_INPUTSINK | RIDEV_DEVNOTIFY`를 등록하여 일반 창 메시지를 유지하면서 백그라운드 입력을 받습니다. 다른 프로그램이 커서를 숨기거나 잠그면 모델은 장치가 보고한 이동량을 사용하고, 바탕 화면에서는 SDL이 시스템 커서 위치를 제공합니다. 수신기는 장치별로 눌린 입력을 추적하고 장치가 분리되거나 입력 데스크톱이 전환될 때 정리합니다. Windows는 입력 훅을 설치하지 않고 DirectInput을 사용하지 않으며 게임에 입력을 보내지 않습니다. SDL3 창, 환경 설정 및 게임패드 이벤트는 메인 스레드에서 처리하며, 모델 파라미터나 단축키에 도달하기 전에 정규화됩니다. 플랫폼 리스너는 Live2D, 오버레이 또는 UI 코드를 직접 호출하지 않습니다.
 
 `bongo_cat_app_run`은 업데이트, 종료 및 보조 프로세스 파라미터를 담당하여 메인 프로세스의 단일 인스턴스 소유권을 보장하고, 애플리케이션 상태를 할당하며, 초기화를 수행하고, `bongo_cat_app_loop`로 진입한 후 정의된 순서대로 상태를 플러시하고 리소스를 소멸시킵니다. 초기화는 구성 및 저장 경로를 로드하고, 리소스를 찾고, SDL/OpenGL 펫 창을 생성하고, 플랫폼 백엔드를 초기화하고, Live2D/오버레이/오디오 서비스를 생성하고, 내장/설치/근처 모델 소스를 스캔하고, 사용 가능한 모델을 로드합니다. `BongoCatApp`은 설정, 세션 상태, 모델 및 동작 카탈로그, 플랫폼 핸들 및 런타임 서비스 핸들을 보유합니다.
 
@@ -227,16 +228,39 @@ flowchart TB
 
 아니요. BongoCat은 애니메이션 구동과 단축키를 위해 키보드 및 마우스 입력을 로컬에서 처리합니다. 키 입력, 마우스 동작 또는 기타 상호 작용 데이터를 기록하거나 업로드하지 않습니다. 구성도 로컬에만 저장되며, 애플리케이션에는 광고, 분석 도구 또는 사용자 추적 코드가 포함되어 있지 않습니다. 업데이트 확인을 수행할 때는 공개 버전 메타데이터만 요청하며, 입력, 구성 또는 사용 데이터를 전송하지 않습니다.
 
+### 📦 BongoCat의 파일은 어디에 저장되며, 휴대용 모드는 어떻게 켜나요?
+
+기본적으로 설정, 모델, 캐시, 로그 및 세션 상태는 사용자별 애플리케이션 데이터 폴더(Windows는 `%LOCALAPPDATA%\BongoCat`, Linux는 XDG 폴더, macOS는 `~/Library`)에 저장됩니다. `--storage-root=DIR`을 사용하면 한 번의 실행에 한해 이 경로들을 모두 대체합니다.
+
+**휴대용 모드**(설정 → 애플리케이션 → 휴대용 모드)는 모든 것을 실행 파일 옆의 `BongoCatData` 폴더로 옮깁니다. 켜면 설정과 모델을 그곳으로 복사하고, 끄면 빠진 내용을 기본 위치로 다시 병합합니다. 캐시는 절대 복사하지 않고 필요할 때 다시 만듭니다. 표시 파일은 `BongoCatData\portable.json`이므로 다른 컴퓨터나 USB 메모리로 옮길 때는 프로그램과 그 폴더만 함께 복사하면 되고 다른 파일은 필요 없습니다. `portable.json`을 삭제하면 기본 위치로 돌아갑니다. 설정 창에는 항상 실제로 사용 중인 폴더가 표시됩니다.
+
+### 🎭 Live2D 모델이 보이지 않습니다. Cubism Core 런타임은 어디에 있나요?
+
+BongoCat은 이를 번들로 제공하지도, 다운로드하지도 않습니다. Live2D 공식 사이트에서 Cubism SDK for Native를 받아 한 번 가져오면 됩니다. [Live2D Cubism Core 다운로드 및 가져오기 안내](live2d-core.md)(중국어)를 참고하세요.
+
+### Linux Wayland 입력
+
+X11은 기본적으로 XInput2를 사용합니다. Wayland용 실험적 evdev 입력은 기본적으로 꺼져 있습니다. [입력 권한 위험](../SECURITY.md#linux-input)을 확인한 뒤 한 번의 실행에 한해 명시적으로 켤 수 있습니다:
+
+```sh
+BONGOCAT_ENABLE_EVDEV=1 ./build/BongoCatTurbo
+```
+
+이 스위치는 장치 권한을 부여하지 않습니다. 이를 위해 root로 실행하거나 계정을 `input` 그룹에 추가하지 마세요. 원시 입력에는 비밀번호 입력란의 키 입력이 포함될 수 있으며, 화면 잠금이나 세션 전환 시 감시가 자동으로 일시 중지되지 않습니다. 감시는 앱을 종료해야 멈추고, 펫을 숨기는 것으로는 멈추지 않습니다. 변수 없이 다시 시작하면 기본 백엔드로 돌아갑니다. 마우스 추적은 가속되지 않은 장치 이동량을 사용하며, 창 배치, 클릭 통과, 항상 위 표시는 여전히 Wayland 컴포지터에 따라 달라집니다.
+
 ### 🖼️ 어떤 그래픽 백엔드를 사용하나요?
 
 네이티브 런타임은 Vulkan과 OpenGL 렌더러를 **둘 다** 포함합니다. 기본값인 `auto`는 **Vulkan**으로 해석되고, Vulkan 탐색에 실패할 때만 OpenGL로 물러납니다. Vulkan 경로는 이미 기능이 동등합니다. Live2D 렌더링, 방사형 메뉴, 모델 커버 캡처, 프레임 감사, 스모크 테스트가 모두 OpenGL과 같은 상위 코드를 사용하며 같은 결과를 냅니다.
 
 설정에서 백엔드를 고르거나(`renderer`), `settings.json`의 같은 키로 강제할 수 있습니다. 알아 둘 점:
 
+* 설정 창 자체가 제대로 그려지지 않아도 막히지 않습니다. `--renderer=opengl`(더 짧게는 `--opengl`)은 그 한 번의 실행에서 앱 전체를 OpenGL로 강제하며, **`settings.json`보다 우선하고 그 파일을 다시 쓰지 않습니다**. 트레이 메뉴에도 “렌더 백엔드: <현재> -> <대상>”이라는 같은 스위치가 있습니다. 이를 전환하면(또는 설정의 세그먼트 컨트롤) 설정이 저장되고 앱이 자동으로 다시 시작되어 새 백엔드가 즉시 적용됩니다. `--help`는 모든 옵션과 환경 변수를 나열합니다. 터미널에서 `BongoCat --help`를 실행해 보세요.
 * Vulkan 렌더러와 Cubism 브리지는 **일부러 하나의** `VkDevice`를 공유합니다. 예전에 두 번째 장치를 썼다가 RTSS / OBS / NVIDIA처럼 "프로세스당 장치 하나"를 가정하는 오버레이에서 충돌했습니다.
 * Windows 10에서는 스왑체인이 `OPAQUE`만 제공합니다. 그래도 투명은 동작합니다. 먼저 `VK_COMPOSITE_ALPHA_PRE_MULTIPLIED_BIT_KHR`를 시도하고, 드라이버가 거부할 때만 물러납니다.
 * 두 감사 도구(`live2d-visual-audit`, `live2d-viewer-audit`)는 자체적으로 오프스크린 프레임을 그리기 때문에 여전히 OpenGL이 필요합니다. 나머지는 백엔드와 무관합니다.
 * 시작 로그에 요청한 백엔드와 실제 사용한 백엔드가 항상 출력되므로 추측할 필요가 없습니다.
+* 보조 창(설정, 방사형 메뉴)이 Vulkan으로 전혀 그릴 수 없다면 — 스왑체인을 만들 수 없거나 프레임이 더 이상 프레젠테이션되지 않는 경우 — 스스로 OpenGL로 다시 만들고 로그에 그 사실을 남깁니다. 메인 창의 백엔드는 영향을 받지 않습니다. Windows에서는 Vulkan 메인 창 위의 OpenGL 설정 창이 부분적으로만 합성되므로 `--renderer=opengl`(둘 다 전환)이 여전히 더 나은 탈출구입니다.
+* `BONGO_CAT_VULKAN_VALIDATION=1`을 설정하면 Vulkan 검증 계층이 켜집니다(`PATH`에 SDK 계층이 있어야 하며, 없으면 로그에 안내됩니다).
 
 ## 🙏 특별 감사
 > [!TIP]

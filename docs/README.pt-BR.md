@@ -12,13 +12,15 @@
 </p>
 <p align="center">
   <a href="https://github.com/Fid-falling/bongocat-turbo/blob/main/LICENSE"><img src="https://img.shields.io/badge/AGPL--3.0-1fa669?style=flat&logo=gnu&logoColor=white"></a>
-  <a href="https://github.com/Fid-falling/bongocat-turbo"><img src="https://img.shields.io/badge/C-A8B9CC?style=flat&logo=c&logoColor=white"></a>
-  <a href="https://discord.gg/vf8jqnattk"><img src="https://img.shields.io/badge/dynamic/json?url=https%3A%2F%2Fdiscord.com%2Fapi%2Finvites%2Fvf8jqnattk%3Fwith_counts%3Dtrue&query=%24.approximate_member_count&suffix=%20members&logo=discord&logoColor=white&label=%20&color=7389D8&labelColor=6A7EC2"></a>
+  <a href="https://github.com/Fid-falling/bongocat-turbo"><img src="https://img.shields.io/badge/C-54AEFF?style=flat&logo=c&logoColor=white"></a>
+<a href="https://discord.gg/vf8jqnattk"><img src="https://img.shields.io/badge/Discord-F77DAA?logo=discord&logoColor=white"></a>
   <a href="https://github.com/Fid-falling/bongocat-turbo/blob/main/docs/wechat.png"><img src="https://img.shields.io/badge/WeChat-%2307C160?logo=wechat&logoColor=%2307C160&labelColor=FFFFFF"></a>
-  <a href="https://qm.qq.com/q/cYlRBbvuda"><img src="https://img.shields.io/badge/QQ-%2312B7F5?logo=qq&labelColor=FFFFFF"></a>
+  <a href="https://qm.qq.com/q/cYlRBbvuda"><img src="https://img.shields.io/badge/422616922-12B7F5?logo=qq&logoColor=12B7F5&labelColor=FFFFFF"></a>
 </p>
 
 <div align="center"><video src="https://github.com/user-attachments/assets/75719230-9e49-4124-ae5a-8e35592c5d49" autoplay loop style="border-radius: 8px; max-width: 800px;"></video></div>
+
+<img width="1149" height="904" alt="Interface do BongoCat Turbo" src="https://github.com/user-attachments/assets/aa376965-539e-4bbd-827d-bb9a29006069" />
 
 > [!TIP]
 > O modelo usado na demonstração é de [宇痕冫](https://space.bilibili.com/348616056).
@@ -52,7 +54,7 @@ Execute os comandos abaixo na raiz do projeto (o diretório que contém `CMakeLi
   ```bash
   sudo apt-get update
   sudo apt-get install -y build-essential cmake ninja-build \
-    libgl1-mesa-dev libx11-dev libxi-dev libxfixes-dev libcurl4-openssl-dev
+    libgl1-mesa-dev libx11-dev libxi-dev libxfixes-dev
   ```
 
 ### 🔧 Configuração e compilação
@@ -125,7 +127,6 @@ cmake -S . -B build -G Ninja \
 
 ## 📌 Status do projeto
 
-
 * Gráficos: Vulkan por padrão (OpenGL como alternativa); ambos são compilados e verificados a cada alteração.
 ![Alt](https://repobeats.axiom.co/api/embed/74334755a589dea40c5d31f8d2bcdc6c2bd39d87.svg "Repobeats analytics image")
 
@@ -159,7 +160,7 @@ Listeners de plataforma (teclado/ponteiro)
   atualização do modelo -> composição OpenGL -> apresentação da plataforma
 ```
 
-O receptor Raw Input do Windows, o tap de eventos Quartz do macOS e os listeners XInput2 do Linux são executados fora do loop principal. Eventos de teclas e botões entram em uma fila atômica limitada; os movimentos são agrupados separadamente e eventos SDL despertam a thread principal. O Windows recebe entradas em segundo plano por uma janela de mensagens com `RIDEV_INPUTSINK | RIDEV_DEVNOTIFY`, preservando as mensagens comuns. Quando outro aplicativo oculta ou bloqueia o cursor, o modelo usa os movimentos do dispositivo; o SDL fornece a posição do cursor na área de trabalho. Estados pressionados são limpos ao desconectar um dispositivo ou mudar a área de trabalho de entrada. O Windows não usa mais hooks de entrada nem DirectInput. Eventos de janela, preferências e gamepad do SDL3 são processados na thread principal. Nenhum listener de plataforma chama diretamente o código de Live2D, sobreposições ou interface.
+O receptor Raw Input do Windows, o tap de eventos Quartz do macOS e os listeners XInput2 do Linux são executados fora do loop principal. Eles publicam eventos de teclas e botões com carimbo de tempo na fila atômica limitada e mesclam o movimento do ponteiro separadamente, de modo que movimentos frequentes não desloquem eventos ordenados de teclas e botões. Eventos SDL despertam a thread principal. O Windows recebe entradas em segundo plano por uma janela de mensagens com `RIDEV_INPUTSINK | RIDEV_DEVNOTIFY`, preservando as mensagens comuns. Quando outro aplicativo oculta ou bloqueia o cursor, o modelo usa os movimentos do dispositivo; o SDL fornece a posição do cursor na área de trabalho. O receptor acompanha as entradas pressionadas por dispositivo e as limpa ao desconectar um dispositivo ou trocar a área de trabalho de entrada. O Windows não instala hooks de entrada, não usa DirectInput e não envia entradas para jogos. Eventos de janela, preferências e gamepad do SDL3 são processados na thread principal, onde os eventos de gamepad são normalizados antes de chegarem aos parâmetros do modelo ou aos atalhos. Nenhum listener de plataforma chama diretamente o código de Live2D, sobreposições ou interface.
 
 `bongo_cat_app_run` trata dos parâmetros de atualização, encerramento e processos secundários, impõe a propriedade de instância única do processo principal, aloca o estado do aplicativo, executa a inicialização, entra em `bongo_cat_app_loop` e, em seguida, atualiza o estado e destrói os recursos na ordem definida. A inicialização carrega a configuração e os caminhos de armazenamento, localiza os recursos, cria a janela de mascote SDL/OpenGL, inicializa os backends de plataforma, cria os serviços de Live2D/sobreposições/áudio, verifica fontes de modelos integradas/instaladas/próximas e carrega os modelos disponíveis. `BongoCatApp` mantém as configurações, o estado da sessão, os catálogos de modelos e comportamentos, os identificadores de plataforma e os identificadores de serviços de runtime.
 
@@ -227,16 +228,39 @@ flowchart TB
 
 Não. O BongoCat processa entradas de teclado e mouse localmente para impulsionar animações e atalhos. Ele não registra nem envia teclas pressionadas, ações do mouse ou outros dados de interação. A configuração também é salva apenas localmente; o aplicativo não contém anúncios, ferramentas de análise nem código de rastreamento de usuários. Ao verificar atualizações, apenas metadados públicos de versão são solicitados; nenhum dado de entrada, configuração ou uso é enviado.
 
+### 📦 Onde o BongoCat guarda os arquivos e como ativo o modo portátil?
+
+Por padrão, as configurações, os modelos, os caches, os logs e o estado da sessão ficam na pasta de dados do aplicativo de cada usuário (`%LOCALAPPDATA%\BongoCat` no Windows, as pastas XDG no Linux, `~/Library` no macOS). `--storage-root=DIR` substitui todos esses caminhos em uma única execução.
+
+O **modo portátil** (Configurações → Aplicativo → Modo portátil) move tudo para uma pasta `BongoCatData` ao lado do executável. Ao ativá-lo, as configurações e os modelos são copiados para lá; ao desativá-lo, o que faltar é mesclado de volta no local padrão; os caches nunca são copiados, são reconstruídos conforme a necessidade. O marcador é `BongoCatData\portable.json`, então para migrar para outra máquina ou um pendrive basta copiar o programa junto com essa pasta — nada mais é necessário. Exclua `portable.json` para voltar ao local padrão. A janela de configurações sempre mostra a pasta que está realmente em uso.
+
+### 🎭 O modelo Live2D não aparece. Onde está o runtime do Cubism Core?
+
+O BongoCat não o inclui nem o baixa: obtenha o Cubism SDK for Native no site oficial da Live2D e importe-o uma vez — veja o [guia de download e importação do Live2D Cubism Core](live2d-core.md) (em chinês).
+
+### Entrada no Linux Wayland
+
+O X11 usa XInput2 por padrão. A entrada evdev experimental para Wayland fica desativada por padrão. Depois de revisar [os riscos das permissões de entrada](../SECURITY.md#linux-input), ela pode ser ativada explicitamente para uma execução:
+
+```sh
+BONGOCAT_ENABLE_EVDEV=1 ./build/BongoCatTurbo
+```
+
+Esse interruptor não concede permissões de dispositivo. Não execute o aplicativo como root nem adicione sua conta ao grupo `input` para fazer isso funcionar. A entrada bruta pode incluir teclas digitadas em campos de senha e não é pausada ao bloquear a tela ou trocar de sessão. Só fechar o aplicativo interrompe o monitoramento; ocultar a mascote não interrompe. Inicie sem a variável para voltar ao backend padrão. O acompanhamento do mouse usa o movimento não acelerado do dispositivo; posicionamento da janela, clique através e sempre no topo ainda dependem do compositor Wayland.
+
 ### 🖼️ Qual backend gráfico é usado?
 
 O runtime nativo inclui **os dois** renderizadores, Vulkan e OpenGL. O padrão `auto` resolve para **Vulkan** e só recorre ao OpenGL se a verificação do Vulkan falhar. O caminho Vulkan já alcançou paridade de recursos: renderização Live2D, menu radial, captura de capas de modelos, auditorias de quadros e testes de fumaça usam as mesmas camadas superiores do OpenGL e produzem o mesmo resultado.
 
 O backend é escolhido nas configurações (`renderer`) ou forçado com a mesma chave em `settings.json`. Vale saber:
 
+* Se a própria janela de configurações não desenhar corretamente, você não fica preso: `--renderer=opengl` (ou a forma curta `--opengl`) força o aplicativo inteiro para OpenGL nessa execução e **tem prioridade sobre `settings.json` sem reescrevê-lo**. O menu da bandeja tem o mesmo interruptor como “Backend de renderização: <atual> -> <alvo>”; alterná-lo (ou o controle segmentado em Configurações) salva a configuração e reinicia o aplicativo automaticamente, então o novo backend entra em vigor na hora. `--help` lista todas as opções e variáveis de ambiente. Execute `BongoCat --help` em um terminal.
 * O renderizador Vulkan e a ponte Cubism compartilham **um único** `VkDevice` de propósito. Um segundo dispositivo travava sob overlays (RTSS / OBS / NVIDIA) que presumem um dispositivo por processo.
 * No Windows 10 a swapchain só oferece `OPAQUE`. A transparência continua funcionando: tentamos primeiro `VK_COMPOSITE_ALPHA_PRE_MULTIPLIED_BIT_KHR` e só recuamos se o driver recusar.
 * Duas ferramentas de auditoria (`live2d-visual-audit`, `live2d-viewer-audit`) ainda precisam de OpenGL, porque renderizam o próprio quadro fora da tela. Todo o resto independe do backend.
 * O log de inicialização sempre mostra o backend solicitado e o real.
+* Se uma janela secundária (configurações, menu radial) não conseguir desenhar com Vulkan de jeito nenhum — a swapchain não pode ser criada, ou os quadros deixam de ser apresentados — ela se reconstrói com OpenGL e informa isso no log. O backend da janela principal não é afetado. Observe que uma janela de configurações OpenGL sobre uma janela principal Vulkan é composta apenas parcialmente no Windows, então `--renderer=opengl` (que troca as duas) continua sendo a melhor saída.
+* Defina `BONGO_CAT_VULKAN_VALIDATION=1` para ativar a camada de validação do Vulkan (requer a camada do SDK no `PATH`; o log avisa se ela faltar).
 
 ## 🙏 Agradecimentos especiais
 > [!TIP]
