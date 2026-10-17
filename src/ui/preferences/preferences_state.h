@@ -50,8 +50,16 @@
  */
 enum BongoCatOptionsSection {
     BONGO_CAT_OPTIONS_WINDOW,
+    /* 宠物页的[行为]子区 (穿透/置顶/隐藏/吸附/滑动), 与 [画面] 同属原"窗口"拆分而来 */
+    BONGO_CAT_OPTIONS_BEHAVIOR,
+    /* 窗口页再拆为 位置/样式/背景 三个可折叠分区 (原 [画面]+[行为] 重组) */
+    BONGO_CAT_OPTIONS_POSITION,
+    BONGO_CAT_OPTIONS_STYLE,
+    BONGO_CAT_OPTIONS_BACKGROUND,
     BONGO_CAT_OPTIONS_PERFORMANCE,
     BONGO_CAT_OPTIONS_MODEL,
+    /* 从 [模型] 区拆出的组合镜像 (模型水平/垂直 + 手势水平/垂直) */
+    BONGO_CAT_OPTIONS_MIRROR,
     BONGO_CAT_OPTIONS_APPLICATION,
     BONGO_CAT_OPTIONS_APPEARANCE,
     BONGO_CAT_OPTIONS_RANDOM,
@@ -204,6 +212,12 @@ struct BongoCatPreferences {
     bool behavior_dialog_input_armed;
     int behavior_tab;
     int model_page_tab;
+    /*
+     * 偏好设置页顶部的子页下标 (0 = 左子页 应用/外观/性能, 1 = 右子页 窗口/模型/权限)。
+     * 切页条只切这一个值, 不动 value->page —— 所以点切页条不会跳到侧栏那一项的内容上;
+     * 两个子页共用同一个页面组与滚动槽 (下标 0), 切子页时由切页条把滚动复位到顶部。
+     */
+    int preferences_tab;
     uint64_t behavior_dialog_opened_ns;
     uint64_t behavior_dialog_closing_ns;
     uint64_t behavior_tab_transition_ns;

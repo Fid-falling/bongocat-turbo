@@ -201,8 +201,7 @@ if(BONGO_CAT_ENABLE_VULKAN)
   target_compile_definitions(bongo_cat_runtime PUBLIC BONGO_CAT_HAS_VULKAN=1)
 endif()
 target_compile_definitions(bongo_cat_runtime PRIVATE
-  BONGO_CAT_DEV_ASSET_ROOT="${CMAKE_CURRENT_SOURCE_DIR}/resources/assets"
-  BONGO_CAT_DEV_LOCALE_ROOT="${CMAKE_CURRENT_SOURCE_DIR}/resources/assets/locales")
+  BONGO_CAT_DEV_ASSET_ROOT="${CMAKE_CURRENT_SOURCE_DIR}/resources/assets")
 
 # 渲染组件 cores/bongo_live2d.*: 只在真有 Cubism Framework 可编时才建 —— 缺 SDK 的诊断
 # 构建里不存在这个组件, 宿主照常启动并走 live2d_stub.c 的兜底实现(这是降级路径的一部分)。
@@ -287,4 +286,3 @@ add_custom_target(check-cubism-compliance ALL
 add_dependencies(check-cubism-compliance bongo_cat)
 include(cmake/Tests.cmake)
 include(cmake/Packaging.cmake)
-

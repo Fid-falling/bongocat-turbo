@@ -25,6 +25,10 @@ bool bongo_cat_windows_borderless_hit_transparent(bool forced,
     bool pointer_transparent, bool right_button_down);
 void bongo_cat_windows_borderless_set_click_through(HWND window,
     bool forced, bool pointer_transparent);
+/* 直接呈现(无代理窗口, 即 Vulkan)时的逐像素穿透: 单独切换 WS_EX_TRANSPARENT。
+   注意它让整窗对鼠标"失明", 只能配合"应用每帧从全局轮询重新判定 pointer_transparent"
+   来用 —— 主窗口收不到鼠标消息也没关系, 光标落到猫上后下一帧就会清掉。 */
+void bongo_cat_windows_borderless_set_pixel_transparent(HWND window, bool enabled);
 void bongo_cat_windows_menu_preview(HWND window, BongoCatMenuPreview preview,
     void (*tick)(void *userdata), void *userdata);
 void bongo_cat_windows_begin_drag(HWND window, BongoCatModalTick modal_tick,

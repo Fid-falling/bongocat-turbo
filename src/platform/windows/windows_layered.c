@@ -193,6 +193,48 @@ HWND bongo_cat_windows_layered_proxy(HWND source) {
 }
 
 /*
+ * Vulkan 专用呈现入口: 与 bongo_cat_windows_layered_present 的 active 分支等价, 但
+ * 像素不是自己抓 GL 前缓冲, 而是用 vk_scene.c 已经整帧回读好的 RGBA。隐藏/不可见时
+ * 直接返回 false (没有可暴露的帧), 与 present 的语义一致。
+ * 不透明(active 为 false)时是 no-op —— Vulkan 平时代价保持为零, 只在"透明背景"开着
+ * 才走代理分层。调用方必须是渲染/主线程 (UpdateLayeredWindow 在窗口所属线程上生效)。
+ */
+bool bongo_cat_windows_layered_submit_rgba(void *presenter, int width, int height,
+    const unsigned char *rgba) {
+    BongoCatWindowsLayered *value = presenter;
+    if (!value || !value->window || !value->active) return false;
+    HWND source = bongo_cat_windows_layered_native_window(value);
+    if (!source || !value->visible || !IsWindowVisible(source) || IsIconic(source)) {
+        if (value->proxy) ShowWindow(value->proxy, SW_HIDE);
+        /* A hidden source has no frame to expose through the proxy. Let the
+           startup path show it before retrying the first presentation. */
+        return false;
+    }
+    RECT bounds;
+    if (!GetWindowRect(source, &bounds)) return false;
+    int display_width = bounds.right - bounds.left,
+        display_height = bounds.bottom - bounds.top;
+    if (!ensure_proxy(value) || width <= 0 || height <= 0 ||
+        display_width <= 0 || display_height <= 0 || !rgba ||
+        !bongo_cat_windows_layered_capture_rgba(value, width, height,
+            display_width, display_height, rgba)) {
+        value->has_frame = false;
+        return SDL_SetError("Cannot allocate the Windows layered frame");
+    }
+    /* 菜单窗口(模态)要求整块矩形都能被点到; 主窗口不设这个标记, 保持"透明处点穿"。 */
+    if (value->solid_hit_area) bongo_cat_windows_layered_solidify_hit_area(value);
+    if (!bongo_cat_windows_layered_update_proxy(value)) {
+        value->has_frame = false;
+        return false;
+    }
+    value->has_frame = true;
+    if (!make_source_transparent(value))
+        return SDL_SetError("Cannot suppress the Vulkan source window");
+    ShowWindow(value->proxy, SW_SHOWNOACTIVATE);
+    return true;
+}
+
+/*
  * 呈现入口(平台层的 present)。没有启用代理模式时就是普通的 SDL_GL_SwapWindow。
  * 启用时: 源窗口不可见或被最小化就直接返回 false —— 此时拿不到画面, 也不该让代理
  * 窗口显示一帧旧内容(隐藏状态没有可暴露的帧, 由启动路径先显示窗口再重试)。

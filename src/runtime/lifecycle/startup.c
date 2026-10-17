@@ -185,10 +185,15 @@ static void begin_log(BongoCatApp *app) {
     }
     if (!log_mutex) log_mutex = SDL_CreateMutex();
     SDL_SetLogOutputFunction(log_output, NULL);
+#ifdef NDEBUG
     SDL_SetLogPriorities(SDL_LOG_PRIORITY_WARN);
     SDL_SetLogPriority(BONGO_CAT_LOG_LIFECYCLE, SDL_LOG_PRIORITY_INFO);
     SDL_SetLogPriority(BONGO_CAT_LOG_UPDATE, SDL_LOG_PRIORITY_INFO);
     SDL_SetLogPriority(BONGO_CAT_LOG_INPUT, SDL_LOG_PRIORITY_INFO);
+#else
+    /* Debug 构建把日志级别压到 DEBUG, 与 log.h 的过滤策略保持一致。 */
+    SDL_SetLogPriorities(SDL_LOG_PRIORITY_DEBUG);
+#endif
     SDL_LogInfo(BONGO_CAT_LOG_LIFECYCLE,
         "[runtime] Process started: version=%s platform=%s",
         BONGO_CAT_VERSION, SDL_GetPlatform());

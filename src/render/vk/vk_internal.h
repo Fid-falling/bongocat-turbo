@@ -88,6 +88,10 @@ typedef struct OverlayPush {
     /* 1 = 贴图是直通 alpha, 片元里要预乘; 0 = 贴图已经是预乘值 (Live2D 离屏结果)。
        多乘一次就是 color*a^2, 所以这个标志由调用点按贴图来源显式给出。 */
     int premultiply;
+    /* 1 = 只保留"够亮 + 够彩"的按键提示像素 (多键显示里非首个按键的键帽通道), 见
+       overlay.frag。自带气泡素材的模型不走这条通道: 它的多键画法在 CPU 侧合成
+       (见 src/render/overlay_bubble.c)。 */
+    int keycap_only;
 } OverlayPush;
 
 typedef struct PointerPush {

@@ -180,6 +180,14 @@ bool bongo_cat_platform_frame_alpha(const BongoCatPlatform *platform,
     (void)platform; (void)width; (void)height; (void)x; (void)y; (void)alpha;
     return false;
 }
+bool bongo_cat_platform_layered_active(BongoCatPlatform *platform) {
+    (void)platform; return false;
+}
+bool bongo_cat_platform_submit_layered_rgba(BongoCatPlatform *platform,
+    int width, int height, const unsigned char *rgba) {
+    (void)platform; (void)width; (void)height; (void)rgba;
+    return false;
+}
 /* 显示 / 隐藏。重新显示时要重设一遍采集属性: 窗口重新上屏后系统可能把 sharingType 之类
    的属性恢复成默认值。 */
 void bongo_cat_platform_set_visible(BongoCatPlatform *platform, bool visible) {

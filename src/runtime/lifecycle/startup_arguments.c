@@ -75,6 +75,37 @@ static bool parse_switch_list(BongoCatApp *app, const char *value,
     return true;
 }
 
+/* --ci-keys=KeyA,KeyS,... 的解析 (注入在 lifecycle/app.c 尾部)。与 parse_switch_list
+   同一个逗号格式, 但写的是输入注入清单: 数量给多了只 WARN 并截断到上限。 */
+static bool parse_key_list(BongoCatApp *app, const char *value,
+    BongoCatError *error) {
+    const char *cursor = value ? value : "";
+    unsigned dropped = 0;
+    while (*cursor) {
+        const char *comma = strchr(cursor, ',');
+        size_t length = comma ? (size_t)(comma - cursor) : strlen(cursor);
+        if (length) {
+            if (app->smoke_keys_count >= BONGO_CAT_SMOKE_SWITCH_CAP) dropped++;
+            else if (length >= BONGO_CAT_ID_CAP) {
+                bongo_cat_error_set(error, BONGO_CAT_ERROR_ARGUMENT,
+                    "Key name is too long: %.*s", (int)length, cursor);
+                return false;
+            } else {
+                char *target = app->smoke_keys[app->smoke_keys_count++];
+                memcpy(target, cursor, length);
+                target[length] = '\0';
+            }
+        }
+        if (!comma) break;
+        cursor = comma + 1;
+    }
+    if (dropped)
+        SDL_LogWarn(SDL_LOG_CATEGORY_APPLICATION,
+            "--ci-keys keeps at most %d keys; ignoring %u more",
+            BONGO_CAT_SMOKE_SWITCH_CAP, dropped);
+    return true;
+}
+
 /* 毫秒参数 (--ci-model-switch-delay-ms= / -gap-ms=): 只接受纯数字, 认不出来的值按默认值
    处理并 WARN —— 自测参数写错时"跑起来用的是默认值"比"启动失败"好查。 */
 static uint64_t milliseconds_argument(const char *value, uint64_t fallback) {
@@ -263,6 +294,8 @@ bool bongo_cat_startup_arguments(BongoCatApp *app, int argc, char **argv,
                 arg + 11, "Model", error)) return false;
         } else if (strncmp(arg, "--ci-model-switch=", 18) == 0) {
             if (!parse_switch_list(app, arg + 18, error)) return false;
+        } else if (strncmp(arg, "--ci-keys=", 10) == 0) {
+            if (!parse_key_list(app, arg + 10, error)) return false;
         } else if (strncmp(arg, "--ci-model-switch-delay-ms=", 27) == 0) {
             app->smoke_switch.delay_ns = milliseconds_argument(arg + 27,
                 SMOKE_SWITCH_DELAY_DEFAULT_NS);

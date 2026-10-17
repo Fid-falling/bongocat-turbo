@@ -17,11 +17,16 @@
 
 void bongo_cat_preferences_page_settings(BongoCatPreferences *value,
     struct nk_context *context);
-/* 设置页 [应用]/[外观] 区 (开关 + 外观) 与 macOS 的输入监控区。定义在
-   preferences_general_page.c: 与 [窗口] 区没有共享状态, 拆开是为了 500 行的行数策略
-   (见 cmake/CheckLines.cmake)。入参是 BongoCatPreferences 而不是 BongoCatApp:
-   分区折叠状态 (options_sections) 挂在 preferences 上 (合并 PR#4 后新增的分区头)。 */
-void bongo_cat_preferences_general_page(BongoCatPreferences *value,
+/* 偏好设置页两个子页共用的分区: 左子页 = 应用 + 外观 + 性能, 右子页 = 窗口 + 模型 +
+   权限。这三个定义在 preferences_general_page.c, 与 [窗口]/[模型] 区没有共享状态, 拆开
+   是为了 500 行的行数策略 (见 cmake/CheckLines.cmake)。入参是 BongoCatPreferences 而
+   不是 BongoCatApp: 分区折叠状态 (options_sections) 挂在 preferences 上。
+   [权限] 区目前只有 macOS 有内容, 其它平台是空实现。 */
+void bongo_cat_preferences_application_section(BongoCatPreferences *value,
+    struct nk_context *context);
+void bongo_cat_preferences_appearance_section(BongoCatPreferences *value,
+    struct nk_context *context);
+void bongo_cat_preferences_permissions_section(BongoCatPreferences *value,
     struct nk_context *context);
 void bongo_cat_preferences_page_model(BongoCatPreferences *value,
     struct nk_context *context);
@@ -98,7 +103,7 @@ void bongo_cat_preferences_portable_draw(BongoCatPreferences *value,
 /* 异步文件夹对话框的结果是 SDL 用户事件, 没有窗口 ID, 必须在按窗口过滤之前处理 */
 bool bongo_cat_preferences_cache_path_dialog_event(BongoCatPreferences *value,
     const SDL_Event *event);
-/* [窗口] 区的"透明背景"开关 (window.glTransparency)。定义只在 Windows 编译
+/* [窗口] 区的"透明背景"开关 (window.transparentBackground)。定义只在 Windows 编译
    (preferences_window_transparency.c), 其它平台不显示这一行, 调用点也要用
    #ifdef _WIN32 包起来。 */
 void bongo_cat_preferences_window_transparency(BongoCatApp *app,

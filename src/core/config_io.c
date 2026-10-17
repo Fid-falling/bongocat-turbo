@@ -83,7 +83,12 @@ static bool read_model(yyjson_val *object, BongoCatModelPreferences *value,
          * 按"老版本里同步跟随最大帧率"的规则收口, 老配置因此不会因为升级而突变。
          * 用 read_int 而不是 read_bool 就是为了保住这个第三态。
          */
-        !read_int(object, "vsync", &value->vsync, error))
+        !read_int(object, "vsync", &value->vsync, error) ||
+        /* 可选读: 老配置缺这两个键时保留默认值 (多键显示打开, 每侧 5 个), 于是老用户
+           升级后立刻拿到多键显示, 而写盘时又必然带上具体取值 (见 config_settings_save.c)。 */
+        !read_int(object, "multiKeyDisplay", &value->multi_key_display, error) ||
+        !read_int(object, "multiKeyLimit", &value->multi_key_limit, error) ||
+        !read_int(object, "bubbleMerge", &value->bubble_merge, error))
         return false;
     const char *text;
     size_t length;
@@ -113,7 +118,8 @@ static bool read_window(yyjson_val *object, BongoCatWindowPreferences *value,
         !read_int(object, "supersample", &value->supersample, error) ||
         !read_int(object, "fontRasterCap", &value->font_raster_cap, error) ||
         !read_int(object, "disableUiEffects", &value->disable_effects, error) ||
-        !read_int(object, "glTransparency", &value->gl_transparency, error) ||
+        !read_int(object, "transparentBackground",
+            &value->transparent_background, error) ||
         !read_bool(object, "captureBackground", &value->obs_background,
             error) ||
         !read_bool(object, "randomExpression", &value->random_expression,

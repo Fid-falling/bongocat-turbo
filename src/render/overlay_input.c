@@ -12,8 +12,8 @@
  * 没有这个回落到所有 F 键都会静默失效。判定要求 name[1] 是数字, 所以单字符 "F"
  * 与 "Foo" 之类不会被误判。
  */
-static bool key_path(BongoCatOverlay *value, const char *group, const char *name,
-    char path[BONGO_CAT_PATH_CAP]) {
+static bool key_path(const BongoCatOverlay *value, const char *group,
+    const char *name, char path[BONGO_CAT_PATH_CAP]) {
     char relative[BONGO_CAT_PATH_CAP];
     snprintf(relative, sizeof(relative), "resources/%s/%s.png", group, name);
     bongo_cat_path_join(path, BONGO_CAT_PATH_CAP, value->directory, relative);
@@ -26,18 +26,78 @@ static bool key_path(BongoCatOverlay *value, const char *group, const char *name
     return false;
 }
 
+/* 该键在这一侧列表里的下标; 没记过时返回 count, 调用方据此判断"这是个新键"。 */
+static size_t side_index(const OverlaySide *hand, const char *name) {
+    for (size_t i = 0; i < hand->count; ++i)
+        if (strcmp(hand->keys[i].name, name) == 0) return i;
+    return hand->count;
+}
+
+/* 对外的路径查询: 单气泡合成要拿到"某个键自己那张图"来抠键名文字, 用的是同一套查找规则,
+   否则合成出来的字与单独按这个键时看到的可能来自不同文件 (例如 F 键的 Fn.png 回落)。 */
+bool bongo_cat_overlay_key_path(const BongoCatOverlay *value, int side,
+    const char *name, char path[BONGO_CAT_PATH_CAP]) {
+    if (!value || (side != 0 && side != 1) || !name) return false;
+    return key_path(value, side ? "right-keys" : "left-keys", name, path);
+}
+
+/*
+ * 该侧这一帧最多画几个键。两种情况恒为 1:
+ *  - 设置里关掉了多键显示 —— 退回"每侧只画最早按下的那个键";
+ *  - 非 Cubism 构建 —— 那里没有独立按键贴图 (手是 CPU 合成进 cover 的), 而合成图只吃
+ *    左右各一张 (见 overlay_draw.c 的 refresh_composite), 多键没有落脚点。
+ */
+int bongo_cat_overlay_display_limit(const BongoCatOverlay *value) {
+    if (!value || !value->multi_key) return 1;
+#ifndef BONGO_CAT_HAS_CUBISM
+    return 1;
+#else
+    return value->key_limit > 0 ? value->key_limit : 1;
+#endif
+}
+
+/*
+ * 重新装载某一侧"显示窗口内"的按键贴图, 并同步 left_path/right_path。
+ * 不变量: 超出显示数量的键只保留名字、贴图为 NULL —— 它们的贴图一旦装了就没人画, 只会
+ * 白占 LRU 槽位; 松开前面的键之后它们补位进来, 在这里被重新装载。
+ * 副作用是"两个后端一致": 非 Cubism 构建里贴图列是哨兵值, 真正的显示交给合成层。
+ */
+void bongo_cat_overlay_refresh_keys(BongoCatOverlay *value, int side) {
+    if (!value || (side != 0 && side != 1)) return;
+    OverlaySide *hand = &value->sides[side];
+    char *side_path = side ? value->right_path : value->left_path;
+    /* 这一侧的按键集合刚刚变过: 单气泡里的 "A + S" 必须重新拼 (见 overlay_assets.c)。
+       放在这里而不是合成函数内部判断, 是因为"集合变了"只有输入层知道。 */
+    value->bubble_dirty[side] = true;
+    if (hand->count == 0) {
+        side_path[0] = '\0';
+        return;
+    }
+    const int limit = bongo_cat_overlay_display_limit(value);
+    for (size_t i = 0; i < hand->count; ++i) {
+        OverlayKey *key = &hand->keys[i];
+        key->texture = NULL;
+        if ((int)i >= limit) continue;
+        char path[BONGO_CAT_PATH_CAP];
+        if (!key_path(value, side ? "right-keys" : "left-keys", key->name, path))
+            continue;
+        if (i == 0) snprintf(side_path, BONGO_CAT_PATH_CAP, "%s", path);
+#ifdef BONGO_CAT_HAS_CUBISM
+        key->texture = bongo_cat_overlay_cached_texture(value, path);
+#else
+        /* 非 Cubism 构建把左右手合成进一张图, 这里只需要一个"有效"标记 */
+        key->texture = (BongoCatTexture *)1;
+#endif
+    }
+}
+
 /*
  * 按键状态入口。返回值: 1 = 右手, 0 = 左手, -1 = 这个键没有对应贴图或参数无效 ——
  * 上层据此判断"这个按键要不要算作模型有反应", 所以不要为了省事把 -1 改成 0。
  *
- * 两条构建路径的差别是这里最容易踩的坑:
- *  - Cubism: 真的去取/缓存贴图, left/right 指向缓存槽位里的句柄;
- *  - 非 Cubism: 贴图在 cover 合成阶段烧进背景, 这里只存一个**哨兵值**
- *    (BongoCatTexture *)1 当作"该手处于按下状态"的标记。哨兵不是可解引用指针,
- *    任何新代码都不能对它调用纹理接口 —— 现有的读取方都只做 NULL 判断。
- *
- * 释放按键时只在"当前记录的确实是这个键"时才清 (strcmp): 同一个键的按下/抬起可能
- * 因为丢焦而乱序到达, 无条件清会把后来按下的另一个键一起清掉。
+ * 同一侧按下的键按**按下顺序**追加进该手列表, 不再互相覆盖 —— 这是"同侧多键只看得见
+ * 最后一个"的修复点。松开时按名字删除, 而不是清空列表头: 同一个键的按下/抬起可能因为
+ * 丢焦而乱序到达, 无条件清会把后来按下的另一个键一起清掉。
  */
 int bongo_cat_overlay_key(BongoCatOverlay *value, const char *name, bool pressed) {
     if (!value || !name) return -1;
@@ -46,32 +106,34 @@ int bongo_cat_overlay_key(BongoCatOverlay *value, const char *name, bool pressed
     if (key_path(value, "right-keys", name, path)) right = true;
     else if (key_path(value, "left-keys", name, path)) right = false;
     else return -1;
-    char *active_name = right ? value->right_name : value->left_name;
-    BongoCatTexture **active = right ? &value->right : &value->left;
-    char *active_path = right ? value->right_path : value->left_path;
+    OverlaySide *hand = &value->sides[right ? 1 : 0];
+    size_t index = side_index(hand, name);
     if (pressed) {
-        snprintf(active_name, BONGO_CAT_ID_CAP, "%s", name);
-#ifdef BONGO_CAT_HAS_CUBISM
-        *active = bongo_cat_overlay_cached_texture(value, path);
-#else
-        snprintf(active_path, BONGO_CAT_PATH_CAP, "%s", path);
-        /* 非 Cubism 构建把左右手合成进一张图, 这里只需要一个"有效"标记 */
-        *active = (BongoCatTexture *)1;
-#endif
-    } else if (strcmp(active_name, name) == 0) {
-        active_name[0] = '\0';
-        *active = NULL;
-        active_path[0] = '\0';
+        if (index == hand->count) {
+            /* 单手按住的键数超过上限 (正常用法到不了): 不记这个键, 但对外仍算"有反应" */
+            if (hand->count >= BONGO_CAT_OVERLAY_HELD_CAP) return right ? 1 : 0;
+            index = hand->count++;
+            snprintf(hand->keys[index].name, BONGO_CAT_ID_CAP, "%s", name);
+            hand->keys[index].texture = NULL;
+        }
+    } else {
+        if (index == hand->count) return right ? 1 : 0;
+        if (index + 1 < hand->count)
+            memmove(&hand->keys[index], &hand->keys[index + 1],
+                (hand->count - index - 1) * sizeof(hand->keys[0]));
+        memset(&hand->keys[hand->count - 1], 0, sizeof(hand->keys[0]));
+        hand->count--;
     }
+    bongo_cat_overlay_refresh_keys(value, right ? 1 : 0);
 #ifndef BONGO_CAT_HAS_CUBISM
     value->composite_dirty = true;
 #endif
     return right ? 1 : 0;
 }
 
-/* 只判断指针非空: 非 Cubism 构建下这里是非 NULL 的哨兵值, 也算"手在按下状态" */
+/* 该手是否按着键 (非 Cubism 构建下贴图列是哨兵值, 所以只判数量、不判句柄) */
 bool bongo_cat_overlay_hand_active(const BongoCatOverlay *value, bool right) {
-    return value && (right ? value->right : value->left) != NULL;
+    return value && value->sides[right ? 1 : 0].count > 0;
 }
 
 /*

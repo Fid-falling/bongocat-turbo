@@ -25,14 +25,24 @@ void *bongo_cat_windows_layered_create(SDL_Window *window);
 void bongo_cat_windows_layered_destroy(void *presenter);
 void bongo_cat_windows_layered_set_click_through(void *presenter, bool enabled);
 void bongo_cat_windows_layered_set_always_on_top(void *presenter, bool enabled);
+/*
+ * 把一帧已抓好的 RGBA 整帧提交给代理分层呈现 (Vulkan 专用入口)。
+ *
+ * GL 路径自己抓 GL 前缓冲 (windows_layered_frame.c 的 glReadPixels), 但 Vulkan 没有
+ * 可读的前缓冲, 像素只能由 vk_scene.c 用整帧回读 (vk_readback.c 的 take_frame_sample)
+ * 拿好之后通过这里喂进来。格式约定与回读契约一致: RGBA、第 0 行为视觉上方；本函数
+ * 内部负责换成 DIB 需要的 BGRA 自下而上并处理缩放。不透明时是 no-op 返回 false。
+ */
+bool bongo_cat_windows_layered_submit_rgba(void *presenter, int width, int height,
+    const unsigned char *rgba);
 /* 返回 source 对应的"代理窗口"句柄(没有则 NULL)。外部模块拿它做命中测试与采集
    判断时不要缓存这个句柄 —— 它可能随模式切换被重建。 */
 HWND bongo_cat_windows_layered_proxy(HWND source);
-/* GL 模式的逐像素透明总开关。主窗口与轮盘共用这一个判断: 写成两处就会出现
-   "主窗口透明显了、轮盘还是黑底"这种半开状态。
-   configured 是用户的设置项 window.glTransparency (0=关闭, 默认)。
+/* OpenGL / Vulkan 模式的逐像素透明总开关。主窗口与轮盘共用这一个判断: 写成两处就会
+   出现 "主窗口透明显了、轮盘还是黑底"这种半开状态。
+   configured 是用户的设置项 window.transparentBackground (0=关闭, 1=开启, 默认开启)。
    优先级: 环境变量 BONGO_CAT_GL_TRANSPARENCY (调试用强制覆盖) > 设置项;
-   另外这套呈现要读 GL 前缓冲, 非 OpenGL 后端一律返回 false。 */
+   另外这套呈现要有可读的帧来源 (GL 前缓冲或 Vulkan 整帧回读), 其它后端一律 false。 */
 bool bongo_cat_windows_layered_requested(bool configured);
 /* 代理模式下真实窗口收不到鼠标消息, 由代理把鼠标消息转投给 source(幂等)。
    为什么必须转、以及转发的坑, 见 windows_layered_window.c 的说明。 */

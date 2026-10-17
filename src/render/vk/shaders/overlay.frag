@@ -14,11 +14,28 @@ layout(push_constant, std430) uniform Push {
     /* 1 = 贴图是直通 alpha (要在这里预乘); 0 = 贴图本身已经是预乘值。
        这个声明必须与调用点 (vk_draw.c) 的口径一致, 理由见文件末尾。 */
     int premultiply;
+    /*
+     * 1 = 多键显示里非首个按键的"第二通道" (只对**没有**自带气泡素材的模型有用: 一张整画布
+     * 图 = 手 + 一块彩色按键高亮)。判据是"够亮 + 够彩": 先丢掉整体偏暗的像素 (max < 0.5),
+     * 再比饱和度 (max-min)。只比饱和度不行 —— 那是纯相对判据, 近黑像素 (1,0,0) 的
+     * max-min 与 max 都是 1/255, 比值恒为 1 会被判成"高饱和", 手部描边整片保留、淹没真正
+     * 的键帽。这段与 OpenGL 侧 overlay.c 的片元着色器是同一套规则, 改一边必须改另一边。
+     *
+     * 自带气泡素材的模型 (每键一张"气泡 + 手"整图) 不走这条通道: 它的多键显示在 CPU 侧
+     * 合成 (合并成一个装着 "A + S" 的气泡, 或每个键各占一个气泡), 见
+     * src/render/overlay_bubble.c。这里只管把合成好的整张图当普通贴图画出去。
+     */
+    int keycap_only;
 } params;
 
 void main() {
     color = texture(image, texcoord);
     if (color.a <= 0.001) discard;
+    if (params.keycap_only != 0) {
+        float mx = max(color.r, max(color.g, color.b));
+        float mn = min(color.r, min(color.g, color.b));
+        if (mx < 0.5 || mx - mn <= 0.45 * mx) discard;
+    }
     vec2 dl = (texcoord - vec2(0.700, 0.515)) / vec2(0.080, 0.170);
     vec2 dr = (texcoord - vec2(0.275, 0.397)) / vec2(0.070, 0.160);
     bool left = dot(dl, dl) < 1.0;

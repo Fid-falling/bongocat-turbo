@@ -31,6 +31,13 @@
    "一直滑动"打开时的效果), 越大人越快停下。合并 PR#4 后默认从 0 改成 15。 */
 #define BONGO_CAT_DEFAULT_SLIDE_SLOWDOWN_PERCENT 15
 #define BONGO_CAT_MAX_SLIDE_SLOWDOWN_PERCENT 99
+/*
+ * 多键显示: 同一侧同时按住的按键全部画出来 (而不是每侧只保留最后按下的那一个)。
+ * 每侧最多显示 BONGO_CAT_MULTI_KEY_LIMIT_DEFAULT 个; 超出的按键仍然保留"按住"状态,
+ * 松开前面的键之后自动补位 (与 BongoCat-X 的 maxKeys 语义一致)。
+ */
+#define BONGO_CAT_MULTI_KEY_LIMIT_DEFAULT 5
+#define BONGO_CAT_MULTI_KEY_LIMIT_MAX 8
 
 typedef enum BongoCatTheme { BONGO_CAT_THEME_AUTO, BONGO_CAT_THEME_LIGHT, BONGO_CAT_THEME_DARK } BongoCatTheme;
 typedef enum BongoCatLanguage {
@@ -84,6 +91,24 @@ typedef struct BongoCatModelPreferences {
      */
     int vsync;
     BongoCatRenderer renderer;
+    /*
+     * 1 = 多键显示 (默认), 0 = 关掉 —— 关掉时退回"每侧只显示最早按下的那个键"。
+     * 用 int 而不是 bool: 走可选读 read_int, 老配置里缺这个键时保持默认 1, 不会因为
+     * "键不存在"判定配置损坏。
+     */
+    int multi_key_display;
+    /*
+     * 每侧最多显示几个键, 1..BONGO_CAT_MULTI_KEY_LIMIT_MAX。只有 multi_key_display
+     * 打开时才有意义; 关掉时这一行在设置页里隐藏、也不生效, 但取值原样保留。
+     */
+    int multi_key_limit;
+    /*
+     * 1 = 合并成一个气泡 (默认): 同侧多键时只画一个气泡, 里面用 "+" 把各键名连起来 ("A + S")。
+     * 0 = 每个键各占一个气泡、并排显示。只对自带气泡素材的模型有意义 —— 内置模型画的是彩色
+     * 键帽, 没有气泡可合并, 两种取值下都是"一只手 + N 块键帽"。同样用 int + 可选读, 老配置
+     * 里缺这个键时保持默认 1。
+     */
+    int bubble_merge;
 } BongoCatModelPreferences;
 
 typedef struct BongoCatWindowPreferences {
@@ -134,17 +159,18 @@ typedef struct BongoCatWindowPreferences {
     /* 1 = 关掉界面发光/阴影 (浅色主题每帧省约 5ms) */
     int disable_effects;
     /*
-     * 1 = 让宠物背景在桌面上真正透明 (默认 0 = 关闭)。
+     * 1 = 让宠物背景在桌面上真正透明 (默认 1 = 开启)。
      *
-     * 为什么需要它: OpenGL 模式下普通窗口的缓冲 alpha 会被 DWM 忽略, 猫以外的区域
-     * 只能显示成黑块。开启后改走"代理分层呈现"(真实窗口压成全透明 + 一个分层代理
-     * 窗口显示抓到的帧, 见 windows_layered_window.c)。
-     * 为什么是 int 而不是 bool: 配置读取走可选的 read_int, 老配置文件缺键时保持
-     * 默认值 0, 不会因为"键不存在"判定配置损坏。写入侧同样按 int 存。
+     * 为什么需要它: 普通窗口直通的缓冲 alpha 交给系统合成时会被忽略, 猫以外的区域
+     * 只能显示成黑块 (Vulkan 直通交换链虽能原生合成透明, 却做不到逐像素点穿)。
+     * 开启后改走"代理分层呈现"(真实窗口压成全透明 + 一个分层代理窗口显示抓到的帧,
+     * 由系统按像素 alpha 判定点击穿透) —— OpenGL 与 Vulkan 共用这一个开关。
+     * 为什么是 int 而不是 bool: 配置读取走可选的 read_int, 缺键时保持默认值 1,
+     * 不会因为"键不存在"判定配置损坏。写入侧同样按 int 存。
      * 代价: 录屏软件按标题采集"真实窗口"时拿到的是全透明画面, 要采代理窗口
      * (设置界面与文档里都写明了这一点)。
      */
-    int gl_transparency;
+    int transparent_background;
     bool obs_background;
     bool random_expression;
     bool random_motion;

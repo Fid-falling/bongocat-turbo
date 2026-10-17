@@ -164,6 +164,13 @@ static bool draw_shell(BongoCatPreferences *value, struct nk_context *context,
         return true;
     }
     float body_height = interior_height - BONGO_CAT_UI_HEADER_HEIGHT;
+    /*
+     * 页内切页条 (偏好设置 / 快捷键两页才有): 占一行 44px, 内容区按 50 预留。
+     * 它可能当场改 value->page, 所以必须排在下面所有"按页号取值"的代码之前 ——
+     * 滚动状态、页面组的 id 都要用新页号, 否则会把上一页的滚动量写进新页的槽里。
+     */
+    if (bongo_cat_preferences_subnavigation(value, context, !modal))
+        body_height -= 50.0f;
     nk_layout_row_dynamic(context, NK_MAX(120.0f, body_height), 1);
     struct nk_rect body_bounds = nk_widget_bounds(context);
     float page_progress = 1.0f;
