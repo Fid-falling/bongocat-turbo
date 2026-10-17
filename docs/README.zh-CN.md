@@ -287,25 +287,6 @@ BONGOCAT_ENABLE_EVDEV=1 ./build/BongoCatTurbo
 * 如果次级窗口（偏好设置、轮盘）完全无法用 Vulkan 绘制 —— 交换链创建失败，或帧不再被呈现 —— 它会自行用 OpenGL 重建，并在日志中说明。主窗口的后端不受影响。注意，在 Windows 上，Vulkan 主窗口之上的 OpenGL 偏好设置窗口只能部分合成，因此 `--renderer=opengl`（同时切换两者）仍是更好的逃生通道。
 * 设置 `BONGO_CAT_VULKAN_VALIDATION=1` 可开启 Vulkan 校验层（需要 SDK 层位于 `PATH` 中；缺失时日志会提示）。
 
-## 赞助商
-
-<div align="center">
-  <table align="center">
-    <tr>
-      <td style="vertical-align: middle; padding-right: 10px;">
-        <img alt="SignPath" src="https://signpath.org/assets/favicon-50x50.png" />
-      </td>
-      <td style="vertical-align: middle;">
-        Windows 上的免费代码签名由
-        <a href="https://signpath.io">SignPath.io</a> 提供，证书由
-        <a href="https://signpath.org/">SignPath Foundation</a> 签发
-      </td>
-    </tr>
-  </table>
-</div>
-
-
-
 ## 🙏 特别感谢
 > [!TIP]
 > BongoCat 的每一步都得益于开源精神。我们衷心感谢所有社区贡献者的无私奉献。正是你们的支持，让桌面陪伴更加自由与真诚。❤️‍🔥
