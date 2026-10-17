@@ -49,6 +49,9 @@ static bool write_model(yyjson_mut_doc *doc, yyjson_mut_val *object,
            "缺键"与"显式 1.0"读出来是同一个值, 写全是为了让用户能手改。 */
         yyjson_mut_obj_add_real(doc, object, "renderScale",
             (double)value->render_scale) &&
+        /* 键名/类型与 config_io.c 的 read_int("textureQuality") 一一对齐 */
+        yyjson_mut_obj_add_int(doc, object, "textureQuality",
+            value->texture_quality) &&
         yyjson_mut_obj_add_strcpy(doc, object, "renderer",
             bongo_cat_renderer_name(value->renderer));
 }

@@ -137,6 +137,17 @@ unsigned int bongo_cat_image_texture_model(const char *path, bool direct_decode,
         alpha, progress, userdata, error);
 }
 
+/*
+ * 模型图集工作尺寸上限: 问宿主 (唯一判定处, 见 ABI 的 model_texture_limit)。
+ * 宿主没提供这一项时退回编译期默认值 —— 组件与宿主版本不一致时仍然能画出模型, 只是
+ * "纹理质量"这一档设置不生效。
+ */
+int bongo_cat_image_model_texture_limit(void) {
+    if (services && services->model_texture_limit)
+        return services->model_texture_limit();
+    return BONGO_CAT_LIVE2D_TEXTURE_LIMIT;
+}
+
 yyjson_doc *bongo_cat_model_json_parse(const char *data, size_t size,
     bool *normalized) {
     if (!services) return NULL;

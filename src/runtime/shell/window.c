@@ -1,5 +1,6 @@
 #include "runtime.h"
 #include <math.h>
+#include "bongo_cat/image.h"
 #include "bongo_cat/log.h"
 #include "bongo_cat/render.h"
 #include "bongo_cat/vk_backend.h"
@@ -244,6 +245,21 @@ void bongo_cat_window_apply(BongoCatApp *app) {
     bongo_cat_live2d_vulkan_set_supersample(
         fabsf(app->settings.model.render_scale - 1.0f) > 0.001f ?
             2 /* 桥的"省内存"档 = 1x */ : app->settings.window.supersample);
+    /*
+     * [性能] 区的纹理质量: 模型图集上传前的工作尺寸上限 (标准 2048 / 高 4096 / 原生)。
+     * 只在**下一次模型加载**生效 —— 图集尺寸是解码/上传那一刻定下的, 所以这里只把上限
+     * 下发给 media 层 (GL 走宿主, Vulkan 由组件问宿主服务要同一个数)。
+     */
+    {
+        static const int limits[BONGO_CAT_TEXTURE_QUALITY_COUNT] = {
+            BONGO_CAT_LIVE2D_TEXTURE_LIMIT,
+            BONGO_CAT_TEXTURE_QUALITY_HIGH_LIMIT,
+            BONGO_CAT_TEXTURE_QUALITY_NATIVE_LIMIT};
+        int quality = app->settings.model.texture_quality;
+        if (quality < 0 || quality >= BONGO_CAT_TEXTURE_QUALITY_COUNT)
+            quality = BONGO_CAT_TEXTURE_QUALITY_DEFAULT;
+        bongo_cat_image_set_model_texture_limit(limits[quality]);
+    }
 }
 
 void bongo_cat_window_apply_capture_only(BongoCatApp *app) {

@@ -26,6 +26,24 @@ typedef struct BongoCatImage {
  * 锯齿。GL 与 Vulkan 两条上传路径必须用**同一个**上限, 否则同一个模型在两个后端会拿到不同
  * 分辨率的图集, 画面就对不上 (见 media/image.c 与 live2d/cubism_model_load.cpp)。 */
 #define BONGO_CAT_LIVE2D_TEXTURE_LIMIT 2048
+/* 模型图集工作尺寸上限的**运行时**取值: 默认等于上面那个宏。
+ *
+ * 图集被缩到多少, 决定了屏幕上每条边缘有多少源像素 —— 也就是模型自带的艺术字/署名能不能
+ * 看清。做成函数而不是到处直接用宏, 是因为它要能被诊断性地抬高 (实验: 确认"糊"到底是源细节
+ * 丢了还是采样/栅格化丢了), 而两条上传路径 (media/image.c 的 GL 路径与
+ * live2d/cubism_model_load.cpp 的 Vulkan 路径) 必须读到**同一个**数, 否则同一个模型在两个
+ * 后端会拿到不同分辨率的图集, 画面就对不上。
+ *
+ * 为什么是**共用的一份实现** (src/media/image_limit.c) 而不是两处各写一遍: Vulkan 那条
+ * 路径在渲染组件 (bongo_live2d.dll) 里, 而组件按纪律**不链接** bongo_cat_core —— 但它与
+ * 宿主必须拿到同一个上限。那份实现被两边共同编译, 于是只有一处逻辑, 又不用把宿主的 core
+ * 拖进组件。
+ *
+ * 环境变量 BONGO_CAT_LIVE2D_TEXTURE_LIMIT=<px> 只用于实验/诊断: 取值夹在
+ * [BONGO_CAT_LIVE2D_TEXTURE_MIN_LIMIT, BONGO_CAT_LIVE2D_TEXTURE_MAX_LIMIT], 非法值忽略并
+ * 保持默认。不设变量时行为与直接用宏完全一致。 */
+#define BONGO_CAT_LIVE2D_TEXTURE_MIN_LIMIT 256
+#define BONGO_CAT_LIVE2D_TEXTURE_MAX_LIMIT 16384
 typedef struct BongoCatImageAlphaMask {
     unsigned char pixels[BONGO_CAT_ALPHA_MASK_SIZE * BONGO_CAT_ALPHA_MASK_SIZE];
     int width, height;
@@ -44,6 +62,11 @@ extern "C" {
 BongoCatResult bongo_cat_image_load(const char *path, BongoCatImage *image, BongoCatError *error);
 bool bongo_cat_image_info(const char *path, int *width, int *height);
 void bongo_cat_image_free(BongoCatImage *image);
+/* 模型图集工作尺寸上限的运行时取值 (默认 BONGO_CAT_LIVE2D_TEXTURE_LIMIT, 见文件头的说明)。
+   GL 与 Vulkan 两条路径都必须问它, 于是同一个模型在两个后端拿到同一个分辨率。 */
+int bongo_cat_image_model_texture_limit(void);
+/* 设置页下发的上限 (0 = 回到默认)。下一个模型负载生效: 图集尺寸只在解码/上传时决定。 */
+void bongo_cat_image_set_model_texture_limit(int limit);
 /* 只做 CPU 处理: 载入图片, 超过上限时等比缩小 (不涉及任何 GPU 资源)。
    Vulkan 的界面纹理用它, OpenGL 侧继续用下面返回纹理名的接口。 */
 BongoCatResult bongo_cat_image_fit(const char *path, int max_width,

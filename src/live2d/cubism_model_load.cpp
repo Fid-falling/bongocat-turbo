@@ -337,14 +337,15 @@ bool NativeModel::textures_step(int index, BongoCatError *error) {
         BongoCatImage image = {0};
         const std::string texture_path = path(setting_->GetTextureFileName(index));
         /*
-         * 与 GL 路径同一个工作尺寸上限: GL 那边在 Windows 上用 WIC 直接解到
-         * ≤BONGO_CAT_LIVE2D_TEXTURE_LIMIT (见 bongo_cat_image_texture_model), 这里过去
+         * 与 GL 路径同一个工作尺寸上限: 两边都走 bongo_cat_image_model_texture_limit()
+         * (GL 那边在 bongo_cat_image_texture_model 里用 WIC 直接解到该上限)。这里过去
          * 一直按原始尺寸解码上传。8192px 的图集只画几百像素, 原尺寸采样等于放弃图集自身的
          * 预平均, 于是 Vulkan 侧的边缘落在与 GL 不同的采样密度上, 表现为模型轮廓上分散的
          * 细差异。bongo_cat_image_fit 是纯 CPU 的 (WIC -> stb + 等比缩小), 不依赖 GL。
          */
+        const int texture_limit = bongo_cat_image_model_texture_limit();
         if (bongo_cat_image_fit(texture_path.c_str(),
-                BONGO_CAT_LIVE2D_TEXTURE_LIMIT, BONGO_CAT_LIVE2D_TEXTURE_LIMIT,
+                texture_limit, texture_limit,
                 &image, error) != BONGO_CAT_OK || !image.pixels) {
             release_textures();
             return false;
@@ -353,6 +354,11 @@ bool NativeModel::textures_step(int index, BongoCatError *error) {
          * 掩码留到 textures_mask_step 里做: 它是纯 CPU 的一段 (逐像素), 和"解码 + 上传"
          * 分开之后每一步都更短, 于是主循环更容易在两步之间插进一帧。
          */
+        /* 与 GL 那条 "[gl] 模型图集" 同一条证据: Vulkan 侧图集最后落在多少。
+           这里用 WARN 而不是 SDL_Log: 组件里的 INFO 会被宿主的日志策略滤掉 (分类不是自定
+           义项), WARN 与同文件其它 attach 探针同级, 也是这一侧唯一的可见证据。 */
+        SDL_LogWarn(SDL_LOG_CATEGORY_RENDER, "[vk] 模型图集 %dx%d (工作尺寸上限 %d): %s",
+            image.width, image.height, texture_limit, texture_path.c_str());
         pending_alpha_image_ = image;
         bongo_cat_image_log_upload_probe(&image, "vk-model-texture");
         vulkan_textures_[(size_t)index] = bongo_cat_live2d_vulkan_create_texture_attached(

@@ -141,6 +141,12 @@ static unsigned int service_image_texture_model(const char *path,
         alpha, progress, userdata, error);
 }
 
+/* 模型图集工作尺寸上限: 直接问 media 层那**唯一一处**判定 (设置档位 + 诊断环境变量),
+   组件按它决定 Vulkan 侧要不要把图集缩小。 */
+static int service_model_texture_limit(void) {
+    return bongo_cat_image_model_texture_limit();
+}
+
 static yyjson_doc *service_model_json_parse(const char *data, size_t size,
     bool *normalized) {
     return bongo_cat_model_json_parse(data, size, normalized);
@@ -176,8 +182,8 @@ static const BongoCatRendererModuleHost host_services = {
     service_gl_current_window, service_gl_current_context, service_gl_make_current,
     service_window_size_pixels,
     service_image_fit, service_image_free, service_image_make_alpha_mask,
-    service_image_texture_model, service_model_json_parse, service_read_file,
-    service_vulkan_native_info
+    service_image_texture_model, service_model_texture_limit,
+    service_model_json_parse, service_read_file, service_vulkan_native_info
 };
 
 const BongoCatRendererModuleHost *bongo_cat_renderer_module_host(void) {
@@ -197,6 +203,7 @@ bool bongo_cat_renderer_module_validate_host(
         host->gl_current_context && host->gl_make_current && host->window_size_pixels &&
         host->image_fit &&
         host->image_free && host->image_make_alpha_mask &&
-        host->image_texture_model && host->model_json_parse && host->read_file &&
+        host->image_texture_model && host->model_texture_limit &&
+        host->model_json_parse && host->read_file &&
         host->vulkan_native_info;
 }

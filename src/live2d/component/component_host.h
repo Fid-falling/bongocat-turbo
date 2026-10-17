@@ -33,6 +33,8 @@ void *bongo_component_gl_current_window(void);
 void *bongo_component_gl_current_context(void);
 bool bongo_component_gl_make_current(void *window, void *context);
 bool bongo_component_window_size_pixels(void *window, int *width, int *height);
+/* 模型图集工作尺寸上限: 转发宿主的服务 (上限在进程内只该有一处判定, 见 ABI 的说明)。 */
+int bongo_cat_image_model_texture_limit(void);
 
 #ifdef __cplusplus
 }

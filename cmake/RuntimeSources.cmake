@@ -25,6 +25,8 @@ set(BONGO_CAT_MEDIA_SOURCES
   src/media/image_mipmap.c
   src/media/image_resize.c
   src/media/image_alpha.c
+  # 模型图集工作尺寸上限的运行时取值 (GL 与 Vulkan 两条路径共用同一份实现)
+  src/media/image_limit.c
   src/media/stb_image_impl.c)
 
 set(BONGO_CAT_RENDER_SOURCES
@@ -345,6 +347,8 @@ set(BONGO_CAT_UI_PREFERENCES_SOURCES
   src/ui/preferences/preferences_segment.c
   src/ui/preferences/preferences_shortcut_clear.c
   src/ui/preferences/preferences_renderer_row.c
+  # 纹理质量 (模型图集上限) 那一行, 见文件头
+  src/ui/preferences/preferences_texture_quality_row.c
   src/ui/preferences/preferences_shortcuts.c
   src/ui/preferences/preferences_smoke.c
   src/ui/preferences/preferences_text_edit.c

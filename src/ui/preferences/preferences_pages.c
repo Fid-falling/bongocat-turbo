@@ -296,6 +296,8 @@ static void performance_section(BongoCatPreferences *value,
     }
 
     /* 画质取舍: 每一帧要画多精致、花多少资源 —— 三档都能下调来省显存。 */
+    /* 纹理质量 (模型图集上限) 单独一行, 见 preferences_texture_quality_row.c */
+    bongo_cat_preferences_texture_quality_row(app, context);
     {
         /* 超采样: 质量档 2x 边缘更干净; 2x 是 4 倍面积, 大窗口很吃显存 */
         const char *const labels[] = {

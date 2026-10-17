@@ -113,6 +113,10 @@ void bongo_cat_preferences_window_transparency(BongoCatApp *app,
    (runtime/lifecycle/renderer_switch.c, 与托盘菜单同一个实现)。 */
 void bongo_cat_preferences_renderer_row(BongoCatApp *app,
     struct nk_context *context);
+/* [性能] 区的"纹理质量"下拉 (model.texture_quality)。定义在
+   preferences_texture_quality_row.c: 图集上传前的工作尺寸上限, 默认标准档 (2048)。 */
+void bongo_cat_preferences_texture_quality_row(BongoCatApp *app,
+    struct nk_context *context);
 void bongo_cat_preferences_cache_path_browse(BongoCatPreferences *value);
 void bongo_cat_preferences_cache_path_cancel(BongoCatPreferences *value);
 

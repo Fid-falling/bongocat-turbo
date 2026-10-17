@@ -8,6 +8,7 @@
  */
 #include "bongo_cat/gl_api.h"
 #include "bongo_cat/image.h"
+#include "bongo_cat/log.h"
 #include "image_internal.h"
 
 #include <SDL3/SDL.h>
@@ -15,8 +16,6 @@
 #include <stb_image.h>
 #include <stdlib.h>
 #include <string.h>
-
-#define BONGO_CAT_LIVE2D_EFFICIENT_TEXTURE_LIMIT BONGO_CAT_LIVE2D_TEXTURE_LIMIT
 
 /*
  * 上传前 CPU 缓冲的诊断探针 (BONGO_CAT_TEST_DECODE_PROBE=1 才工作, 默认只多一次缓存过的
@@ -274,7 +273,7 @@ unsigned int bongo_cat_image_texture_model(const char *path, bool direct_decode,
     BongoCatImageProgress staged = progress ? report_stage_progress : NULL;
     GLint hardware_limit = 0;
     glGetIntegerv(GL_MAX_TEXTURE_SIZE, &hardware_limit);
-    if (hardware_limit < 1) hardware_limit = BONGO_CAT_LIVE2D_EFFICIENT_TEXTURE_LIMIT;
+    if (hardware_limit < 1) hardware_limit = bongo_cat_image_model_texture_limit();
 #ifdef _WIN32
     /*
      * A model atlas can advertise 8192px even when the pet is rendered in a
@@ -285,7 +284,7 @@ unsigned int bongo_cat_image_texture_model(const char *path, bool direct_decode,
      * limit remains authoritative on low-end GPUs.
      */
     int decode_limit = SDL_min(hardware_limit,
-        BONGO_CAT_LIVE2D_EFFICIENT_TEXTURE_LIMIT);
+        bongo_cat_image_model_texture_limit());
     /* Preset atlases are verified byte-identical in WIC and stb. Keep WIC for
        custom PNG color metadata and for memory-bounded oversized decoding. */
     bool scaled = bongo_cat_image_needs_wic_scaling(path, decode_limit);
@@ -299,12 +298,10 @@ unsigned int bongo_cat_image_texture_model(const char *path, bool direct_decode,
         }
     } else if (bongo_cat_image_decode_pixels_responsive(path, &image,
         staged, &stage, error) != BONGO_CAT_OK) return 0;
-    if (scaled) SDL_Log("Live2D texture constrained to %dx%d by a %d pixel "
-        "texture limit: %s", image.width, image.height, decode_limit, path);
-    else if (image.width > BONGO_CAT_LIVE2D_EFFICIENT_TEXTURE_LIMIT ||
-        image.height > BONGO_CAT_LIVE2D_EFFICIENT_TEXTURE_LIMIT)
-        SDL_Log("High-resolution Live2D texture preserved at %dx%d: %s",
-            image.width, image.height, path);
+    /* 一行说清"这张图集最后落在多少": 用户报"贴图上的小字发糊"时, 这是第一手证据 */
+    SDL_LogMessage(BONGO_CAT_LOG_LIFECYCLE, SDL_LOG_PRIORITY_INFO,
+        "[gl] 模型图集 %dx%d (工作尺寸上限 %d%s): %s", image.width, image.height,
+        decode_limit, scaled ? ", 已按上限缩小" : "", path);
 #else
     (void)direct_decode;
     if (bongo_cat_image_decode_pixels_responsive(path, &image,
@@ -317,14 +314,17 @@ unsigned int bongo_cat_image_texture_model(const char *path, bool direct_decode,
     GLuint texture = upload(&image, 0, true);
     GLenum upload_error = glGetError();
 #ifdef _WIN32
+    /* 只有"确实比标准档大"时才值得回退: 与 decode_limit 比会永远为假 (图集就是这么解出来的) */
     if (upload_error == GL_OUT_OF_MEMORY &&
-        (image.width > BONGO_CAT_LIVE2D_EFFICIENT_TEXTURE_LIMIT ||
-            image.height > BONGO_CAT_LIVE2D_EFFICIENT_TEXTURE_LIMIT)) {
+        (image.width > BONGO_CAT_LIVE2D_TEXTURE_LIMIT ||
+            image.height > BONGO_CAT_LIVE2D_TEXTURE_LIMIT)) {
         if (texture) glDeleteTextures(1, &texture);
         texture = 0;
         bongo_cat_image_free(&image);
-        int fallback_limit = SDL_min(hardware_limit,
-            BONGO_CAT_LIVE2D_EFFICIENT_TEXTURE_LIMIT);
+        /* 回退到**标准档**而不是同一个上限: 原生/高这两档比默认值大得多, 用同一个数重试
+           等于再 OOM 一次 (这里过去是"原样重试", 所以那条回退日志永远不会兑现)。 */
+        const int fallback_limit = SDL_min(hardware_limit,
+            BONGO_CAT_LIVE2D_TEXTURE_LIMIT);
         stage = (ImageProgressStage){progress, userdata, .90f, .04f};
         if (bongo_cat_image_decode_wic_responsive(path, &image,
             fallback_limit, fallback_limit, staged, &stage)) {

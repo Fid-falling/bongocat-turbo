@@ -14,6 +14,7 @@
 set(BONGO_CAT_COMPONENT_SOURCES
   src/live2d/component/component_entry.cpp
   src/live2d/component/component_host.c
+
   # 组件自己的 bongo_cat_file_open(UTF-8 -> 宽字符): 语义必须与宿主那份一致, 否则带中文的
   # 用户目录会读不到模型。Windows 上复用平台层的 UTF-8 转换(那个文件不依赖 SDL)。
   src/live2d/component/component_file.c

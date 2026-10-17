@@ -48,6 +48,27 @@
 #define BONGO_CAT_RENDER_SCALE_MAX 4.0f
 #define BONGO_CAT_RENDER_SCALE_DEFAULT 1.0f
 #define BONGO_CAT_RENDER_SCALE_STEP 0.1f
+/*
+ * 模型纹理质量 (设置 → 性能 → 纹理质量): 模型自带的图集在**上传前**要不要被缩小。
+ *
+ * 为什么需要它: 图集可能声明 8192px, 而桌宠只画几百像素, 于是默认把工作尺寸钳在
+ * BONGO_CAT_LIVE2D_TEXTURE_LIMIT (2048) —— 这对大面积渐变/纯色块没有损失, 但模型自带的
+ * 艺术字、署名、小图标只有几十个像素, 缩 4 倍之后在屏幕上再放大回来就糊了。实测 (A-清宵):
+ * 2048 → 4096 让署名区域的梯度能量 +20% (Vulkan 在 337px 窗口就有 +20%, 它没有 mip 链,
+ * 只能靠源纹理自身的预平均; OpenGL 有 mip 链, 小窗口下几乎无感, 675px 窗口 +20%)。
+ * 代价是显存: 8192×4096 的图集从 8.4MB 涨到 33.6MB (高) 或 134MB (原生), 所以默认必须
+ * 保持标准档 —— 那也正是 1.17.1 的行为, 逐像素一致。
+ *
+ * 取值 0=标准(2048) 1=高(4096) 2=原生(不缩小, 由上传路径按硬件上限收口)。
+ */
+#define BONGO_CAT_TEXTURE_QUALITY_STANDARD 0
+#define BONGO_CAT_TEXTURE_QUALITY_HIGH 1
+#define BONGO_CAT_TEXTURE_QUALITY_NATIVE 2
+#define BONGO_CAT_TEXTURE_QUALITY_COUNT 3
+#define BONGO_CAT_TEXTURE_QUALITY_DEFAULT BONGO_CAT_TEXTURE_QUALITY_STANDARD
+/* 各档实际下发的"图集工作尺寸上限"; 原生档给一个足够大的值 = 不缩小 (仍受纹理硬件上限约束) */
+#define BONGO_CAT_TEXTURE_QUALITY_HIGH_LIMIT 4096
+#define BONGO_CAT_TEXTURE_QUALITY_NATIVE_LIMIT 65536
 
 typedef enum BongoCatTheme { BONGO_CAT_THEME_AUTO, BONGO_CAT_THEME_LIGHT, BONGO_CAT_THEME_DARK } BongoCatTheme;
 typedef enum BongoCatLanguage {
@@ -126,6 +147,12 @@ typedef struct BongoCatModelPreferences {
      * 手改文件填 0 / 负数 / 超大值 / 非数字都会在这里被纠正 (读失败按默认值)。
      */
     float render_scale;
+    /*
+     * 纹理质量: 模型图集上传前的工作尺寸上限档位 (见 BONGO_CAT_TEXTURE_QUALITY_*)。
+     * 用 int + 可选读 read_int: 老配置里没有 textureQuality 这个键时保持默认 0, 不会因为
+     * "键不存在"判定配置损坏。校验时钳到 [0, 2], 越界/手改错的值按标准档收口。
+     */
+    int texture_quality;
 } BongoCatModelPreferences;
 
 typedef struct BongoCatWindowPreferences {

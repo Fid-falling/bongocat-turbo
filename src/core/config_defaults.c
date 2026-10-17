@@ -307,6 +307,8 @@ void bongo_cat_settings_defaults(BongoCatSettings *config) {
     /* 渲染精度默认 1.0 = 按窗口尺寸直接渲染, 与 1.17.0 逐像素一致: 更高的默认值等于
        替用户付显卡/显存的代价, 只有用户自己要求时才该升级。 */
     config->model.render_scale = BONGO_CAT_RENDER_SCALE_DEFAULT;
+    /* 纹理质量默认标准档 (图集钳在 2048): 与 1.17.1 逐像素一致, 不替用户付显存。 */
+    config->model.texture_quality = BONGO_CAT_TEXTURE_QUALITY_DEFAULT;
     /* 默认走 OpenGL: Vulkan 现在是显式选项 (见 render_backend.c 的 resolve) */
     config->model.renderer = BONGO_CAT_RENDERER_OPENGL;
     config->window.always_on_top = true;
@@ -394,6 +396,18 @@ void bongo_cat_settings_validate(BongoCatSettings *config) {
                 (double)requested, (double)corrected,
                 (double)BONGO_CAT_RENDER_SCALE_MIN,
                 (double)BONGO_CAT_RENDER_SCALE_MAX);
+    }
+    /*
+     * 纹理质量: 只允许 0/1/2, 其余 (手改文件写 -1/7/"abc" 让 read_int 读成默认值) 一律
+     * 按标准档收口。纠正留一条 WARN —— 用户改过文件却发现"图集没变大"时, 这是唯一线索。
+     */
+    if (config->model.texture_quality < 0 ||
+        config->model.texture_quality >= BONGO_CAT_TEXTURE_QUALITY_COUNT) {
+        snprintf(validation_note, sizeof(validation_note),
+            "[render] 纹理质量 %d 不在允许范围内, 已纠正为 %d (范围 0–%d)",
+            config->model.texture_quality, BONGO_CAT_TEXTURE_QUALITY_STANDARD,
+            BONGO_CAT_TEXTURE_QUALITY_COUNT - 1);
+        config->model.texture_quality = BONGO_CAT_TEXTURE_QUALITY_STANDARD;
     }
     config->window.hide_delay_seconds = clampf_or(
         config->window.hide_delay_seconds, 0.0f, 60.0f, 0.0f);

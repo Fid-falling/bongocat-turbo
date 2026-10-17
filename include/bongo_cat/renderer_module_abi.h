@@ -98,6 +98,12 @@ typedef struct BongoCatRendererModuleHost {
     unsigned int (*image_texture_model)(const char *path, bool direct_decode,
         int *width, int *height, BongoCatImageAlphaMask *alpha,
         BongoCatImageProgress progress, void *userdata, BongoCatError *error);
+    /* 模型图集的工作尺寸上限 (纹理质量设置 + 诊断用环境变量合成出来的那个数, 见
+       bongo_cat_image_model_texture_limit)。组件按它决定 Vulkan 侧要不要把图集缩小 ——
+       必须问宿主而不是自己读配置: 上限在进程内只该有一个判定, 否则同一个模型在两个后端
+       (GL 走宿主的 image_texture_model, VK 走组件自己的解码+缩放) 会拿到不同分辨率的
+       图集, 画面就对不上。为 NULL 时组件退回编译期默认值 (老组件配新宿主)。 */
+    int (*model_texture_limit)(void);
     /* 模型 JSON 的兼容性归一化只有一份实现(宿主), 组件不要自己复制一套。 */
     yyjson_doc *(*model_json_parse)(const char *data, size_t size,
         bool *normalized);
