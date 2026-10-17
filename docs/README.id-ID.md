@@ -21,8 +21,6 @@
 <p align="center">
   <a href="https://github.com/Fid-falling/bongocat-turbo/blob/main/LICENSE"><img src="https://img.shields.io/badge/AGPL--3.0-1fa669?style=flat&logo=gnu&logoColor=white"></a>
   <a href="https://github.com/Fid-falling/bongocat-turbo"><img src="https://img.shields.io/badge/C-54AEFF?style=flat&logo=c&logoColor=white"></a>
-<a href="https://discord.gg/vf8jqnattk"><img src="https://img.shields.io/badge/Discord-F77DAA?logo=discord&logoColor=white"></a>
-  <a href="https://github.com/Fid-falling/bongocat-turbo/blob/main/docs/wechat.png"><img src="https://img.shields.io/badge/WeChat-%2307C160?logo=wechat&logoColor=%2307C160&labelColor=FFFFFF"></a>
   <a href="https://qm.qq.com/q/cYlRBbvuda"><img src="https://img.shields.io/badge/422616922-12B7F5?logo=qq&logoColor=12B7F5&labelColor=FFFFFF"></a>
 </p>
 
@@ -163,6 +161,8 @@ cmake -S . -B build -G Ninja \
 ## 📌 Status Proyek
 
 * Grafis: Vulkan secara bawaan (OpenGL sebagai cadangan); keduanya dibangun dan diuji pada setiap perubahan.
+
+![Alt](https://repobeats.axiom.co/api/embed/74334755a589dea40c5d31f8d2bcdc6c2bd39d87.svg "Repobeats analytics image")
 
 ## 📜 Lisensi
 
@@ -362,9 +362,6 @@ Backend dipilih di Pengaturan (`renderer`), atau dipaksa dengan kunci yang sama 
 * Log awal selalu mencetak backend yang diminta dan yang benar-benar dipakai.
 * Jika jendela sekunder (Pengaturan, menu radial) sama sekali tidak bisa menggambar dengan Vulkan — swapchain tidak dapat dibuat, atau frame berhenti dipresentasikan — jendela itu membangun ulang dirinya dengan OpenGL dan menyebutkannya di log. Backend jendela utama tidak terpengaruh. Perlu diingat bahwa jendela Pengaturan OpenGL di atas jendela utama Vulkan hanya dikomposit sebagian di Windows, jadi `--renderer=opengl` (yang mengganti keduanya) tetap merupakan jalan keluar yang lebih baik.
 * Setel `BONGO_CAT_VULKAN_VALIDATION=1` untuk mengaktifkan lapisan validasi Vulkan (memerlukan lapisan SDK di `PATH`; log akan memberi tahu bila tidak ada).
-
-## Status Proyek
-![Alt](https://repobeats.axiom.co/api/embed/74334755a589dea40c5d31f8d2bcdc6c2bd39d87.svg "Repobeats analytics image")
 
 ## 🙏 Ucapan Terima Kasih
 > [!TIP]

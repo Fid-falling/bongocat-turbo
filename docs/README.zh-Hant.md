@@ -20,8 +20,6 @@
 <p align="center">
   <a href="https://github.com/Fid-falling/bongocat-turbo/blob/main/LICENSE"><img src="https://img.shields.io/badge/AGPL--3.0-1fa669?style=flat&logo=gnu&logoColor=white"></a>
   <a href="https://github.com/Fid-falling/bongocat-turbo"><img src="https://img.shields.io/badge/C-54AEFF?style=flat&logo=c&logoColor=white"></a>
-<a href="https://discord.gg/vf8jqnattk"><img src="https://img.shields.io/badge/Discord-F77DAA?logo=discord&logoColor=white"></a>
-  <a href="https://github.com/Fid-falling/bongocat-turbo/blob/main/docs/wechat.png"><img src="https://img.shields.io/badge/WeChat-%2307C160?logo=wechat&logoColor=%2307C160&labelColor=FFFFFF"></a>
   <a href="https://qm.qq.com/q/cYlRBbvuda"><img src="https://img.shields.io/badge/422616922-12B7F5?logo=qq&logoColor=12B7F5&labelColor=FFFFFF"></a>
 </p>
 
@@ -144,6 +142,8 @@ cmake -S . -B build -G Ninja \
 ## 📌 專案狀態
 
 * 圖形後端：預設 Vulkan（OpenGL 作為回退），每次變更都會建置並驗證兩者。
+
+![Alt](https://repobeats.axiom.co/api/embed/74334755a589dea40c5d31f8d2bcdc6c2bd39d87.svg "Repobeats analytics image")
 
 ## 📜 授權條款
 
@@ -286,9 +286,6 @@ BONGOCAT_ENABLE_EVDEV=1 ./build/BongoCatTurbo
 * 啟動記錄一定會印出「請求的後端」與「實際使用的後端」，不用猜自己用的是哪一個。
 * 如果次級視窗（偏好設定、環狀選單）完全無法用 Vulkan 繪製 —— 交換鏈建立失敗，或影格不再被呈現 —— 它會自行用 OpenGL 重建，並在日誌中說明。主視窗的後端不受影響。注意，在 Windows 上，Vulkan 主視窗之上的 OpenGL 偏好設定視窗只能部分合成，因此 `--renderer=opengl`（同時切換兩者）仍是更好的逃生通道。
 * 設定 `BONGO_CAT_VULKAN_VALIDATION=1` 可開啟 Vulkan 校驗層（需要 SDK 層位於 `PATH` 中；缺少時日誌會提示）。
-
-## 專案狀態
-![Alt](https://repobeats.axiom.co/api/embed/74334755a589dea40c5d31f8d2bcdc6c2bd39d87.svg "Repobeats analytics image")
 
 ## 🙏 特別感謝
 > [!TIP]

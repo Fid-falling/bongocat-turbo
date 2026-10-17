@@ -20,8 +20,6 @@
 <p align="center">
   <a href="https://github.com/Fid-falling/bongocat-turbo/blob/main/LICENSE"><img src="https://img.shields.io/badge/AGPL--3.0-1fa669?style=flat&logo=gnu&logoColor=white"></a>
   <a href="https://github.com/Fid-falling/bongocat-turbo"><img src="https://img.shields.io/badge/C-54AEFF?style=flat&logo=c&logoColor=white"></a>
-<a href="https://discord.gg/vf8jqnattk"><img src="https://img.shields.io/badge/Discord-F77DAA?logo=discord&logoColor=white"></a>
-  <a href="https://github.com/Fid-falling/bongocat-turbo/blob/main/docs/wechat.png"><img src="https://img.shields.io/badge/WeChat-%2307C160?logo=wechat&logoColor=%2307C160&labelColor=FFFFFF"></a>
   <a href="https://qm.qq.com/q/cYlRBbvuda"><img src="https://img.shields.io/badge/422616922-12B7F5?logo=qq&logoColor=12B7F5&labelColor=FFFFFF"></a>
 </p>
 
@@ -163,6 +161,8 @@ cmake -S . -B build -G Ninja \
 
 * Graphics: Vulkan by default (OpenGL available as a fallback), both built and exercised on every change.
 
+![Alt](https://repobeats.axiom.co/api/embed/74334755a589dea40c5d31f8d2bcdc6c2bd39d87.svg "Repobeats analytics image")
+
 ## 📜 License
 
 The BongoCat source code and native runtime are licensed under
@@ -258,7 +258,6 @@ bridge and Cubism implementation live in `src/live2d` and use C++17 only when
 the Cubism SDK is enabled; the rest of the native runtime uses C11. Cubism
 types remain behind opaque C handles, while `src/live2d/live2d_stub.c` provides
 the diagnostic backend when the SDK is unavailable.
-
 
 ```mermaid
 flowchart TB
@@ -403,9 +402,6 @@ Pick a backend in Settings (`renderer`), or force it with the same key in
   both) remains the better escape.
 * Set `BONGO_CAT_VULKAN_VALIDATION=1` to turn on the Vulkan validation layer
   (needs the SDK layer on `PATH`; the log says so when it is missing).
-
-## Project Status
-![Alt](https://repobeats.axiom.co/api/embed/74334755a589dea40c5d31f8d2bcdc6c2bd39d87.svg "Repobeats analytics image")
 
 ## 🙏 Special Thanks
 > [!TIP]
