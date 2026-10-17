@@ -75,6 +75,8 @@
           "vsync": "V-Sync",
           "disableUiEffects": "Effekte im Einstellungsfenster aus",
           "disableUiEffectsHint": "Ohne Leuchten und Schatten läuft das Einstellungsfenster flüssiger",
+          "renderScale": "Renderauflösung",
+          "renderScaleHint": "Höher = schärfer und weicher, aber mehr GPU/VRAM-Last",
           "fontRasterCapHint": "An: spart Speicher, Bilder etwas weicher; aus: schärfer, aber mehr Speicher",
           "fontRasterCap": "Schrift-Schärfe",
           "ssMemory": "Speichersparend",

@@ -1,4 +1,5 @@
 #include "vk_internal.h"
+#include <math.h>
 #include "bongo_cat/log.h"
 
 #include <SDL3/SDL.h>
@@ -266,11 +267,27 @@ bool bongo_cat_vk_mask_corners(BongoCatVk *vk, int width, int height,
     return true;
 }
 
+/*
+ * 渲染精度把这一帧的目标放大到 N 倍: 视口/裁剪的坐标与尺寸都是"窗口像素", 必须按
+ * render_extent / extent 等比放大, 否则内容会按 1x 画在 N 倍目标的左上角 (实测画面
+ * 就是"只有左下角一块, 其余空白")。
+ */
+static void scale_extent_factors(const BongoCatVk *vk, float *sx, float *sy) {
+    VkExtent2D target = vk->render_extent.width && vk->render_extent.height ?
+        vk->render_extent : vk->extent;
+    *sx = vk->extent.width ? (float)target.width / (float)vk->extent.width : 1.0f;
+    *sy = vk->extent.height ? (float)target.height / (float)vk->extent.height : 1.0f;
+}
+
 void bongo_cat_vk_set_viewport(BongoCatVk *vk, int x, int y, int width,
     int height) {
     if (!vk || !vk->frame_active) return;
-    VkViewport viewport = {0.0f, 0.0f, (float)vk->extent.width,
-        (float)vk->extent.height, 0.0f, 1.0f};
+    VkExtent2D target = vk->render_extent.width && vk->render_extent.height ?
+        vk->render_extent : vk->extent;
+    float sx = 1.0f, sy = 1.0f;
+    scale_extent_factors(vk, &sx, &sy);
+    VkViewport viewport = {0.0f, 0.0f, (float)target.width,
+        (float)target.height, 0.0f, 1.0f};
     /*
      * 内容视口: 与 OpenGL 的 glViewport 一致地裁剪到交换链范围内。
      * Vulkan 的视口 y 从上方开始, 调用方传的就是左上角坐标。
@@ -282,10 +299,10 @@ void bongo_cat_vk_set_viewport(BongoCatVk *vk, int x, int y, int width,
         if (x + width > (int)vk->extent.width) width = (int)vk->extent.width - x;
         if (y + height > (int)vk->extent.height) height = (int)vk->extent.height - y;
         if (width > 0 && height > 0) {
-            viewport.x = (float)x;
-            viewport.y = (float)y;
-            viewport.width = (float)width;
-            viewport.height = (float)height;
+            viewport.x = (float)x * sx;
+            viewport.y = (float)y * sy;
+            viewport.width = (float)width * sx;
+            viewport.height = (float)height * sy;
         }
     }
     vkCmdSetViewport(vk->frames[vk->frame_index].command, 0, 1, &viewport);
@@ -293,13 +310,17 @@ void bongo_cat_vk_set_viewport(BongoCatVk *vk, int x, int y, int width,
 
 void bongo_cat_vk_set_scissor(BongoCatVk *vk, int x, int y, int width, int height) {
     if (!vk || !vk->frame_active) return;
+    float sx = 1.0f, sy = 1.0f;
+    scale_extent_factors(vk, &sx, &sy);
     if (x < 0) { width += x; x = 0; }
     if (y < 0) { height += y; y = 0; }
     if (x + width > (int)vk->extent.width) width = (int)vk->extent.width - x;
     if (y + height > (int)vk->extent.height) height = (int)vk->extent.height - y;
     if (width < 0) width = 0;
     if (height < 0) height = 0;
-    VkRect2D scissor = {{x, y}, {(uint32_t)width, (uint32_t)height}};
+    VkRect2D scissor = {{(int32_t)lroundf((float)x * sx),
+        (int32_t)lroundf((float)y * sy)},
+        {(uint32_t)lroundf((float)width * sx), (uint32_t)lroundf((float)height * sy)}};
     vkCmdSetScissor(vk->frames[vk->frame_index].command, 0, 1, &scissor);
 }
 

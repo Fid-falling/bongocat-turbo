@@ -12,6 +12,7 @@
  */
 #include "runtime.h"
 #include "bongo_cat/audio.h"
+#include "bongo_cat/gl_scale.h"
 #include "bongo_cat/log.h"
 #include "model_cover.h"
 #include "bongo_cat/overlay.h"
@@ -96,7 +97,16 @@ static bool render(BongoCatApp *app, bool present) {
     bongo_cat_window_apply_pending_resize(app);
     int width, height;
     SDL_GetWindowSizeInPixels(app->window, &width, &height);
-    glViewport(0, 0, width, height);
+    /*
+     * 渲染精度 (设置 → 性能): 请求 N 倍分辨率时先把这一帧画进 N 倍大小的离屏目标,
+     * 画完再线性缩回窗口尺寸 (见 gl_scale.c)。返回实际生效的倍率, 1.0 = 没走离屏
+     * (默认配置就是这条路径, 与 1.17.0 逐像素一致)。
+     * 注意下面所有 glViewport 都必须走 bongo_cat_gl_scale_viewport(): 离屏目标的坐标系
+     * 是"窗口像素 × 倍率", 漏掉一处就会让那一层画到错误的位置/尺寸上。
+     */
+    float render_scale = bongo_cat_gl_scale_begin(
+        app->settings.model.render_scale, width, height);
+    bongo_cat_gl_scale_viewport(render_scale, 0, 0, width, height);
     glEnable(GL_MULTISAMPLE);
     glDisable(GL_SCISSOR_TEST);
     glColorMask(GL_TRUE, GL_TRUE, GL_TRUE, GL_TRUE);
@@ -107,19 +117,21 @@ static bool render(BongoCatApp *app, bool present) {
         &content_x, &content_y, &content_width, &content_height) &&
         content_width > 0 && content_height > 0;
     if (content_viewport)
-        glViewport(content_x, content_y, content_width, content_height);
+        bongo_cat_gl_scale_viewport(render_scale, content_x, content_y,
+            content_width, content_height);
     bongo_cat_overlay_draw_background(app->overlay,
         app->settings.model.mirror);
     bool cover_requested = !present && bongo_cat_model_cover_pending(app);
     bool cover_ready = !cover_requested ||
         bongo_cat_live2d_prepare_cover_capture(app->live2d);
-    glViewport(0, 0, width, height);
+    bongo_cat_gl_scale_viewport(render_scale, 0, 0, width, height);
     bongo_cat_live2d_set_mirror(app->live2d, app->settings.model.mirror);
     bongo_cat_live2d_set_vertical_flip(app->live2d,
         app->settings.model.vertical_flip);
     bongo_cat_live2d_draw(app->live2d);
     if (content_viewport)
-        glViewport(content_x, content_y, content_width, content_height);
+        bongo_cat_gl_scale_viewport(render_scale, content_x, content_y,
+            content_width, content_height);
     bongo_cat_overlay_draw_pointer_before_keys(app->overlay);
     if (app->settings.model.mouse_centered && app->pointer_known &&
         !app->model_pointer_anchor_ready)
@@ -128,7 +140,10 @@ static bool render(BongoCatApp *app, bool present) {
     bongo_cat_overlay_draw_keys(app->overlay, app->settings.model.mirror);
     bongo_cat_overlay_draw_effect(app->overlay, app->settings.model.mirror);
     bongo_cat_overlay_draw_pointer_after_keys(app->overlay);
-    glViewport(0, 0, width, height);
+    bongo_cat_gl_scale_viewport(render_scale, 0, 0, width, height);
+    /* 到这里这一帧已经画完: 把离屏结果线性缩回默认帧缓冲, 之后的读帧操作
+       (模型封面截帧 / 圆角遮罩 / 帧诊断 / 命中回读) 读到的都是窗口尺寸的那一帧。 */
+    bongo_cat_gl_scale_end(render_scale, width, height);
     bool cover_handled = true;
     if (cover_requested) {
         if (!cover_ready) {

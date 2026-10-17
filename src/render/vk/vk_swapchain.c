@@ -127,6 +127,8 @@ void bongo_cat_vk_destroy_swapchain(BongoCatVk *vk) {
         vk->images[i] = VK_NULL_HANDLE;
     }
     vk->image_count = 0;
+    /* 渲染精度的离屏 framebuffer 引用着下面即将销毁的 render pass, 必须先释放 */
+    bongo_cat_vk_scale_destroy(vk);
     if (vk->render_pass != VK_NULL_HANDLE) {
         vkDestroyRenderPass(vk->device, vk->render_pass, NULL);
         vk->render_pass = VK_NULL_HANDLE;
@@ -232,6 +234,16 @@ bool bongo_cat_vk_create_swapchain(BongoCatVk *vk, int width, int height,
         usage |= VK_IMAGE_USAGE_TRANSFER_SRC_BIT;
         /* 命中测试回读依赖把交换链图像当拷贝源 */
         vk->transfer_source = true;
+    }
+    /*
+     * 渲染精度 (N 倍离屏 + 线性缩放) 要把缩好的图画进交换链, 所以交换链还得能当
+     * TRANSFER_DST。驱动多数都支持; 不支持时 vk_scale.c 会退回"按窗口尺寸直接渲染"
+     * (并提示一次), 不会让呈现失败。
+     */
+    vk->swapchain_transfer_dst = false;
+    if (capabilities.supportedUsageFlags & VK_IMAGE_USAGE_TRANSFER_DST_BIT) {
+        usage |= VK_IMAGE_USAGE_TRANSFER_DST_BIT;
+        vk->swapchain_transfer_dst = true;
     }
 
     VkSwapchainCreateInfoKHR create = {0};

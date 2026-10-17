@@ -75,6 +75,8 @@
           "vsync": "垂直同步",
           "disableUiEffects": "關閉設定介面特效",
           "disableUiEffectsHint": "關掉發光與陰影，設定介面更流暢",
+          "renderScale": "渲染精度",
+          "renderScaleHint": "更高＝更清晰更平滑，但更吃顯示卡/記憶體",
           "fontRasterCapHint": "開啟：更省記憶體，圖片略柔和；關閉：更清晰，但更佔記憶體",
           "fontRasterCap": "字型清晰度",
           "ssMemory": "省記憶體",

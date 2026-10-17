@@ -38,6 +38,16 @@
  */
 #define BONGO_CAT_MULTI_KEY_LIMIT_DEFAULT 5
 #define BONGO_CAT_MULTI_KEY_LIMIT_MAX 8
+/*
+ * 渲染精度 (设置 → 性能 → 渲染精度): 以 N 倍分辨率渲染这一帧, 再用线性过滤缩回窗口
+ * 尺寸 —— 2.0 = 2×宽 × 2×高 渲染后降采样, 0.5 = 半分辨率渲染后放大, 1.0 = 与窗口 1:1。
+ * 默认 1.0: 不设该键的老配置走的就是"直接按窗口尺寸渲染", 与 1.17.0 逐像素一致。
+ * 上下限是产品决定 (0.1 再低只剩几个像素, 4.0 已经能吃满显存), 校验时按 0.1 取整。
+ */
+#define BONGO_CAT_RENDER_SCALE_MIN 0.1f
+#define BONGO_CAT_RENDER_SCALE_MAX 4.0f
+#define BONGO_CAT_RENDER_SCALE_DEFAULT 1.0f
+#define BONGO_CAT_RENDER_SCALE_STEP 0.1f
 
 typedef enum BongoCatTheme { BONGO_CAT_THEME_AUTO, BONGO_CAT_THEME_LIGHT, BONGO_CAT_THEME_DARK } BongoCatTheme;
 typedef enum BongoCatLanguage {
@@ -109,6 +119,13 @@ typedef struct BongoCatModelPreferences {
      * 里缺这个键时保持默认 1。
      */
     int bubble_merge;
+    /*
+     * 渲染精度: 以 N 倍分辨率渲染后再线性缩回窗口尺寸 (见 BONGO_CAT_RENDER_SCALE_*)。
+     * 用 float + 可选读 read_float: 老配置里没有 renderScale 这个键时保持默认 1.0,
+     * 不会因为"键不存在"判定配置损坏。校验时 clamp 到 [0.1, 4.0] 并按 0.1 取整,
+     * 手改文件填 0 / 负数 / 超大值 / 非数字都会在这里被纠正 (读失败按默认值)。
+     */
+    float render_scale;
 } BongoCatModelPreferences;
 
 typedef struct BongoCatWindowPreferences {
@@ -302,6 +319,16 @@ extern "C" {
 
 void bongo_cat_settings_defaults(BongoCatSettings *settings);
 void bongo_cat_settings_validate(BongoCatSettings *settings);
+/*
+ * 最近一次 bongo_cat_settings_validate 纠正过的项 (空串 = 没纠正过), 以及清除它。
+ * 为什么不在核心层直接打日志: bongo_cat_core 不依赖 SDL, 没有日志设施; 但"手改
+ * 配置文件写了个非法值, 程序悄悄改回边界"必须留痕, 所以校验把描述攒在这里,
+ * 由运行时加载完配置后打一条 WARN (见 runtime/lifecycle/config_store.c)。
+ */
+const char *bongo_cat_settings_validation_note(void);
+void bongo_cat_settings_clear_validation_note(void);
+/* 让读取层 (config_io.c) 也能往那条日志里记一句话 (例如"某个键类型不对, 按默认值处理") */ 
+void bongo_cat_settings_note(const char *text);
 void bongo_cat_session_defaults(BongoCatSessionState *session);
 void bongo_cat_session_validate(BongoCatSessionState *session);
 bool bongo_cat_session_model_active(const BongoCatSessionState *session,

@@ -75,6 +75,8 @@
           "vsync": "V-Sync",
           "disableUiEffects": "Disable settings UI effects",
           "disableUiEffectsHint": "Turns off glows and shadows to make the settings window smoother",
+          "renderScale": "Render scale",
+          "renderScaleHint": "Higher = sharper and smoother, but heavier on GPU/VRAM",
           "fontRasterCapHint": "On: saves memory, images slightly softer; off: sharper, but uses more memory",
           "fontRasterCap": "Font clarity",
           "ssMemory": "Low memory",

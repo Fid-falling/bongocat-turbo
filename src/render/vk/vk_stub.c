@@ -219,4 +219,6 @@ bool bongo_cat_vk_native_info(const BongoCatVk *vk, BongoCatVkNativeInfo *info) 
     return false;
 }
 
+void bongo_cat_vk_set_render_scale(float scale) { (void)scale; }
+
 #endif /* !BONGO_CAT_HAS_VULKAN */

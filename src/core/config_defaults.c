@@ -11,6 +11,22 @@
  * 一律要过一遍 bongo_cat_settings_validate; 之后渲染/输入侧就可以直接相信
  * 结构里的数值都在允许范围内, 不必到处再判一次。
  */
+/*
+ * 最近一次校验纠正过的项, 交给运行时打日志 (核心层不依赖 SDL, 自己打不了)。
+ * "渲染精度被改回允许范围"必须让用户在日志里看见: 手改配置文件的人不会知道
+ * 程序悄悄换掉了他写的那一档。
+ */
+static char validation_note[192];
+
+const char *bongo_cat_settings_validation_note(void) { return validation_note; }
+
+void bongo_cat_settings_note(const char *text) {
+    if (!text) return;
+    snprintf(validation_note, sizeof(validation_note), "%s", text);
+}
+
+void bongo_cat_settings_clear_validation_note(void) { validation_note[0] = '\0'; }
+
 static float clampf_or(float value, float low, float high, float fallback) {
     if (!isfinite(value)) return fallback;
     return value < low ? low : value > high ? high : value;
@@ -288,6 +304,9 @@ void bongo_cat_settings_defaults(BongoCatSettings *config) {
     config->model.multi_key_limit = BONGO_CAT_MULTI_KEY_LIMIT_DEFAULT;
     /* 默认合并: 一个气泡里 "A + S" 比并排 N 个气泡更接近"用户按了什么"的直觉读法 */
     config->model.bubble_merge = 1;
+    /* 渲染精度默认 1.0 = 按窗口尺寸直接渲染, 与 1.17.0 逐像素一致: 更高的默认值等于
+       替用户付显卡/显存的代价, 只有用户自己要求时才该升级。 */
+    config->model.render_scale = BONGO_CAT_RENDER_SCALE_DEFAULT;
     /* 默认走 OpenGL: Vulkan 现在是显式选项 (见 render_backend.c 的 resolve) */
     config->model.renderer = BONGO_CAT_RENDERER_OPENGL;
     config->window.always_on_top = true;
@@ -355,6 +374,27 @@ void bongo_cat_settings_validate(BongoCatSettings *config) {
     if (config->model.multi_key_limit < 1 ||
         config->model.multi_key_limit > BONGO_CAT_MULTI_KEY_LIMIT_MAX)
         config->model.multi_key_limit = BONGO_CAT_MULTI_KEY_LIMIT_DEFAULT;
+    /*
+     * 渲染精度: clamp 到 [0.1, 4.0] 并按 0.1 取整。
+     * 越界 (手改文件写 0/-1/9) 与"不在步进上"(1.234) 都在这里纠正: 前者会让离屏目标
+     * 变成 0 像素或吃掉几个 GB 显存, 后者会让人以为"我设的值没生效"(设置页一次拨 0.1)。
+     * 非数字在 read_float 那一步就拒读并保留默认值, 走到这里的 NaN 只是兜底。
+     * 纠正要留一条 WARN: 用户改过文件却看到设置被改回边界值时, 这是唯一线索。
+     */
+    {
+        const float requested = config->model.render_scale;
+        float corrected = clampf_or(requested, BONGO_CAT_RENDER_SCALE_MIN,
+            BONGO_CAT_RENDER_SCALE_MAX, BONGO_CAT_RENDER_SCALE_DEFAULT);
+        corrected = roundf(corrected * 10.0f) / 10.0f;
+        config->model.render_scale = corrected;
+        if (!(fabsf(corrected - requested) <= 0.001f))
+            snprintf(validation_note, sizeof(validation_note),
+                "[render] 渲染精度 %.3f 不在允许范围内, 已纠正为 %.1f "
+                "(范围 %.1f–%.1f, 步进 0.1)",
+                (double)requested, (double)corrected,
+                (double)BONGO_CAT_RENDER_SCALE_MIN,
+                (double)BONGO_CAT_RENDER_SCALE_MAX);
+    }
     config->window.hide_delay_seconds = clampf_or(
         config->window.hide_delay_seconds, 0.0f, 60.0f, 0.0f);
     config->window.hide_fade_seconds = clampf_or(

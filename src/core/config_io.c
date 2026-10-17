@@ -1,6 +1,8 @@
 #include "config_internal.h"
 #include "bongo_cat/path.h"
 
+#include <float.h>
+#include <math.h>
 #include <stdlib.h>
 #include <string.h>
 
@@ -90,6 +92,28 @@ static bool read_model(yyjson_val *object, BongoCatModelPreferences *value,
         !read_int(object, "multiKeyLimit", &value->multi_key_limit, error) ||
         !read_int(object, "bubbleMerge", &value->bubble_merge, error))
         return false;
+    /*
+     * 渲染精度: 宽容读法。这个键是人会手改的 (0.1–4.0 的小数), 写错一个字符不该
+     * 让整份设置判死 —— read_float 的类型错误会让 bongo_cat_settings_load 整体失败,
+     * 用户会丢光所有设置。所以这里自己看 JSON: 数字照读; 其它类型/非有限值保持默认
+     * 1.0, 并留一条日志说明; 越界与不在 0.1 步进上的值仍由 settings_validate 纠正。
+     */
+    {
+        yyjson_val *raw = yyjson_obj_get(object, "renderScale");
+        if (raw) {
+            if (yyjson_is_num(raw)) {
+                const double number = yyjson_get_num(raw);
+                if (isfinite(number) && number >= -FLT_MAX && number <= FLT_MAX)
+                    value->render_scale = (float)number;
+                else
+                    bongo_cat_settings_note(
+                        "[render] renderScale 不是有限数字, 已按默认 1.0 处理");
+            } else {
+                bongo_cat_settings_note(
+                    "[render] renderScale 不是数字, 已按默认 1.0 处理");
+            }
+        }
+    }
     const char *text;
     size_t length;
     if (!read_string(object, "renderer", &text, &length, error)) return false;

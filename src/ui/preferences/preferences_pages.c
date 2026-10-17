@@ -273,6 +273,27 @@ static void performance_section(BongoCatPreferences *value,
        排在上面两行之后: 帧率与垂直同步决定"这一帧什么时候出", 后端决定"用什么画",
        先有节奏再选工具的顺序读起来才顺 (Live2D 的 Core 状态行也跟着这一行走)。 */
     bongo_cat_preferences_renderer_row(app, context);
+    /*
+     * 渲染精度: 以 N 倍分辨率渲染这一帧, 再线性缩回窗口尺寸 (两个后端都支持, 见
+     * gl_scale.c / vk_scale.c)。1.0 = 与窗口 1:1, 也就是 1.17.0 的行为; 控件步进
+     * 0.1、显示一位小数, 双击回到默认值。
+     */
+    {
+        float render_scale = app->settings.model.render_scale;
+        bongo_cat_pref_row_icon(context, BONGO_CAT_PREF_ICON_RENDERER);
+        if (bongo_cat_pref_float(context, "render-scale", tr(app,
+                "pages.preference.cat.labels.renderScale", "Render scale"),
+                tr(app, "pages.preference.cat.labels.renderScaleHint",
+                    "更高 = 更清晰更平滑, 但更吃显卡/显存"),
+                BONGO_CAT_RENDER_SCALE_MIN, &render_scale,
+                BONGO_CAT_RENDER_SCALE_MAX, BONGO_CAT_RENDER_SCALE_STEP,
+                BONGO_CAT_RENDER_SCALE_DEFAULT)) {
+            app->settings.model.render_scale = render_scale;
+            app->dirty = true;
+            /* 立即下发: GL 每帧读设置, VK 要先把倍率交给呈现层 (见 shell/window.c) */
+            bongo_cat_window_apply(app);
+        }
+    }
 
     /* 画质取舍: 每一帧要画多精致、花多少资源 —— 三档都能下调来省显存。 */
     {

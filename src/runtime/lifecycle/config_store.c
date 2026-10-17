@@ -11,6 +11,7 @@
  * 副宠进程不写 settings (只写自己的 session); SMOKE 运行完全不落盘, 保证 CI 可复现。
  */
 #include "runtime.h"
+#include "bongo_cat/log.h"
 #include "bongo_cat/path.h"
 
 #include <stdio.h>
@@ -138,6 +139,15 @@ void bongo_cat_config_store_load(BongoCatApp *app) {
     BongoCatError error = {0};
     BongoCatResult loaded = bongo_cat_settings_load(
         app->settings_path, &app->settings, &error);
+    /* 校验纠正过的项 (目前只有渲染精度) 在这里落到日志: 核心层没有 SDL 日志,
+       把描述攒在校验器里, 由运行时统一打一条 WARN 并清空。 */
+    {
+        const char *note = bongo_cat_settings_validation_note();
+        if (note && note[0]) {
+            SDL_LogWarn(BONGO_CAT_LOG_LIFECYCLE, "%s", note);
+            bongo_cat_settings_clear_validation_note();
+        }
+    }
     app->settings_store_valid = loaded == BONGO_CAT_OK &&
         bongo_cat_path_is_file(app->settings_path);
     bool language_detected = false;

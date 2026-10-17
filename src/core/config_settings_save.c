@@ -45,6 +45,10 @@ static bool write_model(yyjson_mut_doc *doc, yyjson_mut_val *object,
             value->multi_key_limit) &&
         /* 键名/类型与 config_io.c 的 read_int("bubbleMerge") 一一对齐 */
         yyjson_mut_obj_add_int(doc, object, "bubbleMerge", value->bubble_merge) &&
+        /* 键名/类型与 config_io.c 的 read_float("renderScale") 一一对齐。1.0 也照常写:
+           "缺键"与"显式 1.0"读出来是同一个值, 写全是为了让用户能手改。 */
+        yyjson_mut_obj_add_real(doc, object, "renderScale",
+            (double)value->render_scale) &&
         yyjson_mut_obj_add_strcpy(doc, object, "renderer",
             bongo_cat_renderer_name(value->renderer));
 }

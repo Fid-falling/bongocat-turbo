@@ -224,6 +224,14 @@ void bongo_cat_vk_release_cached_frames(BongoCatVk *vk);
 bool bongo_cat_vk_hit_alpha(const BongoCatVk *vk, int x, int y,
     unsigned char *alpha);
 
+/*
+ * 渲染精度 (设置 → 性能): 以 N 倍分辨率渲染一帧, 再用 vkCmdBlitImage 线性缩回窗口尺寸。
+ * 只接受 [0.1, 4.0] (按 0.1 取整), 1.0 = 直接画到交换链 (与 1.17.0 逐像素一致)。
+ * 调用时机: 启动与设置变化时各一次 (见 shell/window.c 的窗口应用路径); 之后每帧由
+ * begin_frame 按这个值建/复用离屏目标。
+ */
+void bongo_cat_vk_set_render_scale(float scale);
+
 #ifdef __cplusplus
 } /* extern "C" */
 #endif

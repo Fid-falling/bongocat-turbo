@@ -1,4 +1,5 @@
 #include "runtime.h"
+#include <math.h>
 #include "bongo_cat/log.h"
 #include "bongo_cat/render.h"
 #include "bongo_cat/vk_backend.h"
@@ -230,8 +231,19 @@ void bongo_cat_window_apply(BongoCatApp *app) {
        样式/位置, 重新应用一次能保证隐藏状态不会在它们之后丢失。 */
     bongo_cat_platform_set_capture_only(&app->platform,
         app->settings.window.capture_only);
-    /* [性能] 区的超采样档位; 实际倍数由桥按窗口尺寸决定 (自动档会降级) */
-    bongo_cat_live2d_vulkan_set_supersample(app->settings.window.supersample);
+    /*
+     * [性能] 区的渲染精度: N 倍分辨率渲染后再线性缩回窗口尺寸 (GL 见 gl_scale.c,
+     * VK 见 vk_scale.c)。1.0 = 不绕离屏, 与 1.17.0 逐像素一致。
+     */
+    bongo_cat_vk_set_render_scale(app->settings.model.render_scale);
+    /*
+     * [性能] 区的超采样档位; 实际倍数由桥按窗口尺寸决定 (自动档会降级)。
+     * 渲染精度 != 1.0 时把组件固定成 1x: 主窗口已经按 N 倍渲染, 再让 Live2D 自己
+     * 超采样一次就是"双重超采样"叠乘 (显存 x16 而画面看不出差别), 必须只有一处负责。
+     */
+    bongo_cat_live2d_vulkan_set_supersample(
+        fabsf(app->settings.model.render_scale - 1.0f) > 0.001f ?
+            2 /* 桥的"省内存"档 = 1x */ : app->settings.window.supersample);
 }
 
 void bongo_cat_window_apply_capture_only(BongoCatApp *app) {

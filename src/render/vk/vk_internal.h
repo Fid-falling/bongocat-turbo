@@ -166,6 +166,24 @@ struct BongoCatVk {
      */
     VkSemaphore present_semaphores[BONGO_CAT_VK_MAX_SWAP_IMAGES];
     VkRenderPass render_pass;
+    /*
+     * 渲染精度 (设置 → 性能): 请求倍率 != 1.0 时这一帧画到 N 倍大小的离屏图上,
+     * end_frame 里再 vkCmdBlitImage 线性缩回交换链 (见 vk_scale.c)。
+     * 交换链是否支持 TRANSFER_DST 决定 blit 能不能落笔, 不支持就退回直接渲染。
+     */
+    bool swapchain_transfer_dst;
+    VkImage scale_image;
+    VkDeviceMemory scale_memory;
+    VkImageView scale_view;
+    VkFramebuffer scale_framebuffer;
+    VkExtent2D scale_extent;
+    bool scale_active;
+    /*
+     * 这一帧真正在渲染的 extent: 平时等于 extent (交换链/窗口), 走渲染精度时是 N 倍目标。
+     * 所有"按窗口坐标传视口/裁剪"的绘制入口 (bongo_cat_vk_set_viewport/set_scissor)
+     * 都要读它并等比放大, 否则内容会按 1x 画在 N 倍目标的左上角。
+     */
+    VkExtent2D render_extent;
 
     BongoCatVkFrame frames[BONGO_CAT_VK_FRAMES_IN_FLIGHT];
     uint32_t frame_index;
@@ -255,6 +273,16 @@ bool bongo_cat_vk_create_texture_resources(BongoCatVk *vk, BongoCatError *error)
 void bongo_cat_vk_destroy_texture_resources(BongoCatVk *vk);
 /* 释放那些引用它们的帧栅栏已经过去的贴图 */
 void bongo_cat_vk_collect_retired(BongoCatVk *vk);
+/*
+ * 渲染精度 (见 vk_scale.c):
+ *   - prepare 由 begin_frame 调用, 需要离屏时准备好目标并把 extent 写回 out_extent;
+ *   - record_blit 由 end_frame 在 end render pass 之后调用 (离屏 -> 交换链);
+ *   - destroy 在交换链/render pass 重建与上下文销毁时调用 (framebuffer 引用 render pass)。
+ */
+bool bongo_cat_vk_scale_prepare(BongoCatVk *vk, int width, int height,
+    VkExtent2D *out_extent);
+void bongo_cat_vk_scale_record_blit(BongoCatVk *vk, VkCommandBuffer command);
+void bongo_cat_vk_scale_destroy(BongoCatVk *vk);
 void bongo_cat_vk_destroy_retired(BongoCatVk *vk);
 
 /* vk_draw.c */

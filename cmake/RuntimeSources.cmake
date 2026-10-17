@@ -31,6 +31,8 @@ set(BONGO_CAT_RENDER_SOURCES
   src/render/render_backend.c
   src/render/render_texture.c
   src/render/gl_api.c
+  # 渲染精度: N 倍离屏渲染 + 线性降采样, GL 侧实现 (见 include/bongo_cat/gl_scale.h)
+  src/render/gl_scale.c
   src/render/overlay.c
   src/render/overlay_assets.c
   src/render/overlay_bubble.c
@@ -52,6 +54,8 @@ set(BONGO_CAT_RENDER_SOURCES
   # 帧同步对象 (信号量/栅栏/命令池) 的创建、重置与销毁
   src/render/vk/vk_frame_sync.c
   src/render/vk/vk_readback.c
+  # 渲染精度: N 倍离屏渲染 + vkCmdBlitImage 线性降采样 (见 vk_scale.c)
+  src/render/vk/vk_scale.c
   src/render/vk/vk_texture.c
   src/render/vk/vk_pipeline.c
   src/render/vk/vk_draw.c

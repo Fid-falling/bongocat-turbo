@@ -144,21 +144,32 @@ bool bongo_cat_vk_begin_frame(BongoCatVk *vk, int width, int height) {
 
     VkClearValue clear = {0};
     clear.color = vk->clear;
+    /*
+     * 渲染精度: 请求 N 倍 (且离屏目标可用) 时, 这一帧的 render pass 指向 N 倍大小的
+     * 离屏帧缓冲, 视口/裁剪也按那个 extent; end_frame 里再线性缩回交换链。
+     * 返回 false 表示"直接画到交换链", 与 1.17.0 完全一致 (默认配置就是这条路径)。
+     */
+    VkExtent2D pass_extent = vk->extent;
+    VkFramebuffer pass_framebuffer = vk->framebuffers[index];
+    if (bongo_cat_vk_scale_prepare(vk, width, height, &pass_extent))
+        pass_framebuffer = vk->scale_framebuffer;
+    /* 绘制入口按这个 extent 换算出视口/裁剪 (见 vk_draw.c), 默认等于交换链尺寸 */
+    vk->render_extent = pass_extent;
     VkRenderPassBeginInfo pass = {0};
     pass.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
     pass.renderPass = vk->render_pass;
-    pass.framebuffer = vk->framebuffers[index];
-    pass.renderArea.extent = vk->extent;
+    pass.framebuffer = pass_framebuffer;
+    pass.renderArea.extent = pass_extent;
     pass.clearValueCount = 1;
     pass.pClearValues = &clear;
     vkCmdBeginRenderPass(frame->command, &pass, VK_SUBPASS_CONTENTS_INLINE);
 
     VkViewport viewport = {0};
-    viewport.width = (float)vk->extent.width;
-    viewport.height = (float)vk->extent.height;
+    viewport.width = (float)pass_extent.width;
+    viewport.height = (float)pass_extent.height;
     viewport.maxDepth = 1.0f;
     vkCmdSetViewport(frame->command, 0, 1, &viewport);
-    VkRect2D scissor = {{0, 0}, {vk->extent.width, vk->extent.height}};
+    VkRect2D scissor = {{0, 0}, {pass_extent.width, pass_extent.height}};
     vkCmdSetScissor(frame->command, 0, 1, &scissor);
 
     vk->image_index = index;
@@ -174,6 +185,8 @@ bool bongo_cat_vk_end_frame(BongoCatVk *vk) {
     if (!vk || !vk->frame_active) return false;
     BongoCatVkFrame *frame = &vk->frames[vk->frame_index];
     vkCmdEndRenderPass(frame->command);
+    /* 渲染精度: 先把 N 倍离屏图线性缩回交换链, 之后的回读读到的就是窗口尺寸那一帧 */
+    if (vk->scale_active) bongo_cat_vk_scale_record_blit(vk, frame->command);
     /* 命中测试需要这一帧的 alpha: 在提交前把指针附近的小块拷回主机 */
     if (vk->readback[vk->frame_index].requested)
         record_readback(vk, &vk->readback[vk->frame_index]);
