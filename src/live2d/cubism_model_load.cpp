@@ -342,12 +342,50 @@ bool NativeModel::textures_step(int index, BongoCatError *error) {
          * 一直按原始尺寸解码上传。8192px 的图集只画几百像素, 原尺寸采样等于放弃图集自身的
          * 预平均, 于是 Vulkan 侧的边缘落在与 GL 不同的采样密度上, 表现为模型轮廓上分散的
          * 细差异。bongo_cat_image_fit 是纯 CPU 的 (WIC -> stb + 等比缩小), 不依赖 GL。
+         *
+         * 上限先过设备侧夹层 (maxImageDimension2D): 超过设备单边上限的纹理创建必然失败,
+         * 夹过之后"原生"在低端 GPU 上退化成"设备吃得下的最大尺寸", 而不是整只模型加载失败。
          */
-        const int texture_limit = bongo_cat_image_model_texture_limit();
-        if (bongo_cat_image_fit(texture_path.c_str(),
-                texture_limit, texture_limit,
-                &image, error) != BONGO_CAT_OK || !image.pixels) {
+        const int requested = bongo_cat_live2d_vulkan_clamp_texture_limit(
+            bongo_cat_image_model_texture_limit());
+        /*
+         * 两档候选: 先按设置档位; 建纹理失败 (显存不够、驱动拒绝) 再退回标准档试一次 ——
+         * "低显存机器选了原生"不该等于"模型消失"。GL 那条路早就有同样的回退 (见
+         * media/image.c 的 GL_OUT_OF_MEMORY 分支), 这里把它补成两侧一致的行为。
+         * 第二档与第一档相同时直接跳过, 免得同一个尺寸白试一次。
+         */
+        const int candidates[2] = {requested,
+            requested < BONGO_CAT_LIVE2D_TEXTURE_LIMIT ? requested
+                : BONGO_CAT_LIVE2D_TEXTURE_LIMIT};
+        void *texture = nullptr;
+        int used_limit = requested;
+        for (int attempt = 0; attempt < 2 && !texture; ++attempt) {
+            const int limit = candidates[attempt];
+            if (attempt > 0 && limit == candidates[0]) break;
+            if (bongo_cat_image_fit(texture_path.c_str(), limit, limit, &image,
+                    error) != BONGO_CAT_OK || !image.pixels) {
+                /* 解码失败与"上限太高"无关: 降一档也不会有用, 直接判这一轮失败 */
+                release_textures();
+                return false;
+            }
+            texture = bongo_cat_live2d_vulkan_create_texture_attached(image.pixels,
+                image.width, image.height);
+            used_limit = limit;
+            if (!texture) {
+                SDL_LogWarn(SDL_LOG_CATEGORY_RENDER,
+                    "[vk] 图集 %dx%d (上限 %d) 上传失败, %s: %s", image.width,
+                    image.height, limit,
+                    attempt == 0 ? "退回标准档重试" : "标准档也失败, 放弃这一轮",
+                    texture_path.c_str());
+                bongo_cat_image_free(&image);
+                image = BongoCatImage{0};
+            }
+        }
+        if (!texture) {
             release_textures();
+            if (error && !error->message[0])
+                bongo_cat_error_set(error, BONGO_CAT_ERROR_CUBISM,
+                    "Cannot upload Live2D texture %d to Vulkan", index);
             return false;
         }
         /*
@@ -358,20 +396,10 @@ bool NativeModel::textures_step(int index, BongoCatError *error) {
            这里用 WARN 而不是 SDL_Log: 组件里的 INFO 会被宿主的日志策略滤掉 (分类不是自定
            义项), WARN 与同文件其它 attach 探针同级, 也是这一侧唯一的可见证据。 */
         SDL_LogWarn(SDL_LOG_CATEGORY_RENDER, "[vk] 模型图集 %dx%d (工作尺寸上限 %d): %s",
-            image.width, image.height, texture_limit, texture_path.c_str());
+            image.width, image.height, used_limit, texture_path.c_str());
         pending_alpha_image_ = image;
         bongo_cat_image_log_upload_probe(&image, "vk-model-texture");
-        vulkan_textures_[(size_t)index] = bongo_cat_live2d_vulkan_create_texture_attached(
-            image.pixels, image.width, image.height);
-        if (!vulkan_textures_[(size_t)index]) {
-            bongo_cat_image_free(&pending_alpha_image_);
-            pending_alpha_image_ = BongoCatImage{0};
-            release_textures();
-            if (error && !error->message[0])
-                bongo_cat_error_set(error, BONGO_CAT_ERROR_CUBISM,
-                    "Cannot upload Live2D texture %d to Vulkan", index);
-            return false;
-        }
+        vulkan_textures_[(size_t)index] = texture;
         return true;
     }
     /* GL 路径的渐进回调只用来把"这一张图解码到哪了"报给 UI; 分步调用方不需要它,

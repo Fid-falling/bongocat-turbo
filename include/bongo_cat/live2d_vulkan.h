@@ -95,6 +95,13 @@ void bongo_cat_live2d_vulkan_destroy_texture(void *texture);
 void *bongo_cat_live2d_vulkan_create_texture_attached(const void *pixels,
     int width, int height);
 
+/*
+ * 图集上限的设备侧夹层: 把"设置档位给的像素上限"夹到设备的 maxImageDimension2D。
+ * 单边超过设备上限的纹理创建必然失败, 那时模型加载会整个失败 —— 与其如此, 不如提前夹到
+ * 设备允许的最大边长并记一条 WARN。设备还没 attach (或没有物理设备句柄) 时原样返回。
+ */
+int bongo_cat_live2d_vulkan_clamp_texture_limit(int requested);
+
 /* 把贴图绑到渲染器上 (两个参数都是不透明句柄) */
 bool bongo_cat_live2d_vulkan_bind_texture(void *renderer, void *texture);
 

@@ -348,6 +348,29 @@ void *bongo_cat_live2d_vulkan_create_texture_attached(const void *pixels, int wi
     return bongo_cat_live2d_vulkan_create_texture(pixels, width, height);
 }
 
+/*
+ * 图集上限的设备侧夹层 (见 live2d_vulkan.h)。
+ *
+ * 为什么要问设备: "纹理质量"是用户选项, 上限可以给到 4096/原生, 而低端 GPU (集显、老驱动)
+ * 的 maxImageDimension2D 可能只有 2048 甚至更小 —— 单边超过它的 VkImage 创建必然失败, 于是
+ * 整只模型都加载不出来。这一层把上限夹到设备允许的最大边长, 让"选了原生"在那种机器上退化
+ * 成"按设备吃得下的最大尺寸", 而不是"什么也看不到"。
+ *
+ * 属性每次现问而不缓存: 只有模型加载时走到这里 (每模型几张图), 一次
+ * vkGetPhysicalDeviceProperties 的开销可以忽略, 还少一个需要失效的缓存。
+ */
+int bongo_cat_live2d_vulkan_clamp_texture_limit(int requested) {
+    if (requested <= 0 || !g_physical) return requested;
+    VkPhysicalDeviceProperties properties{};
+    vkGetPhysicalDeviceProperties(g_physical, &properties);
+    const int maximum = (int)properties.limits.maxImageDimension2D;
+    if (maximum <= 0 || requested <= maximum) return requested;
+    SDL_LogWarn(SDL_LOG_CATEGORY_VIDEO,
+        "[live2d/vk] 图集上限 %d 超过设备 maxImageDimension2D=%d, 已夹到设备上限",
+        requested, maximum);
+    return maximum;
+}
+
 #else /* !BONGO_CAT_HAS_VULKAN */
 
 
@@ -365,5 +388,7 @@ bool bongo_cat_live2d_vulkan_target_info(void **image, void **view, void **sampl
     (void)image; (void)view; (void)sampler; (void)width; (void)height;
     return false;
 }
+/* 没有 Vulkan 时没有设备可问: 原样返回, 让上限逻辑只在 Vulkan 侧生效 */
+int bongo_cat_live2d_vulkan_clamp_texture_limit(int requested) { return requested; }
 
 #endif

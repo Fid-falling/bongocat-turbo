@@ -132,7 +132,20 @@ BongoCatLive2D *bongo_cat_live2d_create(const char *asset_root,
         if (active && active->create) {
             void *instance = active->create(bongo_cat_renderer_module_host(),
                 asset_root, error);
-            if (instance) return (BongoCatLive2D *)instance;
+            if (instance) {
+                /*
+                 * 着色器根目录必须在这里交给组件, 而不是等它自己去猜: Cubism 的 Vulkan
+                 * 渲染器按**相对路径**打开 "FrameworkShaders/*.spv", 组件只知道 exe 所在
+                 * 目录 —— 而资源可能在 (a) exe 旁边的 assets/, (b) 从 pak 解到
+                 * cache/embedded-assets-<版本>/assets/, (c) 开发目录。只有宿主知道这次是
+                 * 哪一个 (见 lifecycle/assets.c 的查找顺序), 所以创建实例时顺手把同一个
+                 * 根目录传下去。漏了这一步的症状是"模型缩在窗口左上角画不全": 缺 mask
+                 * 着色器时 SDK 只会画出一部分 drawable, 而且不报错。
+                 */
+                if (active->vulkan_set_shader_root)
+                    active->vulkan_set_shader_root(asset_root);
+                return (BongoCatLive2D *)instance;
+            }
             /* 组件创建失败: 不把它当成致命 —— 回落到诊断实现, 用户至少还能看到界面。 */
             SDL_LogWarn(BONGO_CAT_LOG_LIFECYCLE,
                 "[live2d] 组件创建实例失败, 回落到诊断实现: %s",
