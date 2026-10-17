@@ -75,7 +75,7 @@
           "vsync": "垂直同步",
           "disableUiEffects": "关闭设置界面特效",
           "disableUiEffectsHint": "关掉发光与阴影，设置界面更流畅",
-          "fontRasterCapHint": "清晰度基本不变, 但更省内存",
+          "fontRasterCapHint": "开启：更省内存，图片略柔和；关闭：更清晰，但更占内存",
           "fontRasterCap": "字体清晰度",
           "ssMemory": "省内存",
           "ssQuality": "质量",

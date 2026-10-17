@@ -75,7 +75,7 @@
           "vsync": "수직 동기화",
           "disableUiEffects": "설정 창 효과 끄기",
           "disableUiEffectsHint": "빛과 그림자를 꺼서 설정 창을 부드럽게 합니다",
-          "fontRasterCapHint": "선명도는 거의 그대로면서 메모리를 아낍니다",
+          "fontRasterCapHint": "켜짐: 메모리 절약, 이미지는 조금 부드러움. 꺼짐: 더 선명하지만 메모리 더 사용",
           "fontRasterCap": "글꼴 선명도",
           "ssMemory": "메모리 절약",
           "ssQuality": "품질",

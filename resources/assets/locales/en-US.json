@@ -75,7 +75,7 @@
           "vsync": "V-Sync",
           "disableUiEffects": "Disable settings UI effects",
           "disableUiEffectsHint": "Turns off glows and shadows to make the settings window smoother",
-          "fontRasterCapHint": "About the same clarity, but uses less memory",
+          "fontRasterCapHint": "On: saves memory, images slightly softer; off: sharper, but uses more memory",
           "fontRasterCap": "Font clarity",
           "ssMemory": "Low memory",
           "ssQuality": "Quality",

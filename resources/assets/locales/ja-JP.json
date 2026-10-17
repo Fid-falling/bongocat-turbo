@@ -75,7 +75,7 @@
           "vsync": "垂直同期",
           "disableUiEffects": "設定画面の効果を無効化",
           "disableUiEffectsHint": "光と影を消して、設定画面をなめらかにします",
-          "fontRasterCapHint": "見た目はほぼ変わらず、メモリを節約できます",
+          "fontRasterCapHint": "オン：メモリ節約、画像は少しやわらか。オフ：より鮮明だがメモリを多く使う",
           "fontRasterCap": "文字のくっきり度",
           "ssMemory": "省メモリ",
           "ssQuality": "高品質",

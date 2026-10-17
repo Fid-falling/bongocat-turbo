@@ -75,7 +75,7 @@
           "vsync": "Sincronização vertical",
           "disableUiEffects": "Desativar efeitos das configurações",
           "disableUiEffectsHint": "Sem brilhos e sombras, a janela de ajustes fica mais fluida",
-          "fontRasterCapHint": "Quase a mesma nitidez, mas menos memória",
+          "fontRasterCapHint": "Ativ.: economiza memória, imagens um pouco mais suaves; desativ.: mais nítidas, mas mais memória",
           "fontRasterCap": "Nitidez do texto",
           "ssMemory": "Economia de memória",
           "ssQuality": "Qualidade",
