@@ -168,7 +168,12 @@ static void job_complete(BongoCatApp *app, const BongoCatModelEntry *entry) {
     app->model_switch.target_id[0] = '\0';
     app->model_switch.session = NULL;
     app->model_switch.slowest_step_ns = 0;
-    bongo_cat_app_capture_pending_model_cover(app);
+    /*
+     * 封面不在这里急切抓取。提交瞬间 loaded_model 已指向新模型, 但新模型还没被渲染过;
+     * Vulkan 的整帧回读有 ≥1 帧延迟, 此刻抓到的仍是旧模型的帧 —— 会把旧画面写进新模型
+     * 的 cover.png。抓取交给主循环的 bongo_cat_app_capture_pending_model_cover()
+     * (它在每一帧 render() 之后才跑), 天然满足"先画新模型、再抓、再写"的时序。
+     */
     /* 不要给用户留下一帧被裁过的旧画面: UI 收尾阶段再补一帧。 */
     if (replacing_model) bongo_cat_app_render_now(app);
     bongo_cat_memory_policy_model_loaded();

@@ -18,6 +18,7 @@
 #include "model_cover.h"
 #include "model_geometry.h"
 #include "model_switch_shadow.h"
+#include "bongo_cat/vk_backend.h"
 #include "bongo_cat/audio.h"
 #include "bongo_cat/memory_policy.h"
 #include "bongo_cat/overlay.h"
@@ -217,6 +218,13 @@ bool bongo_cat_app_commit_model_switch(BongoCatApp *app,
     bongo_cat_overlay_set_bubble_merge(app->overlay,
         app->settings.model.bubble_merge != 0);
     snprintf(app->loaded_model, sizeof(app->loaded_model), "%s", entry->id);
+    /*
+     * 切换完成即作废 Vulkan 里上一模型残留的整帧回读, 让封面捕获的 take 只能等到
+     * 新模型渲染完的那一帧 (见 vk_readback.c 的 discard_pending_frame_sample)。
+     * OpenGL 路径是同步 glReadPixels, 不存在这个时序窗口, 无需处理。
+     */
+    if (app->vk)
+        bongo_cat_vk_discard_pending_frame_sample(app->vk);
     size_t saved_behaviors = bongo_cat_app_saved_behavior_count(app, entry->id);
     bongo_cat_app_restore_behavior_state(app, entry->id);
     SDL_Log("[runtime] Behavior restore summary: model=%s saved=%zu "
