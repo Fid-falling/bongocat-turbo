@@ -16,7 +16,7 @@
 </p>
 <p align="center">Fork BongoCat yang dioptimalkan untuk performa: lebih hemat memori, lebih sedikit lag, plus backend Vulkan dan latar belakang transparan OpenGL.</p>
 <p align="center">
-<a href="https://github.com/Fid-falling/bongocat-turbo/blob/main/README.md">English</a> • <a href="https://github.com/Fid-falling/bongocat-turbo/blob/main/docs/README.zh-CN.md">简体中文</a> • <a href="https://github.com/Fid-falling/bongocat-turbo/blob/main/docs/README.zh-Hant.md">繁體中文</a> • <a href="https://github.com/Fid-falling/bongocat-turbo/blob/main/docs/README.fr-FR.md">Français</a> • <a href="https://github.com/Fid-falling/bongocat-turbo/blob/main/docs/README.de-DE.md">Deutsch</a> • <a href="https://github.com/Fid-falling/bongocat-turbo/blob/main/docs/README.ja-JP.md">日本語</a> • <a href="https://github.com/Fid-falling/bongocat-turbo/blob/main/docs/README.ko-KR.md">한국어</a> • <a href="https://github.com/Fid-falling/bongocat-turbo/blob/main/docs/README.pt-BR.md">Português</a> • <a href="https://github.com/Fid-falling/bongocat-turbo/blob/main/docs/README.ru-RU.md">Русский</a> • <a href="https://github.com/Fid-falling/bongocat-turbo/blob/main/docs/README.es-ES.md">Español</a> • <strong>Bahasa Indonesia</strong>
+<a href="https://github.com/Fid-falling/bongocat-turbo/blob/main/README.en-US.md">English</a> • <a href="https://github.com/Fid-falling/bongocat-turbo/blob/main/README.md">简体中文</a> • <a href="https://github.com/Fid-falling/bongocat-turbo/blob/main/docs/README.zh-Hant.md">繁體中文</a> • <a href="https://github.com/Fid-falling/bongocat-turbo/blob/main/docs/README.fr-FR.md">Français</a> • <a href="https://github.com/Fid-falling/bongocat-turbo/blob/main/docs/README.de-DE.md">Deutsch</a> • <a href="https://github.com/Fid-falling/bongocat-turbo/blob/main/docs/README.ja-JP.md">日本語</a> • <a href="https://github.com/Fid-falling/bongocat-turbo/blob/main/docs/README.ko-KR.md">한국어</a> • <a href="https://github.com/Fid-falling/bongocat-turbo/blob/main/docs/README.pt-BR.md">Português</a> • <a href="https://github.com/Fid-falling/bongocat-turbo/blob/main/docs/README.ru-RU.md">Русский</a> • <a href="https://github.com/Fid-falling/bongocat-turbo/blob/main/docs/README.es-ES.md">Español</a> • <strong>Bahasa Indonesia</strong>
 </p>
 <p align="center">
   <a href="https://github.com/Fid-falling/bongocat-turbo/blob/main/LICENSE"><img src="https://img.shields.io/badge/AGPL--3.0-1fa669?style=flat&logo=gnu&logoColor=white"></a>
@@ -52,13 +52,7 @@
 
 ## 📥 Unduh
 
-<a href="https://apps.microsoft.com/detail/9p41mlsx72xw?referrer=appbadge" target="_self" >
-	<img src="https://get.microsoft.com/images/en-us%20light.svg" width="600"/>
-</a>
-
-- GitHub Releases
-
-  Unduh rilis terbaru dari [GitHub Releases](https://github.com/Fid-falling/bongocat-turbo/releases/latest).
+Unduh rilis terbaru dari [GitHub Releases](https://github.com/Fid-falling/bongocat-turbo/releases/latest).
 
 ## 🛠️ Membangun dari Kode Sumber
 

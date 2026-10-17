@@ -14,7 +14,7 @@
 </p>
 <p align="center">Un fork de BongoCat optimisé pour les performances : moins de mémoire, moins de saccades, avec un backend Vulkan et un fond transparent OpenGL.</p>
 <p align="center">
-<a href="https://github.com/Fid-falling/bongocat-turbo/blob/main/README.md">English</a> • <a href="https://github.com/Fid-falling/bongocat-turbo/blob/main/docs/README.zh-CN.md">简体中文</a> • <a href="https://github.com/Fid-falling/bongocat-turbo/blob/main/docs/README.zh-Hant.md">繁體中文</a> • <a href="https://github.com/Fid-falling/bongocat-turbo/blob/main/docs/README.fr-FR.md"><strong>Français</strong></a> • <a href="https://github.com/Fid-falling/bongocat-turbo/blob/main/docs/README.de-DE.md">Deutsch</a> • <a href="https://github.com/Fid-falling/bongocat-turbo/blob/main/docs/README.ja-JP.md">日本語</a> • <a href="https://github.com/Fid-falling/bongocat-turbo/blob/main/docs/README.ko-KR.md">한국어</a> • <a href="https://github.com/Fid-falling/bongocat-turbo/blob/main/docs/README.pt-BR.md">Português</a> • <a href="https://github.com/Fid-falling/bongocat-turbo/blob/main/docs/README.ru-RU.md">Русский</a> • <a href="https://github.com/Fid-falling/bongocat-turbo/blob/main/docs/README.es-ES.md">Español</a> • <a href="https://github.com/Fid-falling/bongocat-turbo/blob/main/docs/README.id-ID.md">Bahasa Indonesia</a>
+<a href="https://github.com/Fid-falling/bongocat-turbo/blob/main/README.en-US.md">English</a> • <a href="https://github.com/Fid-falling/bongocat-turbo/blob/main/README.md">简体中文</a> • <a href="https://github.com/Fid-falling/bongocat-turbo/blob/main/docs/README.zh-Hant.md">繁體中文</a> • <a href="https://github.com/Fid-falling/bongocat-turbo/blob/main/docs/README.fr-FR.md"><strong>Français</strong></a> • <a href="https://github.com/Fid-falling/bongocat-turbo/blob/main/docs/README.de-DE.md">Deutsch</a> • <a href="https://github.com/Fid-falling/bongocat-turbo/blob/main/docs/README.ja-JP.md">日本語</a> • <a href="https://github.com/Fid-falling/bongocat-turbo/blob/main/docs/README.ko-KR.md">한국어</a> • <a href="https://github.com/Fid-falling/bongocat-turbo/blob/main/docs/README.pt-BR.md">Português</a> • <a href="https://github.com/Fid-falling/bongocat-turbo/blob/main/docs/README.ru-RU.md">Русский</a> • <a href="https://github.com/Fid-falling/bongocat-turbo/blob/main/docs/README.es-ES.md">Español</a> • <a href="https://github.com/Fid-falling/bongocat-turbo/blob/main/docs/README.id-ID.md">Bahasa Indonesia</a>
 </p>
 <p align="center">
   <a href="https://github.com/Fid-falling/bongocat-turbo/blob/main/LICENSE"><img src="https://img.shields.io/badge/AGPL--3.0-1fa669?style=flat&logo=gnu&logoColor=white"></a>
@@ -49,13 +49,7 @@
 
 ## 📥 Téléchargement
 
-<a href="https://apps.microsoft.com/detail/9p41mlsx72xw?referrer=appbadge" target="_self" >
-	<img src="https://get.microsoft.com/images/en-us%20light.svg" width="600"/>
-</a>
-
-- GitHub Releases
-
-  Téléchargez la dernière version depuis [GitHub Releases](https://github.com/Fid-falling/bongocat-turbo/releases/latest).
+Téléchargez la dernière version depuis [GitHub Releases](https://github.com/Fid-falling/bongocat-turbo/releases/latest).
 
 ## 🛠️ Compilation depuis les sources
 
@@ -176,11 +170,11 @@ cmake -S . -B build -G Ninja \
 ## 📜 Licence
 
 Le code source et le runtime natif de BongoCat sont distribués sous licence
-[AGPL-3.0-only](LICENSE).
+[AGPL-3.0-only](../LICENSE).
 
 Le mode de modèle intégré par défaut (`standard`) reste sous licence MIT.
 Les ressources de modèles fournies dans `resources/assets/models/standard`,
-`keyboard` et `gamepad` sont couvertes par la [licence MIT distincte](LICENSE-MIT).
+`keyboard` et `gamepad` sont couvertes par la [licence MIT distincte](../LICENSE-MIT).
 Cette licence MIT s'applique uniquement aux ressources des modèles et aux
 éléments graphiques qui les accompagnent ; elle ne modifie pas la licence du
 code source ni du runtime natif de BongoCat.

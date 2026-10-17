@@ -15,7 +15,7 @@
 </p>
 <p align="center">基於 BongoCat 的效能最佳化分支：更省記憶體、更少卡頓，並提供 Vulkan 後端與 OpenGL 透明背景。</p>
 <p align="center">
-<a href="https://github.com/Fid-falling/bongocat-turbo/blob/main/README.md"><strong>English</strong></a> • <a href="https://github.com/Fid-falling/bongocat-turbo/blob/main/docs/README.zh-CN.md">简体中文</a> • <a href="https://github.com/Fid-falling/bongocat-turbo/blob/main/docs/README.zh-Hant.md">繁體中文</a> • <a href="https://github.com/Fid-falling/bongocat-turbo/blob/main/docs/README.fr-FR.md">Français</a> • <a href="https://github.com/Fid-falling/bongocat-turbo/blob/main/docs/README.de-DE.md">Deutsch</a> • <a href="https://github.com/Fid-falling/bongocat-turbo/blob/main/docs/README.ja-JP.md">日本語</a> • <a href="https://github.com/Fid-falling/bongocat-turbo/blob/main/docs/README.ko-KR.md">한국어</a> • <a href="https://github.com/Fid-falling/bongocat-turbo/blob/main/docs/README.pt-BR.md">Português</a> • <a href="https://github.com/Fid-falling/bongocat-turbo/blob/main/docs/README.ru-RU.md">Русский</a> • <a href="https://github.com/Fid-falling/bongocat-turbo/blob/main/docs/README.es-ES.md">Español</a> • <a href="https://github.com/Fid-falling/bongocat-turbo/blob/main/docs/README.id-ID.md">Bahasa Indonesia</a>
+<a href="https://github.com/Fid-falling/bongocat-turbo/blob/main/README.en-US.md"><strong>English</strong></a> • <a href="https://github.com/Fid-falling/bongocat-turbo/blob/main/README.md">简体中文</a> • <a href="https://github.com/Fid-falling/bongocat-turbo/blob/main/docs/README.zh-Hant.md">繁體中文</a> • <a href="https://github.com/Fid-falling/bongocat-turbo/blob/main/docs/README.fr-FR.md">Français</a> • <a href="https://github.com/Fid-falling/bongocat-turbo/blob/main/docs/README.de-DE.md">Deutsch</a> • <a href="https://github.com/Fid-falling/bongocat-turbo/blob/main/docs/README.ja-JP.md">日本語</a> • <a href="https://github.com/Fid-falling/bongocat-turbo/blob/main/docs/README.ko-KR.md">한국어</a> • <a href="https://github.com/Fid-falling/bongocat-turbo/blob/main/docs/README.pt-BR.md">Português</a> • <a href="https://github.com/Fid-falling/bongocat-turbo/blob/main/docs/README.ru-RU.md">Русский</a> • <a href="https://github.com/Fid-falling/bongocat-turbo/blob/main/docs/README.es-ES.md">Español</a> • <a href="https://github.com/Fid-falling/bongocat-turbo/blob/main/docs/README.id-ID.md">Bahasa Indonesia</a>
 </p>
 <p align="center">
   <a href="https://github.com/Fid-falling/bongocat-turbo/blob/main/LICENSE"><img src="https://img.shields.io/badge/AGPL--3.0-1fa669?style=flat&logo=gnu&logoColor=white"></a>
@@ -51,13 +51,7 @@
 
 ## 📥 下載
 
-<a href="https://apps.microsoft.com/detail/9p41mlsx72xw?referrer=appbadge" target="_self" >
-	<img src="https://get.microsoft.com/images/en-us%20light.svg" width="600"/>
-</a>
-
-- GitHub Releases
-
-  從 [GitHub Releases](https://github.com/Fid-falling/bongocat-turbo/releases/latest) 下載最新版本。
+從 [GitHub Releases](https://github.com/Fid-falling/bongocat-turbo/releases/latest) 下載最新版本。
 
 ## 🛠️ 從原始碼建置
 
@@ -156,9 +150,9 @@ cmake -S . -B build -G Ninja \
 
 ## 📜 授權條款
 
-BongoCat 原始碼和原生執行時期採用 [AGPL-3.0-only](LICENSE) 授權。
+BongoCat 原始碼和原生執行時期採用 [AGPL-3.0-only](../LICENSE) 授權。
 
-預設內建模型模式（`standard`）仍以 MIT 授權釋出。`resources/assets/models/standard`、`keyboard` 和 `gamepad` 中的模型資產，則受個別的 [MIT 授權聲明](LICENSE-MIT) 規範。該 MIT 授權僅適用於模型資產及其附屬藝術作品，不適用於 BongoCat 原始碼或原生執行時期。
+預設內建模型模式（`standard`）仍以 MIT 授權釋出。`resources/assets/models/standard`、`keyboard` 和 `gamepad` 中的模型資產，則受個別的 [MIT 授權聲明](../LICENSE-MIT) 規範。該 MIT 授權僅適用於模型資產及其附屬藝術作品，不適用於 BongoCat 原始碼或原生執行時期。
 
 
 ## 🧭 技術架構

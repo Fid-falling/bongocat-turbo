@@ -1,45 +1,59 @@
+<!-- 本页与仓库主页 README.md 内容相同，保留此文件是为了兼容旧链接；如有更新以主页为准。 -->
+
 <div align="center">
   <a href="https://bongocat.pet" target="_blank">
     <img src="https://github.com/user-attachments/assets/dd693432-8342-440b-8a92-c9f57a96ffb4" alt="BongoCat" width="249">
   </a>
-  <h1><a href="https://bongocat.pet" target="_blank">BongoCat Turbo</a></h1>
+  
+  <h1>
+    <a href="https://bongocat.pet" target="_blank" style="text-decoration: none; color: inherit;">BongoCat Turbo</a>
+  </h1>
 </div>
 
-<p align="center">💘 C/C++ × SDL3 × OpenGL，搅拌在一起，尽情敲击！Bong~ Bongo Cat!!!</p>
+
+<!-- 项目简介 + 火箭图标 -->
+<p align="center"> 
+ 💘 C/C++ × SDL3 × OpenGL，搅拌在一起，尽情敲击！Bong~ Bongo Cat!!!
+</p>
 <p align="center">基于 BongoCat 的性能优化分支：更省内存、更少卡顿，并提供 Vulkan 后端与 OpenGL 透明背景。</p>
 <p align="center">
-  选择语言 ❯ <a href="https://github.com/Fid-falling/bongocat-turbo/blob/main/README.md">English</a> • <strong>简体中文</strong> • <a href="https://github.com/Fid-falling/bongocat-turbo/blob/main/docs/README.zh-Hant.md">繁體中文</a> • <a href="https://github.com/Fid-falling/bongocat-turbo/blob/main/docs/README.fr-FR.md">Français</a> • <a href="https://github.com/Fid-falling/bongocat-turbo/blob/main/docs/README.de-DE.md">Deutsch</a> • <a href="https://github.com/Fid-falling/bongocat-turbo/blob/main/docs/README.ja-JP.md">日本語</a> • <a href="https://github.com/Fid-falling/bongocat-turbo/blob/main/docs/README.ko-KR.md">한국어</a> • <a href="https://github.com/Fid-falling/bongocat-turbo/blob/main/docs/README.pt-BR.md">Português</a> • <a href="https://github.com/Fid-falling/bongocat-turbo/blob/main/docs/README.ru-RU.md">Русский</a> • <a href="https://github.com/Fid-falling/bongocat-turbo/blob/main/docs/README.es-ES.md">Español</a> • <a href="https://github.com/Fid-falling/bongocat-turbo/blob/main/docs/README.id-ID.md">Bahasa Indonesia</a>
+  选择语言 ❯ <a href="https://github.com/Fid-falling/bongocat-turbo/blob/main/README.en-US.md">English</a> • <a href="https://github.com/Fid-falling/bongocat-turbo/blob/main/README.md"><strong>简体中文</strong></a> • <a href="https://github.com/Fid-falling/bongocat-turbo/blob/main/docs/README.zh-Hant.md">繁體中文</a> • <a href="https://github.com/Fid-falling/bongocat-turbo/blob/main/docs/README.fr-FR.md">Français</a> • <a href="https://github.com/Fid-falling/bongocat-turbo/blob/main/docs/README.de-DE.md">Deutsch</a> • <a href="https://github.com/Fid-falling/bongocat-turbo/blob/main/docs/README.ja-JP.md">日本語</a> • <a href="https://github.com/Fid-falling/bongocat-turbo/blob/main/docs/README.ko-KR.md">한국어</a> • <a href="https://github.com/Fid-falling/bongocat-turbo/blob/main/docs/README.pt-BR.md">Português</a> • <a href="https://github.com/Fid-falling/bongocat-turbo/blob/main/docs/README.ru-RU.md">Русский</a> • <a href="https://github.com/Fid-falling/bongocat-turbo/blob/main/docs/README.es-ES.md">Español</a> • <a href="https://github.com/Fid-falling/bongocat-turbo/blob/main/docs/README.id-ID.md">Bahasa Indonesia</a>
 </p>
 <p align="center">
   <a href="https://github.com/Fid-falling/bongocat-turbo/blob/main/LICENSE"><img src="https://img.shields.io/badge/AGPL--3.0-1fa669?style=flat&logo=gnu&logoColor=white"></a>
-  <a href="https://github.com/Fid-falling/bongocat-turbo"><img src="https://img.shields.io/badge/C-A8B9CC?style=flat&logo=c&logoColor=white"></a>
-  <a href="https://discord.gg/vf8jqnattk"><img src="https://img.shields.io/badge/dynamic/json?url=https%3A%2F%2Fdiscord.com%2Fapi%2Finvites%2Fvf8jqnattk%3Fwith_counts%3Dtrue&query=%24.approximate_member_count&suffix=%20members&logo=discord&logoColor=white&label=%20&color=7389D8&labelColor=6A7EC2"></a>
+  <a href="https://github.com/Fid-falling/bongocat-turbo"><img src="https://img.shields.io/badge/C-54AEFF?style=flat&logo=c&logoColor=white"></a>
+<a href="https://discord.gg/vf8jqnattk"><img src="https://img.shields.io/badge/Discord-F77DAA?logo=discord&logoColor=white"></a>
   <a href="https://github.com/Fid-falling/bongocat-turbo/blob/main/docs/wechat.png"><img src="https://img.shields.io/badge/WeChat-%2307C160?logo=wechat&logoColor=%2307C160&labelColor=FFFFFF"></a>
-  <a href="https://qm.qq.com/q/cYlRBbvuda"><img src="https://img.shields.io/badge/QQ-%2312B7F5?logo=qq&labelColor=FFFFFF"></a>
+  <a href="https://qm.qq.com/q/cYlRBbvuda"><img src="https://img.shields.io/badge/422616922-12B7F5?logo=qq&logoColor=12B7F5&labelColor=FFFFFF"></a>
 </p>
 
-<div align="center"><video src="https://github.com/user-attachments/assets/75719230-9e49-4124-ae5a-8e35592c5d49" autoplay loop style="border-radius: 8px; max-width: 800px;"></video></div>
+
+<!-- 演示视频 -->
+<div align="center" style="margin-bottom: 30px;">
+  <video src="https://github.com/user-attachments/assets/75719230-9e49-4124-ae5a-8e35592c5d49" autoplay loop style="border-radius: 8px; max-width: 800px;"></video>
+</div>
+
+
+<img width="1149" height="904" alt="BongoCat Turbo 界面截图" src="https://github.com/user-attachments/assets/aa376965-539e-4bbd-827d-bb9a29006069" />
+
 
 > [!TIP]
 > 演示中使用的模型来自 [宇痕冫](https://space.bilibili.com/348616056)。
 >
 > 🎁 想找**免费**模型？我们与才华横溢的模型创作者合作，为您带来丰富多样的免费模型，同时持续探索更多有趣的桌面体验！欢迎访问我们的官方网站：[bongocat.pet](https://bongocat.pet/models)
-
 <p align="center">
   <a href="https://bongocat.pet/models">
     <img height="1080" src="https://github.com/user-attachments/assets/dedd83ca-742a-4f8c-a64a-69e659fca564" />
   </a>
 </p>
 
-<p align="center"><img src="https://count.getloli.com/@bongocat?name=bongocat&theme=booru-qualityhentais&padding=7&offset=0&align=top&scale=1&pixelated=1&darkmode=auto" width="400"></p>
+<p align="center">
+    <img src="https://count.getloli.com/@bongocat?name=bongocat&theme=booru-qualityhentais&padding=7&offset=0&align=top&scale=1&pixelated=1&darkmode=auto" width="400">
+  </p>
 
 ## 📥 下载
 
-<a href="https://apps.microsoft.com/detail/9p41mlsx72xw?referrer=appbadge" target="_self"><img src="https://get.microsoft.com/images/en-us%20light.svg" width="600"></a>
-
-- GitHub Releases
-
-  从 [GitHub Releases](https://github.com/Fid-falling/bongocat-turbo/releases/latest) 下载最新版本。
+从 [GitHub Releases](https://github.com/Fid-falling/bongocat-turbo/releases/latest) 下载最新版本。
 
 ## 🛠️ 从源码构建
 
@@ -56,7 +70,7 @@ BongoCat 使用 CMake，需要 C11 编译器、C++17 编译器、CMake 3.24 或�
   ```bash
   sudo apt-get update
   sudo apt-get install -y build-essential cmake ninja-build \
-    libgl1-mesa-dev libx11-dev libxi-dev libxfixes-dev libcurl4-openssl-dev
+    libgl1-mesa-dev libx11-dev libxi-dev libxfixes-dev
   ```
 
 ### 🔧 配置与构建
@@ -129,9 +143,9 @@ cmake -S . -B build -G Ninja \
 
 ## 📌 项目状态
 
-
 * 图形后端：默认 Vulkan（OpenGL 作为回退），每次改动都会构建并验证两者。
-![Alt](https://repobeats.axiom.co/api/embed/74334755a589dea40c5d31f8d2bcdc6c2bd39d87.svg "Repobeats analytics image")
+
+![Repobeats analytics image](https://repobeats.axiom.co/api/embed/74334755a589dea40c5d31f8d2bcdc6c2bd39d87.svg "Repobeats analytics image")
 
 ## 📜 许可证
 
@@ -141,7 +155,7 @@ BongoCat 源代码和本地运行时采用 [AGPL-3.0-only](../LICENSE) 许可证
 
 ## 🧭 技术架构
 
-当前原生版本基于 C/C++、SDL3 和 OpenGL 构建。下图重点展示运行时数据流；构建与打包细节请参阅 CMake 文件。
+> 当前原生版本基于 C/C++、SDL3 和 OpenGL 构建。下图重点展示运行时数据流；构建与打包细节请参阅 CMake 文件。
 
 ### 🔄 运行时所有权与帧调度
 
@@ -163,9 +177,9 @@ BongoCat 源代码和本地运行时采用 [AGPL-3.0-only](../LICENSE) 许可证
   模型更新 -> OpenGL 合成 -> 平台呈现
 ```
 
-Windows Raw Input 接收器、macOS Quartz 事件 tap 和 Linux XInput2 监听器运行在主循环之外。按键和鼠标按钮边沿进入有界原子队列，移动量单独合并，并通过 SDL 事件唤醒主线程，避免高频移动挤出按键事件。Windows 使用独立消息窗口，以 `RIDEV_INPUTSINK | RIDEV_DEVNOTIFY` 订阅后台键鼠输入并保留普通窗口消息；其他程序隐藏或锁定光标时，模型使用设备上报的移动量，桌面跟随则读取 SDL 提供的系统光标位置。接收器分别管理各设备的按下状态，在设备拔出或输入桌面切换时清理。Windows 不再安装输入钩子或使用 DirectInput，也不向游戏发送输入。SDL3 窗口、偏好设置和手柄事件仍在主线程处理，平台监听器不会直接调用 Live2D、覆盖层或 UI 代码。
+Windows Raw Input 接收器、macOS Quartz 事件 tap 和 Linux XInput2 监听器运行在主循环之外。它们把带时间戳的按键和鼠标按钮边沿发布到有界原子队列，并单独合并指针移动，因此高频移动不会挤掉有序的按键与按钮边沿。原生 SDL 唤醒事件负责通知主线程。Windows 使用独立消息窗口，以 `RIDEV_INPUTSINK | RIDEV_DEVNOTIFY` 订阅后台键鼠输入并保留普通窗口消息；其他程序隐藏或锁定光标时，模型使用设备上报的移动量，桌面跟随则读取 SDL 提供的系统光标位置。接收器分别跟踪各设备的按下状态，在设备拔出或切换输入桌面时清理。它不安装输入钩子、不使用 DirectInput，也不向游戏发送输入。SDL3 窗口、偏好设置和手柄事件仍在主线程处理，手柄事件在到达模型参数或快捷键之前会被规范化。平台监听器不会直接调用 Live2D、覆盖层或 UI 代码。
 
-`bongo_cat_app_run` 负责更新、关闭和次级进程参数，确保主进程的单实例所有权，分配应用状态，执行初始化，进入 `bongo_cat_app_loop`，随后按定义顺序刷新状态并销毁资源。初始化会加载配置和存储路径、定位资源、创建 SDL/OpenGL 宠物窗口、初始化平台后端、创建 Live2D/覆盖层/音频服务、扫描内置/已安装/附近的模型来源，并加载可用模型。`BongoCatApp` 持有设置、会话状态、模型和行为目录、平台句柄及运行时服务句柄。
+`bongo_cat_app_run` 负责处理更新、关闭和次级进程参数，确保主进程的单实例所有权，分配应用状态，执行初始化，进入 `bongo_cat_app_loop`，随后按定义顺序刷新状态并销毁资源。初始化会加载配置和存储路径、定位资源、创建 SDL/OpenGL 宠物窗口、初始化平台后端、创建 Live2D/覆盖层/音频服务、扫描内置/已安装/附近的模型来源，并加载可用模型。`BongoCatApp` 持有设置、会话状态、模型和行为目录、平台句柄及运行时服务句柄。
 
 已安装的模型包使用 Mver 作为规范格式。导入流程会解析选中的文件或目录，发现并验证候选项，生成包身份指纹，将 Tauri 来源转换为 Mver，应用图像补丁，并将规范化包提交到 `models_root`。随后生成运行时适配器并刷新目录。附近来源只在不安装源目录的情况下被发现；其适配器和检查结果缓存在 `models_root` 之外的 `cache_root` 下。
 
@@ -181,6 +195,7 @@ flowchart TB
   BuiltIn(["内置模型资源"])
   Sources(["外部模型来源<br/>Mver、Tauri、.model3.json、图像补丁"])
   Desktop(["宠物窗口和偏好设置窗口"])
+
   subgraph Runtime["BongoCat 原生运行时"]
     direction TB
     Entry["src/main.c<br/>bongo_cat_app_run"]
@@ -197,6 +212,7 @@ flowchart TB
     Preferences["偏好设置和桌面外壳<br/>Nuklear UI、托盘、窗口操作"]
     Compose["OpenGL 帧合成"]
     Present["平台呈现"]
+
     Entry --> Startup --> Loop
     Loop --> Shutdown
     Loop --> InputDispatch --> State
@@ -212,11 +228,13 @@ flowchart TB
     Compose --> Present
     Loop --> Compose
   end
+
   subgraph Platform["平台后端"]
     direction LR
     Global["全局键盘/指针捕获<br/>Windows、macOS、Linux"]
     SDL["SDL3 事件<br/>窗口和手柄事件"]
   end
+
   Input --> Global --> InputQueue --> InputDispatch
   Input --> SDL --> Loop
   BuiltIn --> Catalog
@@ -230,6 +248,16 @@ flowchart TB
 ### 🔒 BongoCat 会记录我的键盘或鼠标输入吗？
 
 不会。BongoCat 在本地处理键盘和鼠标输入，用于驱动动画和快捷键。它不会记录或上传按键、鼠标操作或其他交互数据。配置也只保存在本地，应用不包含广告、分析工具或用户跟踪代码。执行更新检查时只会请求公开的版本元数据，不会发送输入、配置或使用数据。
+
+### 📦 BongoCat 的文件保存在哪里？如何启用便携模式？
+
+默认情况下，设置、模型、缓存、日志和会话状态保存在每用户的应用数据目录中（Windows 为 `%LOCALAPPDATA%\BongoCat`，Linux 为 XDG 目录，macOS 为 `~/Library`）。`--storage-root=DIR` 可以在单次启动中覆盖以上全部路径。
+
+**便携模式**（偏好设置 → 通用设置 → 应用 → 便携模式）会把所有内容移到可执行文件旁边的 `BongoCatData` 文件夹。开启时会把设置和模型复制过去，关闭时会把缺失的内容合并回默认位置；缓存从不复制，而是按需重建。标记文件是 `BongoCatData\portable.json`，因此要迁移到另一台机器或 U 盘，只需把程序和该文件夹一起复制，无需其他文件。删除 `portable.json` 即可回退到默认位置。设置窗口始终显示实际正在使用的文件夹。
+
+### 🎭 Live2D 模型不显示，Cubism Core 运行时在哪里？
+
+BongoCat 既不捆绑也不下载它：请从 Live2D 官网获取 Cubism SDK for Native，并导入一次 —— 参见 [Live2D Cubism Core 下载与导入教程](live2d-core.md)（中文）。
 
 ### Linux Wayland 输入
 
@@ -251,14 +279,36 @@ BONGOCAT_ENABLE_EVDEV=1 ./build/BongoCatTurbo
 
 可以在设置里选择后端（`renderer`），或在 `settings.json` 里用同一个键强制指定。有几点值得知道：
 
-* Vulkan 渲染器与 Cubism 桥**刻意共享同一个** `VkDevice`。以前用过第二套设备，在 RTSS / OBS / NVIDIA 这类假定"一个进程一个设备"的叠加层下会崩溃。
+* 如果偏好设置窗口本身都画不正确，你也不会被困住：`--renderer=opengl`（或更短的 `--opengl`）会在那一次运行中把整个应用强制切到 OpenGL，而且它**优先于 `settings.json`，并且不会回写该文件**。托盘菜单里有同样的开关，名为“渲染后端：<当前> -> <目标>”；切换它（或设置里的分段控件）会保存设置并自动重启应用，新后端立刻生效。`--help` 会列出所有选项和环境变量。在终端里运行 `BongoCat --help` 即可查看。
+* Vulkan 渲染器与 Cubism 桥**刻意共享同一个** `VkDevice`。以前用过第二套设备，在 RTSS / OBS / NVIDIA 这类假定“一个进程一个设备”的叠加层下会崩溃。
 * Windows 10 上交换链只提供 `OPAQUE`。透明依然可用：我们先尝试 `VK_COMPOSITE_ALPHA_PRE_MULTIPLIED_BIT_KHR`，只有驱动拒绝时才回退。
 * 两个审计工具（`live2d-visual-audit`、`live2d-viewer-audit`）仍然需要 OpenGL，因为它们要自己渲染一帧离屏画面。其余部分都与后端无关。
-* 启动日志总会打印"请求的后端"与"实际使用的后端"，不用猜自己用的是哪个。
+* 启动日志总会打印“请求的后端”与“实际使用的后端”，不用猜自己用的是哪个。
+* 如果次级窗口（偏好设置、轮盘）完全无法用 Vulkan 绘制 —— 交换链创建失败，或帧不再被呈现 —— 它会自行用 OpenGL 重建，并在日志中说明。主窗口的后端不受影响。注意，在 Windows 上，Vulkan 主窗口之上的 OpenGL 偏好设置窗口只能部分合成，因此 `--renderer=opengl`（同时切换两者）仍是更好的逃生通道。
+* 设置 `BONGO_CAT_VULKAN_VALIDATION=1` 可开启 Vulkan 校验层（需要 SDK 层位于 `PATH` 中；缺失时日志会提示）。
+
+## 赞助商
+
+<div align="center">
+  <table align="center">
+    <tr>
+      <td style="vertical-align: middle; padding-right: 10px;">
+        <img alt="SignPath" src="https://signpath.org/assets/favicon-50x50.png" />
+      </td>
+      <td style="vertical-align: middle;">
+        Windows 上的免费代码签名由
+        <a href="https://signpath.io">SignPath.io</a> 提供，证书由
+        <a href="https://signpath.org/">SignPath Foundation</a> 签发
+      </td>
+    </tr>
+  </table>
+</div>
+
+
 
 ## 🙏 特别感谢
 > [!TIP]
-> BongoCat 的每一步都得益于开源精神。我们衷心感谢所有社区贡献者的无私奉献（按贡献日期先后排序列于下方）。正是你们的支持，让桌面陪伴更加自由与真诚。❤️‍🔥
+> BongoCat 的每一步都得益于开源精神。我们衷心感谢所有社区贡献者的无私奉献。正是你们的支持，让桌面陪伴更加自由与真诚。❤️‍🔥
 
 
 <a href="https://bongocat.pet">
@@ -270,7 +320,9 @@ BONGOCAT_ENABLE_EVDEV=1 ./build/BongoCatTurbo
 ---
 
 <div align="center">
+
 版权所有 © 2026 - **BongoCat**<br>
 By vladelaina<br>
 Made with ❤️ & ⌨️
+
 </div>
