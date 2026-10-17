@@ -1,6 +1,6 @@
 <div align="center">
   <a href="https://bongocat.pet" target="_blank">
-    <img src="https://github.com/user-attachments/assets/dd693432-8342-440b-8a92-c9f57a96ffb4" alt="Catime" width="249">
+    <img src="https://github.com/user-attachments/assets/dd693432-8342-440b-8a92-c9f57a96ffb4" alt="BongoCat" width="249">
   </a>
   
   <h1>
@@ -19,25 +19,24 @@
 </p>
 <p align="center">
   <a href="https://github.com/Fid-falling/bongocat-turbo/blob/main/LICENSE"><img src="https://img.shields.io/badge/AGPL--3.0-1fa669?style=flat&logo=gnu&logoColor=white"></a>
-  <a href="https://github.com/Fid-falling/bongocat-turbo"><img src="https://img.shields.io/badge/C-A8B9CC?style=flat&logo=c&logoColor=white"></a>
-  <a href="https://discord.gg/vf8jqnattk"><img src="https://img.shields.io/badge/dynamic/json?url=https%3A%2F%2Fdiscord.com%2Fapi%2Finvites%2Fvf8jqnattk%3Fwith_counts%3Dtrue&query=%24.approximate_member_count&suffix=%20%E6%9C%83%E5%93%A1&logo=discord&logoColor=white&label=%20&color=7389D8&labelColor=6A7EC2"></a>
+  <a href="https://github.com/Fid-falling/bongocat-turbo"><img src="https://img.shields.io/badge/C-54AEFF?style=flat&logo=c&logoColor=white"></a>
+<a href="https://discord.gg/vf8jqnattk"><img src="https://img.shields.io/badge/Discord-F77DAA?logo=discord&logoColor=white"></a>
   <a href="https://github.com/Fid-falling/bongocat-turbo/blob/main/docs/wechat.png"><img src="https://img.shields.io/badge/WeChat-%2307C160?logo=wechat&logoColor=%2307C160&labelColor=FFFFFF"></a>
-  <a href="https://qm.qq.com/q/cYlRBbvuda"><img src="https://img.shields.io/badge/QQ-%2312B7F5?logo=qq&labelColor=FFFFFF"></a>
+  <a href="https://qm.qq.com/q/cYlRBbvuda"><img src="https://img.shields.io/badge/422616922-12B7F5?logo=qq&logoColor=12B7F5&labelColor=FFFFFF"></a>
 </p>
 
 
 <!-- 示範影片 -->
 <div align="center" style="margin-bottom: 30px;">
-  <video src="https://github.com/user-attachments/assets/75719230-9e49-4124-ae5a-8e35592c5d49
-" autoplay loop style="border-radius: 8px; max-width: 800px;"></video>
+  <video src="https://github.com/user-attachments/assets/75719230-9e49-4124-ae5a-8e35592c5d49" autoplay loop style="border-radius: 8px; max-width: 800px;"></video>
 </div>
 
+<img width="1149" height="904" alt="BongoCat Turbo 介面截圖" src="https://github.com/user-attachments/assets/aa376965-539e-4bbd-827d-bb9a29006069" />
 
 > [!TIP]
 > 本示範所使用的模型來自 [宇痕冫](https://space.bilibili.com/348616056)。
 >
 > 🎁 尋找**免費**模型？我們與才華洋溢的模型創作者合作，為您帶來豐富多樣的免費模型，同時持續探索更多有趣的桌面體驗！請瀏覽我們的官方網站：[bongocat.pet](https://bongocat.pet/models)
-
 
 <p align="center">
   <a href="https://bongocat.pet/models">
@@ -68,7 +67,7 @@ BongoCat 使用 CMake，需要 C11 編譯器、C++17 編譯器、CMake 3.24 或�
   ```bash
   sudo apt-get update
   sudo apt-get install -y build-essential cmake ninja-build \
-    libgl1-mesa-dev libx11-dev libxi-dev libxfixes-dev libcurl4-openssl-dev
+    libgl1-mesa-dev libx11-dev libxi-dev libxfixes-dev
   ```
 
 ### 🔧 配置與建置
@@ -144,8 +143,6 @@ cmake -S . -B build -G Ninja \
 
 ## 📌 專案狀態
 
-
-
 * 圖形後端：預設 Vulkan（OpenGL 作為回退），每次變更都會建置並驗證兩者。
 
 ## 📜 授權條款
@@ -153,7 +150,6 @@ cmake -S . -B build -G Ninja \
 BongoCat 原始碼和原生執行時期採用 [AGPL-3.0-only](../LICENSE) 授權。
 
 預設內建模型模式（`standard`）仍以 MIT 授權釋出。`resources/assets/models/standard`、`keyboard` 和 `gamepad` 中的模型資產，則受個別的 [MIT 授權聲明](../LICENSE-MIT) 規範。該 MIT 授權僅適用於模型資產及其附屬藝術作品，不適用於 BongoCat 原始碼或原生執行時期。
-
 
 ## 🧭 技術架構
 
@@ -181,7 +177,7 @@ BongoCat 原始碼和原生執行時期採用 [AGPL-3.0-only](../LICENSE) 授權
   模型更新 -> OpenGL 合成 -> 平台呈現
 ```
 
-Windows Raw Input 接收器、macOS Quartz 事件監聽，以及 Linux XInput2 監聽器均執行於主迴圈之外。按鍵和滑鼠按鈕邊緣事件進入有界原子佇列，移動量獨立合併，並透過 SDL 事件喚醒主執行緒。Windows 使用訊息專用視窗，以 `RIDEV_INPUTSINK | RIDEV_DEVNOTIFY` 訂閱背景鍵鼠輸入並保留一般視窗訊息；其他程式隱藏或鎖定游標時，模型使用裝置回報的移動量，桌面跟隨則讀取 SDL 提供的系統游標位置。裝置拔除或輸入桌面切換時會清理按下狀態。Windows 不再安裝輸入鉤子或使用 DirectInput，也不向遊戲傳送輸入。SDL3 視窗、偏好設定和遊戲控制器事件仍在主執行緒處理，平台監聽器不會直接呼叫 Live2D、覆疊層或 UI 程式碼。
+Windows Raw Input 接收器、macOS Quartz 事件監聽，以及 Linux XInput2 監聽器均執行於主迴圈之外。它們把帶時間戳的按鍵與滑鼠按鈕邊緣發布到有界原子佇列，並單獨合併指標移動，因此高頻移動不會擠掉有序的按鍵與按鈕邊緣。原生 SDL 喚醒事件負責通知主執行緒。Windows 使用獨立訊息視窗，以 `RIDEV_INPUTSINK | RIDEV_DEVNOTIFY` 訂閱背景鍵鼠輸入並保留一般視窗訊息；其他程式隱藏或鎖定游標時，模型使用裝置回報的移動量，桌面跟隨則讀取 SDL 提供的系統游標位置。接收器分別追蹤各裝置的按下狀態，在裝置拔除或切換輸入桌面時清理。它不安裝輸入鉤子、不使用 DirectInput，也不向遊戲傳送輸入。SDL3 視窗、偏好設定和遊戲控制器事件仍在主執行緒處理，遊戲控制器事件在到達模型參數或快捷鍵之前會被正規化。平台監聽器不會直接呼叫 Live2D、覆疊層或 UI 程式碼。
 
 `bongo_cat_app_run` 負責處理更新、關閉和輔助行程參數，為主要行程強制執行單一實例所有權，分配應用程式狀態，執行初始化，進入 `bongo_cat_app_loop`，然後依序清除狀態並釋放資源。初始化會載入配置和儲存路徑、定位資產、建立 SDL/OpenGL 寵物視窗、初始化平台後端、建立 Live2D、覆疊層和音訊服務、掃描內建／已安裝／鄰近模型來源，並載入可用的模型。`BongoCatApp` 擁有設定、工作階段狀態、模型與行為目錄、平台控制代碼，以及執行時期服務控制代碼。
 
@@ -192,7 +188,6 @@ Windows Raw Input 接收器、macOS Quartz 事件監聽，以及 Linux XInput2 �
 一般寵物路徑僅在視窗可見、未最小化且標記為髒污時才進行渲染。每個影格會清除背景、繪製模型，並合成指標、按鍵與特效覆疊層，最後呼叫平台呈現器。預覽操作可要求立即渲染，而擷取渲染則可能略過呈現。macOS 和 Linux 直接交換 SDL OpenGL 視窗。Windows 在圖層呈現未啟用時直接交換，否則會讀回影格供 `UpdateLayeredWindow` 使用。偏好設定 UI 擁有獨立的 SDL/OpenGL 視窗，且獨立於寵物視窗進行渲染和呈現。
 
 C 執行時期會呼叫 `include/bongo_cat/model.h` 中宣告的 ABI。Live2D 橋接與 Cubism 實作位於 `src/live2d`，且僅在啟用 Cubism SDK 時使用 C++17；其餘原生執行時期則使用 C11。Cubism 類型保留在不透明的 C 控制代碼之後，而 `src/live2d/live2d_stub.c` 則在 SDK 不可用時提供診斷後端。
-
 
 ```mermaid
 flowchart TB
@@ -254,20 +249,46 @@ flowchart TB
 
 不會。BongoCat 僅在本地處理鍵盤和滑鼠輸入，以驅動動畫和快捷鍵。它不會記錄或上傳您的按鍵、滑鼠動作或其他互動資料。配置也僅儲存在本地，且應用程式不含廣告、分析工具或使用者追蹤程式碼。執行更新檢查時，僅會請求公開的發行版本元資料；不會傳送輸入、配置或使用資料。
 
+### 📦 BongoCat 的檔案保存在哪裡？如何啟用攜帶模式？
+
+預設情況下，設定、模型、快取、日誌與工作階段狀態會保存在每位使用者的應用程式資料目錄中（Windows 為 `%LOCALAPPDATA%\BongoCat`，Linux 為 XDG 目錄，macOS 為 `~/Library`）。`--storage-root=DIR` 可在單次啟動中覆寫以上全部路徑。
+
+**攜帶模式**（偏好設定 → 應用程式 → 攜帶模式）會把所有內容移到執行檔旁邊的 `BongoCatData` 資料夾。開啟時會把設定和模型複製過去，關閉時會把缺少的內容合併回預設位置；快取從不複製，而是視需要重建。標記檔案是 `BongoCatData\portable.json`，因此要搬到另一台電腦或 USB 隨身碟，只需把程式和該資料夾一起複製，不需其他檔案。刪除 `portable.json` 即可回到預設位置。設定視窗一律顯示實際正在使用的資料夾。
+
+### 🎭 Live2D 模型不顯示，Cubism Core 執行時期在哪裡？
+
+BongoCat 既不內建也不下載它：請從 Live2D 官網取得 Cubism SDK for Native，並匯入一次 —— 參見 [Live2D Cubism Core 下載與匯入教學](live2d-core.md)（中文）。
+
+### Linux Wayland 輸入
+
+X11 預設使用 XInput2。Wayland 的實驗性 evdev 輸入預設關閉；閱讀
+[輸入權限風險](../SECURITY.md#linux-input) 後，可以為單次啟動明確啟用：
+
+```sh
+BONGOCAT_ENABLE_EVDEV=1 ./build/BongoCatTurbo
+```
+
+這個開關不會授予裝置權限。不要為此以 root 身分執行程式，或把帳號加入
+`input` 群組。原始輸入可能包含密碼欄位裡的按鍵，監聽不會在鎖定畫面或切換工作階段時自動暫停。
+結束程式才會停止監聽，隱藏寵物不會停止；不帶該變數重新啟動即可恢復預設後端。
+滑鼠跟隨使用未經加速的裝置位移，視窗定位、點擊穿透和置頂仍取決於 Wayland 合成器。
+
 ### 🖼️ 使用哪個圖形後端？
 
 原生執行環境**同時**內建 Vulkan 與 OpenGL 兩套渲染器。預設的 `auto` 會解析為 **Vulkan**，只有 Vulkan 探測失敗時才回退到 OpenGL。Vulkan 這條路徑已經追平功能：Live2D 渲染、環狀選單、模型封面擷取、影格稽核與冒煙測試都和 OpenGL 跑同一套上層程式碼、產出相同結果。
 
 可以在設定中選擇後端（`renderer`），或在 `settings.json` 裡用同一個鍵強制指定。有幾點值得知道：
 
+* 如果偏好設定視窗本身都畫不正確，你也不會被困住：`--renderer=opengl`（或更短的 `--opengl`）會在那一次執行中把整個應用程式強制切到 OpenGL，而且它**優先於 `settings.json`，並且不會回寫該檔案**。系統匣選單裡有同樣的開關，名為「渲染後端：<目前> -> <目標>」；切換它（或設定裡的分段控制項）會儲存設定並自動重新啟動應用程式，新後端立刻生效。`--help` 會列出所有選項和環境變數。在終端機裡執行 `BongoCat --help` 即可查看。
 * Vulkan 渲染器與 Cubism 橋接**刻意共用同一個** `VkDevice`。以前用過第二套裝置，在 RTSS / OBS / NVIDIA 這類假定「一個行程一個裝置」的疊加層下會崩潰。
 * Windows 10 上交換鏈只提供 `OPAQUE`。透明依然可用：我們先嘗試 `VK_COMPOSITE_ALPHA_PRE_MULTIPLIED_BIT_KHR`，只有驅動拒絕時才回退。
 * 兩個稽核工具（`live2d-visual-audit`、`live2d-viewer-audit`）仍然需要 OpenGL，因為它們要自己渲染一張離屏畫面。其餘部分都與後端無關。
 * 啟動記錄一定會印出「請求的後端」與「實際使用的後端」，不用猜自己用的是哪一個。
+* 如果次級視窗（偏好設定、環狀選單）完全無法用 Vulkan 繪製 —— 交換鏈建立失敗，或影格不再被呈現 —— 它會自行用 OpenGL 重建，並在日誌中說明。主視窗的後端不受影響。注意，在 Windows 上，Vulkan 主視窗之上的 OpenGL 偏好設定視窗只能部分合成，因此 `--renderer=opengl`（同時切換兩者）仍是更好的逃生通道。
+* 設定 `BONGO_CAT_VULKAN_VALIDATION=1` 可開啟 Vulkan 校驗層（需要 SDK 層位於 `PATH` 中；缺少時日誌會提示）。
 
 ## 專案狀態
 ![Alt](https://repobeats.axiom.co/api/embed/74334755a589dea40c5d31f8d2bcdc6c2bd39d87.svg "Repobeats analytics image")
-
 
 ## 🙏 特別感謝
 > [!TIP]
