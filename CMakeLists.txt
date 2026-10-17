@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.24)
-set(BONGO_CAT_VERSION "1.17.3")
+set(BONGO_CAT_VERSION "1.17.4")
 project(BongoCat VERSION ${BONGO_CAT_VERSION} DESCRIPTION "BongoCat Turbo" HOMEPAGE_URL "https://github.com/Fid-falling/bongocat-turbo" LANGUAGES C CXX)
 include(cmake/Version.cmake)
 include(FetchContent)
