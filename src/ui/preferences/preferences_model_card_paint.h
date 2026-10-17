@@ -17,5 +17,8 @@ void bongo_cat_preferences_model_card_draw_progress(
 void bongo_cat_preferences_model_card_draw_selection_badge(
     BongoCatPreferences *value, struct nk_command_buffer *canvas,
     struct nk_rect preview, BongoCatUIPalette palette, float amount);
+void bongo_cat_preferences_model_card_draw_corner_marker(
+    struct nk_command_buffer *canvas, float x, float y, float size,
+    float radius, struct nk_color color);
 
 #endif

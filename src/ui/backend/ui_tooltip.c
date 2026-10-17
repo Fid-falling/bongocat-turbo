@@ -117,3 +117,9 @@ void bongo_cat_ui_question_tooltip(struct nk_context *context,
         nk_strlen(question), font, nk_rgba(0, 0, 0, 0), palette.accent);
     if (hover) tooltip_multiline(context, reply, palette.pink);
 }
+
+void bongo_cat_ui_plain_tooltip(struct nk_context *context,
+    const char *text, struct nk_color color) {
+    if (!context || !text || !text[0]) return;
+    tooltip_multiline(context, text, color);
+}

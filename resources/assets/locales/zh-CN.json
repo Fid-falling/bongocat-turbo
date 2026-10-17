@@ -188,7 +188,9 @@
         },
         "random": {
           "configuring": "正在配置",
-          "defaultPet": "当前桌宠"
+          "defaultPet": "当前桌宠",
+          "include": "参与顺序切换模型",
+          "skip": "跳过顺序切换模型"
         },
         "hints": {
           "deleteSuccess": "已删除“%s”",

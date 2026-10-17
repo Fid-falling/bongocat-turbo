@@ -188,7 +188,9 @@
         },
         "random": {
           "configuring": "Configuring",
-          "defaultPet": "Current Pet"
+          "defaultPet": "Current Pet",
+          "include": "Include in sequential rotation",
+          "skip": "Skip in sequential rotation"
         },
         "hints": {
           "deleteSuccess": "Deleted \"%s\"",

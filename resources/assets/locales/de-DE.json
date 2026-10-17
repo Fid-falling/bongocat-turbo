@@ -188,7 +188,9 @@
         },
         "random": {
           "configuring": "Wird konfiguriert",
-          "defaultPet": "Aktuelles Haustier"
+          "defaultPet": "Aktuelles Haustier",
+          "include": "In sequentielle Rotation aufnehmen",
+          "skip": "Bei sequentieller Rotation überspringen"
         },
         "hints": {
           "deleteSuccess": "\"%s\" wurde gelöscht",

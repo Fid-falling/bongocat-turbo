@@ -188,7 +188,9 @@
         },
         "random": {
           "configuring": "설정 중",
-          "defaultPet": "현재 데스크톱 펫"
+          "defaultPet": "현재 데스크톱 펫",
+          "include": "순차 모델 전환에 포함",
+          "skip": "순차 모델 전환에서 건너뛰기"
         },
         "hints": {
           "deleteSuccess": "\"%s\" 모델을 삭제했습니다",

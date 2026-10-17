@@ -188,7 +188,9 @@
         },
         "random": {
           "configuring": "Configuration en cours",
-          "defaultPet": "Mascotte actuelle"
+          "defaultPet": "Mascotte actuelle",
+          "include": "Inclure dans la rotation séquentielle",
+          "skip": "Ignorer dans la rotation séquentielle"
         },
         "hints": {
           "deleteSuccess": "« %s » a été supprimé",
