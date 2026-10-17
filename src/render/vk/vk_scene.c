@@ -201,18 +201,6 @@ bool bongo_cat_vk_render_main(BongoCatApp *app, bool present) {
         SDL_LogWarn(SDL_LOG_CATEGORY_VIDEO,
             "[vulkan] 封面整帧回读入队失败 (%dx%d)", width, height);
 
-    /*
-     * 代理分层 (Vulkan 透明背景): 每帧入队一次整帧回读, 供下一次提交给代理窗口。
-     * 只在真开着透明 (layered_active) 时才排队, 普通 Vulkan 流程不付这份回读代价;
-     * 冒烟诊断本身就要这份整帧, 两者共用同一条回读, 别重复排。结果与命中/封面一样是
-     * 一帧延迟, 下一帧 begin_frame 里被 collect 后, 本函数末尾的 take 就能拿到。
-     */
-    if (present && !app->smoke &&
-        bongo_cat_platform_layered_active(&app->platform) &&
-        !bongo_cat_vk_queue_frame_sample(app->vk, 0, 0, width, height))
-        SDL_LogWarn(SDL_LOG_CATEGORY_VIDEO,
-            "[vulkan] 代理分层整帧回读入队失败 (%dx%d)", width, height);
-
     app->render_retry_ns = 0;
     bool presented = bongo_cat_vk_end_frame(app->vk);
     if (!presented) {
@@ -228,26 +216,6 @@ bool bongo_cat_vk_render_main(BongoCatApp *app, bool present) {
     if (reveal_startup) {
         bongo_cat_platform_set_visible(&app->platform, true);
         app->startup_visibility_pending = false;
-    }
-    /*
-     * 代理分层 (Vulkan 透明背景): 把上一帧整帧回读 (本帧 begin_frame 的 collect 已经
-     * 把结果放进 frame_pixels) 喂给代理窗口呈现。此刻 swapchain 也已经端出去一帧了
-     * (上面的 end_frame), 所以在普通流程里这里每帧跑一次, 代理窗口跟手。take 会消费
-     * frame_ready, 所以必须与上面的排队走同一套门控 (present && !smoke), 冒烟走它自己
-     * 的取用, 别两边抢同一份数据。未开透明时 submit 是 no-op, 普通 Vulkan 零开销。
-     */
-    if (present && !app->smoke) {
-        int sample_width = 0, sample_height = 0;
-        const unsigned char *sample = NULL;
-        if (bongo_cat_vk_take_frame_sample(app->vk, &sample_width, &sample_height,
-                &sample) && sample && sample_width >= width &&
-            sample_height >= height) {
-            if (!bongo_cat_platform_submit_layered_rgba(&app->platform,
-                    width, height, sample))
-                SDL_LogWarn(SDL_LOG_CATEGORY_VIDEO,
-                    "[vulkan] 代理分层提交失败 (回读 %dx%d -> 窗口 %dx%d)",
-                    sample_width, sample_height, width, height);
-        }
     }
     app->input_diagnostics.presented_frames++;
     app->dirty = false;

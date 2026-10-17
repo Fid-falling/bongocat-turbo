@@ -57,11 +57,6 @@ void bongo_cat_windows_layered_apply_mode(BongoCatWindowsLayered *value,
 /* 抓一帧 GL 前缓冲进内存 DC, 以及把 DIB 释放掉 (实现在 windows_layered_frame.c)。 */
 bool bongo_cat_windows_layered_capture(BongoCatWindowsLayered *value,
     int width, int height, int display_width, int display_height);
-/* Vulkan 专用: 把整帧回读 (RGBA, 第 0 行为视觉上方) 拷进内存 DC (实现在
-   windows_layered_frame.c)。内部处理 R/B 交换、垂直翻转与缩放 (如需)。 */
-bool bongo_cat_windows_layered_capture_rgba(BongoCatWindowsLayered *value,
-    int width, int height, int display_width, int display_height,
-    const unsigned char *rgba);
 void bongo_cat_windows_layered_release_frame(BongoCatWindowsLayered *value);
 /* 透明像素抬到 alpha=1, 让整窗矩形都能被点到(仅模态菜单, 见实现处的说明)。 */
 void bongo_cat_windows_layered_solidify_hit_area(BongoCatWindowsLayered *value);

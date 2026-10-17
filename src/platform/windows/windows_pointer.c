@@ -49,7 +49,7 @@ bool bongo_cat_platform_pointer_local(BongoCatPlatform *platform, double screen_
  *   1) 启动/设置重新下发 (bongo_cat_window_apply_transparency);
  *   2) 设置界面点"透明背景" (同上);
  *   3) 采集模式开关 (bongo_cat_platform_set_capture_only 里回调这里)。
- * 决策本身仍然只有两个输入: window.transparentBackground (与环境变量 BONGO_CAT_GL_TRANSPARENCY
+ * 决策本身仍然只有两个输入: window.glTransparency (与环境变量 BONGO_CAT_GL_TRANSPARENCY
  * 的强制覆盖, 见 windows_layered_window.c 的 helper) 和"仅在录屏软件中显示"。
  *
  * 注意穿透(forced: 设置里的"鼠标穿透"或悬停隐藏)刻意不在这里出现。代理会把真实窗口
@@ -65,7 +65,7 @@ void bongo_cat_platform_apply_transparency(BongoCatPlatform *platform) {
      * 不启用代理。
      */
     bool transparent = !platform->capture_only &&
-        bongo_cat_windows_layered_requested(platform->transparent_background);
+        bongo_cat_windows_layered_requested(platform->gl_transparency);
     bongo_cat_windows_layered_set_click_through(platform->presenter, transparent);
     /* 代理模式下真实窗口收不到鼠标消息, 必须在代理窗口上补一条转发, 否则拖不动。 */
     if (transparent)
@@ -92,13 +92,6 @@ void bongo_cat_platform_set_click_through(BongoCatPlatform *platform,
     HWND proxy = bongo_cat_windows_layered_proxy(window);
     bongo_cat_windows_borderless_set_click_through(proxy ? proxy : window, forced,
         pointer_transparent);
-    /* 直接呈现(proxy 为空, 即 Vulkan)没有代理窗口, 主窗口的 HTTRANSPARENT 无法把点击
-       穿到桌面/其它进程。这里再按 forced || pointer_transparent 单独切换 WS_EX_TRANSPARENT,
-       让点击能从系统层穿透过去; 每帧都会据此重新下发(见 window_hit.c 的 sync_click_through),
-       光标回到不透明像素时下一帧就清掉, 不会把整窗锁死成不可点。 */
-    if (!proxy)
-        bongo_cat_windows_borderless_set_pixel_transparent(window,
-            forced || pointer_transparent);
 }
 
 /* 把窗口抬到最前(托盘菜单或快捷键触发)。存在代理窗口时要一并抬起 —— 它才是

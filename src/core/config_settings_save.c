@@ -80,13 +80,11 @@ static bool write_window(yyjson_mut_doc *doc, yyjson_mut_val *object,
             value->font_raster_cap) &&
         yyjson_mut_obj_add_int(doc, object, "disableUiEffects",
             value->disable_effects) &&
-        /* 键名与 config_io.c 的 read_int("transparentBackground") 一一对齐。键名
-           从一开始的 glTransparency 改成了 transparentBackground (GL/Vulkan 共用后
-           旧名带误导语义)。
-           新键对更老的版本来说是未知键: 它们会原样忽略, 所以升级再回退只是丢掉这一
-           项, 不会让配置读取失败(新增键必须满足这条, 见本文件开头的契约)。 */
-        yyjson_mut_obj_add_int(doc, object, "transparentBackground",
-            value->transparent_background) &&
+        /* 键名/类型与 config_io.c 的 read_int("glTransparency") 一一对齐, 并沿用
+           1.17.0 的键名: 老配置里的取值不能因为改名而丢失(旧版本读到未知键只会忽略)。
+           这个键对老版本来说是已知键, 升级再回退都只是原样读写同一项。 */
+        yyjson_mut_obj_add_int(doc, object, "glTransparency",
+            value->gl_transparency) &&
         yyjson_mut_obj_add_bool(doc, object, "captureBackground",
             value->obs_background) &&
         yyjson_mut_obj_add_bool(doc, object, "randomExpression",

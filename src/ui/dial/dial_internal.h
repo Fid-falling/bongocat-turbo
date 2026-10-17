@@ -127,11 +127,11 @@ typedef struct Dial {
      */
     void *layered;
     /*
-     * window.transparentBackground 的快照 (来自 platform->transparent_background, 见 platform.h)。
+     * window.glTransparency 的快照 (来自 platform->gl_transparency, 见 platform.h)。
      * 菜单在打开的那一刻据此决定要不要挂代理呈现器 —— 菜单是模态的, 打开期间用户
      * 改不了设置, 所以一份快照就够, 不必每帧回查。
      */
-    bool transparent_background;
+    bool gl_transparency;
     /*
      * 强制这个菜单窗口用 OpenGL。由"上一次用 Vulkan 开菜单失败"置位 (建窗/首帧/
      * 连续提交失败), 见 dial_window.c 的 context_menu: 窗口的图形 API 标志在创建时

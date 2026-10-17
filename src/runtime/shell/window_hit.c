@@ -41,24 +41,11 @@ bool bongo_cat_window_visible_at_pointer(BongoCatApp *app, float x, float y) {
         /* Vulkan 路径没有可读的 GL 前后缓冲: 用渲染帧回读缓存下来的 alpha。
            Vulkan 图像第 0 行在视觉上方, 所以像素 y 不需要翻转。 */
         uint8_t alpha = 0;
-        static uint64_t last_vk_hit_log_ns;
-        const uint64_t hit_now = SDL_GetTicksNS();
-        const bool hit_got = bongo_cat_vk_hit_alpha(bongo_cat_vk_current(),
-            SDL_clamp((int)(x * pixel_width / width), 0, pixel_width - 1),
-            SDL_clamp((int)(y * pixel_height / height), 0, pixel_height - 1),
-            &alpha);
-        if (hit_now - last_vk_hit_log_ns > 500000000ull) {
-            last_vk_hit_log_ns = hit_now;
-            SDL_LogInfo(SDL_LOG_CATEGORY_VIDEO,
-                "[hit-probe] Vulkan visible_at_pointer (%.0f,%.0f) px=(%d,%d) "
-                "cache=%d alpha=%u px_w=%d px_h=%d -> %s",
-                x, y,
+        if (bongo_cat_vk_hit_alpha(bongo_cat_vk_current(),
                 SDL_clamp((int)(x * pixel_width / width), 0, pixel_width - 1),
                 SDL_clamp((int)(y * pixel_height / height), 0, pixel_height - 1),
-                hit_got, alpha, pixel_width, pixel_height,
-                hit_got && alpha > 8 ? "opaque" : "transparent");
-        }
-        if (hit_got) return alpha > 8;
+                &alpha))
+            return alpha > 8;
         /* 还没有回读结果 (刚启动或指针在缓存块之外): 先按不透明处理, 宁可多点
            一下, 也不要把窗口变成不可点。 */
         return true;
@@ -96,14 +83,6 @@ void bongo_cat_window_capture_pointer_hit(BongoCatApp *app) {
         !bongo_cat_platform_dynamic_hit_supported() ||
         app->settings.window.pass_through || app->hover_hidden ||
         app->left_mouse_down || app->right_mouse_down) return;
-    /*
-     * Vulkan 的回读是一帧异步延迟、且只覆盖指针附近一小块: 鼠标一移动指针常常就在
-     * 缓存之外, 立刻判"不透明"会把透明处误当成可点击, 随后又把 dirty 消费掉 ——
-     * 命中数据就无限期停留在过期状态, 透明处永远点不穿。Vulkan 没有 OpenGL 那样的
-     * 同步 glReadPixels, 这条"按下前即时判定"的语义对它不成立, 所以直接跳过, 把
-     * 判定完全交给帧路径的异步回读 (vk_scene 每帧的 schedule_hit_check 会持续排队)。
-     */
-    if (bongo_cat_renderer_active() == BONGO_CAT_RENDERER_VULKAN) return;
     float local_x, local_y;
     bool inside = bongo_cat_platform_pointer_local(&app->platform,
         app->pointer_x, app->pointer_y, &local_x, &local_y);
@@ -204,8 +183,7 @@ void bongo_cat_window_schedule_hit_check(BongoCatApp *app) {
    呈现路径被挂在一条逐帧变化的路径上 —— 命中测试的结果一抖, 用户刚打开的开关就跟着翻。 */
 void bongo_cat_window_apply_transparency(BongoCatApp *app) {
     if (!app || !app->window) return;
-    app->platform.transparent_background =
-        app->settings.window.transparent_background != 0;
+    app->platform.gl_transparency = app->settings.window.gl_transparency != 0;
     bongo_cat_platform_apply_transparency(&app->platform);
 }
 
@@ -217,14 +195,13 @@ void bongo_cat_window_apply_transparency(BongoCatApp *app) {
 void bongo_cat_window_sync_click_through(BongoCatApp *app) {
     if (!app || !app->window) return;
     /*
-     * window.transparentBackground 的镜像: 平台层读不到 BongoCatSettings, 而它要用这个值决定
+     * window.glTransparency 的镜像: 平台层读不到 BongoCatSettings, 而它要用这个值决定
      * 主窗口走不走代理分层呈现(见 windows_pointer.c)。只有值真的变了才下发, 且下发的
      * 是"设置"(不是命中结果) —— 设置界面改完 app->settings 后总会有一次穿透同步跑到
      * 这里, 所以开关不需要重启就能生效。
      */
-    bool transparent_background =
-        app->settings.window.transparent_background != 0;
-    if (app->platform.transparent_background != transparent_background) {
+    bool gl_transparency = app->settings.window.gl_transparency != 0;
+    if (app->platform.gl_transparency != gl_transparency) {
         bongo_cat_window_apply_transparency(app);
         app->click_through_valid = false;
     }
@@ -243,18 +220,6 @@ void bongo_cat_window_sync_click_through(BongoCatApp *app) {
             app->pointer_x, app->pointer_y, &local_x, &local_y);
         app->pointer_transparent = inside && !bongo_cat_window_visible_at_pointer(app,
             local_x, local_y);
-        static uint64_t last_sync_log_ns;
-        const uint64_t sync_now = SDL_GetTicksNS();
-        if (sync_now - last_sync_log_ns > 500000000ull) {
-            last_sync_log_ns = sync_now;
-            SDL_LogInfo(SDL_LOG_CATEGORY_VIDEO,
-                "[hit-probe] sync_click_through: pointer=(%.0f,%.0f) local=(%.0f,%.0f) "
-                "inside=%d visible=%d -> pointer_transparent=%d",
-                app->pointer_x, app->pointer_y, local_x, local_y,
-                inside,
-                bongo_cat_window_visible_at_pointer(app, local_x, local_y) ? 1 : 0,
-                app->pointer_transparent ? 1 : 0);
-        }
         app->pointer_hit_dirty = false;
         app->pointer_hit_deadline_ns = 0;
     }
@@ -263,18 +228,6 @@ void bongo_cat_window_sync_click_through(BongoCatApp *app) {
         app->click_through_forced_applied != forced;
     if (app->click_through_valid && !forced_changed &&
         app->click_through_applied == pointer_transparent) return;
-    static uint64_t last_apply_log_ns;
-    const uint64_t apply_now = SDL_GetTicksNS();
-    if (apply_now - last_apply_log_ns > 300000000ull) {
-        last_apply_log_ns = apply_now;
-        SDL_LogInfo(SDL_LOG_CATEGORY_VIDEO,
-            "[hit-probe] APPLY set_click_through: forced=%d ptr_trans=%d "
-            "(was valid=%d forced_applied=%d applied=%d)",
-            forced ? 1 : 0, pointer_transparent ? 1 : 0,
-            app->click_through_valid ? 1 : 0,
-            app->click_through_forced_applied ? 1 : 0,
-            app->click_through_applied ? 1 : 0);
-    }
     bongo_cat_platform_set_click_through(&app->platform, forced, pointer_transparent);
     app->click_through_applied = pointer_transparent;
     app->click_through_forced_applied = forced;

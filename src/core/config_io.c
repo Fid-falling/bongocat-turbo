@@ -118,8 +118,9 @@ static bool read_window(yyjson_val *object, BongoCatWindowPreferences *value,
         !read_int(object, "supersample", &value->supersample, error) ||
         !read_int(object, "fontRasterCap", &value->font_raster_cap, error) ||
         !read_int(object, "disableUiEffects", &value->disable_effects, error) ||
-        !read_int(object, "transparentBackground",
-            &value->transparent_background, error) ||
+        /* 键名沿用 1.17.0 的 glTransparency: 老配置里的取值必须原样读回来
+           (改名会让"原来开着的"升级后变成关闭, 而默认值又是 0, 用户根本不会发现)。 */
+        !read_int(object, "glTransparency", &value->gl_transparency, error) ||
         !read_bool(object, "captureBackground", &value->obs_background,
             error) ||
         !read_bool(object, "randomExpression", &value->random_expression,

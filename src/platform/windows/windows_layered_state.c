@@ -77,23 +77,6 @@ bool bongo_cat_platform_present(BongoCatPlatform *platform, int width, int heigh
     return bongo_cat_windows_layered_present(platform->presenter, width, height);
 }
 
-/* Vulkan 后端是否走代理分层 (Vulkan 整帧回读 -> submit_rgba)。
-   由 vk_scene.c 决定"要不要每帧排一次整帧回读": 只有真开着才排队, 免得普通
-   Vulkan 模式被整帧回读拖慢。 */
-bool bongo_cat_platform_layered_active(BongoCatPlatform *platform) {
-    BongoCatWindowsLayered *value = platform ? platform->presenter : NULL;
-    return value && value->active;
-}
-
-/* Vulkan 后端把整帧回读 (RGBA) 喂给代理分层呈现。窗口/呈现器语义全部交给
-   windows_layered.c 的 submit_rgba; 这里是平台适配层, 没有代理模式时直接返回 false。 */
-bool bongo_cat_platform_submit_layered_rgba(BongoCatPlatform *platform,
-    int width, int height, const unsigned char *rgba) {
-    if (!platform || !platform->presenter) return false;
-    return bongo_cat_windows_layered_submit_rgba(platform->presenter,
-        width, height, rgba);
-}
-
 /*
  * 显示 / 隐藏。隐藏时连代理窗口一起藏起来, 否则会出现"猫看不见了, 但还能点到
  * 一块区域"。

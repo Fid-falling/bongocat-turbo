@@ -32,21 +32,17 @@
  * 三个输入, 优先级从高到低:
  *   1) BONGO_CAT_GL_TRANSPARENCY: 调试用的强制覆盖, "1" 强制开、"0" 强制关。
  *      用户可感知的设置项是下面那个, 环境变量只留给排查问题的人;
- *   2) configured: 设置界面的[透明背景] (window.transparentBackground), 默认开启 ——
-      走代理分层呈现, 画面真正透明并支持透明处点穿; 代价是用户在 OBS 里按标题采集
-      "真实窗口"时拿到的是全透明画面(见 windows_pointer.c 的长注释);
- *   3) 渲染后端: 这套呈现有两个像素来源 —— GL 读前缓冲 (windows_layered_frame.c
- *      的 glReadPixels), Vulkan 没有可读的前缓冲, 由 vk_scene.c 把整帧回读的结果喂
- *      给代理呈现 (bongo_cat_windows_layered_submit_rgba, 走 vk_readback.c 的
- *      take_frame_sample)。两者都走同一套代理窗口, 所以 OpenGL 与 Vulkan 都放行,
- *      其它后端 (软件/无后端) 一律返回 false。
+ *   2) configured: 设置界面的[透明背景] (window.glTransparency), 默认关闭 ——
+ *      用户在 OBS 里按标题采集"真实窗口"时, 一开透明画面就卡住(见 windows_pointer.c
+ *      的长注释), 所以不做成默认行为;
+ *   3) 渲染后端: 这套呈现抓的是 GL 前缓冲 (windows_layered_frame.c 的 glReadPixels),
+ *      Vulkan 下没有可读的前缓冲, 强开只会让代理窗口显示一块无效内存合成的黑块,
+ *      所以非 OpenGL 后端一律返回 false。
  *
  * 主窗口与轮盘共用这一个判断, 否则会出现"猫透明了、菜单还是黑底"的半开状态。
  */
 bool bongo_cat_windows_layered_requested(bool configured) {
-    BongoCatRenderer renderer = bongo_cat_renderer_active();
-    if (renderer != BONGO_CAT_RENDERER_OPENGL &&
-        renderer != BONGO_CAT_RENDERER_VULKAN) return false;
+    if (bongo_cat_renderer_active() != BONGO_CAT_RENDERER_OPENGL) return false;
     const char *value = SDL_getenv("BONGO_CAT_GL_TRANSPARENCY");
     if (value && value[1] == '\0') {
         if (value[0] == '1') return true;

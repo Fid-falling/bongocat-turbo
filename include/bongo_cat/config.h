@@ -159,18 +159,21 @@ typedef struct BongoCatWindowPreferences {
     /* 1 = 关掉界面发光/阴影 (浅色主题每帧省约 5ms) */
     int disable_effects;
     /*
-     * 1 = 让宠物背景在桌面上真正透明 (默认 1 = 开启)。
+     * 1 = 让宠物背景在桌面上真正透明 (默认 0 = 关闭)。
      *
-     * 为什么需要它: 普通窗口直通的缓冲 alpha 交给系统合成时会被忽略, 猫以外的区域
-     * 只能显示成黑块 (Vulkan 直通交换链虽能原生合成透明, 却做不到逐像素点穿)。
-     * 开启后改走"代理分层呈现"(真实窗口压成全透明 + 一个分层代理窗口显示抓到的帧,
-     * 由系统按像素 alpha 判定点击穿透) —— OpenGL 与 Vulkan 共用这一个开关。
-     * 为什么是 int 而不是 bool: 配置读取走可选的 read_int, 缺键时保持默认值 1,
-     * 不会因为"键不存在"判定配置损坏。写入侧同样按 int 存。
+     * 为什么需要它: OpenGL 模式下普通窗口的缓冲 alpha 会被 DWM 忽略, 猫以外的区域
+     * 只能显示成黑块。开启后改走"代理分层呈现"(真实窗口压成全透明 + 一个分层代理
+     * 窗口显示抓到的帧, 见 windows_layered_window.c)。
+     * 只对 OpenGL 生效: Vulkan 走原生交换链呈现 (见 windows_layered_window.c 的
+     * bongo_cat_windows_layered_requested), 这个开关在那边是 no-op。
+     * 持久化键名沿用 1.17.0 的 glTransparency(不是新名): 改名会让老配置里的取值凭空
+     * 消失(旧版本读到未知键只会忽略), 而这个开关对用户的意义从来没变过。
+     * 为什么是 int 而不是 bool: 配置读取走可选的 read_int, 老配置文件缺键时保持
+     * 默认值 0, 不会因为"键不存在"判定配置损坏。写入侧同样按 int 存。
      * 代价: 录屏软件按标题采集"真实窗口"时拿到的是全透明画面, 要采代理窗口
      * (设置界面与文档里都写明了这一点)。
      */
-    int transparent_background;
+    int gl_transparency;
     bool obs_background;
     bool random_expression;
     bool random_motion;
