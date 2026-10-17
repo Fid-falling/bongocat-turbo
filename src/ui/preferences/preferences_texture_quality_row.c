@@ -38,7 +38,7 @@ void bongo_cat_preferences_texture_quality_row(BongoCatApp *app,
     selected = bongo_cat_pref_combo(context, "texture-quality",
         tr(app, "pages.preference.cat.labels.textureQuality", "Texture quality"),
         tr(app, "pages.preference.cat.hints.textureQuality",
-            "更高 = 模型自带的文字/署名/图标更清楚, 但更吃显存; 对下一个加载的模型生效"),
+            "越高模型上的小字越清楚，但更吃显存；对下一个加载的模型生效"),
         labels, count, selected);
     if (selected == app->settings.model.texture_quality) return;
     app->settings.model.texture_quality = selected;

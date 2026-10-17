@@ -284,7 +284,7 @@ static void performance_section(BongoCatPreferences *value,
         if (bongo_cat_pref_float(context, "render-scale", tr(app,
                 "pages.preference.cat.labels.renderScale", "Render scale"),
                 tr(app, "pages.preference.cat.labels.renderScaleHint",
-                    "更高 = 更清晰更平滑, 但更吃显卡/显存"),
+                    "越大边缘越平滑、越吃显卡；1.0 与以前一致，补不回贴图细节"),
                 BONGO_CAT_RENDER_SCALE_MIN, &render_scale,
                 BONGO_CAT_RENDER_SCALE_MAX, BONGO_CAT_RENDER_SCALE_STEP,
                 BONGO_CAT_RENDER_SCALE_DEFAULT)) {
