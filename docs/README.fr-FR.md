@@ -1,6 +1,6 @@
 <div align="center">
   <a href="https://bongocat.pet" target="_blank">
-    <img src="https://github.com/user-attachments/assets/dd693432-8342-440b-8a92-c9f57a96ffb4" alt="Catime" width="249">
+    <img src="https://github.com/user-attachments/assets/dd693432-8342-440b-8a92-c9f57a96ffb4" alt="BongoCat" width="249">
   </a>
 
   <h1>
@@ -18,24 +18,23 @@
 </p>
 <p align="center">
   <a href="https://github.com/Fid-falling/bongocat-turbo/blob/main/LICENSE"><img src="https://img.shields.io/badge/AGPL--3.0-1fa669?style=flat&logo=gnu&logoColor=white"></a>
-  <a href="https://github.com/Fid-falling/bongocat-turbo"><img src="https://img.shields.io/badge/C-A8B9CC?style=flat&logo=c&logoColor=white"></a>
-  <a href="https://discord.gg/vf8jqnattk"><img src="https://img.shields.io/badge/dynamic/json?url=https%3A%2F%2Fdiscord.com%2Fapi%2Finvites%2Fvf8jqnattk%3Fwith_counts%3Dtrue&query=%24.approximate_member_count&suffix=%20members&logo=discord&logoColor=white&label=%20&color=7389D8&labelColor=6A7EC2"></a>
+  <a href="https://github.com/Fid-falling/bongocat-turbo"><img src="https://img.shields.io/badge/C-54AEFF?style=flat&logo=c&logoColor=white"></a>
+<a href="https://discord.gg/vf8jqnattk"><img src="https://img.shields.io/badge/Discord-F77DAA?logo=discord&logoColor=white"></a>
   <a href="https://github.com/Fid-falling/bongocat-turbo/blob/main/docs/wechat.png"><img src="https://img.shields.io/badge/WeChat-%2307C160?logo=wechat&logoColor=%2307C160&labelColor=FFFFFF"></a>
-  <a href="https://qm.qq.com/q/cYlRBbvuda"><img src="https://img.shields.io/badge/QQ-%2312B7F5?logo=qq&labelColor=FFFFFF"></a>
+  <a href="https://qm.qq.com/q/cYlRBbvuda"><img src="https://img.shields.io/badge/422616922-12B7F5?logo=qq&logoColor=12B7F5&labelColor=FFFFFF"></a>
 </p>
 
 <!-- Vidéo de démonstration -->
 <div align="center" style="margin-bottom: 30px;">
-  <video src="https://github.com/user-attachments/assets/75719230-9e49-4124-ae5a-8e35592c5d49
-" autoplay loop style="border-radius: 8px; max-width: 800px;"></video>
+  <video src="https://github.com/user-attachments/assets/75719230-9e49-4124-ae5a-8e35592c5d49" autoplay loop style="border-radius: 8px; max-width: 800px;"></video>
 </div>
 
+<img width="1149" height="904" alt="Interface de BongoCat Turbo" src="https://github.com/user-attachments/assets/aa376965-539e-4bbd-827d-bb9a29006069" />
 
 > [!TIP]
 > Le modèle présenté dans cette démonstration provient de [宇痕冫](https://space.bilibili.com/348616056).
 >
 > 🎁 Vous cherchez des modèles **gratuits** ? Nous collaborons avec des créateurs de modèles talentueux pour vous proposer une grande variété de modèles gratuits, tout en explorant continuellement de nouvelles expériences de bureau amusantes ! Rendez-vous sur notre site officiel : [bongocat.pet](https://bongocat.pet/models)
-
 
 <p align="center">
   <a href="https://bongocat.pet/models">
@@ -74,7 +73,7 @@ contenant `CMakeLists.txt`).
   ```bash
   sudo apt-get update
   sudo apt-get install -y build-essential cmake ninja-build \
-    libgl1-mesa-dev libx11-dev libxi-dev libxfixes-dev libcurl4-openssl-dev
+    libgl1-mesa-dev libx11-dev libxi-dev libxfixes-dev
   ```
 
 ### 🔧 Configuration et compilation
@@ -163,8 +162,6 @@ cmake -S . -B build -G Ninja \
 
 ## 📌 État du projet
 
-
-
 * Graphismes : Vulkan par défaut (OpenGL en secours) ; les deux sont compilés et vérifiés à chaque changement.
 
 ## 📜 Licence
@@ -210,14 +207,17 @@ système d'entrée :
 
 Le récepteur Raw Input de Windows, l'event tap Quartz de macOS et l'écouteur
 XInput2 de Linux s'exécutent en dehors de la boucle principale. Les transitions
-des touches et des boutons utilisent une file atomique bornée ; les mouvements
-sont regroupés séparément et des événements SDL réveillent le thread principal.
+des touches et des boutons sont horodatées et publiées dans une file atomique
+bornée ; les mouvements du pointeur sont regroupés séparément, afin qu'un
+mouvement fréquent ne chasse pas les transitions ordonnées des touches et des
+boutons. Des événements SDL réveillent le thread principal.
 Windows utilise une fenêtre de messages avec `RIDEV_INPUTSINK | RIDEV_DEVNOTIFY`
 pour recevoir les entrées en arrière-plan, en conservant les messages ordinaires.
 Le modèle utilise les mouvements du périphérique lorsqu'une autre application
 masque ou verrouille le curseur ; SDL fournit sa position sur le bureau.
-Les états sont nettoyés au retrait d'un périphérique ou au changement de bureau.
-Windows n'installe plus de hooks d'entrée et n'utilise plus DirectInput.
+Le récepteur suit les appuis par périphérique et les nettoie au retrait d'un
+périphérique ou au changement de bureau d'entrée. Windows n'installe pas de
+hooks d'entrée, n'utilise pas DirectInput et n'envoie aucune entrée aux jeux.
 
 Les événements SDL3 liés aux fenêtres, aux préférences et aux manettes sont
 traités sur le thread principal, où les événements de manette sont normalisés
@@ -351,16 +351,78 @@ vérification de mise à jour est effectuée, l'application demande uniquement l
 métadonnées publiques des versions ; elle n'envoie aucune donnée d'entrée,
 de configuration ou d'utilisation.
 
+### 📦 Où BongoCat conserve-t-il ses fichiers, et comment activer le mode portable ?
+
+Par défaut, les réglages, les modèles, les caches, les journaux et l'état de
+session sont stockés dans le dossier de données applicatives de l'utilisateur
+(`%LOCALAPPDATA%\BongoCat` sous Windows, les dossiers XDG sous Linux, `~/Library`
+sous macOS). `--storage-root=DIR` remplace tous ces chemins pour un seul lancement.
+
+Le **mode portable** (Réglages → Application → Mode portable) déplace tout dans un
+dossier `BongoCatData` à côté de l'exécutable. L'activer y copie les réglages et
+les modèles ; le désactiver refusionne ce qui manque dans l'emplacement par
+défaut ; les caches ne sont jamais copiés, ils sont reconstruits à la demande.
+Le marqueur est `BongoCatData\portable.json` : pour migrer vers une autre machine
+ou une clé USB, il suffit donc de copier le programme avec ce dossier, rien
+d'autre n'est nécessaire. Supprimez `portable.json` pour revenir à l'emplacement
+par défaut. La fenêtre des réglages affiche toujours le dossier réellement utilisé.
+
+### 🎭 Le modèle Live2D ne s'affiche pas. Où se trouve le runtime Cubism Core ?
+
+BongoCat ne l'embarque pas et ne le télécharge pas : récupérez le SDK Cubism for
+Native sur le site officiel de Live2D et importez-le une fois — voir le
+[guide de téléchargement et d'import de Live2D Cubism Core](live2d-core.md) (en chinois).
+
+### Entrée Linux Wayland
+
+X11 utilise XInput2 par défaut. L'entrée evdev expérimentale pour Wayland est
+désactivée par défaut. Après avoir pris connaissance des
+[risques liés aux permissions d'entrée](../SECURITY.md#linux-input), elle peut
+être activée explicitement pour un lancement :
+
+```sh
+BONGOCAT_ENABLE_EVDEV=1 ./build/BongoCatTurbo
+```
+
+Ce commutateur n'accorde aucune permission sur les périphériques. N'exécutez pas
+l'application en root et n'ajoutez pas votre compte au groupe `input` pour y
+parvenir. L'entrée brute peut contenir des frappes saisies dans des champs de mot
+de passe, et la surveillance n'est pas suspendue lors du verrouillage de l'écran
+ou d'un changement de session. Seule la fermeture de l'application arrête la
+surveillance ; masquer le compagnon ne l'arrête pas. Relancez sans la variable
+pour revenir au backend par défaut. Le suivi de la souris utilise le mouvement
+non accéléré du périphérique ; le placement des fenêtres, le clic à travers et le
+mode toujours au premier plan dépendent encore du compositeur Wayland.
+
 ### 🖼️ Quel backend graphique est utilisé ?
 
 Le runtime natif embarque **les deux** moteurs de rendu, Vulkan et OpenGL. La valeur par défaut `auto` choisit **Vulkan** et ne retombe sur OpenGL que si la détection de Vulkan échoue. La voie Vulkan a atteint la parité fonctionnelle : rendu Live2D, menu radial, capture des couvertures de modèles, audits d'images et tests de fumée utilisent les mêmes couches supérieures qu'OpenGL et produisent le même résultat.
 
 Le backend se choisit dans les réglages (`renderer`) ou se force avec la même clé dans `settings.json`. À savoir :
 
+* Si la fenêtre des réglages elle-même ne s'affiche pas correctement, vous n'êtes
+  pas bloqué : `--renderer=opengl` (ou la forme courte `--opengl`) force toute
+  l'application sur OpenGL pour cette exécution, et il **a priorité sur
+  `settings.json` sans réécrire ce fichier**. Le menu de la zone de notification
+  propose le même commutateur sous la forme « Backend de rendu : <actuel> ->
+  <cible> » ; le changer (ou le contrôle segmenté des réglages) enregistre le
+  réglage et redémarre l'application automatiquement, si bien que le nouveau
+  backend est actif immédiatement. `--help` liste toutes les options et variables
+  d'environnement. Lancez `BongoCat --help` dans un terminal.
 * Le moteur Vulkan et le pont Cubism partagent **volontairement un seul** `VkDevice`. Un second périphérique plantait sous les overlays (RTSS / OBS / NVIDIA) qui supposent un périphérique par processus.
 * Sous Windows 10, la chaîne d'échange ne propose que `OPAQUE`. La transparence fonctionne quand même : on tente d'abord `VK_COMPOSITE_ALPHA_PRE_MULTIPLIED_BIT_KHR` et on ne recule que si le pilote refuse.
 * Deux outils d'audit (`live2d-visual-audit`, `live2d-viewer-audit`) ont toujours besoin d'OpenGL, car ils rendent leur propre image hors écran. Tout le reste est indépendant du backend.
 * Le journal de démarrage indique toujours le backend demandé et celui réellement utilisé.
+* Si une fenêtre secondaire (réglages, menu radial) ne peut pas du tout dessiner
+  avec Vulkan — la chaîne d'échange ne peut pas être créée, ou les images ne sont
+  plus présentées — elle se reconstruit elle-même avec OpenGL et l'indique dans le
+  journal. Le backend de la fenêtre principale n'est pas affecté. Notez qu'une
+  fenêtre de réglages OpenGL au-dessus d'une fenêtre principale Vulkan n'est que
+  partiellement composée sous Windows ; `--renderer=opengl` (qui bascule les deux)
+  reste donc la meilleure échappatoire.
+* Définissez `BONGO_CAT_VULKAN_VALIDATION=1` pour activer la couche de validation
+  Vulkan (nécessite la couche du SDK dans `PATH` ; le journal l'indique si elle
+  manque).
 
 ## État du projet
 

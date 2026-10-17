@@ -1,7 +1,7 @@
 
 <div align="center">
   <a href="https://bongocat.pet" target="_blank">
-    <img src="https://github.com/user-attachments/assets/dd693432-8342-440b-8a92-c9f57a96ffb4" alt="Catime" width="249">
+    <img src="https://github.com/user-attachments/assets/dd693432-8342-440b-8a92-c9f57a96ffb4" alt="BongoCat" width="249">
   </a>
 
   <h1>
@@ -20,25 +20,24 @@
 </p>
 <p align="center">
   <a href="https://github.com/Fid-falling/bongocat-turbo/blob/main/LICENSE"><img src="https://img.shields.io/badge/AGPL--3.0-1fa669?style=flat&logo=gnu&logoColor=white"></a>
-  <a href="https://github.com/Fid-falling/bongocat-turbo"><img src="https://img.shields.io/badge/C-A8B9CC?style=flat&logo=c&logoColor=white"></a>
-  <a href="https://discord.gg/vf8jqnattk"><img src="https://img.shields.io/badge/dynamic/json?url=https%3A%2F%2Fdiscord.com%2Fapi%2Finvites%2Fvf8jqnattk%3Fwith_counts%3Dtrue&query=%24.approximate_member_count&suffix=%20members&logo=discord&logoColor=white&label=%20&color=7389D8&labelColor=6A7EC2"></a>
+  <a href="https://github.com/Fid-falling/bongocat-turbo"><img src="https://img.shields.io/badge/C-54AEFF?style=flat&logo=c&logoColor=white"></a>
+<a href="https://discord.gg/vf8jqnattk"><img src="https://img.shields.io/badge/Discord-F77DAA?logo=discord&logoColor=white"></a>
   <a href="https://github.com/Fid-falling/bongocat-turbo/blob/main/docs/wechat.png"><img src="https://img.shields.io/badge/WeChat-%2307C160?logo=wechat&logoColor=%2307C160&labelColor=FFFFFF"></a>
-  <a href="https://qm.qq.com/q/cYlRBbvuda"><img src="https://img.shields.io/badge/QQ-%2312B7F5?logo=qq&labelColor=FFFFFF"></a>
+  <a href="https://qm.qq.com/q/cYlRBbvuda"><img src="https://img.shields.io/badge/422616922-12B7F5?logo=qq&logoColor=12B7F5&labelColor=FFFFFF"></a>
 </p>
 
 
 <!-- Video Demo -->
 <div align="center" style="margin-bottom: 30px;">
-  <video src="https://github.com/user-attachments/assets/75719230-9e49-4124-ae5a-8e35592c5d49
-" autoplay loop style="border-radius: 8px; max-width: 800px;"></video>
+  <video src="https://github.com/user-attachments/assets/75719230-9e49-4124-ae5a-8e35592c5d49" autoplay loop style="border-radius: 8px; max-width: 800px;"></video>
 </div>
 
+<img width="1149" height="904" alt="Antarmuka BongoCat Turbo" src="https://github.com/user-attachments/assets/aa376965-539e-4bbd-827d-bb9a29006069" />
 
 > [!TIP]
 > Model yang ditampilkan dalam demo ini berasal dari [宇痕冫](https://space.bilibili.com/348616056).
 >
 > 🎁 Mencari model **gratis**? Kami bekerja sama dengan kreator model berbakat untuk menghadirkan beragam model gratis, sambil terus mengeksplorasi pengalaman desktop yang lebih seru! Kunjungi situs resmi kami: [bongocat.pet](https://bongocat.pet/models)
-
 
 <p align="center">
   <a href="https://bongocat.pet/models">
@@ -163,8 +162,6 @@ cmake -S . -B build -G Ninja \
 
 ## 📌 Status Proyek
 
-
-
 * Grafis: Vulkan secara bawaan (OpenGL sebagai cadangan); keduanya dibangun dan diuji pada setiap perubahan.
 
 ## 📜 Lisensi
@@ -177,7 +174,6 @@ disertakan dalam `resources/assets/models/standard`, `keyboard`, dan `gamepad`
 dilindungi oleh [pemberitahuan lisensi MIT](../LICENSE-MIT) terpisah.
 Lisensi MIT tersebut hanya berlaku untuk aset model dan artwork pendampingnya;
 lisensi tersebut tidak mengubah lisensi kode sumber atau runtime native BongoCat.
-
 
 ## 🧭 Arsitektur Teknis
 
@@ -207,14 +203,16 @@ Listener platform
 ```
 
 Penerima Raw Input Windows, event tap Quartz macOS, dan listener XInput2 Linux
-berjalan di luar main loop. Perubahan tombol masuk ke antrean atomik berbatas,
-gerakan digabungkan secara terpisah, dan event SDL membangunkan thread utama.
+berjalan di luar main loop. Mereka memublikasikan edge tombol dan mouse dengan stempel waktu ke antrean
+atomik berbatas dan menggabungkan gerakan pointer secara terpisah, sehingga
+gerakan berfrekuensi tinggi tidak menggeser edge tombol dan mouse yang
+berurutan. Event SDL membangunkan thread utama.
 Windows memakai jendela khusus pesan dengan `RIDEV_INPUTSINK | RIDEV_DEVNOTIFY`
 untuk menerima input latar belakang sambil mempertahankan pesan jendela biasa.
 Model memakai gerakan perangkat ketika aplikasi lain menyembunyikan atau mengunci
-kursor; SDL menyediakan posisi kursor desktop. Status tombol dibersihkan ketika
-perangkat dilepas atau desktop input berganti. Windows tidak lagi memakai hook
-input atau DirectInput. Event jendela SDL3, preferensi, dan gamepad ditangani di thread utama,
+kursor; SDL menyediakan posisi kursor desktop. Penerima melacak input yang tertahan per perangkat dan membersihkannya saat
+perangkat dilepas atau desktop input berganti. Windows tidak memasang hook
+input, tidak memakai DirectInput, dan tidak mengirim input ke game. Event jendela SDL3, preferensi, dan gamepad ditangani di thread utama,
 tempat event gamepad dinormalisasi sebelum mencapai parameter model atau
 shortcut. Tidak ada listener platform yang memanggil kode Live2D, overlay, atau
 UI secara langsung.
@@ -264,7 +262,6 @@ menggunakan C++17 saat Cubism SDK diaktifkan; runtime native lainnya menggunakan
 C11. Tipe Cubism tetap berada di balik handle C yang opaque, sedangkan
 `src/live2d/live2d_stub.c` menyediakan backend diagnostik ketika SDK tidak
 tersedia.
-
 
 ```mermaid
 flowchart TB
@@ -332,20 +329,42 @@ pelacakan pengguna. Saat pemeriksaan pembaruan dilakukan, aplikasi hanya meminta
 metadata rilis publik; aplikasi tidak mengirim data input, konfigurasi, atau
 penggunaan.
 
+### 📦 Di mana BongoCat menyimpan berkasnya, dan bagaimana mengaktifkan mode portabel?
+
+Secara bawaan, pengaturan, model, cache, log, dan state sesi tersimpan di folder data aplikasi per pengguna (`%LOCALAPPDATA%\BongoCat` di Windows, folder XDG di Linux, `~/Library` di macOS). `--storage-root=DIR` menimpa semua jalur tersebut untuk satu kali peluncuran.
+
+**Mode portabel** (Pengaturan → Aplikasi → Mode portabel) memindahkan semua ke folder `BongoCatData` di samping executable. Saat diaktifkan, pengaturan dan model disalin ke sana; saat dinonaktifkan, isi yang hilang digabungkan kembali ke lokasi bawaan; cache tidak pernah disalin, tetapi dibuat ulang sesuai kebutuhan. Penandanya adalah `BongoCatData\portable.json`, jadi untuk pindah ke komputer lain atau USB, cukup salin program bersama folder tersebut — tidak perlu berkas lain. Hapus `portable.json` untuk kembali ke lokasi bawaan. Jendela pengaturan selalu menampilkan folder yang benar-benar dipakai.
+
+### 🎭 Model Live2D tidak muncul. Di mana runtime Cubism Core?
+
+BongoCat tidak menyertakan maupun mengunduhnya: dapatkan Cubism SDK for Native dari situs resmi Live2D lalu impor sekali — lihat [panduan unduh dan impor Live2D Cubism Core](live2d-core.md) (Bahasa Mandarin).
+
+### Input Linux Wayland
+
+X11 memakai XInput2 secara bawaan. Input evdev eksperimental untuk Wayland nonaktif secara bawaan. Setelah membaca [risiko izin input](../SECURITY.md#linux-input), Anda dapat mengaktifkannya secara eksplisit untuk satu kali peluncuran:
+
+```sh
+BONGOCAT_ENABLE_EVDEV=1 ./build/BongoCatTurbo
+```
+
+Sakelar ini tidak memberikan izin perangkat. Jangan menjalankan aplikasi sebagai root atau menambahkan akun ke grup `input` untuk itu. Input mentah bisa memuat ketikan dari kolom sandi dan pemantauan tidak otomatis berhenti saat layar dikunci atau sesi diganti. Pemantauan hanya berhenti bila aplikasi ditutup; menyembunyikan pet tidak menghentikannya. Jalankan tanpa variabel tersebut untuk kembali ke backend bawaan. Pelacakan mouse memakai gerakan perangkat tanpa akselerasi; penempatan jendela, klik-tembus, dan selalu di atas tetap bergantung pada compositor Wayland.
+
 ### 🖼️ Backend grafis mana yang dipakai?
 
 Runtime native menyertakan **keduanya**, perender Vulkan dan OpenGL. Nilai bawaan `auto` memilih **Vulkan**, dan hanya mundur ke OpenGL bila pemeriksaan Vulkan gagal. Jalur Vulkan sudah setara fiturnya: perenderan Live2D, menu radial, pengambilan sampul model, audit bingkai, dan uji asap memakai lapisan atas yang sama dengan OpenGL dan menghasilkan keluaran yang sama.
 
 Backend dipilih di Pengaturan (`renderer`), atau dipaksa dengan kunci yang sama di `settings.json`. Beberapa hal yang perlu diketahui:
 
+* Jika jendela Pengaturan sendiri tidak tergambar dengan benar, Anda tidak terjebak: `--renderer=opengl` (atau yang lebih pendek `--opengl`) memaksa seluruh aplikasi ke OpenGL untuk satu kali jalan itu, dan **menang atas `settings.json` tanpa menulis ulang berkas tersebut**. Menu tray memiliki sakelar yang sama sebagai “Render backend: <saat ini> -> <target>”; mengubahnya (atau kontrol tersegmentasi di Pengaturan) menyimpan pengaturan dan memulai ulang aplikasi secara otomatis, sehingga backend baru langsung aktif. `--help` mencantumkan semua opsi dan variabel lingkungan. Jalankan `BongoCat --help` di terminal.
 * Perender Vulkan dan jembatan Cubism **sengaja berbagi satu** `VkDevice`. Perangkat kedua dulu membuat crash di bawah overlay (RTSS / OBS / NVIDIA) yang mengasumsikan satu perangkat per proses.
 * Di Windows 10 swapchain hanya menyediakan `OPAQUE`. Transparansi tetap berfungsi: kami coba `VK_COMPOSITE_ALPHA_PRE_MULTIPLIED_BIT_KHR` lebih dulu dan hanya mundur bila driver menolak.
 * Dua alat audit (`live2d-visual-audit`, `live2d-viewer-audit`) masih butuh OpenGL karena merender bingkai offscreen sendiri. Sisanya tidak bergantung backend.
 * Log awal selalu mencetak backend yang diminta dan yang benar-benar dipakai.
+* Jika jendela sekunder (Pengaturan, menu radial) sama sekali tidak bisa menggambar dengan Vulkan — swapchain tidak dapat dibuat, atau frame berhenti dipresentasikan — jendela itu membangun ulang dirinya dengan OpenGL dan menyebutkannya di log. Backend jendela utama tidak terpengaruh. Perlu diingat bahwa jendela Pengaturan OpenGL di atas jendela utama Vulkan hanya dikomposit sebagian di Windows, jadi `--renderer=opengl` (yang mengganti keduanya) tetap merupakan jalan keluar yang lebih baik.
+* Setel `BONGO_CAT_VULKAN_VALIDATION=1` untuk mengaktifkan lapisan validasi Vulkan (memerlukan lapisan SDK di `PATH`; log akan memberi tahu bila tidak ada).
 
 ## Status Proyek
 ![Alt](https://repobeats.axiom.co/api/embed/74334755a589dea40c5d31f8d2bcdc6c2bd39d87.svg "Repobeats analytics image")
-
 
 ## 🙏 Ucapan Terima Kasih
 > [!TIP]
