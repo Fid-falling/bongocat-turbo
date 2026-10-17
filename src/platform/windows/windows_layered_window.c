@@ -123,15 +123,21 @@ static LRESULT CALLBACK layered_proxy_input_proc(HWND window, UINT message,
         wparam, lparam);
 }
 
-/* 幂等: 代理窗口只在启用代理时创建, 装过一次就不再装 (属性就是标记)。 */
-void bongo_cat_windows_layered_forward_input(HWND source) {
+/* 幂等: 代理窗口只在启用代理时创建, 装过一次就不再装 (属性就是标记)。
+   preserve_transparent 是强制整窗穿透的唯一开关: 采集模式/鼠标穿透/悬停隐藏下,
+   代理窗口必须一直保持 WS_EX_TRANSPARENT; 否则启动阶段最后一次透明重下发会把它清掉
+   (那一步本来是为了逐像素命中测试才摘的)。 */
+void bongo_cat_windows_layered_forward_input(HWND source,
+    bool preserve_transparent) {
     HWND proxy = bongo_cat_windows_layered_proxy(source);
     if (!source || !proxy) return;
     SDL_SetHint(SDL_HINT_MOUSE_FOCUS_CLICKTHROUGH, "1");
     LONG_PTR proxy_ex_style = GetWindowLongPtrW(proxy, GWL_EXSTYLE);
-    if (proxy_ex_style & WS_EX_TRANSPARENT)
-        SetWindowLongPtrW(proxy, GWL_EXSTYLE,
-            proxy_ex_style & ~WS_EX_TRANSPARENT);
+    LONG_PTR wanted_style = preserve_transparent ?
+        proxy_ex_style | WS_EX_TRANSPARENT :
+        proxy_ex_style & ~WS_EX_TRANSPARENT;
+    if (wanted_style != proxy_ex_style)
+        SetWindowLongPtrW(proxy, GWL_EXSTYLE, wanted_style);
     if (GetPropW(proxy, proxy_input_proc_property)) return;
     WNDPROC previous = (WNDPROC)GetWindowLongPtrW(proxy, GWLP_WNDPROC);
     if (!previous) return;
@@ -179,7 +185,7 @@ void *bongo_cat_windows_layered_window_attach(SDL_Window *window, SDL_Window *ow
      */
     bongo_cat_windows_layered_apply_mode(value, true);
     bongo_cat_windows_layered_forward_input(
-        bongo_cat_windows_layered_native_window(value));
+        bongo_cat_windows_layered_native_window(value), false);
     SDL_LogWarn(BONGO_CAT_LOG_LIFECYCLE,
         "[probe] 轮盘呈现路径: 代理分层=%d", value->proxy != NULL);
     return value;

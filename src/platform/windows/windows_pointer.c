@@ -67,9 +67,12 @@ void bongo_cat_platform_apply_transparency(BongoCatPlatform *platform) {
     bool transparent = !platform->capture_only &&
         bongo_cat_windows_layered_requested(platform->gl_transparency);
     bongo_cat_windows_layered_set_click_through(platform->presenter, transparent);
-    /* 代理模式下真实窗口收不到鼠标消息, 必须在代理窗口上补一条转发, 否则拖不动。 */
+    /* 代理模式下真实窗口收不到鼠标消息, 必须在代理窗口上补一条转发, 否则拖不动。
+       强制整窗穿透时不能把代理窗口的 WS_EX_TRANSPARENT 摘掉 —— 那正是穿透本体;
+       逐像素命中测试只在非强制时才需要"代理收消息再转发"。 */
     if (transparent)
-        bongo_cat_windows_layered_forward_input(native_window(platform));
+        bongo_cat_windows_layered_forward_input(native_window(platform),
+            platform->click_through_forced);
 }
 
 /*
@@ -86,9 +89,11 @@ void bongo_cat_platform_set_click_through(BongoCatPlatform *platform,
     HWND window = native_window(platform);
     /* 桌面上看不见的窗口不能有点得到的区域, 所以采集模式下强制整窗穿透。 */
     if (platform->capture_only) {
+        platform->click_through_forced = true;
         bongo_cat_windows_borderless_set_click_through(window, true, true);
         return;
     }
+    platform->click_through_forced = forced;
     HWND proxy = bongo_cat_windows_layered_proxy(window);
     bongo_cat_windows_borderless_set_click_through(proxy ? proxy : window, forced,
         pointer_transparent);

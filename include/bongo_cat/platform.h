@@ -25,6 +25,13 @@ typedef struct BongoCatPlatform {
      * 其它平台忽略这个字段。
      */
     bool gl_transparency;
+    /*
+     * 当前是否要求"强制整窗穿透"(设置里的鼠标穿透/悬停隐藏/采集模式)。Windows 的
+     * 代理分层路径会在重下发透明时清掉代理窗口的 WS_EX_TRANSPARENT(那是逐像素命中
+     * 测试需要的), 而强制穿透必须把它保留下来, 否则启动阶段最后一次"采集模式透明
+     * 重下发"会把刚设好的穿透清掉。见 windows_pointer.c 与 windows_layered_window.c。
+     */
+    bool click_through_forced;
 } BongoCatPlatform;
 
 typedef enum BongoCatMenuAction {

@@ -180,6 +180,14 @@ bool bongo_cat_window_behavior_self_test(BongoCatApp *app) {
     if (test_nth_behavior(app, BONGO_CAT_BEHAVIOR_MOTION, 0)) {
         const BongoCatBehaviorEntry *first = test_nth_behavior(app,
             BONGO_CAT_BEHAVIOR_MOTION, 0);
+        /*
+         * 一次性动作的勾选态按设计只在播放期间存在 (见 cubism_motion_playback.cpp 的
+         * expire_motion_runs / clear_motion_runs): 预览取消会 StopAllMotions 并清记账,
+         * 所以"预览前选中的一次性动作"取消后必须变成未选中; 持久型动作则必须保留。
+         * 下面的断言按这个语义分开, 而不是假定所有模型的首个动作都是持久型。
+         */
+        const bool first_persistent = bongo_cat_live2d_motion_persistent(
+            app->live2d, first->group, first->index);
         passed = bongo_cat_window_behavior_action(app,
             BONGO_CAT_MENU_MOTION_FIRST) && passed;
         char motions[BONGO_CAT_BEHAVIOR_CAP][BONGO_CAT_MENU_LABEL_CAP];
@@ -197,39 +205,58 @@ bool bongo_cat_window_behavior_self_test(BongoCatApp *app) {
             bongo_cat_shortcut_format(first_shortcut, shortcut_label, sizeof(shortcut_label));
             passed = strstr(motions[0], shortcut_label) != NULL && passed;
         }
-        /* hover 预览期间勾选态不能变: 预览是"试穿", 只有确认才写回会话。 */
-        memcpy(before, checked, motion_count * sizeof(before[0]));
-        size_t preview_position = test_nth_behavior(app,
-            BONGO_CAT_BEHAVIOR_MOTION, 1) ? 1 : 0;
-        BongoCatWindowMenuPreview preview;
-        bongo_cat_window_menu_preview_init(&preview, app);
-        bongo_cat_window_menu_preview(&preview,
-            BONGO_CAT_MENU_MOTION_FIRST + preview_position);
-        bongo_cat_window_behavior_labels(app, motions, checked, &motion_count,
-            expressions, &expression_count, &current_expression);
-        bool preview_stable = memcmp(before, checked,
-            motion_count * sizeof(before[0])) == 0;
-        passed = preview_stable && passed;
-        bongo_cat_window_menu_restore(&preview, BONGO_CAT_MENU_NONE);
-        passed = bongo_cat_live2d_motion_selected(app->live2d,
-            first->group, first->index) && passed;
-        passed = bongo_cat_window_behavior_action(app,
-            BONGO_CAT_MENU_MOTION_FIRST + preview_position) && passed;
-        bongo_cat_window_behavior_labels(app, motions, checked, &motion_count,
-            expressions, &expression_count, &current_expression);
-        passed = checked[preview_position] && passed;
-        const BongoCatBehaviorEntry *preview_entry = test_nth_behavior(app,
-            BONGO_CAT_BEHAVIOR_MOTION, preview_position);
-        BongoCatWindowMenuPreview cancel_preview;
-        bongo_cat_window_menu_preview_init(&cancel_preview, app);
-        bongo_cat_window_menu_preview(&cancel_preview,
-            BONGO_CAT_MENU_MOTION_FIRST + preview_position);
-        bongo_cat_window_menu_restore(&cancel_preview,
-            BONGO_CAT_MENU_MOTION_FIRST + preview_position);
-        passed = preview_entry && bongo_cat_window_menu_preview_applied(
-            &cancel_preview, BONGO_CAT_MENU_MOTION_FIRST + preview_position) &&
-            !bongo_cat_live2d_motion_selected(app->live2d,
-                preview_entry->group, preview_entry->index) && passed;
+        /*
+         * 预览用例需要有"另一个可见动作"才有意义: 只有一个动作时, 预览它等于切换当前
+         * 动作, "勾选态在预览期间不变"这个前提本身不成立。只有 1 个动作时跳过这一组
+         * (不是跳过整个自检), 后面的选中与开关断言仍然会跑。
+         */
+        bool preview_stable = true;
+        if (motion_count > 1) {
+            const size_t preview_position = 1;
+            const BongoCatBehaviorEntry *preview_entry = test_nth_behavior(app,
+                BONGO_CAT_BEHAVIOR_MOTION, preview_position);
+            const bool preview_persistent = preview_entry &&
+                bongo_cat_live2d_motion_persistent(app->live2d,
+                    preview_entry->group, preview_entry->index);
+            /* hover 预览期间勾选态不能变: 预览是"试穿", 只有确认才写回会话。 */
+            memcpy(before, checked, motion_count * sizeof(before[0]));
+            BongoCatWindowMenuPreview preview;
+            bongo_cat_window_menu_preview_init(&preview, app);
+            bongo_cat_window_menu_preview(&preview,
+                BONGO_CAT_MENU_MOTION_FIRST + preview_position);
+            bongo_cat_window_behavior_labels(app, motions, checked, &motion_count,
+                expressions, &expression_count, &current_expression);
+            preview_stable = memcmp(before, checked,
+                motion_count * sizeof(before[0])) == 0;
+            passed = preview_stable && passed;
+            bongo_cat_window_menu_restore(&preview, BONGO_CAT_MENU_NONE);
+            const bool first_after_restore =
+                bongo_cat_live2d_motion_selected(app->live2d, first->group,
+                    first->index);
+            passed = (first_persistent ? first_after_restore
+                : !first_after_restore) && passed;
+            passed = bongo_cat_window_behavior_action(app,
+                BONGO_CAT_MENU_MOTION_FIRST + preview_position) && passed;
+            bongo_cat_window_behavior_labels(app, motions, checked, &motion_count,
+                expressions, &expression_count, &current_expression);
+            passed = checked[preview_position] && passed;
+            /* 确认预览 (restore 传动作本身 = commit): 事务必须落定; 持久型动作还必须
+               保持选中。一次性动作确认后是否仍选中取决于它是否已经播完, 不能一概而论。 */
+            BongoCatWindowMenuPreview commit_preview;
+            bongo_cat_window_menu_preview_init(&commit_preview, app);
+            bongo_cat_window_menu_preview(&commit_preview,
+                BONGO_CAT_MENU_MOTION_FIRST + preview_position);
+            bongo_cat_window_menu_restore(&commit_preview,
+                BONGO_CAT_MENU_MOTION_FIRST + preview_position);
+            const bool commit_applied = preview_entry &&
+                bongo_cat_window_menu_preview_applied(&commit_preview,
+                    BONGO_CAT_MENU_MOTION_FIRST + preview_position);
+            const bool commit_selected = preview_entry &&
+                bongo_cat_live2d_motion_selected(app->live2d,
+                    preview_entry->group, preview_entry->index);
+            passed = commit_applied &&
+                (!preview_persistent || commit_selected) && passed;
+        }
         bool independent = false;
         for (size_t i = 1; i < motion_count && !independent; ++i) {
             passed = bongo_cat_window_behavior_action(app,
@@ -248,6 +275,11 @@ bool bongo_cat_window_behavior_self_test(BongoCatApp *app) {
          * 所以只在此时断言 independent。 */
         if (motion_count > 2 && strcmp(first->group, "CAT_motion_lock") == 0)
             passed = independent && passed;
+        /* 开关断言要求"点击前它是选中的": 上面的预览/独立性用例可能已经把它切走。 */
+        if (!bongo_cat_live2d_motion_selected(app->live2d, first->group,
+                first->index))
+            passed = bongo_cat_window_behavior_action(app,
+                BONGO_CAT_MENU_MOTION_FIRST) && passed;
         passed = bongo_cat_window_behavior_action(app,
             BONGO_CAT_MENU_MOTION_FIRST) && passed;
         bool paired = false;
@@ -262,11 +294,15 @@ bool bongo_cat_window_behavior_self_test(BongoCatApp *app) {
         }
         bool toggled_off = !bongo_cat_live2d_motion_selected(app->live2d,
             first->group, first->index);
-        passed = (!paired || toggled_off) && passed;
-        if (!passed) SDL_Log("Motion menu self-test failed: initial=%d "
-            "preview=%d count=%llu independent=%d off=%d",
+        /* 配对项与持久型动作点击后必须取消选中; 一次性非配对动作按设计会重播并保持
+           选中, 这种语义下不断言"取消"。 */
+        bool expects_off = paired || first_persistent;
+        passed = (!expects_off || toggled_off) && passed;
+        if (!passed) SDL_LogWarn(SDL_LOG_CATEGORY_APPLICATION,
+            "Motion menu self-test failed: initial=%d preview=%d count=%llu "
+            "independent=%d paired=%d persistent=%d off=%d",
             initial_passed, preview_stable, (unsigned long long)motion_count,
-            independent, toggled_off);
+            independent, paired, first_persistent, toggled_off);
     }
     passed = motion_lifecycle_self_test(app) && passed;
     passed = expression_self_test(app) && passed;

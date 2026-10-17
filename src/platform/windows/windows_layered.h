@@ -35,8 +35,11 @@ HWND bongo_cat_windows_layered_proxy(HWND source);
    另外这套呈现要读 GL 前缓冲, 非 OpenGL 后端一律返回 false。 */
 bool bongo_cat_windows_layered_requested(bool configured);
 /* 代理模式下真实窗口收不到鼠标消息, 由代理把鼠标消息转投给 source(幂等)。
-   为什么必须转、以及转发的坑, 见 windows_layered_window.c 的说明。 */
-void bongo_cat_windows_layered_forward_input(HWND source);
+   preserve_transparent = true 时保留代理窗口的 WS_EX_TRANSPARENT(强制整窗穿透);
+   为 false 时摘掉它, 让逐像素命中测试能收到鼠标消息。为什么必须转、以及转发的坑,
+   见 windows_layered_window.c 的说明。 */
+void bongo_cat_windows_layered_forward_input(HWND source,
+    bool preserve_transparent);
 
 /*
  * 第二个窗口(轮盘径向菜单)的接入口, 目前只有 src/ui/dial 用它。

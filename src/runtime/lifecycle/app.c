@@ -260,7 +260,10 @@ bool bongo_cat_app_initialize(BongoCatApp *app, int argc, char **argv,
         bool wheel = bongo_cat_window_wheel_self_test(app);
         bool tray = bongo_cat_tray_self_test(app->tray);
         bool wait = bongo_cat_window_wait_timeout_self_test();
-        SDL_Log("Menu self-test: menu=%d geometry=%d display=%d wheel=%d tray=%d wait=%d",
+        /* 用 WARN 而不是 SDL_Log: Release 构建的日志过滤器只放行 WARN+ 与自定义
+           INFO 分类, 默认 INFO 不会落盘 —— 而这行正是 --ci-menu 唯一的通过证据。 */
+        SDL_LogWarn(SDL_LOG_CATEGORY_APPLICATION,
+            "Menu self-test: menu=%d geometry=%d display=%d wheel=%d tray=%d wait=%d",
             menu, geometry, display, wheel, tray, wait);
         if (!menu || !geometry || !display || !wheel || !tray || !wait) {
             BongoCatError menu_error = {0};

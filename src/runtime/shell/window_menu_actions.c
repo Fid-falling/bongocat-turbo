@@ -224,6 +224,14 @@ bool bongo_cat_window_menu_self_test(BongoCatApp *app) {
         app->session.window.scale_percent == 120.0f &&
         app->session.window.opacity_percent == 50.0f &&
         bongo_cat_preferences_visible(app->preferences) && behavior;
+    /* 详细子结果只在失败时打: app.c 的那行只给出 menu=0, 排障时需要知道是哪一项。 */
+    if (!result) SDL_LogWarn(SDL_LOG_CATEGORY_APPLICATION,
+        "Context menu self-test detail: pass=%d top=%d scale=%.2f "
+        "opacity=%.2f preferences=%d behavior=%d",
+        app->settings.window.pass_through, app->settings.window.always_on_top,
+        (double)app->session.window.scale_percent,
+        (double)app->session.window.opacity_percent,
+        bongo_cat_preferences_visible(app->preferences), behavior);
     bongo_cat_preferences_close(app->preferences);
     return result;
 }
