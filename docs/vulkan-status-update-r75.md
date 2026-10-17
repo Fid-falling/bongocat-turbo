@@ -134,7 +134,7 @@ Vulkan 下更是连 GL 前缓冲都没有，代理永远拿不到新帧。
 
 ## 八、设置界面的图标 / logo 在 Vulkan 下变成纯色方块（已修复）
 
-设置界面里的贴图（logo、侧边栏图标、关闭按钮、Discord/QQ 徽标）在 Vulkan 下整体
+设置界面里的贴图（logo、侧边栏图标、关闭按钮、QQ 徽标）在 Vulkan 下整体
 画成纯色方块，文字却正常。
 
 根因在 `shaders/ui.frag`：它统一按**单通道遮罩**处理 —— `coverage = texture().r`、
