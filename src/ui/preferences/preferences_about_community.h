@@ -4,7 +4,7 @@
 #include "preferences_internal.h"
 
 /*
- * 社区区块 (Discord / QQ) 与"更多应用"标题。
+ * 社区区块 (只有 QQ 群) 与"更多应用"标题。
  * localized_link 的 animation_id 必须每个链接各不相同, 否则多个链接会共用一个悬停动画。
  */
 void bongo_cat_preferences_about_community(

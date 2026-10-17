@@ -1,5 +1,5 @@
 /*
- * "社区"区块: Discord / QQ 群两张卡片 + 请喝咖啡按钮。
+ * "社区"区块: 只有 QQ 群一张卡片 + 请喝咖啡按钮。
  *
  * 这一块和 about.c 里那两张推广卡片的分工: 这里的图是"图标"(走图标图集, 按 id 画),
  * 那里的图是"位图素材"(走纹理)。所以这里不需要图片文件, 换主题也不会变形。
@@ -97,23 +97,22 @@ void bongo_cat_preferences_about_localized_link(BongoCatPreferences *value,
 }
 
 /*
- * 一张社区卡片。brand 是各平台自己的品牌色 (Discord 蓝 / QQ 用主题强调色),
- * 卡片底色是"玻璃底混一点品牌色" —— 悬停时混入比例从 5.5% 提到 10%, 这个幅度是
- * 调出来的: 再高会盖掉文字对比度。
+ * QQ 群卡片。品牌色用主题强调色 (没有独立品牌色), 卡片底色是"玻璃底混一点强调色" ——
+ * 悬停时混入比例从 5.5% 提到 10%, 这个幅度是调出来的: 再高会盖掉文字对比度。
  * 右侧的小箭头是用两条线段拼的, 不是图标: 图标图集里没有这个形状。
+ *
+ * 历史上这里并排两张卡片 (Discord + QQ)。Discord 入口已按需求移除, 只剩 QQ;
+ * 单张卡片居中显示, 不留空槽 —— 所以下面直接写死一张卡片的布局, 不再有 index/数组。
  */
 static void community_link(BongoCatPreferences *value,
     struct nk_context *context, struct nk_command_buffer *canvas,
-    struct nk_rect bounds, int index, BongoCatUIPalette p) {
-    const char *labels[] = {"Discord", tr(value,
-        "native.support.qqGroup", "QQ Group")};
-    const char *details[] = {"https://discord.gg/vf8jqnattk", "422616922"};
-    const char *urls[] = {"https://discord.gg/vf8jqnattk",
-        "https://qm.qq.com/q/6ksRMCZIuA"};
-    struct nk_color brand = index ? p.accent : nk_rgb(88, 101, 242);
+    struct nk_rect bounds, BongoCatUIPalette p) {
+    const char *label = tr(value, "native.support.qqGroup", "QQ Group");
+    const char *detail = "422616922";
+    const char *url = "https://qm.qq.com/q/6ksRMCZIuA";
+    struct nk_color brand = p.accent;
     bool hover = nk_input_is_mouse_hovering_rect(&context->input, bounds);
-    char id[32]; snprintf(id, sizeof(id), "community-hover-%d", index);
-    float lift = bongo_cat_ui_animate_eased(context, id,
+    float lift = bongo_cat_ui_animate_eased(context, "community-hover",
         hover ? 1.0f : 0.0f, 220.0f, BONGO_CAT_UI_EASE_SWIFT);
     bounds.y -= 2.0f * lift;
     struct nk_color background = bongo_cat_ui_color_mix(p.surface_glass,
@@ -124,19 +123,19 @@ static void community_link(BongoCatPreferences *value,
     struct nk_rect mark = nk_rect(bounds.x + 12, bounds.y + 12, 44, 44);
     nk_fill_rect(canvas, mark, 14, brand);
     bongo_cat_preferences_icon_draw(value, canvas,
-        index ? BONGO_CAT_UI_ICON_QQ : BONGO_CAT_UI_ICON_DISCORD,
+        BONGO_CAT_UI_ICON_QQ,
         nk_rect(mark.x + 9.5f, mark.y + 9.5f, 25, 25), nk_rgb(255, 255, 255));
     text(canvas, nk_rect(bounds.x + 68, bounds.y + 13, bounds.w - 94, 22),
-        labels[index], value->ui.label_font, p.text);
+        label, value->ui.label_font, p.text);
     text(canvas, nk_rect(bounds.x + 68, bounds.y + 37, bounds.w - 94, 18),
-        details[index], value->ui.caption_font, p.muted);
+        detail, value->ui.caption_font, p.muted);
     nk_stroke_line(canvas, bounds.x + bounds.w - 22, bounds.y + 31,
         bounds.x + bounds.w - 17, bounds.y + 34, 1.5f, brand);
     nk_stroke_line(canvas, bounds.x + bounds.w - 17, bounds.y + 34,
         bounds.x + bounds.w - 22, bounds.y + 37, 1.5f, brand);
     if (hover) bongo_cat_ui_cursor_hover_rect(context, bounds,
         BONGO_CAT_UI_CURSOR_POINTER);
-    if (hit(context, bounds)) open_url(urls[index]);
+    if (hit(context, bounds)) open_url(url);
 }
 
 /* "请喝咖啡"胶囊按钮: 宽度按标签宽度 + 图标占位算出来, 所以换语言不会挤在一起 */
@@ -209,7 +208,7 @@ void bongo_cat_preferences_about_projects_heading(
         open_url("https://vladelaina.com");
 }
 
-/* 社区区块整体布局; 两张卡片横向并排, 中间留 18px 间隙 (280 + 18 = 298 的步进) */
+/* 社区区块整体布局; 现在只有一张 QQ 卡片, 水平居中 (不再留另一半空槽)。 */
 void bongo_cat_preferences_about_community(
     BongoCatPreferences *value, struct nk_context *context) {
     struct nk_rect bounds;
@@ -221,10 +220,8 @@ void bongo_cat_preferences_about_community(
     centered(canvas, nk_rect(bounds.x, bounds.y, bounds.w, 30),
         tr(value, "native.support.community", "Community"),
         value->ui.heading_font, p.text);
-    for (int i = 0; i < 2; ++i)
-        community_link(value, context, canvas,
-            nk_rect(bounds.x + bounds.w * .5f - 289 + i * 298,
-            bounds.y + 48, 280, 68), i, p);
+    community_link(value, context, canvas,
+        nk_rect(bounds.x + bounds.w * .5f - 140, bounds.y + 48, 280, 68), p);
     coffee(value, context, canvas,
         nk_rect(bounds.x, bounds.y + 136, bounds.w, 36), p);
 }
