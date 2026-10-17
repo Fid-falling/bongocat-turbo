@@ -80,7 +80,15 @@ static bool render(BongoCatApp *app, bool present) {
          */
         int width = 0, height = 0;
         SDL_GetWindowSizeInPixels(app->window, &width, &height);
-        return bongo_cat_model_cover_capture(app, width, height);
+        /*
+         * 与 GL 分支一致: 回读未就绪 (Vulkan 有一帧延迟) 或尺寸/分配失败都算"这一帧没完成",
+         * 必须进 defer 退避, 否则 retry_ns 恒为 0, 任务每帧都被无条件重抓, 变成忙循环。
+         */
+        if (!bongo_cat_model_cover_capture(app, width, height)) {
+            bongo_cat_model_cover_defer(app, "vk-readback-not-ready");
+            return false;
+        }
+        return true;
     }
 /* GL 上下文可能被设置窗口或其他路径抢走/暂时失效: 失败时标脏并在 1s 后重试, 不当成
    致命错误。Vulkan 路径没有这个问题 (它自己管上下文)。 */

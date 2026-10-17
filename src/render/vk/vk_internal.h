@@ -58,6 +58,7 @@ typedef struct BongoCatVkReadback {
 bool bongo_cat_vk_create_readbacks(BongoCatVk *vk, BongoCatError *error);
 void bongo_cat_vk_destroy_readbacks(BongoCatVk *vk);
 void bongo_cat_vk_collect_readback(BongoCatVk *vk);
+void bongo_cat_vk_discard_pending_frame_sample(BongoCatVk *vk);
 
 struct BongoCatVkTexture {
     VkImage image;

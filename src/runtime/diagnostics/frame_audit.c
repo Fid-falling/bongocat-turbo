@@ -10,6 +10,7 @@
 #include "bongo_cat/path.h"
 #include "bongo_cat/render.h"
 #include "bongo_cat/vk_backend.h"
+#include "model_cover.h"
 
 #include <SDL3/SDL_opengl.h>
 #include <stdio.h>
@@ -189,6 +190,17 @@ static void record_frame(BongoCatApp *app, const unsigned char *pixels,
  */
 void bongo_cat_frame_audit(BongoCatApp *app, int width, int height) {
     if (!app || !app->smoke || width < 2 || height < 2) return;
+    /*
+     * 封面捕获与冒烟诊断共用 Vulkan 的同一份**一次性**整帧回读 (见 vk_readback.c)。
+     * 诊断在渲染末尾先 take 的话, 主循环随后的封面 capture 永远只能拿到
+     * sample=0x0; 而封面任务会一直挂起重试, 于是两边互相饿死 —— 实测 --ci-smoke
+     * 下每帧一条 "Model cover readback not ready", 封面一次都写不出来。
+     * 封面优先: 只要有封面任务挂起, 本帧整帧诊断整体跳过 (不 take), 写完后的下一帧
+     * 自然恢复。非冒烟运行本来就在上一行返回, 零开销。
+     */
+    if (bongo_cat_renderer_active() == BONGO_CAT_RENDERER_VULKAN &&
+        bongo_cat_model_cover_pending(app))
+        return;
     /* Vulkan 的整帧回读有一帧延迟: 首帧取不到就保持未审计, 下一帧再试 */
     if (!app->smoke_frame_audited && log_first_frame(app, width, height))
         app->smoke_frame_audited = true;

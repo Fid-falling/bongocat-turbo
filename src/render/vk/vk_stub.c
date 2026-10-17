@@ -164,6 +164,10 @@ void bongo_cat_vk_release_cached_frames(BongoCatVk *vk) {
     (void)vk;
 }
 
+void bongo_cat_vk_discard_pending_frame_sample(BongoCatVk *vk) {
+    (void)vk;
+}
+
 /* 命中测试与整帧回读在这里恒为失败: 上层据此回退到几何判断/跳过诊断输出, 而不是
    以为"回读结果还没准备好"而一直等下去 */
 bool bongo_cat_vk_hit_alpha(const BongoCatVk *vk, int x, int y,

@@ -196,6 +196,27 @@ void bongo_cat_vk_release_cached_frames(BongoCatVk *vk) {
     vk->frame_ready = false;
 }
 
+/*
+ * 模型切换完成的瞬间调用: 作废整帧回读的已缓存结果与所有待采集 (pending/requested)
+ * 的整帧样本。
+ *
+ * 回读是异步的 (queue->下一帧 collect->take), 而提交切换那一帧的主循环 capture 会
+ * 立即渲染并 take —— 若此刻还留着一份切换前模型的旧回读, take 就会把旧模型的画面写进
+ * 新模型的封面。这里在每次切换时把"上一模型"可能残留的整帧像素全部扔掉, 让切换后的
+ * take 只能等到新模型渲染的那一帧, 也就是"切换完成之后再捕获"。
+ */
+void bongo_cat_vk_discard_pending_frame_sample(BongoCatVk *vk) {
+    if (!vk) return;
+    vk->frame_ready = false;
+    vk->frame_width = vk->frame_height = 0;
+    for (uint32_t i = 0; i < BONGO_CAT_VK_FRAMES_IN_FLIGHT; ++i) {
+        if (vk->readback[i].whole_frame) {
+            vk->readback[i].requested = false;
+            vk->readback[i].pending = false;
+        }
+    }
+}
+
 bool bongo_cat_vk_queue_hit_sample(BongoCatVk *vk, int x, int y) {
     if (!vk || !vk->frame_active || !vk->transfer_source) return false;
     const int tile = BONGO_CAT_VK_HIT_TILE;

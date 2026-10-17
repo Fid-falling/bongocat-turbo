@@ -64,24 +64,30 @@ static void flip_cover_pixels(unsigned char *pixels, int height, size_t pitch) {
     }
 }
 
-/* 取一帧 RGBA 像素。返回 malloc 的缓冲, 由调用方 free; 失败返回 NULL。
- * 副作用: Vulkan 分支会一次性取走 (take) 整帧样本, 之后再取要等下一次回读。
+/* 取一帧 RGBA 像素的**内容区** (ox,oy)-(rw,rh) (GL framebuffer 底部原点坐标), 返回 malloc
+ * 的缓冲, 由调用方 free; 失败返回 NULL。frame_* 是整帧 (窗口) 尺寸。
+ * 副作用: Vulkan 分支会一次性取走 (take) 帧样本, 之后再取要等下一次回读。
+ * 行序: GL 第 0 行是图像底部 → 翻行; Vulkan 第 0 行在视觉上方 → 不翻, 但 ox/oy 是
+ * GL 的底部原点, 进 VK 时要换算成顶部坐标系 (vk_oy)。
  */
-static unsigned char *read_cover_pixels(const char *path, int width,
-    int height, size_t pitch, size_t bytes) {
+static unsigned char *read_cover_pixels(const char *path,
+    int frame_width, int frame_height, int ox, int oy,
+    int rw, int rh, size_t pitch, size_t bytes) {
     /*
      * Vulkan 没有可读的 GL 前后缓冲: 用整帧回读的结果 (vk_readback.c)。
-     * Vulkan 图像第 0 行在视觉上方, 与 glReadPixels 相反, 所以这里不翻转。
+     * Vulkan 图像第 0 行在视觉上方, 与 glReadPixels 相反, 所以区域偏移要换算、但不翻行。
      */
     if (bongo_cat_renderer_active() == BONGO_CAT_RENDERER_VULKAN) {
         int sample_width = 0, sample_height = 0;
         const unsigned char *sample = NULL;
         if (!bongo_cat_vk_take_frame_sample(bongo_cat_vk_current(),
                 &sample_width, &sample_height, &sample) ||
-            sample_width < width || sample_height < height || !sample) {
+            sample_width < frame_width || sample_height < frame_height ||
+            !sample) {
             SDL_LogWarn(SDL_LOG_CATEGORY_VIDEO,
                 "Model cover readback not ready (Vulkan): path=%s sample=%dx%d "
-                "window=%dx%d", path, sample_width, sample_height, width, height);
+                "window=%dx%d", path, sample_width, sample_height,
+                frame_width, frame_height);
             return NULL;
         }
         unsigned char *copy = malloc(bytes);
@@ -91,9 +97,12 @@ static unsigned char *read_cover_pixels(const char *path, int width,
                 bytes, path);
             return NULL;
         }
-        for (int y = 0; y < height; ++y)
+        const int vk_oy = frame_height - (oy + rh);
+        for (int y = 0; y < rh; ++y)
             SDL_memcpy(copy + (size_t)y * pitch,
-                sample + (size_t)y * (size_t)sample_width * 4u, pitch);
+                sample + (size_t)(vk_oy + y) * (size_t)sample_width * 4u +
+                    (size_t)ox * 4u,
+                pitch);
         return copy;
     }
     unsigned char *pixels = malloc(bytes);
@@ -104,7 +113,7 @@ static unsigned char *read_cover_pixels(const char *path, int width,
         return NULL;
     }
     while (glGetError() != GL_NO_ERROR) {}
-    glReadPixels(0, 0, width, height, GL_RGBA, GL_UNSIGNED_BYTE, pixels);
+    glReadPixels(ox, oy, rw, rh, GL_RGBA, GL_UNSIGNED_BYTE, pixels);
     GLenum error = glGetError();
     if (error != GL_NO_ERROR) {
         SDL_LogWarn(SDL_LOG_CATEGORY_VIDEO,
@@ -113,7 +122,7 @@ static unsigned char *read_cover_pixels(const char *path, int width,
         free(pixels);
         return NULL;
     }
-    flip_cover_pixels(pixels, height, pitch);
+    flip_cover_pixels(pixels, rh, pitch);
     return pixels;
 }
 
@@ -153,17 +162,33 @@ bool bongo_cat_model_cover_capture(BongoCatApp *app, int width, int height) {
     int path_length = snprintf(path, sizeof(path), "%s", pending_path);
     if (path_length < 0 || (size_t)path_length >= sizeof(path)) return false;
     if (width < 2 || height < 2) return false;
-    /* Keep the desktop's native pixel size while bounding readback memory. */
-    if (width > 4096 || height > 4096) {
+    /*
+     * 独立通道里抓的是"模型内容区"而非整窗: 取 live2d 的内容视口 (模型主体所在的矩形),
+     * 摆脱对窗口分辨率、四周透明空白与 overlay 的依赖; 视口不可用时回退到整帧。
+     * ox/oy/rw/rh 是 GL framebuffer 底部原点坐标, 行序差异由 read_cover_pixels 内部处理。
+     */
+    int ox = 0, oy = 0, rw = width, rh = height;
+    if (bongo_cat_live2d_viewport(app->live2d, &ox, &oy, &rw, &rh) &&
+        rw >= 2 && rh >= 2 && ox >= 0 && oy >= 0 &&
+        ox + rw <= width && oy + rh <= height) {
+        SDL_LogInfo(SDL_LOG_CATEGORY_VIDEO, "Model cover uses content region: "
+            "%d,%d %dx%d (frame=%dx%d)", ox, oy, rw, rh, width, height);
+    } else {
+        ox = oy = 0;
+        rw = width;
+        rh = height;
+    }
+    /* Keep the model's native pixel density while bounding readback memory. */
+    if (rw > 4096 || rh > 4096) {
         SDL_LogWarn(SDL_LOG_CATEGORY_VIDEO,
             "Model cover refresh abandoned for unsupported size %dx%d: %s",
-            width, height, path);
+            rw, rh, path);
         bongo_cat_model_cover_finish(app);
         return true;
     }
-    size_t pitch = (size_t)width * 4;
-    size_t bytes = pitch * (size_t)height;
-    if (pitch / 4 != (size_t)width || bytes / pitch != (size_t)height) {
+    size_t pitch = (size_t)rw * 4;
+    size_t bytes = pitch * (size_t)rh;
+    if (pitch / 4 != (size_t)rw || bytes / pitch != (size_t)rh) {
         SDL_LogWarn(SDL_LOG_CATEGORY_VIDEO,
             "Model cover refresh skipped due to size overflow: %s", path);
         return false;
@@ -178,16 +203,17 @@ bool bongo_cat_model_cover_capture(BongoCatApp *app, int width, int height) {
         bongo_cat_model_cover_finish(app);
         return true;
     }
-    unsigned char *pixels = read_cover_pixels(path, width, height, pitch, bytes);
+    unsigned char *pixels = read_cover_pixels(path, width, height, ox, oy,
+        rw, rh, pitch, bytes);
     if (!pixels) return false;
     bool written = write_cover_png(temporary, path, pixels,
-        width, height, pitch);
+        rw, rh, pitch);
     free(pixels);
     if (!written) return false;
     bongo_cat_model_cover_finish(app);
     if (app->preferences)
         bongo_cat_preferences_model_cover_reload(app, path);
     SDL_Log("Model cover refreshed: path=%s (%dx%d) elapsed_ms=%.2f", path,
-        width, height, (double)(SDL_GetTicksNS() - started_ns) / 1000000.0);
+        rw, rh, (double)(SDL_GetTicksNS() - started_ns) / 1000000.0);
     return true;
 }
