@@ -8,18 +8,27 @@
  *
  * 看门狗把这段空白变成一个确定的结论与一个确定的自救动作:
  *   启动后 8 秒内没看到"首帧真的端出去", 就打一条 ERROR (后端/GPU/驱动/DPI/交换链参数/
- *   当前阶段), 然后把渲染后端写回 OpenGL 并自动重启一次 —— 复用既有的重启机制
- *   (application_restart.c: 先落盘、再还单实例锁、主循环末尾拉起新进程)。
+ *   当前阶段), 记一次"自动回退"(renderer_fallback_state.c), 然后把渲染后端切回 OpenGL
+ *   并自动重启一次 —— 复用既有的重启机制 (application_restart.c: 先落盘、再还单实例锁、
+ *   主循环末尾拉起新进程)。
  *
  * 三个不变量:
  *   1. 只在**启动后**计时: arm 在装配完成后调用, 不把模型加载的几秒算进去;
  *   2. "成功呈现"的判据是 bongo_cat_startup_ready() 被调用 (它只在第一帧真的端出去或
  *      窗口本来就不显示时被调), 不是"初始化返回了 true";
- *   3. 同一进程只回退一次。回退会把 settings 里写死 OpenGL, 所以下一次启动不会再选中
- *      Vulkan; 即便 OpenGL 也端不出帧, 看门狗也只会再打一条 ERROR, 不会再重启 —— 否则
- *      就是无限重启循环。
+ *   3. 同一进程只回退一次, 否则就是无限重启循环。回退不再把 settings 里的 renderer
+ *      写死 OpenGL (那是 1.17.6 的行为): 现在改由持久化的自动回退计数/暂停标志接管 ——
+ *      连续失败达到阈值后, 后续启动直接走 OpenGL (见 shell/window.c 的暂停判定)。
+ *      只有状态文件也写不进去时, 才退回"写死 settings"的硬保险。
+ *
+ * 测试钩子 (只在显式设置环境变量时生效, 默认零开销):
+ *   BONGO_CAT_TEST_FIRST_FRAME_TIMEOUT_MS=N  把 8 秒判定改成 N 毫秒;
+ *   BONGO_CAT_TEST_FIRST_FRAME_STALL=vulkan  强制"首帧永不呈现", 值给 vulkan 时只在
+ *                                            Vulkan 后端上生效 (重启到 OpenGL 后自然消失,
+ *                                            不会在事后污染日志)。
  */
 #include "runtime.h"
+#include "renderer_fallback_state.h"
 
 #include "bongo_cat/log.h"
 #include "bongo_cat/render.h"
@@ -27,6 +36,7 @@
 
 #include <SDL3/SDL.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 
 /*
@@ -50,6 +60,31 @@ const char *bongo_cat_first_frame_stage_name(void) {
     return current_stage;
 }
 
+/* 测试钩子: 想验证"首帧超时"这条真实故障路径, 不可能要求机器真的卡死, 所以允许把
+   判定时间改短。只接受纯数字; 写错时退回默认值并留一条 WARN, 免得测试以为钩子生效了。 */
+static uint64_t first_frame_timeout_ns(void) {
+    const char *value = SDL_getenv("BONGO_CAT_TEST_FIRST_FRAME_TIMEOUT_MS");
+    if (!value || !value[0]) return BONGO_CAT_FIRST_FRAME_TIMEOUT_NS;
+    char *end = NULL;
+    unsigned long long parsed = strtoull(value, &end, 10);
+    if (!end || *end || parsed > UINT64_MAX / 1000000ull) {
+        SDL_LogWarn(SDL_LOG_CATEGORY_VIDEO,
+            "[watchdog] 忽略非法的 BONGO_CAT_TEST_FIRST_FRAME_TIMEOUT_MS=%s", value);
+        return BONGO_CAT_FIRST_FRAME_TIMEOUT_NS;
+    }
+    return parsed * 1000000ull;
+}
+
+/* 测试钩子: 强制让看门狗认为"首帧从未呈现"。给 vulkan 时只在 Vulkan 后端上生效 ——
+   回退重启后的 OpenGL 进程不会再被注入, 日志里只剩真实链路。 */
+static bool first_frame_stalled(void) {
+    const char *value = SDL_getenv("BONGO_CAT_TEST_FIRST_FRAME_STALL");
+    if (!value || !value[0]) return false;
+    if (strcmp(value, "vulkan") == 0)
+        return bongo_cat_renderer_active() == BONGO_CAT_RENDERER_VULKAN;
+    return true;
+}
+
 void bongo_cat_first_frame_watchdog_arm(BongoCatApp *app) {
     started_ns = SDL_GetTicksNS();
     armed = true;
@@ -63,6 +98,13 @@ void bongo_cat_first_frame_watchdog_arm(BongoCatApp *app) {
      */
     if (!presented)
         presented = !app || !app->session.window.visible;
+    if (first_frame_stalled()) {
+        presented = false;
+        SDL_LogWarn(SDL_LOG_CATEGORY_VIDEO,
+            "[watchdog] 测试钩子: 强制首帧永不呈现 (后端=%s, 超时=%llums)",
+            bongo_cat_renderer_name(bongo_cat_renderer_active()),
+            (unsigned long long)(first_frame_timeout_ns() / 1000000ull));
+    }
     if (presented) current_stage = "not-visible";
 }
 
@@ -98,9 +140,9 @@ static void swapchain_summary(BongoCatApp *app, char *output, size_t capacity) {
         snprintf(output, capacity, "swapchain=(未创建)");
 }
 
-/* 首帧超时: 打一条能直接引用的 ERROR, 然后回退 OpenGL 并重启一次。 */
+/* 首帧超时: 打一条能直接引用的 ERROR, 记一次自动回退, 然后重启一次。 */
 static void first_frame_timed_out(BongoCatApp *app, uint64_t elapsed_ns) {
-    char gpu[224], swapchain[192];
+    char gpu[224], swapchain[192], detail[192];
     gpu_summary(app, gpu, sizeof(gpu));
     swapchain_summary(app, swapchain, sizeof(swapchain));
     float scale = 1.0f;
@@ -128,20 +170,28 @@ static void first_frame_timed_out(BongoCatApp *app, uint64_t elapsed_ns) {
     }
     fell_back = true;
     armed = false;
-    app->settings.model.renderer = BONGO_CAT_RENDERER_OPENGL;
-    app->dirty = true;
+    /* 记的是"这台机器上的 Vulkan 又失败了一次" —— 计数/暂停标志由下一次启动读取,
+       达到阈值后不再自动尝试 Vulkan。状态写不进去时该函数会退回旧保险 (写死
+       settings.renderer=opengl), 所以这里不重复处理。 */
+    snprintf(detail, sizeof(detail), "阶段=%s DPI=%.0f%% 窗口=%dx%d %s",
+        current_stage, (double)(scale * 100.0f), width, height, swapchain);
+    bongo_cat_renderer_fallback_note_failure(app,
+        BONGO_CAT_RENDERER_FALLBACK_REASON_TIMEOUT, detail, gpu);
     /* 先落盘: 重启动作在主循环末尾会先 flush, 但这里也显式刷一次 —— 即便重启被拦下
-       (无人值守), 用户下次手动启动也已经是 OpenGL 了。 */
+       (无人值守), 用户下次手动启动也会读到最新的自动回退状态。 */
     bongo_cat_config_store_flush(app);
     const bool restarting = bongo_cat_app_request_restart(app);
     SDL_LogError(SDL_LOG_CATEGORY_VIDEO,
-        "[watchdog] 首帧超时，已回退 OpenGL（写入配置 renderer=opengl），%s",
+        "[watchdog] 首帧超时，已回退 OpenGL（自动回退 %d 次%s），%s",
+        app ? app->renderer_fallback.consecutive_failures : 0,
+        app && bongo_cat_renderer_fallback_paused(app)
+            ? "，已暂停尝试 Vulkan" : "",
         restarting ? "正在自动重启" : "自动重启未执行，请手动重启");
 }
 
 void bongo_cat_first_frame_watchdog_update(BongoCatApp *app, uint64_t now) {
     if (!armed || presented) return;
     uint64_t elapsed = now - started_ns;
-    if (elapsed < BONGO_CAT_FIRST_FRAME_TIMEOUT_NS) return;
+    if (elapsed < first_frame_timeout_ns()) return;
     first_frame_timed_out(app, elapsed);
 }

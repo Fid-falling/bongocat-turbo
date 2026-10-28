@@ -97,7 +97,15 @@
           "supersampleQuality": "輪郭のなめらかさ",
           "performanceSettings": "パフォーマンス",
           "unlimitedFps": "無制限",
-          "renderer": "レンダラー"
+          "renderer": "レンダラー",
+          "rendererFallbackTitle": "このマシンでは Vulkan の起動に失敗したため、OpenGL に自動で切り替えました",
+          "rendererFallbackReason": "原因: %s",
+          "rendererFallbackReasonTimeout": "初回フレームのタイムアウト（8 秒以内に画面が出ない）",
+          "rendererFallbackReasonInit": "Vulkan の初期化に失敗",
+          "rendererFallbackFailures": "連続 %d 回失敗",
+          "rendererFallbackLastAt": "最終試行: %s",
+          "rendererFallbackPaused": "Vulkan の自動試行を停止しました",
+          "rendererFallbackRetry": "Vulkan を再試行"
         },
         "hints": {
         "rendererRestart": "設定を保存しました。反映するには BongoCat を手動で再起動してください。",

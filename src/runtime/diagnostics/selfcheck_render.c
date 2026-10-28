@@ -12,6 +12,7 @@
  * [切换并重启] 按钮, 那正是这台机器上唯一能立刻自救的动作。
  */
 #include "selfcheck_internal.h"
+#include "renderer_fallback_state.h"
 
 #include "bongo_cat/app.h"
 #include "bongo_cat/log.h"
@@ -156,6 +157,35 @@ void bongo_cat_selfcheck_render(BongoCatSelfCheckBuilder *builder,
         bongo_cat_selfcheck_add(builder, BONGO_CAT_SELFCHECK_PASS, "当前后端",
             "%s（配置=%s）", bongo_cat_renderer_name(active),
             bongo_cat_renderer_name(configured));
+    /*
+     * 自动回退记录: 只在**真的有记录**时出现 —— 正常机器上自检项数保持不变 (26 项)。
+     * 与上面那条"当前后端"分开写是有意的: 那条说的是本次运行的现状, 这条是历史证据。
+     * 用户换了机器/修好驱动之后记录仍然要能看到, 并告诉他怎么一键重置。状态为 WARN
+     * 而不是 FAIL: OpenGL 已经在正常工作, 这不是当前故障, 只是"别再自动踩坑"的提醒。
+     */
+    if (bongo_cat_renderer_fallback_recorded(app)) {
+        const BongoCatRendererFallbackState *state = &app->renderer_fallback;
+        char detail[BONGO_CAT_SELFCHECK_DETAIL_CAP];
+        int used = snprintf(detail, sizeof(detail),
+            "Vulkan 在这台机器上已连续自动回退 %d 次（最近一次 %s，原因：%s）",
+            state->consecutive_failures,
+            state->last_failure_at[0] ? state->last_failure_at : "时间未记录",
+            bongo_cat_renderer_fallback_reason_label(state->last_reason));
+        if (used > 0 && (size_t)used < sizeof(detail) && state->last_gpu[0])
+            used += snprintf(detail + used, sizeof(detail) - (size_t)used,
+                "；显卡 %s", state->last_gpu);
+        if (used > 0 && (size_t)used < sizeof(detail) && state->last_detail[0])
+            used += snprintf(detail + used, sizeof(detail) - (size_t)used,
+                "；%s", state->last_detail);
+        if (used > 0 && (size_t)used < sizeof(detail))
+            snprintf(detail + used, sizeof(detail) - (size_t)used, "%s",
+                state->auto_disabled
+                    ? "；已暂停自动尝试 Vulkan（下次启动直接 OpenGL），"
+                      "可在 设置 → 性能 点「再试一次 Vulkan」重置"
+                    : "；下次启动仍会再尝试一次 Vulkan（连续 2 次失败后暂停）");
+        bongo_cat_selfcheck_add(builder, BONGO_CAT_SELFCHECK_WARN,
+            "自动回退记录", "%s", detail);
+    }
     /*
      * Vulkan 首帧探测。这一次调用同时给出设备信息与呈现结果 —— 失败时它已经把
      * "走到了哪一步、驱动给了什么返回码"写进 error 与各字段里 (见 vk_selfcheck.c)。

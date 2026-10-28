@@ -11,6 +11,7 @@
  * 副宠进程不写 settings (只写自己的 session); SMOKE 运行完全不落盘, 保证 CI 可复现。
  */
 #include "runtime.h"
+#include "renderer_fallback_state.h"
 #include "bongo_cat/log.h"
 #include "bongo_cat/path.h"
 
@@ -203,6 +204,10 @@ void bongo_cat_config_store_load(BongoCatApp *app) {
         handle_rejected_configuration("Session", app->session_path,
             loaded, &app->session_store_blocked);
     }
+    /* 自动回退记忆与 settings/session 无关, 但它和"这次启动用哪个后端"直接相关, 所以在
+       配置加载阶段一起读出来 (路径已经由 startup_prepare 解析好)。读取失败只会得到空
+       记录, 绝不影响启动; 详见 renderer_fallback_state.c。 */
+    bongo_cat_renderer_fallback_load(app);
     /* 没有可用配置时把 saved_hash 取反: 主循环第一轮就会认为"与磁盘不一致", 于是把
        默认设置写出来, 下一次启动就有文件可读了。 */
     uint64_t settings = settings_hash(&app->settings);

@@ -129,6 +129,11 @@ void bongo_cat_preferences_window_transparency(BongoCatApp *app,
    (runtime/lifecycle/renderer_switch.c, 与托盘菜单同一个实现)。 */
 void bongo_cat_preferences_renderer_row(BongoCatApp *app,
     struct nk_context *context);
+/* [性能] 区"渲染后端"上方的自动回退提示条 (定义在
+   preferences_renderer_fallback.c): 只在发生过自动回退时出现, 带一个
+   「再试一次 Vulkan」按钮 (走同一条共享切换路径)。 */
+void bongo_cat_preferences_renderer_fallback(BongoCatApp *app,
+    struct nk_context *context);
 /* [性能] 区的"纹理质量"下拉 (model.texture_quality)。定义在
    preferences_texture_quality_row.c: 图集上传前的工作尺寸上限, 默认标准档 (2048)。 */
 void bongo_cat_preferences_texture_quality_row(BongoCatApp *app,

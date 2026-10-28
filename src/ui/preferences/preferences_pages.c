@@ -268,6 +268,10 @@ static void performance_section(BongoCatPreferences *value,
         app->settings.model.vsync = perf_vsync ? 1 : 0;
         app->dirty = true;
     }
+    /* 自动回退提示条: 只在发生过自动回退时出现, 排在渲染后端那一行**上方** ——
+       它解释的正是"下面这个后端为什么显示成 Vulkan/实际却在用 OpenGL", 以及怎么重试。
+       没有记录时这一行完全不占空间。 */
+    bongo_cat_preferences_renderer_fallback(app, context);
     /* 渲染后端: 实现在 preferences_renderer_row.c (它要同时管"写配置 -> 确认框 ->
        重启"和"被拒也要留痕", 与托盘那一项共用 runtime 里的同一份实现)。
        排在上面两行之后: 帧率与垂直同步决定"这一帧什么时候出", 后端决定"用什么画",

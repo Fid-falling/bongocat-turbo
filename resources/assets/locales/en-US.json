@@ -97,7 +97,15 @@
           "supersampleQuality": "Edge smoothness",
           "performanceSettings": "Performance",
           "unlimitedFps": "Unlimited",
-          "renderer": "Renderer"
+          "renderer": "Renderer",
+          "rendererFallbackTitle": "Vulkan failed to start on this machine; switched to OpenGL automatically",
+          "rendererFallbackReason": "Reason: %s",
+          "rendererFallbackReasonTimeout": "First-frame timeout (no frame within 8 s)",
+          "rendererFallbackReasonInit": "Vulkan initialization failed",
+          "rendererFallbackFailures": "%d consecutive failures",
+          "rendererFallbackLastAt": "Last attempt: %s",
+          "rendererFallbackPaused": "Automatic Vulkan attempts are paused",
+          "rendererFallbackRetry": "Try Vulkan again"
         },
         "hints": {
         "rendererRestart": "Setting saved. Restart BongoCat manually to apply it.",

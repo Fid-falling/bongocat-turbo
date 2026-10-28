@@ -58,6 +58,32 @@ typedef struct BongoCatModelSwitchShadow {
     bool context_activated;
 } BongoCatModelSwitchShadow;
 
+/*
+ * "自动回退 OpenGL" 的持久化记忆 (状态文件由 runtime/lifecycle/renderer_fallback_state.c
+ * 负责读写, 不写进 settings.json: 它是这台机器上的运行证据, 不是用户偏好)。
+ *
+ * 为什么必须有它: 看门狗回退一次之后, 用户下次手动改回 Vulkan 还会再卡一次, 而界面上
+ * 除了日志没有任何线索。把连续失败次数、最近原因与"是否已暂停自动尝试"留下来, 才能让
+ * 设置页给出可见提示、也才能避免无休止地重试一个已知会卡死的后端。
+ *
+ * 字段全部是自包含的定长缓冲: 这份状态要能在启动最早期 (设置还未加载完) 被读出来, 不能
+ * 依赖堆分配, 也不能因为一次读写失败影响启动。
+ */
+typedef struct BongoCatRendererFallbackState {
+    /* 连续自动回退次数: 只在自动回退时 +1, 成功启动 Vulkan 或用户手动重试时归零 */
+    int consecutive_failures;
+    /* 达到阈值后置位: 之后的启动不再自动尝试 Vulkan (直接 OpenGL), 直到用户明确重试 */
+    bool auto_disabled;
+    /* 最近一次失败的原因枚举字符串 (first-frame-timeout / init-failed), 不本地化 */
+    char last_reason[48];
+    /* 给界面/自检看的一句原因摘要 (阶段/驱动返回码等), 可以本地化, 允许为空 */
+    char last_detail[192];
+    /* 失败时的显卡/驱动摘要 (首帧超时时能拿到; 初始化失败时通常为空) */
+    char last_gpu[160];
+    /* 失败时间戳, 格式与日志一致 (带 UTC 偏移), 允许为空 */
+    char last_failure_at[64];
+} BongoCatRendererFallbackState;
+
 typedef struct BongoCatApp {
     BongoCatSettings settings;
     BongoCatSessionState session;
@@ -239,6 +265,9 @@ typedef struct BongoCatApp {
      * 通道, 所以它的优先级必须高于配置。覆盖只作用于本次运行, 不写回配置。
      */
     int renderer_override;
+    /* 自动回退记忆 (见上面的 BongoCatRendererFallbackState): 由 config 加载之后读入,
+       看门狗/初始化失败/手动重试/成功启动时更新。零值 = 没有回退记录。 */
+    BongoCatRendererFallbackState renderer_fallback;
     /*
      * 这次运行带了 --ci-* 参数 (无人值守/自测)。与 smoke 分开是因为 --ci-menu 这类
      * 参数并不置 smoke: 它们照样会走真实菜单回调, 而模态弹窗 (SDL_ShowSimpleMessageBox)

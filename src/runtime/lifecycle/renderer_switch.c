@@ -23,6 +23,7 @@
  */
 #include "runtime.h"
 #include "preferences_notice.h"
+#include "renderer_fallback_state.h"
 
 #include "bongo_cat/i18n.h"
 #include "bongo_cat/log.h"
@@ -85,6 +86,15 @@ bool bongo_cat_app_switch_renderer(BongoCatApp *app, BongoCatRenderer target,
         renderer_rejected(app, target, entry);
         return false;
     }
+    /*
+     * 用户手动把后端设为 Vulkan = 明确要求"再试一次": 清空自动回退计数与暂停标志。
+     * 必须排在可用性检查之后 —— 被拒的切换不能把证据也一起清掉。
+     * 只认 Vulkan: 选 AUTO 不等于"再试一次"(AUTO 的自动尝试恰恰是被暂停标志拦下的那
+     * 一条), 要重试就得明确点 Vulkan/提示条上的按钮。清空要发生在落盘与重启之前,
+     * 新进程才不会又读到"已暂停"。
+     */
+    if (target == BONGO_CAT_RENDERER_VULKAN)
+        bongo_cat_renderer_fallback_note_manual_retry(app, entry_name(entry));
     const BongoCatRenderer previous = app->settings.model.renderer;
     const BongoCatRenderer active = bongo_cat_renderer_active();
     app->settings.model.renderer = target;

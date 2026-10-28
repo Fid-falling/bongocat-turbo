@@ -97,7 +97,15 @@
           "supersampleQuality": "Suavizado de bordes",
           "performanceSettings": "Rendimiento",
           "unlimitedFps": "Sin límite",
-          "renderer": "Renderizador"
+          "renderer": "Renderizador",
+          "rendererFallbackTitle": "Vulkan no pudo iniciarse en este equipo; se cambió automáticamente a OpenGL",
+          "rendererFallbackReason": "Motivo: %s",
+          "rendererFallbackReasonTimeout": "Tiempo de espera agotado en el primer fotograma (sin imagen en 8 s)",
+          "rendererFallbackReasonInit": "Error al inicializar Vulkan",
+          "rendererFallbackFailures": "%d fallos consecutivos",
+          "rendererFallbackLastAt": "Último intento: %s",
+          "rendererFallbackPaused": "Los intentos automáticos de Vulkan están en pausa",
+          "rendererFallbackRetry": "Probar Vulkan de nuevo"
         },
         "hints": {
         "rendererRestart": "Ajuste guardado. Reinicia BongoCat manualmente para aplicarlo.",

@@ -1,4 +1,5 @@
 #include "runtime.h"
+#include "renderer_fallback_state.h"
 #include <math.h>
 #include "bongo_cat/image.h"
 #include "bongo_cat/log.h"
@@ -151,16 +152,44 @@ BongoCatResult bongo_cat_window_create(BongoCatApp *app, BongoCatError *error) {
        命令行覆盖 (--renderer=/--opengl/--vulkan) 优先于 settings.json: 设置窗口
        自己就是用选中的后端画的, 那个后端一旦画不出内容, 用户就没有 GUI 入口可以
        切回来。覆盖值只作用于本次运行, 因此这里绝不能把它写回 app->settings —— 否则
-       config_store 会在 300ms 后把"临时逃生"变成用户的持久设置。 */
-    bongo_cat_renderer_select_source(
-        app->renderer_override >= 0 ? (BongoCatRenderer)app->renderer_override
-            : app->settings.model.renderer,
-        app->settings.model.renderer, app->renderer_override >= 0);
+       config_store 会在 300ms 后把"临时逃生"变成用户的持久设置。
+
+       自动回退记忆: 连续失败达到阈值后, 本次启动不再自动尝试 Vulkan (直接 OpenGL)。
+       两条边界:
+         - 命令行覆盖不拦 —— 那是用户显式给的逃生通道, 他想试就必须真的去试;
+         - 用户手动在设置/托盘里把后端设成 Vulkan 时, 切换路径已经把记录清空
+           (见 renderer_switch.c), 所以这里读到 paused 只可能来自"上次自动回退后
+           留下的证据", 放行它就又卡一次。 */
+    const bool command_line_renderer = app->renderer_override >= 0;
+    BongoCatRenderer requested = command_line_renderer
+        ? (BongoCatRenderer)app->renderer_override
+        : app->settings.model.renderer;
+    if (!command_line_renderer && bongo_cat_renderer_fallback_paused(app) &&
+        (requested == BONGO_CAT_RENDERER_AUTO ||
+            requested == BONGO_CAT_RENDERER_VULKAN)) {
+        SDL_LogWarn(BONGO_CAT_LOG_LIFECYCLE,
+            "[render] 已暂停尝试 Vulkan (连续 %d 次自动回退, 最近原因=%s, 时间=%s): "
+            "本次请求 %s 直接改用 OpenGL; 在 设置→性能 点「再试一次 Vulkan」可手动重置",
+            app->renderer_fallback.consecutive_failures,
+            bongo_cat_renderer_fallback_reason_label(
+                app->renderer_fallback.last_reason),
+            app->renderer_fallback.last_failure_at[0]
+                ? app->renderer_fallback.last_failure_at : "未记录",
+            bongo_cat_renderer_name(requested));
+        requested = BONGO_CAT_RENDERER_OPENGL;
+    }
+    bongo_cat_renderer_select_source(requested,
+        app->settings.model.renderer, command_line_renderer);
     if (bongo_cat_renderer_active() == BONGO_CAT_RENDERER_VULKAN) {
         BongoCatError vk_error = {0};
         if (try_vulkan_window(app, &vk_error)) return BONGO_CAT_OK;
         bongo_cat_renderer_fallback(BONGO_CAT_RENDERER_VULKAN,
             vk_error.message);
+        /* 初始化失败也是一次"自动回退": 与首帧超时共用同一份计数/暂停状态, 达到阈值
+           后下次启动不再尝试 Vulkan。这里**不**重启 —— 当前进程已经用 OpenGL 继续跑,
+           重启只会把窗口闪断一次; 暂停标志在下次启动时生效。 */
+        bongo_cat_renderer_fallback_note_failure(app,
+            BONGO_CAT_RENDERER_FALLBACK_REASON_INIT, vk_error.message, NULL);
     }
     /* Keep a lower-cost MSAA path for drivers that cannot provide 4 samples. */
     const int options[][2] = {{true, 4}, {true, 2}, {true, 0}, {false, 0}};

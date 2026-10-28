@@ -79,6 +79,9 @@ set(BONGO_CAT_RUNTIME_LIFECYCLE_SOURCES
   src/runtime/lifecycle/frame_clock.c
   # 首帧看门狗: 启动后 8 秒没端出第一帧 -> ERROR + 回退 OpenGL + 重启一次
   src/runtime/lifecycle/first_frame_watchdog.c
+  # 自动回退 OpenGL 的持久化记忆 (连续失败次数/最近原因/时间/显卡 + 暂停自动尝试):
+  # 独立的 renderer-fallback.json, 设置页提示条与自检报告都读同一份状态
+  src/runtime/lifecycle/renderer_fallback_state.c
   src/runtime/lifecycle/memory_policy.c
   # 便携模式 (BongoCatData): 标记判定 + 设置/模型的搬迁
   src/runtime/lifecycle/portable_mode.c
@@ -371,6 +374,9 @@ set(BONGO_CAT_UI_PREFERENCES_SOURCES
   src/ui/preferences/preferences_segment.c
   src/ui/preferences/preferences_shortcut_clear.c
   src/ui/preferences/preferences_renderer_row.c
+  # 渲染后端上方那条"已自动回退 OpenGL"提示 +「再试一次 Vulkan」按钮
+  # (只在有回退记录时出现; 状态读写见 runtime/lifecycle/renderer_fallback_state.c)
+  src/ui/preferences/preferences_renderer_fallback.c
   # 纹理质量 (模型图集上限) 那一行, 见文件头
   src/ui/preferences/preferences_texture_quality_row.c
   src/ui/preferences/preferences_shortcuts.c
