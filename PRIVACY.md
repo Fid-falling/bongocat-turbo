@@ -71,7 +71,7 @@ access may occur in these cases:
 * **Update checking on Windows:** When an update check is initiated or
   scheduled, BongoCat sends a basic HTTPS `GET` request to the GitHub Releases
   API endpoint
-  `https://api.github.com/repos/vladelaina/BongoCat/releases/latest`.
+  `https://api.github.com/repos/Fid-falling/bongocat-turbo/releases/latest`.
   The request retrieves release information and does not include personal
   data. The user agent identifies the application as `BongoCat Update
   Checker/1.0`. Automatic update checks are not currently available on macOS
@@ -113,6 +113,6 @@ the BongoCat project homepage or repository.
 ## Contact
 
 For questions or suggestions about this privacy policy, please use the GitHub
-project page: <https://github.com/vladelaina/BongoCat>.
+project page: <https://github.com/Fid-falling/bongocat-turbo>.
 
 > Last Updated: August 28, 2026

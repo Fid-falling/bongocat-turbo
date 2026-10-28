@@ -240,7 +240,7 @@ static void draw_links(BongoCatPreferences *value,
         feedback_color);
     link_cursor(context, feedback);
     if (hit(context, feedback) && !SDL_OpenURL(
-            "https://github.com/vladelaina/BongoCat/issues"))
+            "https://github.com/Fid-falling/bongocat-turbo/issues"))
         SDL_LogWarn(SDL_LOG_CATEGORY_APPLICATION,
             "Cannot open URL: %s", SDL_GetError());
 

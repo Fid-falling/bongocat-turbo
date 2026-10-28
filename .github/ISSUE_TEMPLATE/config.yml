@@ -1,5 +1,5 @@
 blank_issues_enabled: true
 contact_links:
-  - name: 💬 Questions & Discussions 💬
-    url: https://github.com/vladelaina/BongoCat/discussions
-    about: "🤝 Have a question or want to chat? Join our friendly community discussions!"
+  - name: 💬 Questions & Feedback 💬
+    url: https://github.com/Fid-falling/bongocat-turbo/issues
+    about: "🤝 Have a question or something to report? Open an issue in our repository."

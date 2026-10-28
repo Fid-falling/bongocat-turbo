@@ -153,7 +153,7 @@ static void star_button(BongoCatPreferences *value,
         value->ui.label_font, nk_rgb(255, 255, 255));
     link_cursor(context, bounds);
     if (hit(context, bounds))
-        open_url("https://github.com/vladelaina/BongoCat");
+        open_url("https://github.com/Fid-falling/bongocat-turbo");
 }
 /*
  * 作者名做成链接: 前面 "by " 是普通文字, 只有作者名那块参与命中与动画, 所以
