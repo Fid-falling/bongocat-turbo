@@ -131,6 +131,17 @@ if(BUILD_TESTING)
   target_link_libraries(bongo_cat_ui_tests PRIVATE bongo_cat_warnings)
   add_test(NAME ui COMMAND bongo_cat_ui_tests)
 
+  # 逻辑/像素尺寸换算: 锁死 "像素 = 逻辑 x 布局缩放" (200% 下 564x493 -> 282x247)。
+  # 纯算术, 不建窗口也不初始化 SDL, 所以能进默认测试集。
+  add_executable(bongo_cat_ui_scale_tests tests/ui/test_ui_scale.c)
+  target_include_directories(bongo_cat_ui_scale_tests PRIVATE
+    ${BONGO_CAT_RUNTIME_INTERNAL_INCLUDE_DIRS})
+  target_include_directories(bongo_cat_ui_scale_tests SYSTEM PRIVATE
+    ${BONGO_CAT_NUKLEAR_INCLUDE_DIR})
+  target_link_libraries(bongo_cat_ui_scale_tests PRIVATE
+    bongo_cat_runtime bongo_cat_warnings)
+  add_test(NAME ui-scale COMMAND bongo_cat_ui_scale_tests)
+
   if(APPLE)
     # The refresh helper runs the real page code with the platform read replaced
     # per target, so the repaint decision is tested without touching TCC.

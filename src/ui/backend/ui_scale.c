@@ -14,6 +14,7 @@
 
 #include <math.h>
 #include <stdlib.h>
+#include <string.h>
 
 #define BONGO_CAT_UI_SCALE_MIN 0.5f
 #define BONGO_CAT_UI_SCALE_MAX 8.0f
@@ -56,6 +57,38 @@ void bongo_cat_ui_query_window_scale(SDL_Window *window,
 }
 
 /*
+ * 逻辑尺寸的唯一换算式子。四舍五入而不是截断: 200% 下 493/2 = 246.5, 截断会得到
+ * 246, 而用户按"像素是逻辑的两倍"核对时 247 才对得上 (自检报告就靠这条对账)。
+ */
+void bongo_cat_ui_logical_from_window(int window_width, int window_height,
+    float layout_scale, int *logical_width, int *logical_height) {
+    float scale = layout_scale > 0.0f ? layout_scale : 1.0f;
+    if (logical_width)
+        *logical_width = SDL_max(1, (int)lroundf(window_width / scale));
+    if (logical_height)
+        *logical_height = SDL_max(1, (int)lroundf(window_height / scale));
+}
+
+void bongo_cat_ui_window_metrics(SDL_Window *window,
+    BongoCatUIWindowMetrics *metrics) {
+    if (!metrics) return;
+    memset(metrics, 0, sizeof(*metrics));
+    metrics->layout_scale = 1.0f;
+    metrics->raster_scale = 1.0f;
+    if (window) {
+        SDL_GetWindowSize(window, &metrics->window_width,
+            &metrics->window_height);
+        SDL_GetWindowSizeInPixels(window, &metrics->pixel_width,
+            &metrics->pixel_height);
+    }
+    bongo_cat_ui_query_window_scale(window, &metrics->layout_scale,
+        &metrics->raster_scale);
+    bongo_cat_ui_logical_from_window(metrics->window_width,
+        metrics->window_height, metrics->layout_scale,
+        &metrics->logical_width, &metrics->logical_height);
+}
+
+/*
  * 诊断一行, 用户回传日志时先看它:
  *   [ui] 设置窗口 逻辑=900x680 像素=1125x850 窗口=1125x850 缩放=1.25(布局)/1.25(光栅)
  * 逻辑与像素不相等就说明这台机器在缩放显示 (125% 即 1.25 倍)。逻辑尺寸是布局与输入
@@ -63,21 +96,17 @@ void bongo_cat_ui_query_window_scale(SDL_Window *window,
  * 空白、图标与开关消失"的成因 (见 ui_backend.c 的 render_vulkan)。窗口尺寸是 SDL 的
  * 窗口坐标, 与像素尺寸之比就是像素密度 —— 只看窗口尺寸分不清"窗口被按缩放建大了"
  * 还是"窗口没变、内容按缩放铺开"。只在建窗与缩放变化时调用, 不进每帧路径。
+ * 三个值统一来自 bongo_cat_ui_window_metrics, 自检报告用同一份 (见 selfcheck_env.c),
+ * 免得日志与自检各算一遍、高 DPI 下对不上。
  */
 void bongo_cat_ui_log_scale(const char *tag, SDL_Window *window) {
-    int window_width = 0, window_height = 0;
-    int pixel_width = 0, pixel_height = 0;
-    if (window) {
-        SDL_GetWindowSize(window, &window_width, &window_height);
-        SDL_GetWindowSizeInPixels(window, &pixel_width, &pixel_height);
-    }
-    float layout_scale = 1.0f, raster_scale = 1.0f;
-    bongo_cat_ui_query_window_scale(window, &layout_scale, &raster_scale);
+    BongoCatUIWindowMetrics metrics;
+    bongo_cat_ui_window_metrics(window, &metrics);
     SDL_LogInfo(BONGO_CAT_LOG_LIFECYCLE,
-        "[ui] %s 逻辑=%.0fx%.0f 像素=%dx%d 窗口=%dx%d 缩放=%.2f(布局)/%.2f(光栅)",
-        tag ? tag : "窗口", window_width / layout_scale,
-        window_height / layout_scale, pixel_width, pixel_height,
-        window_width, window_height, layout_scale, raster_scale);
+        "[ui] %s 逻辑=%dx%d 像素=%dx%d 窗口=%dx%d 缩放=%.2f(布局)/%.2f(光栅)",
+        tag ? tag : "窗口", metrics.logical_width, metrics.logical_height,
+        metrics.pixel_width, metrics.pixel_height, metrics.window_width,
+        metrics.window_height, metrics.layout_scale, metrics.raster_scale);
 }
 
 void bongo_cat_ui_logical_size(const BongoCatUIBackend *ui,
@@ -86,6 +115,8 @@ void bongo_cat_ui_logical_size(const BongoCatUIBackend *ui,
     if (ui && ui->window)
         SDL_GetWindowSize(ui->window, &window_width, &window_height);
     float scale = ui && ui->layout_scale > 0.0f ? ui->layout_scale : 1.0f;
+    /* 布局要的是精确值, 不能借用上面那个"给报告看的整数换算式" (取整会差半个像素)。 */
     if (width) *width = SDL_max(1.0f, window_width / scale);
     if (height) *height = SDL_max(1.0f, window_height / scale);
 }
+

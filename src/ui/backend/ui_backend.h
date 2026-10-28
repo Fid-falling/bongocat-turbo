@@ -144,6 +144,28 @@ BongoCatUIBackend *bongo_cat_ui_backend_for_context(
 float bongo_cat_ui_display_layout_scale(SDL_DisplayID display);
 void bongo_cat_ui_query_window_scale(SDL_Window *window,
     float *layout_scale, float *raster_scale);
+/*
+ * 窗口的三套尺寸口径一次取全。只给诊断/自检用, 不进每帧路径:
+ *  - window_*: SDL 窗口坐标。Windows 的 DPI 感知窗口这里就是物理像素, macOS 是逻辑点;
+ *  - pixel_*:  交换链 / 视口 / 裁剪矩形用的像素尺寸;
+ *  - logical_*: 布局与输入坐标用的逻辑尺寸, 由 window_* / layout_scale 算出。
+ * 高 DPI 下这三者会分成两组 (Windows 200%: 窗口=像素=564x493, 逻辑=282x247)。
+ * 易改错: 把 SDL_GetWindowSize 直接当"逻辑尺寸"打印/使用, 在 Windows 上会得到
+ * "像素 == 逻辑" 的假象 —— 自检报告里那条互相矛盾的数字就是这么来的。
+ */
+typedef struct BongoCatUIWindowMetrics {
+    int window_width, window_height;
+    int pixel_width, pixel_height;
+    int logical_width, logical_height;
+    float layout_scale, raster_scale;
+} BongoCatUIWindowMetrics;
+
+void bongo_cat_ui_window_metrics(SDL_Window *window,
+    BongoCatUIWindowMetrics *metrics);
+/* 逻辑尺寸换算的纯函数: 自检、日志与测试共用一条式子。layout_scale 非法按 1 算,
+   结果至少为 1 (窗口最小化时 SDL 可能给出 0)。 */
+void bongo_cat_ui_logical_from_window(int window_width, int window_height,
+    float layout_scale, int *logical_width, int *logical_height);
 void bongo_cat_ui_logical_size(const BongoCatUIBackend *ui,
     float *width, float *height);
 /*

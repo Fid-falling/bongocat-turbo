@@ -11,6 +11,7 @@
 #include "bongo_cat/log.h"
 #include "bongo_cat/platform.h"
 #include "bongo_cat/render.h"
+#include "ui_backend.h"
 
 #include <SDL3/SDL.h>
 #include <stdio.h>
@@ -56,9 +57,20 @@ void bongo_cat_selfcheck_env(BongoCatSelfCheckBuilder *builder,
     float scale = 1.0f;
     int logical_width = 0, logical_height = 0, pixel_width = 0, pixel_height = 0;
     if (app && app->window) {
+        /*
+         * 这里过去把 SDL_GetWindowSize 直接当"逻辑尺寸"打印。在 Windows 的 DPI 感知
+         * 窗口里那是物理像素 —— 200% 缩放下窗口 564x493 会打印成
+         * "564x493 像素 (564x493 逻辑)", 与 [ui] 日志里同一窗口的
+         * "逻辑=282x247 像素=564x493" 自相矛盾, 看上去像"HiDPI 没生效"。
+         * 三个口径统一从 ui_scale.c 取, 与日志/布局/输入同源。
+         */
+        BongoCatUIWindowMetrics metrics;
+        bongo_cat_ui_window_metrics(app->window, &metrics);
         scale = SDL_GetWindowDisplayScale(app->window);
-        SDL_GetWindowSize(app->window, &logical_width, &logical_height);
-        SDL_GetWindowSizeInPixels(app->window, &pixel_width, &pixel_height);
+        pixel_width = metrics.pixel_width;
+        pixel_height = metrics.pixel_height;
+        logical_width = metrics.logical_width;
+        logical_height = metrics.logical_height;
     }
     bongo_cat_selfcheck_add(builder, BONGO_CAT_SELFCHECK_PASS, "操作系统",
         "%s · %s · DPI 缩放 %.0f%% (%.2fx) · 宠物窗口 %dx%d 像素 (%dx%d 逻辑)",
