@@ -100,10 +100,9 @@
           "renderer": "Renderer",
           "rendererFallbackTitle": "Vulkan failed to start on this machine; switched to OpenGL automatically",
           "rendererFallbackReason": "Reason: %s",
-          "rendererFallbackReasonTimeout": "First-frame timeout (no frame within 8 s)",
+          "rendererFallbackReasonTimeout": "First-frame timeout",
           "rendererFallbackReasonInit": "Vulkan initialization failed",
           "rendererFallbackFailures": "%d consecutive failures",
-          "rendererFallbackLastAt": "Last attempt: %s",
           "rendererFallbackPaused": "Automatic Vulkan attempts are paused",
           "rendererFallbackRetry": "Try Vulkan again"
         },

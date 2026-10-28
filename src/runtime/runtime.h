@@ -61,6 +61,13 @@ void bongo_cat_startup_ready(BongoCatApp *app);
 void bongo_cat_first_frame_watchdog_arm(BongoCatApp *app);
 void bongo_cat_first_frame_watchdog_presented(void);
 void bongo_cat_first_frame_watchdog_update(BongoCatApp *app, uint64_t now);
+/*
+ * 测试钩子是否正在强制"首帧永不呈现"(BONGO_CAT_TEST_FIRST_FRAME_STALL)。
+ * startup_ready 必须知道这件事: 装配期的首次模型加载本来会画出第一帧, 如果那里照常
+ * 记"呈现成功", 注入出来的超时场景会被提前收尾 (计数也会被清零), 测试就失去意义。
+ * 默认没有这个环境变量, 恒为 false。
+ */
+bool bongo_cat_first_frame_watchdog_stalled(void);
 void bongo_cat_first_frame_stage(const char *stage);
 const char *bongo_cat_first_frame_stage_name(void);
 /*

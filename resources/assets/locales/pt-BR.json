@@ -100,10 +100,9 @@
           "renderer": "Renderizador",
           "rendererFallbackTitle": "O Vulkan não iniciou neste computador; alternado automaticamente para OpenGL",
           "rendererFallbackReason": "Motivo: %s",
-          "rendererFallbackReasonTimeout": "Tempo esgotado no primeiro quadro (sem imagem em 8 s)",
+          "rendererFallbackReasonTimeout": "Tempo esgotado no primeiro quadro",
           "rendererFallbackReasonInit": "Falha ao inicializar o Vulkan",
           "rendererFallbackFailures": "%d falhas consecutivas",
-          "rendererFallbackLastAt": "Última tentativa: %s",
           "rendererFallbackPaused": "As tentativas automáticas do Vulkan estão pausadas",
           "rendererFallbackRetry": "Tentar o Vulkan novamente"
         },

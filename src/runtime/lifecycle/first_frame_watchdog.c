@@ -77,7 +77,7 @@ static uint64_t first_frame_timeout_ns(void) {
 
 /* 测试钩子: 强制让看门狗认为"首帧从未呈现"。给 vulkan 时只在 Vulkan 后端上生效 ——
    回退重启后的 OpenGL 进程不会再被注入, 日志里只剩真实链路。 */
-static bool first_frame_stalled(void) {
+bool bongo_cat_first_frame_watchdog_stalled(void) {
     const char *value = SDL_getenv("BONGO_CAT_TEST_FIRST_FRAME_STALL");
     if (!value || !value[0]) return false;
     if (strcmp(value, "vulkan") == 0)
@@ -98,7 +98,7 @@ void bongo_cat_first_frame_watchdog_arm(BongoCatApp *app) {
      */
     if (!presented)
         presented = !app || !app->session.window.visible;
-    if (first_frame_stalled()) {
+    if (bongo_cat_first_frame_watchdog_stalled()) {
         presented = false;
         SDL_LogWarn(SDL_LOG_CATEGORY_VIDEO,
             "[watchdog] 测试钩子: 强制首帧永不呈现 (后端=%s, 超时=%llums)",

@@ -100,10 +100,9 @@
           "renderer": "Рендерер",
           "rendererFallbackTitle": "Vulkan не удалось запустить на этом компьютере; выполнен автоматический переход на OpenGL",
           "rendererFallbackReason": "Причина: %s",
-          "rendererFallbackReasonTimeout": "Тайм-аут первого кадра (нет изображения за 8 с)",
+          "rendererFallbackReasonTimeout": "Тайм-аут первого кадра",
           "rendererFallbackReasonInit": "Ошибка инициализации Vulkan",
           "rendererFallbackFailures": "Неудач подряд: %d",
-          "rendererFallbackLastAt": "Последняя попытка: %s",
           "rendererFallbackPaused": "Автоматические попытки запуска Vulkan приостановлены",
           "rendererFallbackRetry": "Повторить попытку с Vulkan"
         },

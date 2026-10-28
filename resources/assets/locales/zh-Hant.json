@@ -100,10 +100,9 @@
           "renderer": "渲染後端",
           "rendererFallbackTitle": "Vulkan 在這台機器上啟動失敗，已自動改用 OpenGL",
           "rendererFallbackReason": "原因：%s",
-          "rendererFallbackReasonTimeout": "首幀逾時（8 秒內沒有畫面）",
+          "rendererFallbackReasonTimeout": "首幀逾時",
           "rendererFallbackReasonInit": "Vulkan 初始化失敗",
           "rendererFallbackFailures": "連續 %d 次",
-          "rendererFallbackLastAt": "最近一次 %s",
           "rendererFallbackPaused": "已暫停嘗試 Vulkan",
           "rendererFallbackRetry": "再試一次 Vulkan"
         },

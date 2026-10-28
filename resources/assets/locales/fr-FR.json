@@ -100,10 +100,9 @@
           "renderer": "Moteur de rendu",
           "rendererFallbackTitle": "Vulkan n'a pas pu démarrer sur cette machine ; bascule automatique vers OpenGL",
           "rendererFallbackReason": "Cause : %s",
-          "rendererFallbackReasonTimeout": "Délai dépassé pour la première image (aucune image en 8 s)",
+          "rendererFallbackReasonTimeout": "Délai dépassé pour la première image",
           "rendererFallbackReasonInit": "Échec de l'initialisation de Vulkan",
           "rendererFallbackFailures": "%d échecs consécutifs",
-          "rendererFallbackLastAt": "Dernière tentative : %s",
           "rendererFallbackPaused": "Les tentatives automatiques de Vulkan sont en pause",
           "rendererFallbackRetry": "Réessayer Vulkan"
         },

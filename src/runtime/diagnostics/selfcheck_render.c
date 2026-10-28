@@ -166,23 +166,21 @@ void bongo_cat_selfcheck_render(BongoCatSelfCheckBuilder *builder,
     if (bongo_cat_renderer_fallback_recorded(app)) {
         const BongoCatRendererFallbackState *state = &app->renderer_fallback;
         char detail[BONGO_CAT_SELFCHECK_DETAIL_CAP];
+        /* 时间只显示到秒, 显卡不重复 (下一条"Vulkan 设备"已经写了型号): 报告面板一行
+           最多折四行, 把"已暂停…可在设置里重置"挤没了就失去这条结论的意义。完整时间戳
+           仍在状态文件与日志里。 */
+        char when[24];
+        snprintf(when, sizeof(when), "%.19s",
+            state->last_failure_at[0] ? state->last_failure_at : "时间未记录");
         int used = snprintf(detail, sizeof(detail),
-            "Vulkan 在这台机器上已连续自动回退 %d 次（最近一次 %s，原因：%s）",
-            state->consecutive_failures,
-            state->last_failure_at[0] ? state->last_failure_at : "时间未记录",
-            bongo_cat_renderer_fallback_reason_label(state->last_reason));
-        if (used > 0 && (size_t)used < sizeof(detail) && state->last_gpu[0])
-            used += snprintf(detail + used, sizeof(detail) - (size_t)used,
-                "；显卡 %s", state->last_gpu);
-        if (used > 0 && (size_t)used < sizeof(detail) && state->last_detail[0])
-            used += snprintf(detail + used, sizeof(detail) - (size_t)used,
-                "；%s", state->last_detail);
-        if (used > 0 && (size_t)used < sizeof(detail))
-            snprintf(detail + used, sizeof(detail) - (size_t)used, "%s",
-                state->auto_disabled
-                    ? "；已暂停自动尝试 Vulkan（下次启动直接 OpenGL），"
-                      "可在 设置 → 性能 点「再试一次 Vulkan」重置"
-                    : "；下次启动仍会再尝试一次 Vulkan（连续 2 次失败后暂停）");
+            "Vulkan 在这台机器上已连续自动回退 %d 次（最近一次 %s，原因：%s）%s",
+            state->consecutive_failures, when,
+            bongo_cat_renderer_fallback_reason_label(state->last_reason),
+            state->auto_disabled
+                ? "；已暂停自动尝试 Vulkan（下次启动直接 OpenGL），"
+                  "可在 设置 → 性能 点「再试一次 Vulkan」重置"
+                : "；下次启动仍会再尝试一次 Vulkan（连续 2 次失败后暂停）");
+        if (used < 0) detail[0] = '\0';
         bongo_cat_selfcheck_add(builder, BONGO_CAT_SELFCHECK_WARN,
             "自动回退记录", "%s", detail);
     }

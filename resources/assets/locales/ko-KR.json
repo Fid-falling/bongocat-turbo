@@ -100,10 +100,9 @@
           "renderer": "렌더러",
           "rendererFallbackTitle": "이 컴퓨터에서 Vulkan 시작에 실패하여 OpenGL로 자동 전환했습니다",
           "rendererFallbackReason": "원인: %s",
-          "rendererFallbackReasonTimeout": "첫 프레임 시간 초과(8초 안에 화면이 나오지 않음)",
+          "rendererFallbackReasonTimeout": "첫 프레임 시간 초과",
           "rendererFallbackReasonInit": "Vulkan 초기화 실패",
           "rendererFallbackFailures": "%d회 연속 실패",
-          "rendererFallbackLastAt": "마지막 시도: %s",
           "rendererFallbackPaused": "Vulkan 자동 시도가 중지되었습니다",
           "rendererFallbackRetry": "Vulkan 다시 시도"
         },

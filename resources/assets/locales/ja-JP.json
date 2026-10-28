@@ -100,10 +100,9 @@
           "renderer": "レンダラー",
           "rendererFallbackTitle": "このマシンでは Vulkan の起動に失敗したため、OpenGL に自動で切り替えました",
           "rendererFallbackReason": "原因: %s",
-          "rendererFallbackReasonTimeout": "初回フレームのタイムアウト（8 秒以内に画面が出ない）",
+          "rendererFallbackReasonTimeout": "初回フレームのタイムアウト",
           "rendererFallbackReasonInit": "Vulkan の初期化に失敗",
           "rendererFallbackFailures": "連続 %d 回失敗",
-          "rendererFallbackLastAt": "最終試行: %s",
           "rendererFallbackPaused": "Vulkan の自動試行を停止しました",
           "rendererFallbackRetry": "Vulkan を再試行"
         },

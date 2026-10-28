@@ -17,9 +17,16 @@ cmake --build build-vulkan --config Release --target bongo_cat --parallel 8
 { "rendering": { "renderer": "vulkan" } }
 ```
 
-`renderer` 取 `auto` / `opengl` / `vulkan`。`auto` 目前仍解析成 OpenGL；选 `vulkan`
-时如果探测不到可用设备，或初始化中途失败，运行时会把原因写进日志并回退 OpenGL，
-不会把窗口留在半初始化状态。
+`renderer` 取 `auto` / `opengl` / `vulkan`。选 `vulkan`（或 `auto` 解析到它）时如果
+首帧 8 秒内没有端出去、或初始化中途失败，运行时会把原因写进日志并回退 OpenGL，不会把
+窗口留在半初始化状态。
+
+回退不是一次性的日志：`config/renderer-fallback.json` 会记住「连续失败次数 / 最近原因 /
+时间 / 显卡 / 是否已暂停自动尝试」。每次自动回退计数 +1，连续 2 次后暂停自动尝试 Vulkan
+（之后启动直接走 OpenGL）；用户手动把渲染后端选回 Vulkan、或点设置页提示条上的
+「再试一次 Vulkan」，计数与暂停标志清零并重启重试。状态文件写不进去时退回旧保险：把
+`settings.json` 的 `renderer` 写死 `opengl`。设置 → 性能 → 「渲染后端」上方的提示条与
+自检报告里的「自动回退记录」都读这一份状态。
 
 有用的环境变量：
 
@@ -27,6 +34,8 @@ cmake --build build-vulkan --config Release --target bongo_cat --parallel 8
 | --- | --- |
 | `BONGO_CAT_VULKAN_VALIDATION=1` | 打开 `VK_LAYER_KHRONOS_validation` 并把消息转发到日志 |
 | `BONGO_CAT_TEST_VULKAN_FALLBACK=1` | 强制 Vulkan 初始化失败，用于验证回退路径 |
+| `BONGO_CAT_TEST_FIRST_FRAME_TIMEOUT_MS=N` | 把首帧看门狗的 8 秒判定改成 N 毫秒 |
+| `BONGO_CAT_TEST_FIRST_FRAME_STALL=vulkan` | 强制「首帧永不呈现」（只在 Vulkan 后端上生效），用于复现首帧超时回退 |
 
 ## 结构
 

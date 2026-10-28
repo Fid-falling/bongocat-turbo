@@ -321,13 +321,17 @@ void bongo_cat_startup_ready(BongoCatApp *app) {
     if (!app || startup_is_ready) return;
     startup_is_ready = true;
     /* 首帧真的端出去了 (或者本次启动根本不需要首帧): 停掉首帧看门狗, 别让它在 8 秒后
-       报一条假的超时。看门狗只认这个入口, 不认 "初始化返回 true"。 */
-    bongo_cat_first_frame_watchdog_presented();
-    /* 用的是 Vulkan 而且真的端出了帧: 之前"连续自动回退"的证据当场作废。这条路径是
-       计数归零的唯一来源 (手动重试与它作用相同), 所以放在"呈现确认"之后, 而不是
-       "Vulkan 初始化返回成功"的时候。 */
-    if (bongo_cat_renderer_active() == BONGO_CAT_RENDERER_VULKAN)
-        bongo_cat_renderer_fallback_note_success(app);
+       报一条假的超时。看门狗只认这个入口, 不认 "初始化返回 true"。
+       测试钩子要求"首帧永不呈现"时, 这里也必须不当真 —— 否则装配期的首次模型加载会
+       把注入出来的超时场景提前收尾, 计数也会被清掉。 */
+    if (!bongo_cat_first_frame_watchdog_stalled()) {
+        bongo_cat_first_frame_watchdog_presented();
+        /* 用的是 Vulkan 而且真的端出了帧: 之前"连续自动回退"的证据当场作废。这条路径是
+           计数归零的唯一来源 (手动重试与它作用相同), 所以放在"呈现确认"之后, 而不是
+           "Vulkan 初始化返回成功"的时候。 */
+        if (bongo_cat_renderer_active() == BONGO_CAT_RENDERER_VULKAN)
+            bongo_cat_renderer_fallback_note_success(app);
+    }
     bongo_cat_first_frame_stage("running");
     char path[BONGO_CAT_PATH_CAP];
     if (bongo_cat_path_join(path, sizeof(path), app->state_root,

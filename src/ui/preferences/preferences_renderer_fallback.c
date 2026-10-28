@@ -101,8 +101,9 @@ static int wrap_title(const struct nk_user_font *font, const char *text,
     return rows;
 }
 
-/* 一条小字: "原因：首帧超时 · 连续 2 次 · 最近一次 <时间>"。三个片段各自可翻译,
-   代码只负责用 " · " 串起来 —— 避免把参数顺序塞进翻译串 (十种语言里最容易出错的地方)。 */
+/* 一条小字: "原因：首帧超时 · 连续 2 次"。两个片段各自可翻译, 代码只负责用 " · "
+   串起来 —— 避免把参数顺序塞进翻译串 (十种语言里最容易出错的地方)。时间戳不在这条
+   小字里: 它会把这行挤爆, 完整值在状态文件与自检报告里。 */
 static void detail_line(BongoCatApp *app,
     const BongoCatRendererFallbackState *state, char *output, size_t capacity) {
     const bool init_failed = strcmp(state->last_reason,
@@ -111,28 +112,30 @@ static void detail_line(BongoCatApp *app,
         ? tr(app, "pages.preference.cat.labels.rendererFallbackReasonInit",
             "Vulkan initialization failed")
         : tr(app, "pages.preference.cat.labels.rendererFallbackReasonTimeout",
-            "First-frame timeout (no frame within 8 s)");
-    char reason[FALLBACK_TEXT_CAP], failures[256], last[256];
+            "First-frame timeout");
+    char reason[FALLBACK_TEXT_CAP], failures[256];
     snprintf(reason, sizeof(reason), tr(app,
         "pages.preference.cat.labels.rendererFallbackReason", "Reason: %s"),
         reason_text);
     snprintf(failures, sizeof(failures), tr(app,
         "pages.preference.cat.labels.rendererFallbackFailures",
         "%d consecutive failures"), state->consecutive_failures);
-    snprintf(last, sizeof(last), tr(app,
-        "pages.preference.cat.labels.rendererFallbackLastAt", "Last attempt: %s"),
-        state->last_failure_at[0] ? state->last_failure_at : "-");
-    snprintf(output, capacity, "%s · %s · %s", reason, failures, last);
+    snprintf(output, capacity, "%s · %s", reason, failures);
 }
 
-/* 第二条小字: 暂停说明 + 显卡。显卡摘要可能很长 (设备/驱动/api), 由绘制端截断。 */
+/* 第二条小字: 暂停说明 + 显卡。显卡摘要可能是 "设备 / 驱动 ... / api ...", 界面上只取
+   设备名 (用户认的是型号); 其余部分留给状态文件与自检报告。 */
 static void status_line(BongoCatApp *app,
     const BongoCatRendererFallbackState *state, char *output, size_t capacity) {
     const char *paused = state->auto_disabled
         ? tr(app, "pages.preference.cat.labels.rendererFallbackPaused",
             "Automatic Vulkan attempts are paused") : "";
+    char gpu[FALLBACK_TEXT_CAP];
+    snprintf(gpu, sizeof(gpu), "%s", state->last_gpu);
+    char *separator = strstr(gpu, " / ");
+    if (separator) *separator = '\0';
     snprintf(output, capacity, "%s%s%s", paused,
-        paused[0] && state->last_gpu[0] ? " · " : "", state->last_gpu);
+        paused[0] && gpu[0] ? " · " : "", gpu);
 }
 
 void bongo_cat_preferences_renderer_fallback(BongoCatApp *app,
