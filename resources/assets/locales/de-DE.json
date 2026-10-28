@@ -125,6 +125,31 @@
         }
       },
       "general": {
+        "selfcheck": {
+          "labels": {
+            "title": "Selbsttest starten"
+          },
+          "hints": {
+            "description": "Prüft Laufzeitumgebung, Rendering, Live2D und Dateirechte und erstellt einen kopierbaren Bericht.",
+            "copied": "Bericht in die Zwischenablage kopiert",
+            "copyFailed": "Bericht konnte nicht kopiert werden",
+            "saveFailed": "Bericht konnte nicht gespeichert werden"
+          },
+          "options": {
+            "start": "Prüfung starten",
+            "copy": "Bericht kopieren",
+            "save": "Als Datei speichern",
+            "switchToOpenGL": "Wechseln & neu starten"
+          },
+          "status": {
+            "pass": "Bestanden",
+            "warn": "Warnung",
+            "fail": "Fehlgeschlagen",
+            "counts": "%u bestanden · %u Warnungen · %u fehlgeschlagen · %u ms",
+            "savedPath": "Gespeichert unter: %s",
+            "vulkanAdvice": "Vulkan konnte das erste Bild nicht präsentieren. Es wird empfohlen, das Rendering-Backend auf OpenGL umzustellen."
+          }
+        },
         "title": "Allgemein",
         "labels": {
           "appSettings": "Anwendung",

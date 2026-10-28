@@ -125,6 +125,31 @@
         }
       },
       "general": {
+        "selfcheck": {
+          "labels": {
+            "title": "자체 점검 실행"
+          },
+          "hints": {
+            "description": "실행 환경, 렌더링, Live2D, 파일 권한 등을 확인하고 복사할 수 있는 보고서를 만듭니다",
+            "copied": "보고서를 클립보드에 복사했습니다",
+            "copyFailed": "보고서를 복사하지 못했습니다",
+            "saveFailed": "보고서를 저장하지 못했습니다"
+          },
+          "options": {
+            "start": "점검 시작",
+            "copy": "보고서 복사",
+            "save": "파일로 저장",
+            "switchToOpenGL": "전환 후 다시 시작"
+          },
+          "status": {
+            "pass": "통과",
+            "warn": "경고",
+            "fail": "실패",
+            "counts": "통과 %u개 · 경고 %u개 · 실패 %u개 · %u ms",
+            "savedPath": "저장 위치: %s",
+            "vulkanAdvice": "Vulkan 첫 프레임 표시에 실패했습니다. 렌더링 백엔드를 OpenGL로 전환하는 것을 권장합니다."
+          }
+        },
         "title": "일반",
         "labels": {
           "appSettings": "앱",

@@ -125,6 +125,31 @@
         }
       },
       "general": {
+        "selfcheck": {
+          "labels": {
+            "title": "Run self-check"
+          },
+          "hints": {
+            "description": "Checks the runtime environment, rendering, Live2D and file permissions, then produces a report you can copy.",
+            "copied": "Report copied to the clipboard",
+            "copyFailed": "Could not copy the report",
+            "saveFailed": "Could not save the report"
+          },
+          "options": {
+            "start": "Start check",
+            "copy": "Copy report",
+            "save": "Save to file",
+            "switchToOpenGL": "Switch & restart"
+          },
+          "status": {
+            "pass": "Pass",
+            "warn": "Warning",
+            "fail": "Failed",
+            "counts": "%u passed · %u warnings · %u failed · %u ms",
+            "savedPath": "Saved to: %s",
+            "vulkanAdvice": "Vulkan could not present its first frame. Switching the render backend to OpenGL is recommended."
+          }
+        },
         "title": "General",
         "labels": {
           "appSettings": "Application",

@@ -125,6 +125,31 @@
         }
       },
       "general": {
+        "selfcheck": {
+          "labels": {
+            "title": "Executar autoverificação"
+          },
+          "hints": {
+            "description": "Verifica o ambiente de execução, renderização, Live2D e permissões de arquivo e gera um relatório que pode ser copiado.",
+            "copied": "Relatório copiado para a área de transferência",
+            "copyFailed": "Não foi possível copiar o relatório",
+            "saveFailed": "Não foi possível salvar o relatório"
+          },
+          "options": {
+            "start": "Iniciar verificação",
+            "copy": "Copiar relatório",
+            "save": "Salvar em arquivo",
+            "switchToOpenGL": "Alternar e reiniciar"
+          },
+          "status": {
+            "pass": "Aprovado",
+            "warn": "Aviso",
+            "fail": "Falhou",
+            "counts": "%u aprovados · %u avisos · %u falhas · %u ms",
+            "savedPath": "Salvo em: %s",
+            "vulkanAdvice": "O Vulkan não conseguiu apresentar o primeiro quadro. Recomenda-se mudar o backend de renderização para OpenGL."
+          }
+        },
         "title": "Geral",
         "labels": {
           "appSettings": "Aplicativo",

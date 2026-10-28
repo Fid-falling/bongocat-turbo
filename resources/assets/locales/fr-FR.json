@@ -125,6 +125,31 @@
         }
       },
       "general": {
+        "selfcheck": {
+          "labels": {
+            "title": "Lancer l'auto-diagnostic"
+          },
+          "hints": {
+            "description": "Vérifie l'environnement d'exécution, le rendu, Live2D et les droits de fichiers, puis produit un rapport copiable.",
+            "copied": "Rapport copié dans le presse-papiers",
+            "copyFailed": "Impossible de copier le rapport",
+            "saveFailed": "Impossible d'enregistrer le rapport"
+          },
+          "options": {
+            "start": "Démarrer",
+            "copy": "Copier le rapport",
+            "save": "Enregistrer dans un fichier",
+            "switchToOpenGL": "Basculer et redémarrer"
+          },
+          "status": {
+            "pass": "Réussi",
+            "warn": "Avertissement",
+            "fail": "Échec",
+            "counts": "%u réussis · %u avertissements · %u échecs · %u ms",
+            "savedPath": "Enregistré dans : %s",
+            "vulkanAdvice": "Vulkan n'a pas pu présenter sa première image. Il est recommandé de passer le moteur de rendu à OpenGL."
+          }
+        },
         "title": "Général",
         "labels": {
           "appSettings": "Application",

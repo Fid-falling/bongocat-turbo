@@ -49,6 +49,10 @@ set(BONGO_CAT_RENDER_SOURCES
   src/render/vk/vk_core.c
   # 上下文生命周期与查询 (vk_core.c 只留 Instance/Device 的创建销毁)
   src/render/vk/vk_context.c
+  # VkResult 的枚举名 (所有非成功结果都要在日志里带名字, 否则用户只看到 -13)
+  src/render/vk/vk_result.c
+  # 自检的 Vulkan 首帧探测: 独立隐藏窗口上把 设备->交换链->提交->呈现 走一遍
+  src/render/vk/vk_selfcheck.c
   src/render/vk/vk_stub.c
   src/render/vk/vk_swapchain.c
   src/render/vk/vk_swapchain_rebuild.c
@@ -73,6 +77,8 @@ set(BONGO_CAT_RUNTIME_LIFECYCLE_SOURCES
   src/runtime/lifecycle/assets.c
   src/runtime/lifecycle/config_store.c
   src/runtime/lifecycle/frame_clock.c
+  # 首帧看门狗: 启动后 8 秒没端出第一帧 -> ERROR + 回退 OpenGL + 重启一次
+  src/runtime/lifecycle/first_frame_watchdog.c
   src/runtime/lifecycle/memory_policy.c
   # 便携模式 (BongoCatData): 标记判定 + 设置/模型的搬迁
   src/runtime/lifecycle/portable_mode.c
@@ -126,7 +132,17 @@ set(BONGO_CAT_RUNTIME_DIAGNOSTIC_SOURCES
   src/runtime/diagnostics/live2d_viewer_timing.c
   src/runtime/diagnostics/live2d_visual_audit.c
   # --ci-sound-test: 音效管理的判定/增益/禁用证据 (不需要真听声音)
-  src/runtime/diagnostics/sound_audit.c)
+  src/runtime/diagnostics/sound_audit.c
+  # 设置 → 应用 → [运行自检]: 编排/总结/报告落盘 + 七个分组 (版本/渲染/Live2D/
+  # 文件/配置/音频/输入)。拆开是为了守住单文件行数策略, 也让各组依赖的子系统互不牵连。
+  src/runtime/diagnostics/selfcheck.c
+  src/runtime/diagnostics/selfcheck_env.c
+  src/runtime/diagnostics/selfcheck_render.c
+  src/runtime/diagnostics/selfcheck_live2d.c
+  src/runtime/diagnostics/selfcheck_files.c
+  src/runtime/diagnostics/selfcheck_config.c
+  src/runtime/diagnostics/selfcheck_audio.c
+  src/runtime/diagnostics/selfcheck_input.c)
 
 set(BONGO_CAT_RUNTIME_INPUT_SOURCES
   src/runtime/input/gamepad.c
@@ -343,6 +359,8 @@ set(BONGO_CAT_UI_PREFERENCES_SOURCES
   # 互动页的 [音效] 区: 总音量 / 全部静音 / 当前模型逐条开关
   src/ui/preferences/preferences_sound_section.c
   src/ui/preferences/preferences_portable.c
+  # 设置 → 应用 → [运行自检]: 那一行 + 结果面板 (自检本体在 runtime/diagnostics)
+  src/ui/preferences/preferences_selfcheck.c
   src/ui/preferences/preferences_present.c
   src/ui/preferences/preferences_render.c
   src/ui/preferences/preferences_row_icons.c

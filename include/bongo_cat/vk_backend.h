@@ -44,6 +44,41 @@ bool bongo_cat_vk_compiled(void);
 /* 运行时探测: 能否创建实例并找到可用的图形队列。不会创建窗口表面。 */
 bool bongo_cat_vk_probe(BongoCatError *error);
 
+/*
+ * 设置 → 应用 → [运行自检] 的 Vulkan 首帧探测。
+ *
+ * 为什么需要它: 用户报告的故障是"日志停在 create_renderer 之后, 进程闪一下就消失",
+ * 而那段没有日志 —— 只有真的在**一个与宠物窗口无关的隐藏窗口**上把
+ * "设备 -> 交换链 -> 提交 -> 呈现"整条链走一遍, 才能把"这台机器的 Vulkan 到底能不能
+ * 端出一帧"变成一个明确的结论。探测过程绝不碰正在运行的宠物窗口:
+ *   - 有自己的 SDL 隐藏窗口与自己的一整条交换链;
+ *   - 主窗口已经有 Vulkan 上下文时复用它的 VkDevice (一个进程一套设备是刻意设计, 见
+ *     bongo_cat_vk_create_shared), 否则才建一套独立的实例/设备;
+ *   - 结束即销毁, 不写配置、不联网。
+ * 返回 false 表示这一帧没能端出去; report->error 里是可直接展示的原因, 各字段是
+ * 已经走到哪一步、驱动/设备是谁。report 可以为 NULL (只关心成败)。
+ */
+typedef struct BongoCatVkSelfCheck {
+    bool compiled;              /* 这次构建有没有编入 Vulkan */
+    bool shared;                /* 复用主窗口的 VkDevice, 还是独立实例 */
+    char device[128];
+    char driver[128];
+    char api[32];
+    char error[256];            /* 失败原因 (成功时为空串) */
+    /* 1 << VkPresentModeKHR: FIFO=1 位, MAILBOX=2 位, IMMEDIATE=4 位, FIFO_RELAXED=8 位 */
+    unsigned present_modes;
+    unsigned composite_supported; /* VkCompositeAlphaFlagsKHR */
+    unsigned composite_alpha;     /* 实际使用的 VkCompositeAlphaFlagBitsKHR */
+    int format;                   /* VkFormat */
+    int width, height;
+    bool swapchain_created;
+    bool presented;
+    int present_result;           /* 最后一次 present 的 VkResult */
+    unsigned elapsed_ms;
+} BongoCatVkSelfCheck;
+
+bool bongo_cat_vk_selfcheck(BongoCatVkSelfCheck *report);
+
 /* 当前进程里活跃的 Vulkan 上下文 (没有则为 NULL)。窗口只有一个, 纹理与绘制
    都发生在主窗口的上下文里, 所以这里沿用与 renderer_active 一致的单例语义。 */
 BongoCatVk *bongo_cat_vk_current(void);
@@ -65,6 +100,24 @@ BongoCatVk *bongo_cat_vk_create_shared(SDL_Window *window, const BongoCatVk *own
 void bongo_cat_vk_destroy(BongoCatVk *vk);
 
 bool bongo_cat_vk_info(const BongoCatVk *vk, BongoCatVkInfo *info);
+
+/*
+ * 交换链参数快照 (排障用): 首帧看门狗的 ERROR 行与自检报告都要一个"当时那条交换链
+ * 到底长什么样"的确定值 —— present mode / composite alpha / format / 图像数。
+ * 这些字段只在上下文里, 而调用方 (runtime) 不该解释 BongoCatVk。未建交换链时返回 false。
+ */
+typedef struct BongoCatVkSwapchainInfo {
+    int width, height;
+    unsigned image_count;
+    int format;             /* VkFormat */
+    int present_mode;       /* VkPresentModeKHR */
+    unsigned composite_alpha;
+    unsigned composite_supported;
+    unsigned present_modes; /* 1 << VkPresentModeKHR */
+} BongoCatVkSwapchainInfo;
+
+bool bongo_cat_vk_swapchain_info(const BongoCatVk *vk,
+    BongoCatVkSwapchainInfo *info);
 
 /*
  * 连续呈现失败的次数 (成功一次即清零) 与累计失败次数。

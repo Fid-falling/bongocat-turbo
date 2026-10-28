@@ -146,6 +146,13 @@ struct BongoCatVk {
     VkFormat format;
     VkColorSpaceKHR color_space;
     VkPresentModeKHR present_mode;
+    /* 表面支持的呈现模式位集合 (1 << VkPresentModeKHR), 只用于诊断/自检报告:
+       驱动只给 FIFO 与给 FIFO+MAILBOX+IMMEDIATE 是两种完全不同的机器。 */
+    unsigned present_modes_supported;
+    /* 最近一次 acquire/present 的原始返回值: 上层 (自检报告) 要展示确切结果码,
+       而 begin/end 只返回 bool。 */
+    int last_acquire_result;
+    int last_present_result;
     /*
      * 逐像素合成: 窗口透明时必须是 PRE_MULTIPLIED, 否则 DWM 把清屏 alpha 当成
      * 不透明, 桌面宠物的背景就是黑的 (见 vk_swapchain.c 的 choose_composite_alpha)。
@@ -249,14 +256,31 @@ struct BongoCatVk {
     uint64_t presented_total;
     /* 第一次成功呈现打一条日志, 之后降噪 (帧日志在逐帧路径上, 每帧打会淹掉别的) */
     bool present_success_logged;
+    /*
+     * 首帧的三个关键点 (进入/提交/present 返回码) 各只打一条 INFO。
+     * 用户报告的故障形态是"日志停在 create_renderer 之后, 一个字都没有, 进程随即消失":
+     * 只要首帧路径上有一个点没打出来, 就能立刻判断卡在哪一段 —— 而这三条正是那段空白
+     * 里唯一能依靠的锚点。逐帧打会淹掉别的日志, 所以只在第一帧打。
+     */
+    bool first_frame_begin_logged;
+    bool first_frame_submit_logged;
+    bool first_frame_present_logged;
 
     BongoCatVkInfo info;
 };
+
+/* vk_result.c: VkResult 的枚举名 (日志里所有非成功结果都要带它, 见文件头) */
+const char *bongo_cat_vk_result_name(VkResult result);
 
 /* vk_core.c */
 bool bongo_cat_vk_create_instance(BongoCatVk *vk, BongoCatError *error);
 bool bongo_cat_vk_create_device(BongoCatVk *vk, BongoCatError *error);
 void bongo_cat_vk_destroy_device(BongoCatVk *vk);
+
+/* vk_context.c / vk_selfcheck.c */
+/* 同 bongo_cat_vk_create, 但不把新上下文登记成 bongo_cat_vk_current() (自检专用) */
+BongoCatVk *bongo_cat_vk_create_isolated(SDL_Window *window,
+    const BongoCatVk *owner, BongoCatError *error);
 
 /* vk_swapchain.c */
 bool bongo_cat_vk_create_swapchain(BongoCatVk *vk, int width, int height,

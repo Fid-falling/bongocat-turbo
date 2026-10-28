@@ -125,6 +125,31 @@
         }
       },
       "general": {
+        "selfcheck": {
+          "labels": {
+            "title": "執行自我檢查"
+          },
+          "hints": {
+            "description": "檢查執行環境與渲染、Live2D、檔案權限等，產生一份可複製的報告",
+            "copied": "報告已複製到剪貼簿",
+            "copyFailed": "複製報告失敗",
+            "saveFailed": "儲存報告失敗"
+          },
+          "options": {
+            "start": "開始檢查",
+            "copy": "複製報告",
+            "save": "儲存為檔案",
+            "switchToOpenGL": "切換並重新啟動"
+          },
+          "status": {
+            "pass": "通過",
+            "warn": "警告",
+            "fail": "失敗",
+            "counts": "通過 %u 項 · 警告 %u 項 · 失敗 %u 項 · 耗時 %u ms",
+            "savedPath": "已儲存到：%s",
+            "vulkanAdvice": "偵測到 Vulkan 首幀呈現失敗，建議切換渲染後端為 OpenGL。"
+          }
+        },
         "title": "一般設定",
         "labels": {
           "appSettings": "應用程式",

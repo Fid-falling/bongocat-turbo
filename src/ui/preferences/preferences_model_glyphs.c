@@ -126,5 +126,51 @@ void bongo_cat_preferences_model_glyphs(const BongoCatApp *app,
         for (size_t i = 0; i < preferences->pending_import_name_count; ++i)
             add_text(ranges, capacity, &used,
                 preferences->pending_import_names[i]);
+        /* 运行时生成的文字 (自检报告) 里的字也要在图集里, 否则会画成缺字方块 */
+        add_text(ranges, capacity, &used, preferences->glyph_extra);
     }
+}
+
+/*
+ * 登记一段"运行时才出现"的文本里用到的字 (自检报告)。字体图集是按范围预烘焙的,
+ * 报告内容包含大量界面文案里没有的字 (力/识/元/帧 …), 不登记就必然是方块。
+ *
+ * 只往 glyph_extra 里追加"还没出现过的非 ASCII 码位", 不直接改 glyph_ranges:
+ * 后者每次重建图集都会由 fonts_resolve 重新生成, 直接写进去会被覆盖。glyph_extra
+ * 是持久的那一份, fonts_resolve 在最后把它并进范围表。
+ */
+void bongo_cat_preferences_glyphs_add_text(BongoCatPreferences *preferences,
+    const char *text) {
+    if (!preferences || !text || !text[0]) return;
+    const size_t capacity = sizeof(preferences->glyph_extra);
+    size_t used = strlen(preferences->glyph_extra);
+    const char *cursor = text;
+    size_t remaining = strlen(text);
+    while (*cursor) {
+        nk_rune rune = 0;
+        int decoded = nk_utf_decode(cursor, &rune, (int)remaining);
+        if (decoded <= 0) { cursor++; if (remaining) remaining--; continue; }
+        cursor += decoded;
+        remaining -= (size_t)decoded;
+        /* ASCII 永远在图集里; 已经在 glyph_extra 里的字也不重复登记 */
+        if (rune <= 0x7e) continue;
+        char encoded[8] = {0};
+        int length = nk_utf_encode(rune, encoded, (int)sizeof(encoded));
+        if (length <= 0 || used + (size_t)length >= capacity) continue;
+        if (strstr(preferences->glyph_extra, encoded)) continue;
+        memcpy(preferences->glyph_extra + used, encoded, (size_t)length);
+        used += (size_t)length;
+        preferences->glyph_extra[used] = '\0';
+    }
+}
+
+/* 重建图集前把 glyph_extra 并进范围表 (只追加尚未覆盖的码位) */
+void bongo_cat_preferences_glyphs_include_extra(
+    const BongoCatPreferences *preferences, uint32_t *ranges,
+    size_t capacity) {
+    if (!preferences || !ranges) return;
+    size_t used = 0;
+    while (used < capacity && ranges[used]) used++;
+    if (used >= capacity || (used & 1)) return;
+    add_text(ranges, capacity, &used, preferences->glyph_extra);
 }

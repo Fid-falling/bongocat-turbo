@@ -170,7 +170,8 @@ bool bongo_cat_vk_create_instance(BongoCatVk *vk, BongoCatError *error) {
     VkResult result = vkCreateInstance(&create, NULL, &vk->instance);
     if (result != VK_SUCCESS) {
         bongo_cat_error_set(error, BONGO_CAT_ERROR_PLATFORM,
-            "Vulkan 实例创建失败 (VkResult=%d)", (int)result);
+            "Vulkan 实例创建失败 (VkResult=%d %s)", (int)result,
+            bongo_cat_vk_result_name(result));
         return false;
     }
     if (vk->validation) {
@@ -266,7 +267,8 @@ bool bongo_cat_vk_create_device(BongoCatVk *vk, BongoCatError *error) {
     VkResult result = vkCreateDevice(vk->physical, &create, NULL, &vk->device);
     if (result != VK_SUCCESS) {
         bongo_cat_error_set(error, BONGO_CAT_ERROR_PLATFORM,
-            "Vulkan 逻辑设备创建失败 (VkResult=%d)", (int)result);
+            "Vulkan 逻辑设备创建失败 (VkResult=%d %s)", (int)result,
+            bongo_cat_vk_result_name(result));
         return false;
     }
     vk->queue_family = best_family;

@@ -104,6 +104,18 @@ bool bongo_cat_preferences_cache_path_event(BongoCatPreferences *value,
    (portable_mode.c), 这里只做交互与多帧反馈。 */
 void bongo_cat_preferences_portable_draw(BongoCatPreferences *value,
     struct nk_context *context);
+/* 设置 → 应用 → [运行自检]: 那一行 + 结果面板 (实现见 preferences_selfcheck.c)。
+   自检本身是只读的运行时诊断, 实现在 runtime/diagnostics/selfcheck*.c。
+   面板是窗口内模态浮层: 打开期间 chrome 拖拽与页面输入都要让路 (见 preferences.c 与
+   preferences_render.c 的 modal 判定)。 */
+void bongo_cat_preferences_selfcheck_row(BongoCatPreferences *value,
+    struct nk_context *context);
+void bongo_cat_preferences_selfcheck_dialog_draw(BongoCatPreferences *value,
+    struct nk_context *context);
+bool bongo_cat_preferences_selfcheck_active(const BongoCatApp *app);
+void bongo_cat_preferences_selfcheck_close(BongoCatApp *app);
+/* 窗口回收时清空面板状态 (报告不跨窗口保留, 下次重新跑) */
+void bongo_cat_preferences_selfcheck_reset(BongoCatPreferences *value);
 /* 异步文件夹对话框的结果是 SDL 用户事件, 没有窗口 ID, 必须在按窗口过滤之前处理 */
 bool bongo_cat_preferences_cache_path_dialog_event(BongoCatPreferences *value,
     const SDL_Event *event);

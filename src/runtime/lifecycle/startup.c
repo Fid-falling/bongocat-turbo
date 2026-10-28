@@ -90,6 +90,24 @@ static void SDLCALL log_output(void *userdata, int category,
     if (log_mutex) SDL_UnlockMutex(log_mutex);
 }
 
+/* 崩溃兜底专用: 不经过 SDL 的日志钩子、不分配内存、写完立刻 flush。
+   它在未处理异常过滤器里被调用 —— 那时进程状态已经不保证干净, 但文件系统通常还在;
+   每行都是 open-append-close, 所以"崩溃前必须 flush"在这里是天然满足的, 末尾再显式
+   fflush 一次 stderr。日志路径还没解析出来 (启动最早期就崩) 时只写 stderr。 */
+void bongo_cat_runtime_log_crash_line(const char *text) {
+    char timestamp[64];
+    char line[512];
+    bongo_cat_runtime_timestamp(timestamp, sizeof(timestamp));
+    snprintf(line, sizeof(line), "%s [%s] [CRITICAL] %s\n", timestamp,
+        log_source, text ? text : "unhandled exception");
+    if (runtime_log_path[0])
+        bongo_cat_file_append(runtime_log_path, line, strlen(line));
+    fflush(stderr);
+    fputs(line, stderr);
+    fflush(stderr);
+    fflush(NULL);
+}
+
 /* 正常退出的收尾: 补一条"关闭完成"日志 (之后 log_mutex 会被销毁), 再把 runtime-state
    清掉。所以它必须发生在 bongo_cat_runtime_log_stop() 之前。 */
 void bongo_cat_runtime_clean_shutdown(BongoCatApp *app, int exit_code) {
@@ -300,6 +318,10 @@ void bongo_cat_startup_stage(BongoCatApp *app, const char *stage) {
 void bongo_cat_startup_ready(BongoCatApp *app) {
     if (!app || startup_is_ready) return;
     startup_is_ready = true;
+    /* 首帧真的端出去了 (或者本次启动根本不需要首帧): 停掉首帧看门狗, 别让它在 8 秒后
+       报一条假的超时。看门狗只认这个入口, 不认 "初始化返回 true"。 */
+    bongo_cat_first_frame_watchdog_presented();
+    bongo_cat_first_frame_stage("running");
     char path[BONGO_CAT_PATH_CAP];
     if (bongo_cat_path_join(path, sizeof(path), app->state_root,
         "startup-stage.txt")) bongo_cat_file_remove(path);

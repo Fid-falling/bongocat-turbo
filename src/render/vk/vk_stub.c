@@ -2,6 +2,7 @@
 #include "bongo_cat/log.h"
 
 #include <SDL3/SDL.h>
+#include <string.h>
 
 /*
  * 未启用 Vulkan 时的桩实现。
@@ -54,6 +55,12 @@ BongoCatVk *bongo_cat_vk_create_shared(SDL_Window *window, const BongoCatVk *own
 }
 
 bool bongo_cat_vk_info(const BongoCatVk *vk, BongoCatVkInfo *info) {
+    (void)vk; (void)info;
+    return false;
+}
+
+bool bongo_cat_vk_swapchain_info(const BongoCatVk *vk,
+    BongoCatVkSwapchainInfo *info) {
     (void)vk; (void)info;
     return false;
 }
@@ -220,6 +227,20 @@ BongoCatVkTexture *bongo_cat_vk_texture_from_external(BongoCatVk *vk,
 bool bongo_cat_vk_native_info(const BongoCatVk *vk, BongoCatVkNativeInfo *info) {
     (void)vk;
     (void)info;
+    return false;
+}
+
+/* 自检的 Vulkan 首帧探测: 没有编 Vulkan 时直接给出"这个构建没有 Vulkan"的结论,
+   而不是让面板显示"未知"。 */
+bool bongo_cat_vk_selfcheck(BongoCatVkSelfCheck *report) {
+    if (report) {
+        memset(report, 0, sizeof(*report));
+        report->compiled = false;
+        report->format = -1;
+        report->present_result = -1;
+        snprintf(report->error, sizeof(report->error),
+            "此构建未启用 Vulkan (需要 -DBONGO_CAT_ENABLE_VULKAN=ON)");
+    }
     return false;
 }
 

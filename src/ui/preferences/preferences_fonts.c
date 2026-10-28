@@ -66,6 +66,13 @@ void bongo_cat_preferences_fonts_resolve(BongoCatPreferences *value,
     /* Include label glyphs in the initial atlas so page switches need no bake. */
     bongo_cat_preferences_model_glyphs(value->app, value->glyph_ranges,
         sizeof(value->glyph_ranges) / sizeof(value->glyph_ranges[0]));
+    /*
+     * 运行时生成的文字 (自检报告) 里用到的字。glyph_extra 是持久的那一份 ——
+     * 每次重建图集上面的 i18n 调用都会重写整张范围表, 所以报告的字不能直接写进
+     * glyph_ranges, 只能在最后并进来。
+     */
+    bongo_cat_preferences_glyphs_include_extra(value, value->glyph_ranges,
+        sizeof(value->glyph_ranges) / sizeof(value->glyph_ranges[0]));
     fonts->ranges = value->glyph_ranges;
 }
 

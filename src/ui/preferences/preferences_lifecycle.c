@@ -86,6 +86,8 @@ static void release_window(BongoCatPreferences *value) {
     value->render_retry_ns = 0;
     value->shown_ns = 0;
     value->vk_consecutive_failures = 0;
+    /* 自检面板是窗口内的浮层, 窗口没了它也不能留着 (否则下次开窗会先冒出旧结果) */
+    bongo_cat_preferences_selfcheck_reset(value);
     /*
      * 只有 GL 窗口才碰 GL: 主窗口是 Vulkan 时 app->gl_context 为 NULL, 这里的
      * SDL_GL_SetSwapInterval 会进 nvoglv64.dll 崩掉 (与 preferences_scale.c 里

@@ -22,5 +22,15 @@ bool bongo_cat_preferences_model_glyphs_ready(
     const BongoCatPreferences *preferences, const char *name);
 void bongo_cat_preferences_model_glyphs_clear_pending(
     BongoCatPreferences *preferences);
+/*
+ * 登记一段运行时生成的文本 (自检报告) 里用到的字; 图集重建由调用方在帧末触发
+ * (绘制中途不能重建, 见 preferences_fonts.c)。字体图集是按范围预烘焙的, 报告里的
+ * 字大多不在界面文案里, 不登记就会画成缺字方块。
+ */
+void bongo_cat_preferences_glyphs_add_text(BongoCatPreferences *preferences,
+    const char *text);
+/* 把已登记的运行时文字并进范围表 (fonts_resolve 在重建图集前调用) */
+void bongo_cat_preferences_glyphs_include_extra(
+    const BongoCatPreferences *preferences, uint32_t *ranges, size_t capacity);
 
 #endif

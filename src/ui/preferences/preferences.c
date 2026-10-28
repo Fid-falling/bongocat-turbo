@@ -193,7 +193,9 @@ bool bongo_cat_preferences_chrome_drag_allowed(
     const BongoCatPreferences *value) {
     return value && value->app && !value->native_drag &&
         !bongo_cat_preferences_behavior_dialog_active(value) &&
-        !bongo_cat_preferences_remove_dialog_active(value->app);
+        !bongo_cat_preferences_remove_dialog_active(value->app) &&
+        /* 自检面板同样盖住标题栏: 拖窗会把面板拖到遮罩底下 */
+        !bongo_cat_preferences_selfcheck_active(value->app);
 }
 
 /*
@@ -227,6 +229,12 @@ static bool chrome_event(BongoCatPreferences *value, const SDL_Event *event) {
     if (event->type == SDL_EVENT_KEY_DOWN && event->key.key == SDLK_ESCAPE) {
         if (bongo_cat_preferences_behavior_dialog_active(value)) {
             bongo_cat_preferences_behavior_dialog_close(value);
+            value->render_dirty = true;
+            return true;
+        }
+        /* 自检面板在删除确认框之上: ESC 先关它 */
+        if (bongo_cat_preferences_selfcheck_active(value->app)) {
+            bongo_cat_preferences_selfcheck_close(value->app);
             value->render_dirty = true;
             return true;
         }

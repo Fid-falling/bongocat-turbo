@@ -121,7 +121,11 @@ bool bongo_cat_vk_render_main(BongoCatApp *app, bool present) {
     bongo_cat_live2d_set_mirror(app->live2d, app->settings.model.mirror);
     bongo_cat_live2d_set_vertical_flip(app->live2d,
         app->settings.model.vertical_flip);
+    /* 用户报告的故障就卡在下一步里 (create_renderer 之后无输出): 这个阶段标记
+       让首帧看门狗的 ERROR 能直接说出"卡在 vk:live2d-draw"。 */
+    bongo_cat_first_frame_stage("vk:live2d-draw");
     bongo_cat_live2d_draw(app->live2d);
+    bongo_cat_first_frame_stage("vk:begin-frame");
     if (!bongo_cat_vk_begin_frame(app->vk, width, height)) {
         app->dirty = true;
         app->render_retry_ns = now + 1000000000ull;
@@ -147,6 +151,7 @@ bool bongo_cat_vk_render_main(BongoCatApp *app, bool present) {
         /* GL 的视口 y 从左下角算, Vulkan 从左上角算, 这里翻转 */
         bongo_cat_vk_set_viewport(app->vk, content_x,
             height - content_y - content_height, content_width, content_height);
+    bongo_cat_first_frame_stage("vk:overlay");
     bongo_cat_overlay_draw_background(app->overlay, app->settings.model.mirror);
     bongo_cat_vk_set_viewport(app->vk, 0, 0, width, height);
     /*
@@ -202,6 +207,7 @@ bool bongo_cat_vk_render_main(BongoCatApp *app, bool present) {
             "[vulkan] 封面整帧回读入队失败 (%dx%d)", width, height);
 
     app->render_retry_ns = 0;
+    bongo_cat_first_frame_stage("vk:end-frame");
     bool presented = bongo_cat_vk_end_frame(app->vk);
     if (!presented) {
         app->dirty = true;

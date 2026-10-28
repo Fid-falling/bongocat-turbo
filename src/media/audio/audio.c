@@ -35,6 +35,24 @@ BongoCatAudio *bongo_cat_audio_create(BongoCatError *error) {
 }
 
 /*
+ * 自检用的设备探测。刻意用一个临时 ma_engine: 复用 audio->engine 会在用户正在放音效时
+ * 把引擎重建掉 (声音会断, 正在播的 voice 全部失效), 而自检的价值在于"不打扰"。
+ * 初始化成功立刻 uninit —— 探测只回答"这台机器能不能打开播放设备"。
+ */
+bool bongo_cat_audio_probe(BongoCatError *error) {
+    ma_engine engine;
+    ma_result result = ma_engine_init(NULL, &engine);
+    if (result != MA_SUCCESS) {
+        bongo_cat_error_set(error, BONGO_CAT_ERROR_PLATFORM,
+            "音频设备初始化失败 (miniaudio %d: %s)", (int)result,
+            ma_result_description(result));
+        return false;
+    }
+    ma_engine_uninit(&engine);
+    return true;
+}
+
+/*
  * 全局增益: 记在 audio 上并 (若引擎已初始化) 立刻下发。用引擎级音量而不是逐个 voice,
  * 是为了让"正在播的声音"也实时跟随滑杆, 而且不需要在播放路径上反复设值。
  * 只影响本程序的 miniaudio 引擎 —— 系统音量与其它进程完全不受影响。

@@ -47,6 +47,28 @@ bool bongo_cat_cli_wants_help(int argc, char **argv);
 void bongo_cat_cli_print_usage(FILE *out);
 void bongo_cat_startup_stage(BongoCatApp *app, const char *stage);
 void bongo_cat_startup_ready(BongoCatApp *app);
+/*
+ * 首帧看门狗 (实现见 lifecycle/first_frame_watchdog.c):
+ *   - arm:     启动装配完成后调用一次, 记下起点; 窗口本来就不可见时直接视为"不需要首帧";
+ *   - presented: 第一帧真的端出去时调用 (startup_ready 内部会调), 停表;
+ *   - update:  主循环每轮调用; 8 秒内没呈现过首帧就打 ERROR (带后端/GPU/驱动/DPI/
+ *              交换链参数/当前阶段), 并把渲染后端写回 OpenGL 后自动重启一次。
+ *   - stage:   渲染路径在关键点上报"当前在哪一步", 只写一个 const char*, 供上面那条
+ *              ERROR 使用。用户报告的故障恰恰是"日志停在某一步之后没有任何输出",
+ *              没有这个标记就只能写"卡住了", 有了它才能写"卡在 live2d-draw"。
+ * 同一进程最多回退一次 (防止"回退 -> 重启 -> 再回退"的循环)。
+ */
+void bongo_cat_first_frame_watchdog_arm(BongoCatApp *app);
+void bongo_cat_first_frame_watchdog_presented(void);
+void bongo_cat_first_frame_watchdog_update(BongoCatApp *app, uint64_t now);
+void bongo_cat_first_frame_stage(const char *stage);
+const char *bongo_cat_first_frame_stage_name(void);
+/*
+ * 崩溃兜底写日志 (startup.c): 直接往本次会话日志追加一行并 flush, 不经过 SDL 的日志
+ * 过滤与锁 —— 它会在未处理异常过滤器里被调用, 那时不能假设进程状态还是干净的。
+ * 未安装日志钩子 (日志路径还没算出来) 时只写 stderr。
+ */
+void bongo_cat_runtime_log_crash_line(const char *text);
 void bongo_cat_runtime_stage(BongoCatApp *app, const char *stage);
 void bongo_cat_runtime_log_stop(void);
 /* 自动重启前把当前会话日志留成 BongoCat.previous.log (新进程启动会清空 BongoCat.log,

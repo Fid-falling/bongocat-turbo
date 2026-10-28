@@ -37,6 +37,10 @@ if(WIN32)
     src/platform/windows/windows_tray.c
     src/platform/windows/windows_assets.c
     src/platform/windows/windows_capture_probe.c
+    # 自检用的三个系统事实 (RtlGetVersion / GetNativeSystemInfo / GetDiskFreeSpaceExW)
+    src/platform/windows/windows_selfcheck.c
+    # 崩溃兜底: 未处理异常 -> 异常码 + 出错模块名写日志 (不吞异常)
+    src/platform/windows/windows_crash.c
     # 用户自备 Cubism Core 的加载/校验(LoadLibraryW + 三符号探测 + PE 架构判定)
     src/platform/windows/windows_live2d_core.c)
   target_include_directories(bongo_cat_runtime PRIVATE

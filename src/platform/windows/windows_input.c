@@ -265,6 +265,18 @@ bool bongo_cat_windows_input_start(BongoCatPlatform *platform) {
     return false;
 }
 
+/*
+ * 只读状态查询 (设置 → 应用 → 运行自检用): 接收线程还在不在。
+ * 判据用"线程句柄还活着"而不是 state->registered —— 后者只在接收线程里读写, 跨线程
+ * 读它是数据竞争; 而 WaitForSingleObject(0) 是内核状态, 没有这个问题。它也不会做任何
+ * 注册/反注册动作, 自检因此不会扰动正在运行的输入通道。
+ */
+bool bongo_cat_platform_input_receiver_active(const BongoCatPlatform *platform) {
+    WindowsInputState *state = platform ? (WindowsInputState *)platform->native : NULL;
+    if (!state || !state->thread) return false;
+    return WaitForSingleObject(state->thread, 0) == WAIT_TIMEOUT;
+}
+
 /* 停止: 先把 platform 指针置空(此后不会再有新事件进队列), 再置 stop 事件并等线程
    退出。线程若 3 秒内没退, 只记错误并延后清理 —— 强杀线程会让它持有的锁处于未定义
    状态, 宁可等它自然结束(引用计数保证内存最终会被释放)。 */

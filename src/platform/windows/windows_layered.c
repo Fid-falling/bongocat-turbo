@@ -173,7 +173,7 @@ void bongo_cat_windows_layered_set_click_through(
     BongoCatWindowsLayered *value = presenter;
     if (!value || (value->mode_logged && value->active == enabled)) return;
     SDL_LogWarn(BONGO_CAT_LOG_LIFECYCLE,
-        "[probe] 呈现路径: 代理分层=%d (0=直接 GL 呈现)", enabled);
+        "[probe] 呈现路径: 代理分层=%d (0=直接呈现)", enabled);
     bongo_cat_windows_layered_apply_mode(value, enabled);
 }
 

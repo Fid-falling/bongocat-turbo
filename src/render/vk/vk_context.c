@@ -75,7 +75,7 @@ bool bongo_cat_vk_probe(BongoCatError *error) {
 }
 
 static BongoCatVk *create_context(SDL_Window *window, const BongoCatVk *owner,
-    BongoCatError *error) {
+    bool register_current, BongoCatError *error) {
     if (!window) {
         bongo_cat_error_set(error, BONGO_CAT_ERROR_ARGUMENT, "Vulkan 后端缺少窗口");
         return NULL;
@@ -149,8 +149,10 @@ static BongoCatVk *create_context(SDL_Window *window, const BongoCatVk *owner,
     }
     vk->info.width = (int)vk->extent.width;
     vk->info.height = (int)vk->extent.height;
-    /* 单例只登记主上下文: 叠加层绘制走 bongo_cat_vk_current(), 不能拿到设置窗口的 */
-    if (!owner) current_context = vk;
+    /* 单例只登记主上下文: 叠加层绘制走 bongo_cat_vk_current(), 不能拿到设置窗口的。
+       自检的隐藏窗口上下文更不能顶掉主上下文 —— 否则探测一跑完, 宠物窗口的叠加层
+       就再也拿不到自己的设备了。 */
+    if (!owner && register_current) current_context = vk;
     /*
      * "设备就绪"是图形故障的第一手证据, 所以字段一个都不能空: device/driver/api 由
      * create_device 填写 (共享上下文从 owner 继承), swapchain/format/present_mode
@@ -175,7 +177,17 @@ static BongoCatVk *create_context(SDL_Window *window, const BongoCatVk *owner,
 }
 
 BongoCatVk *bongo_cat_vk_create(SDL_Window *window, BongoCatError *error) {
-    return create_context(window, NULL, error);
+    return create_context(window, NULL, true, error);
+}
+
+/*
+ * 自检专用: 与 bongo_cat_vk_create 完全同一条装配路径, 但**不登记为当前上下文**。
+ * 探测的隐藏窗口是一份临时上下文, 探测结束就会销毁; 一旦它登记成 current,
+ * 宠物窗口的 bongo_cat_vk_current() 会在探测之后变成悬空/空指针。
+ */
+BongoCatVk *bongo_cat_vk_create_isolated(SDL_Window *window,
+    const BongoCatVk *owner, BongoCatError *error) {
+    return create_context(window, owner, false, error);
 }
 
 BongoCatVk *bongo_cat_vk_create_shared(SDL_Window *window, const BongoCatVk *owner,
@@ -192,7 +204,7 @@ BongoCatVk *bongo_cat_vk_create_shared(SDL_Window *window, const BongoCatVk *own
         return NULL;
     }
     if (!owner) return bongo_cat_vk_create(window, error);
-    return create_context(window, owner, error);
+    return create_context(window, owner, true, error);
 }
 
 void bongo_cat_vk_destroy(BongoCatVk *vk) {
@@ -219,6 +231,20 @@ void bongo_cat_vk_destroy(BongoCatVk *vk) {
 bool bongo_cat_vk_info(const BongoCatVk *vk, BongoCatVkInfo *info) {
     if (!vk || !info) return false;
     *info = vk->info;
+    return true;
+}
+
+bool bongo_cat_vk_swapchain_info(const BongoCatVk *vk,
+    BongoCatVkSwapchainInfo *info) {
+    if (!vk || !info || !vk->extent_valid) return false;
+    info->width = (int)vk->extent.width;
+    info->height = (int)vk->extent.height;
+    info->image_count = vk->image_count;
+    info->format = (int)vk->format;
+    info->present_mode = (int)vk->present_mode;
+    info->composite_alpha = (unsigned)vk->composite_alpha;
+    info->composite_supported = (unsigned)vk->composite_supported;
+    info->present_modes = vk->present_modes_supported;
     return true;
 }
 

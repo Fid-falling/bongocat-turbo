@@ -94,6 +94,9 @@ static bool render(BongoCatApp *app, bool present) {
    致命错误。Vulkan 路径没有这个问题 (它自己管上下文)。 */
     uint64_t now = SDL_GetTicksNS();
     if (app->render_retry_ns > now) return false;
+    /* 首帧看门狗的阶段标记: 卡在拿上下文 / 画 Live2D / 提交 是三种完全不同的问题,
+       没有这行只能写"卡住了"。 */
+    bongo_cat_first_frame_stage("gl:make-current");
     if (!SDL_GL_MakeCurrent(app->window, app->gl_context)) {
         app->dirty = true;
         app->render_retry_ns = now + 1000000000ull;
@@ -136,7 +139,9 @@ static bool render(BongoCatApp *app, bool present) {
     bongo_cat_live2d_set_mirror(app->live2d, app->settings.model.mirror);
     bongo_cat_live2d_set_vertical_flip(app->live2d,
         app->settings.model.vertical_flip);
+    bongo_cat_first_frame_stage("gl:live2d-draw");
     bongo_cat_live2d_draw(app->live2d);
+    bongo_cat_first_frame_stage("gl:overlay");
     if (content_viewport)
         bongo_cat_gl_scale_viewport(render_scale, content_x, content_y,
             content_width, content_height);
@@ -177,6 +182,7 @@ static bool render(BongoCatApp *app, bool present) {
     /* Keep the native window hidden while diagnostics/readback finish. The
        reveal is intentionally adjacent to the swap so an uninitialised front
        buffer cannot be displayed as a black startup frame. */
+    bongo_cat_first_frame_stage("gl:present");
     bool pre_presented = reveal_startup &&
         bongo_cat_platform_present(&app->platform, width, height);
     if (reveal_startup)
@@ -288,6 +294,8 @@ static bool take_update_shutdown(BongoCatApp *app) {
 
 void bongo_cat_app_loop(BongoCatApp *app) {
     while (app->running) {
+        /* 首帧看门狗: 只在"启动后 8 秒还没端出第一帧"时有事可做, 平时只是一次比较 */
+        bongo_cat_first_frame_watchdog_update(app, SDL_GetTicksNS());
         bongo_cat_app_apply_frame_pacing(app);
         int wait_ms = bongo_cat_window_wait_timeout(app, SDL_GetTicksNS());
         if (app->secondary_pet && wait_ms > 100) wait_ms = 100;

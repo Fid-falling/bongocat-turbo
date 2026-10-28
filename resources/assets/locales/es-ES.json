@@ -125,6 +125,31 @@
         }
       },
       "general": {
+        "selfcheck": {
+          "labels": {
+            "title": "Ejecutar autodiagnóstico"
+          },
+          "hints": {
+            "description": "Comprueba el entorno de ejecución, el renderizado, Live2D y los permisos de archivos, y genera un informe que puedes copiar.",
+            "copied": "Informe copiado al portapapeles",
+            "copyFailed": "No se pudo copiar el informe",
+            "saveFailed": "No se pudo guardar el informe"
+          },
+          "options": {
+            "start": "Iniciar comprobación",
+            "copy": "Copiar informe",
+            "save": "Guardar en archivo",
+            "switchToOpenGL": "Cambiar y reiniciar"
+          },
+          "status": {
+            "pass": "Correcto",
+            "warn": "Advertencia",
+            "fail": "Error",
+            "counts": "%u correctos · %u advertencias · %u errores · %u ms",
+            "savedPath": "Guardado en: %s",
+            "vulkanAdvice": "Vulkan no pudo presentar el primer fotograma. Se recomienda cambiar el backend de renderizado a OpenGL."
+          }
+        },
         "title": "General",
         "labels": {
           "appSettings": "Aplicación",

@@ -304,5 +304,8 @@ bool bongo_cat_app_initialize(BongoCatApp *app, int argc, char **argv,
         bongo_cat_input_push(&app->input, &key);
     }
     if (!app->session.window.visible) bongo_cat_startup_ready(app);
+    /* 看门狗在装配完成之后才开始计时: 上面这些步骤 (模型加载/Core 装载) 的耗时不该
+       算进"首帧没出来"的 8 秒里。 */
+    bongo_cat_first_frame_watchdog_arm(app);
     return true;
 }

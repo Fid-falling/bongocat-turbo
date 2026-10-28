@@ -125,6 +125,13 @@ struct BongoCatPreferences {
     int style_theme;
     BongoCatLanguage font_language;
     nk_rune glyph_ranges[2048];
+    /*
+     * 运行时生成的文字 (自检报告) 里出现过的非 ASCII 字, 以 UTF-8 拼在这里。
+     * 字体图集是按范围预烘焙的, glyph_ranges 每次重建都会被 i18n 重新生成, 所以
+     * "报告里要有哪些字"必须存在这个持久字段里, 由 fonts_resolve 并进范围表
+     * (见 preferences_model_glyphs.c 的 glyphs_add_text)。跨窗口会话保留。
+     */
+    char glyph_extra[4096];
     bool input_active;
     bool import_requested;
     bool import_drop_active;

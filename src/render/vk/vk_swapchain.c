@@ -109,7 +109,8 @@ static bool create_render_pass(BongoCatVk *vk, BongoCatError *error) {
     VkResult result = vkCreateRenderPass(vk->device, &create, NULL, &vk->render_pass);
     if (result != VK_SUCCESS) {
         bongo_cat_error_set(error, BONGO_CAT_ERROR_PLATFORM,
-            "Vulkan 渲染通道创建失败 (VkResult=%d)", (int)result);
+            "Vulkan 渲染通道创建失败 (VkResult=%d %s)", (int)result,
+            bongo_cat_vk_result_name(result));
         return false;
     }
     return true;
@@ -184,6 +185,15 @@ bool bongo_cat_vk_create_swapchain(BongoCatVk *vk, int width, int height,
         return false;
     }
     vkGetPhysicalDeviceSurfacePresentModesKHR(vk->physical, vk->surface, &mode_count, modes);
+    /*
+     * 把"这个表面到底支持哪些呈现模式"记成位集合: 自检报告要如实写出它 (驱动只给
+     * FIFO 与给 FIFO+MAILBOX+IMMEDIATE 是两种完全不同的机器), 而枚举结果本身是
+     * 一次性分配的临时数组, 出了这个函数就没了。
+     */
+    vk->present_modes_supported = 0;
+    for (uint32_t i = 0; i < mode_count; ++i)
+        if ((unsigned)modes[i] < 32u)
+            vk->present_modes_supported |= 1u << (unsigned)modes[i];
     /*
      * 呈现模式: 关掉垂直同步 (无限帧率) 时优先 IMMEDIATE, 其次 MAILBOX, 都没有
      * 才退回 FIFO; 开着同步时固定 FIFO。
@@ -278,30 +288,49 @@ bool bongo_cat_vk_create_swapchain(BongoCatVk *vk, int width, int height,
          * 起不来。
          */
         SDL_LogWarn(SDL_LOG_CATEGORY_VIDEO,
-            "[vulkan] compositeAlpha=0x%x 创建失败 (VkResult=%d), 退回不透明合成",
-            (unsigned)create.compositeAlpha, (int)result);
+            "[vulkan] compositeAlpha=0x%x 创建失败 (VkResult=%d %s), 退回不透明合成",
+            (unsigned)create.compositeAlpha, (int)result,
+            bongo_cat_vk_result_name(result));
         create.compositeAlpha = VK_COMPOSITE_ALPHA_OPAQUE_BIT_KHR;
         result = vkCreateSwapchainKHR(vk->device, &create, NULL, &vk->swapchain);
     }
     vk->composite_alpha = create.compositeAlpha;
     vk->composite_supported = capabilities.supportedCompositeAlpha;
+    /*
+     * "透明"这件事有两个不同的含义, 日志里必须写**实际生效的那个**:
+     *   - 窗口想要透明 (window_is_transparent) —— 这是输入, 决定上面按哪张优先级表挑 alpha;
+     *   - 交换链最终拿到了哪种合成 —— 这是结果。驱动可能把预乘拒掉 (AMD/远程会话上实测
+     *     会掉回 OPAQUE), 那时 DWM 拿到的 alpha 全是 1, 画面就是不透明的。
+     * 以前这里直接打窗口意图, 于是日志里出现 "composite_alpha=0x1(OPAQUE) 却
+     * transparent=1" 这种自相矛盾的说法, 排查透明失效时反而被误导。现在只以实际合成
+     * 模式为准: 0x1 = 不透明, 其它位 = 真的逐像素透明。
+     */
+    const bool alpha_composite =
+        vk->composite_alpha != VK_COMPOSITE_ALPHA_OPAQUE_BIT_KHR;
     if (result != VK_SUCCESS) {
         bongo_cat_error_set(error, BONGO_CAT_ERROR_PLATFORM,
-            "Vulkan 交换链创建失败 (VkResult=%d, %ux%u)", (int)result,
-            extent.width, extent.height);
+            "Vulkan 交换链创建失败 (VkResult=%d %s, %ux%u)", (int)result,
+            bongo_cat_vk_result_name(result), extent.width, extent.height);
         return false;
     }
     vk->extent = extent;
-    if (vkGetSwapchainImagesKHR(vk->device, vk->swapchain, &vk->image_count, NULL) != VK_SUCCESS) {
-        bongo_cat_error_set(error, BONGO_CAT_ERROR_PLATFORM, "无法读取交换链图像数量");
+    VkResult images_result = vkGetSwapchainImagesKHR(vk->device, vk->swapchain,
+        &vk->image_count, NULL);
+    if (images_result != VK_SUCCESS) {
+        bongo_cat_error_set(error, BONGO_CAT_ERROR_PLATFORM,
+            "无法读取交换链图像数量 (VkResult=%d %s)", (int)images_result,
+            bongo_cat_vk_result_name(images_result));
         bongo_cat_vk_destroy_swapchain(vk);
         return false;
     }
     if (vk->image_count > BONGO_CAT_VK_MAX_SWAP_IMAGES)
         vk->image_count = BONGO_CAT_VK_MAX_SWAP_IMAGES;
-    if (vkGetSwapchainImagesKHR(vk->device, vk->swapchain, &vk->image_count,
-            vk->images) != VK_SUCCESS) {
-        bongo_cat_error_set(error, BONGO_CAT_ERROR_PLATFORM, "无法读取交换链图像");
+    images_result = vkGetSwapchainImagesKHR(vk->device, vk->swapchain,
+        &vk->image_count, vk->images);
+    if (images_result != VK_SUCCESS) {
+        bongo_cat_error_set(error, BONGO_CAT_ERROR_PLATFORM,
+            "无法读取交换链图像 (VkResult=%d %s)", (int)images_result,
+            bongo_cat_vk_result_name(images_result));
         bongo_cat_vk_destroy_swapchain(vk);
         return false;
     }
@@ -368,10 +397,11 @@ bool bongo_cat_vk_create_swapchain(BongoCatVk *vk, int width, int height,
      */
     SDL_LogInfo(BONGO_CAT_LOG_LIFECYCLE,
         "[vulkan] 交换链 %ux%u images=%u format=%d present_mode=%d "
-        "composite_alpha=0x%x supported=0x%x transparent=%d",
+        "composite_alpha=0x%x supported=0x%x transparent=%d (窗口要求=%d)",
         extent.width, extent.height, vk->image_count, (int)vk->format,
         (int)vk->present_mode, (unsigned)vk->composite_alpha,
-        (unsigned)vk->composite_supported, transparent ? 1 : 0);
+        (unsigned)vk->composite_supported, alpha_composite ? 1 : 0,
+        transparent ? 1 : 0);
     return true;
 }
 

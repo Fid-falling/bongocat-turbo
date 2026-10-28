@@ -125,6 +125,31 @@
         }
       },
       "general": {
+        "selfcheck": {
+          "labels": {
+            "title": "セルフチェックを実行"
+          },
+          "hints": {
+            "description": "実行環境・レンダリング・Live2D・ファイル権限などを確認し、コピー可能なレポートを作成します",
+            "copied": "レポートをクリップボードにコピーしました",
+            "copyFailed": "レポートをコピーできませんでした",
+            "saveFailed": "レポートを保存できませんでした"
+          },
+          "options": {
+            "start": "チェック開始",
+            "copy": "レポートをコピー",
+            "save": "ファイルに保存",
+            "switchToOpenGL": "切り替えて再起動"
+          },
+          "status": {
+            "pass": "合格",
+            "warn": "警告",
+            "fail": "失敗",
+            "counts": "合格 %u 件 · 警告 %u 件 · 失敗 %u 件 · %u ms",
+            "savedPath": "保存先: %s",
+            "vulkanAdvice": "Vulkan の初回フレーム提示に失敗しました。レンダリングバックエンドを OpenGL に切り替えることをおすすめします。"
+          }
+        },
         "title": "一般",
         "labels": {
           "appSettings": "アプリ",

@@ -16,6 +16,12 @@ typedef struct BongoCatAudio BongoCatAudio;
 
 BongoCatAudio *bongo_cat_audio_create(BongoCatError *error);
 void bongo_cat_audio_destroy(BongoCatAudio *audio);
+/*
+ * 自检: 用一个**临时引擎**试初始化一次音频设备, 成功即销毁。
+ * 与正在播放的引擎完全隔离 (不碰 audio 的状态), 所以可以在音效正在播的时候调用。
+ * 失败时 error 里是 miniaudio 的返回码与描述 —— 那正是音频故障唯一有价值的线索。
+ */
+bool bongo_cat_audio_probe(BongoCatError *error);
 BongoCatResult bongo_cat_audio_play(BongoCatAudio *audio, const char *path, BongoCatError *error);
 /* With overlap disabled, only the same clip restarts; other clips continue. */
 BongoCatResult bongo_cat_audio_play_sound(BongoCatAudio *audio, const char *path,

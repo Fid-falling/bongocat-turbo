@@ -101,7 +101,9 @@ static bool draw_shell(BongoCatPreferences *value, struct nk_context *context,
         tr(value, "pages.preference.shortcut.title", "Shortcuts"),
         tr(value, "native.support.title", "Support the Developer")};
     bool modal = bongo_cat_preferences_remove_dialog_active(value->app) ||
-        bongo_cat_preferences_behavior_dialog_active(value);
+        bongo_cat_preferences_behavior_dialog_active(value) ||
+        /* 自检面板也是模态: 打开期间页面不能抢输入 */
+        bongo_cat_preferences_selfcheck_active(value->app);
     const bool native_chrome = bongo_cat_ui_native_chrome(); BongoCatUIPalette p = bongo_cat_ui_palette(dark);
     bongo_cat_ui_shell_draw(context, width, height, dark,
         !value->transparent_window);
@@ -288,6 +290,8 @@ static bool draw_shell(BongoCatPreferences *value, struct nk_context *context,
     bongo_cat_preferences_notice_draw(value, context, width, height);
     bongo_cat_preferences_remove_dialog_draw(value->app, context);
     bongo_cat_preferences_behavior_dialog_draw(value, context);
+    /* 自检面板最后画: 它是本轮最上层的模态浮层 (打开时页面输入已被屏蔽) */
+    bongo_cat_preferences_selfcheck_dialog_draw(value, context);
     return close_requested;
 }
 /*

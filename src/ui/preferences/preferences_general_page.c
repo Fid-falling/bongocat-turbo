@@ -203,6 +203,9 @@ void bongo_cat_preferences_application_section(BongoCatPreferences *value,
     section_gap(context, 7);
     /* 便携模式紧挨着路径那一行: 它们说的是同一件事 (数据放在哪), 用户应该连着看。 */
     bongo_cat_preferences_portable_draw(value, context);
+    /* 运行自检 (用户指定的位置: 便携模式之后、缓存目录之前): 它也是"程序怎么跑"的
+       一部分 —— 出问题时这一行给出的报告比让用户翻日志直接得多。 */
+    bongo_cat_preferences_selfcheck_row(value, context);
     bongo_cat_preferences_cache_path_draw(value, context);
     bongo_cat_preferences_options_end(value, context);
     }

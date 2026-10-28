@@ -125,6 +125,31 @@
         }
       },
       "general": {
+        "selfcheck": {
+          "labels": {
+            "title": "运行自检"
+          },
+          "hints": {
+            "description": "检查运行环境与渲染、Live2D、文件权限等，生成一份可复制的报告",
+            "copied": "报告已复制到剪贴板",
+            "copyFailed": "复制报告失败",
+            "saveFailed": "保存报告失败"
+          },
+          "options": {
+            "start": "开始自检",
+            "copy": "复制报告",
+            "save": "保存为文件",
+            "switchToOpenGL": "切换并重启"
+          },
+          "status": {
+            "pass": "通过",
+            "warn": "警告",
+            "fail": "失败",
+            "counts": "通过 %u 项 · 警告 %u 项 · 失败 %u 项 · 耗时 %u ms",
+            "savedPath": "已保存到：%s",
+            "vulkanAdvice": "检测到 Vulkan 首帧呈现失败，建议切换渲染后端为 OpenGL。"
+          }
+        },
         "title": "通用设置",
         "labels": {
           "appSettings": "应用",

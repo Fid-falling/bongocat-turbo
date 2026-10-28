@@ -15,7 +15,19 @@
 #include <stdio.h>
 #include <stdlib.h>
 
+#ifdef _WIN32
+#include "windows_diagnostics.h"
+#endif
+
 int bongo_cat_app_run(int argc, char **argv) {
+    /*
+     * 崩溃兜底必须最先装: 用户报的"进程闪一下就消失"发生在启动首帧附近, 而 Windows 的
+     * 默认处理多半是静默退出。装上之后, 未处理的异常码与出错模块名会先落进日志
+     * (见 windows_crash.c), 再交回系统默认处理。
+     */
+#ifdef _WIN32
+    bongo_cat_windows_install_crash_handler();
+#endif
     if (bongo_cat_cli_wants_help(argc, argv)) {
         bongo_cat_cli_print_usage(stdout);
         return 0;

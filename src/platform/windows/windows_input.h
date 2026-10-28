@@ -21,6 +21,11 @@ bool bongo_cat_windows_input_take_relative(BongoCatPlatform *platform,
 void bongo_cat_windows_input_reset_relative(BongoCatPlatform *platform);
 void bongo_cat_windows_input_release_relative(BongoCatPlatform *platform);
 bool bongo_cat_windows_input_pointer_locked(BongoCatPlatform *platform);
+/*
+ * 只读状态: 接收线程是否还在运行 (设置 → 应用 → 运行自检用)。
+ * 不做注册/反注册, 也不碰输入队列 —— 自检不能扰动正在运行的输入通道。
+ */
+bool bongo_cat_platform_input_receiver_active(const BongoCatPlatform *platform);
 #endif
 
 #endif
