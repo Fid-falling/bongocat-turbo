@@ -14,12 +14,14 @@
  * 副进程 (--secondary-pet=, 多宠) 跳过托盘/设置/更新, 并且初始强制不可见。
  */
 #include "runtime.h"
+#include "bongo_cat/log.h"
 #include "storage_paths.h"
 #include "bongo_cat/audio.h"
 #include "bongo_cat/file.h"
 #include "bongo_cat/sound.h"
 #include "bongo_cat/i18n.h"
 #include "bongo_cat/path.h"
+#include "model_cover_paths.h"
 #include "bongo_cat/overlay.h"
 #include "bongo_cat/preferences.h"
 #include "bongo_cat/tray.h"
@@ -31,6 +33,38 @@
 #include <string.h>
 static void scan_models(BongoCatApp *app) {
     bongo_cat_app_rescan_models(app);
+}
+/*
+ * 启动占位画面: 在模型加载完成之前, 先把模型封面画进桌宠窗口并把窗口显示出来。
+ *
+ * 为什么值得: 一个 8K 图集的模型要 3~5 秒才加载完 (大头是 SDK 建渲染器), 这段时间窗口一直
+ * 是隐藏的 —— 用户看到的就是"双击了但什么都没发生"。封面图上一轮已经生成过
+ * (<adapter>/resources/cover.png, 正是设置页卡片上那张), 拿它顶住画面只要一次纹理上传,
+ * 于是"猫"几乎立刻出现在桌面上; 之后 Live2D 接管时 overlay 会整体重建, 占位图自动消失。
+ *
+ * 三处刻意不做:
+ *   - 没有封面 (第一次用这个模型) 或上传失败: 什么也不做, 保持"首帧就绪才显示"的老行为;
+ *   - 冒烟/自动化: 那些路径会截帧做断言, 早出现一帧占位图会让它们看到"错的画面";
+ *   - 副宠: 它的窗口默认隐藏, 由主进程的可见性下发决定。
+ */
+static void show_startup_placeholder(BongoCatApp *app) {
+    if (!app || !app->overlay || !app->live2d || !app->window) return;
+    if (app->smoke || app->automated || app->secondary_pet) return;
+    const char *id = app->session.active_model_id[0]
+        ? app->session.active_model_id : "standard";
+    const BongoCatModelEntry *entry = bongo_cat_models_find(&app->models, id);
+    if (!entry) entry = bongo_cat_models_find(&app->models, "standard");
+    if (!entry || !entry->adapter_directory[0]) return;
+    char cover[BONGO_CAT_PATH_CAP];
+    if (!bongo_cat_path_join(cover, sizeof(cover), entry->adapter_directory,
+            BONGO_CAT_MODEL_COVER_FILE)) return;
+    if (!bongo_cat_path_is_file(cover)) return;
+    if (!bongo_cat_overlay_effect(app->overlay, cover)) return;
+    const uint64_t started = SDL_GetTicksNS();
+    bongo_cat_app_render_now(app);
+    SDL_LogInfo(BONGO_CAT_LOG_LIFECYCLE,
+        "[render] 启动占位: 先用封面显示桌宠 (模型 %s 还在加载), 用时 %.1fms: %s",
+        entry->id, (double)(SDL_GetTicksNS() - started) / 1e6, cover);
 }
 /* 选一个能用的模型: session 里记的 id 可能已经不存在 (用户删过模型/换了机器), 于是
    依次退回 standard -> keyboard -> gamepad, 再退到列表第一个; 最后才尝试重建内置
@@ -170,13 +204,19 @@ bool bongo_cat_app_initialize(BongoCatApp *app, int argc, char **argv,
     app->live2d = bongo_cat_live2d_create(app->asset_root, error);
     if (!app->live2d) return false;
     /*
-     * 手柄子系统的首次初始化要枚举 HID 设备, 实测在 Windows 上超过 600ms。它过去是"第一次
-     * 切到手柄模型"时才做的, 于是那一次切换的收尾会整段卡住 —— 用户看到的是"换模型换到
-     * 一半画面冻住"。这里在启动阶段就预热掉: 启动时窗口还没显示, 这 600ms 用户看不到。
-     * 预热不改变输入行为, 失败也只降级 (手柄不可用时键鼠照常), 详见
-     * bongo_cat_gamepads_prewarm 的说明。
+     * 手柄子系统的首次初始化要枚举 HID 设备, 实测在 Windows 上 440ms 以上。它过去是"第一次
+     * 切到手柄模型"时才做的, 于是那一次切换的收尾会整段卡住 —— 用户看到的是"换模型换到一半
+     * 画面冻住"。之前的做法是无条件在启动阶段预热: 启动时窗口还没显示, 这段用户看不到, 但
+     * **所有**用户每次启动都要替它付钱。
+     *
+     * 现在只给"用过手柄模型"的人预热 (session.gamepad_used, 切到过手柄模型就置位): 绝大多数
+     * 人只用键鼠/标准模型, 这笔开销对他们纯粹是拖慢启动。从没用过的人真的切到手柄模型时,
+     * 那一次切换会付一次初始化 —— 那是一次有进度动画的显式操作, 代价与理解成本对得上; 之后
+     * 再启动就自动预热了。失败仍只降级 (手柄不可用时键鼠照常), 详见 gamepad.c 的说明。
      */
-    bongo_cat_gamepads_prewarm(app);
+    if (app->session.gamepad_used) bongo_cat_gamepads_prewarm(app);
+    else SDL_LogInfo(BONGO_CAT_LOG_LIFECYCLE,
+        "[input] 没预热手柄子系统 (这个配置从没用过手柄模型), 启动更快");
     optional = (BongoCatError){0}; app->overlay = bongo_cat_overlay_create(&optional);
     if (!app->overlay) SDL_LogWarn(SDL_LOG_CATEGORY_APPLICATION,
         "Overlay disabled: %s", optional.message);
@@ -192,6 +232,7 @@ bool bongo_cat_app_initialize(BongoCatApp *app, int argc, char **argv,
 /* 扫描 + 选模型是 model-ready 的全部前提: 走到这里才算"有画面可画"; 这一步失败
    就整个启动失败, 因为它没有可降级的替代路径。 */
     scan_models(app);
+    show_startup_placeholder(app);
     if (!load_selected_model(app, error)) return false;
     bongo_cat_startup_stage(app, "model-ready");
     /* --ci-sound-test: 模型已就绪, 用真实播放路径把音效策略走一遍 (无参数时零开销) */

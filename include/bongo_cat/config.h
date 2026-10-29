@@ -361,6 +361,13 @@ typedef struct BongoCatSessionState {
     size_t additional_model_count;
     BongoCatActiveBehavior active_behaviors[BONGO_CAT_BEHAVIOR_BINDING_CAP];
     size_t active_behavior_count;
+    /*
+     * 用过手柄模型吗? 手柄子系统的首次初始化要枚举 HID 设备 (Windows 上实测 400~600ms),
+     * 过去无条件塞在启动路径里给所有用户加钱。只有真的用过手柄模型的人下次启动才预热,
+     * 其余人把这笔开销省掉; 从没切过手柄模型的人则在下一次切换时付一次 (那是一次有进度
+     * 动画的显式操作, 而不是每次开机都要等)。
+     */
+    bool gamepad_used;
 } BongoCatSessionState;
 
 #ifdef __cplusplus

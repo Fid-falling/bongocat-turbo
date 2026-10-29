@@ -174,7 +174,9 @@ BongoCatResult bongo_cat_session_load(const char *path,
             "availableUpdateVersion", loaded.available_update_version,
             sizeof(loaded.available_update_version), error) &&
         read_additional_models(additional_models, &loaded, error) &&
-        read_active_behaviors(active_behaviors, &loaded, error);
+        read_active_behaviors(active_behaviors, &loaded, error) &&
+        /* 老会话文件里没有这个键: 缺省即 false (没预热过), 不算格式错误。 */
+        read_bool(root, "gamepadUsed", &loaded.gamepad_used, error);
     yyjson_doc_free(document);
     if (!valid) return BONGO_CAT_ERROR_FORMAT;
     bongo_cat_session_validate(&loaded);
@@ -275,6 +277,8 @@ BongoCatResult bongo_cat_session_save(const char *path,
             canonical.last_update_check_version) &&
         yyjson_mut_obj_add_strcpy(doc, root, "availableUpdateVersion",
             canonical.available_update_version) &&
+        yyjson_mut_obj_add_bool(doc, root, "gamepadUsed",
+            canonical.gamepad_used) &&
         write_additional_models(doc, root, &canonical) &&
         write_active_behaviors(doc, root, &canonical);
     if (!built) {
