@@ -52,6 +52,8 @@ struct BongoCatLive2DLoadSession {
     uint64_t stage_ns[kLoadStageCount] = {};
     uint64_t stage_max_ns[kLoadStageCount] = {};
     unsigned stage_steps[kLoadStageCount] = {};
+    /* 整个会话的起点: 加载结束时用它算总耗时, 与 stage_ns 一起构成"这次慢在哪"的那条日志。 */
+    uint64_t started_ns = 0;
 };
 
 namespace {
@@ -155,6 +157,7 @@ extern "C" BongoCatLive2DLoadSession *bongo_cat_live2d_load_session_begin(
     }
     session->runtime = runtime;
     session->direct_textures = direct_textures;
+    session->started_ns = SDL_GetTicksNS();
     session->progress_callback = progress;
     session->progress_userdata = userdata;
     session->pending = new(std::nothrow) bongo_cat::NativeModel();
@@ -348,6 +351,18 @@ extern "C" BongoCatLive2DStepResult bongo_cat_live2d_load_session_step(
         session->stage_steps[slot]++;
         if (elapsed > session->stage_max_ns[slot])
             session->stage_max_ns[slot] = elapsed;
+    }
+    /* 分段耗时摘要只能在组件里打: 游标、各段累计时间、单步峰值都只存在于这里。
+       启动时的同步加载与运行期的分步切换走的是同一段代码, 所以这一条同时回答
+       "启动慢"和"切换卡"两种反馈。必须放在**累加之后** —— 否则最后一步 (finalize,
+       恰好经常是建渲染器/上传贴图那一步) 的耗时会从摘要里漏掉。峰值不到 32ms 时静默。 */
+    if (outcome == BONGO_CAT_LIVE2D_STEP_DONE) {
+        /* 只打目录名: 完整路径在有中文/长路径的模型上会把这一行撑得很长 */
+        const char *leaf = directory ? directory : "";
+        for (const char *at = leaf; *at; ++at)
+            if (*at == '/' || *at == '\\') leaf = at + 1;
+        bongo_cat_live2d_load_session_log_timing(session, leaf,
+            SDL_GetTicksNS() - session->started_ns);
     }
     return outcome;
 }
