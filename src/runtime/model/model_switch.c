@@ -122,6 +122,19 @@ bool bongo_cat_app_request_model_switch(BongoCatApp *app, const char *id,
     return true;
 }
 
+/* 贴图档位升级: 把**当前已加载的**模型按现在的图集上限重新加载一遍。
+ * 为什么复用切换队列而不是另开一条路径: 加载的每一步都只能在主线程、按帧预算推进, 而且
+ * 提交之前不许动 loaded_model —— 这些不变量在队列里已经成立, 重写一遍只会多一份会走样的
+ * 副本。唯一的差别是允许 target 等于 loaded_model (force_reload)。 */
+bool bongo_cat_app_request_model_reload(BongoCatApp *app) {
+    if (!app || !app->loaded_model[0]) return false;
+    app->model_switch.force_reload = true;
+    if (bongo_cat_app_request_model_switch(app, app->loaded_model, NULL))
+        return true;
+    app->model_switch.force_reload = false;
+    return false;
+}
+
 /* 失败收尾: 记录原因、通知界面、回到原模型。app->loaded_model 与 session 从来没被改过,
  * 所以"回退"这件事本身不需要额外动作 —— 要做的只是把仅加载期有效的显示状态清干净, 并让
  * 主循环重新出帧。 */
@@ -193,8 +206,11 @@ static bool job_start(BongoCatApp *app, const BongoCatModelEntry *entry,
     app->model_switch.started_ns = now;
     app->model_switch.deadline_ns = now + MODEL_SWITCH_TIMEOUT_NS;
     BongoCatError failure = {0};
+    const bool force = app->model_switch.force_reload;
+    /* force 只对本次加载有效: 用过就清, 免得后面某次普通切换被它带成"重载同一个模型"。 */
+    app->model_switch.force_reload = false;
     if (!bongo_cat_app_begin_model_switch(app, entry,
-            &app->model_switch.shadow, &failure)) {
+            &app->model_switch.shadow, force, &failure)) {
         /* begin 的两种失败: 参数不对 (前面已经挡过) 或"已经加载的就是它" (上层挡过), 所以
          * 走到这里只剩真失败。 */
         app->model_switch.error = failure;

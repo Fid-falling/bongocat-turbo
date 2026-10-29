@@ -20,6 +20,8 @@
 #include "model_switch_shadow.h"
 #include "bongo_cat/vk_backend.h"
 #include "bongo_cat/audio.h"
+#include "bongo_cat/image.h"
+#include "bongo_cat/log.h"
 #include "bongo_cat/memory_policy.h"
 #include "bongo_cat/overlay.h"
 #include "bongo_cat/preferences.h"
@@ -39,6 +41,14 @@ static void select_model_state(BongoCatApp *app, const BongoCatModelEntry *entry
     snprintf(app->session.active_model_id, sizeof(app->session.active_model_id), "%s",
         entry->id);
     app->loaded_mode = entry->mode;
+    /* 记住「用过手柄模型」: 手柄子系统的首次初始化要 400~600ms, 只有真的用过它的人才值得在
+       下次启动时预热 (见 app.c 里 bongo_cat_gamepads_prewarm 的调用点)。本次的启用照旧在
+       下面立刻发生, 所以这里只影响下次启动的行为。 */
+    if (entry->mode == BONGO_CAT_MODE_GAMEPAD && !app->session.gamepad_used) {
+        app->session.gamepad_used = true;
+        SDL_LogInfo(BONGO_CAT_LOG_LIFECYCLE,
+            "[input] 记录「用过手柄模型」: 下次启动会预热手柄子系统");
+    }
     bongo_cat_gamepads_set_enabled(app, entry->mode == BONGO_CAT_MODE_GAMEPAD);
 }
 /* reveal 为真时把隐藏、最小化或悬停隐藏的窗口拉回可见，否则只把越界窗口夹回显示器；无论
@@ -119,19 +129,25 @@ static void commit_model(BongoCatApp *app,
 }
 
 /* 切换的"影子准备"入口: 校验 id 与前置条件, 再把准备工作交给 model_switch_shadow.c。
- * 已经加载同一个 id 时只补一次 commit（模式可能变过）, 不重新加载也不建影子。 */
+ * 已经加载同一个 id 时只补一次 commit（模式可能变过）, 不重新加载也不建影子。
+ * force 为真时上面这条短路失效: 图集档位升级要把同一个模型真的重新解码/上传一遍。 */
 bool bongo_cat_app_begin_model_switch(BongoCatApp *app,
     const BongoCatModelEntry *entry, BongoCatModelSwitchShadow *shadow,
-    BongoCatError *error) {
+    bool force, BongoCatError *error) {
     if (!app || !app->live2d || !entry || !shadow) {
         bongo_cat_error_set(error, BONGO_CAT_ERROR_ARGUMENT,
             "Cannot select a model without an active renderer and model id");
         return false;
     }
-    if (app->loaded_model[0] && strcmp(app->loaded_model, entry->id) == 0) {
+    if (!force && app->loaded_model[0] &&
+        strcmp(app->loaded_model, entry->id) == 0) {
         commit_model(app, entry, false, false);
         return false;
     }
+    /* 这一次加载用的图集上限记在 app 上: 宠物窗口放大之后要靠它判断"当前图集还够不够清晰"
+       (见 bongo_cat_app_upgrade_model_textures_if_needed)。上限在解码/上传那一刻就定死了,
+       所以在这里取一次, 之后它就是这一次加载的事实。 */
+    app->model_texture_limit_loaded = bongo_cat_image_model_texture_limit();
     if (!bongo_cat_model_switch_prepare(app, entry, shadow, error)) return false;
     model_runtime_stage(app, "started", entry);
     snprintf(app->loading_model, sizeof(app->loading_model), "%s", entry->id);
@@ -283,7 +299,7 @@ bool bongo_cat_app_select_model_with_error(BongoCatApp *app,
         return false;
     }
     BongoCatModelSwitchShadow shadow;
-    if (!bongo_cat_app_begin_model_switch(app, entry, &shadow, failure))
+    if (!bongo_cat_app_begin_model_switch(app, entry, &shadow, false, failure))
         /* 已经加载的就是这个模型: begin 只补了一次 commit, 算成功; 其余情况是真失败。 */
         return app->loaded_model[0] && strcmp(app->loaded_model, entry->id) == 0;
     char previous_model[BONGO_CAT_ID_CAP];
@@ -342,4 +358,36 @@ bool bongo_cat_app_select_model_with_error(BongoCatApp *app,
 
 bool bongo_cat_app_select_model(BongoCatApp *app, const char *id) {
     return bongo_cat_app_select_model_with_error(app, id, NULL);
+}
+
+/*
+ * 宠物被放大之后, 当前图集可能已经跟不上显示尺寸: 这时用一个**异步**切换把同一个模型按
+ * 现在值得的图集上限重新加载一遍。几条边界:
+ *  - 只升级不降级: 缩小宠物没必要为了省显存把画面重载一遍 (重载本身要一两秒, 还是一次
+ *    可见的"闪一下"); 下次冷启动自然会按新尺寸解码;
+ *  - 差得不够多不做: 1.5 倍以内的差距肉眼分不出来, 但会白付一次加载;
+ *  - 加载期间旧模型照常显示, 所以放大不会黑屏 —— 这是复用切换队列而不是另开一条路的原因;
+ *  - 两次升级之间至少隔 5 秒: 连续拖拽缩放时不要每松一次手就重载一遍。
+ */
+#define BONGO_CAT_TEXTURE_UPGRADE_RATIO_NUM 3
+#define BONGO_CAT_TEXTURE_UPGRADE_RATIO_DEN 2
+#define BONGO_CAT_TEXTURE_UPGRADE_COOLDOWN_NS 5000000000ull
+
+void bongo_cat_app_upgrade_model_textures_if_needed(BongoCatApp *app) {
+    if (!app || !app->live2d || !app->loaded_model[0] || app->secondary_pet) return;
+    if (app->model_switch.active) return;
+    const int needed = bongo_cat_image_model_texture_limit();
+    const int loaded = app->model_texture_limit_loaded;
+    if (loaded <= 0 || needed <= loaded) return;
+    if ((long long)needed * BONGO_CAT_TEXTURE_UPGRADE_RATIO_DEN <
+        (long long)loaded * BONGO_CAT_TEXTURE_UPGRADE_RATIO_NUM) return;
+    const uint64_t now = SDL_GetTicksNS();
+    if (app->model_texture_upgrade_ns &&
+        now - app->model_texture_upgrade_ns < BONGO_CAT_TEXTURE_UPGRADE_COOLDOWN_NS)
+        return;
+    if (!bongo_cat_app_request_model_reload(app)) return;
+    app->model_texture_upgrade_ns = now;
+    SDL_LogInfo(BONGO_CAT_LOG_LIFECYCLE,
+        "[render] 宠物窗口放大: 图集上限 %d -> %d, 重新加载模型 %s 以恢复清晰度",
+        loaded, needed, app->loaded_model);
 }

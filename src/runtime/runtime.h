@@ -235,6 +235,12 @@ void bongo_cat_smoke_model_switch_update(BongoCatApp *app, uint64_t now);
  * 调用方只登记请求, 由主循环每轮调一次 step 按帧预算推进; 失败时当前模型保持不变。 */
 bool bongo_cat_app_request_model_switch(BongoCatApp *app, const char *id,
     BongoCatError *error);
+/* 把当前已加载的模型按现在的图集上限重新加载一遍 (窗口放大后恢复清晰度; 实现见
+ * model/model_switch.c 与 model/model_files.c)。 */
+bool bongo_cat_app_request_model_reload(BongoCatApp *app);
+/* 宠物窗口尺寸变化之后调用一次: 当前图集明显跟不上显示尺寸时, 异步重载同一个模型。
+ * 只升级不降级, 有 1.5 倍差距门槛与 5 秒冷却, 加载期间旧模型照常显示。 */
+void bongo_cat_app_upgrade_model_textures_if_needed(BongoCatApp *app);
 bool bongo_cat_app_model_switch_step(BongoCatApp *app, uint64_t now,
     uint64_t budget_ns);
 bool bongo_cat_app_model_switch_active(const BongoCatApp *app);
