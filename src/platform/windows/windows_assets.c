@@ -183,6 +183,26 @@ static bool content_matches(const char *path, const unsigned char *expected, siz
     return ok;
 }
 
+/* 关键文件的内容是否与包内一致。压缩条目必须先解压再比: 磁盘上躺的永远是解压后的内容,
+   拿 deflate 字节去比是两件不同的东西。只对 verify_contents 清单里的文件走这条路径
+   (标准模型 + 几张图, 合计 1.5 MB 量级), 解压一遍只要几毫秒。 */
+static bool payload_content_matches(const char *path, const unsigned char *data,
+    const PackEntry *entry) {
+    if (!(entry->flags & 1))
+        return content_matches(path, data + entry->payload_offset,
+            entry->payload_size);
+    if (entry->payload_size < 4) return false;
+    uint32_t raw_size = read32(data + entry->payload_offset);
+    unsigned char *buffer = malloc(raw_size ? raw_size : 1);
+    if (!buffer) return false;
+    mz_ulong length = raw_size;
+    bool matches = mz_uncompress(buffer, &length,
+        data + entry->payload_offset + 4, entry->payload_size - 4) == MZ_OK &&
+        length == raw_size && content_matches(path, buffer, raw_size);
+    free(buffer);
+    return matches;
+}
+
 /* 标记摘要没变时走的快速路径: 只检查包内每个**资源**文件在磁盘上存在且大小一致, 关键文件
    再比对内容。任何一项不满足就返回 false, 触发完整解包。cores/ 段不在这里检查 —— 它落在
    <存储根>/cores/, 与这个缓存目录无关, 由 release_component 自己按哈希判定。 */
@@ -195,11 +215,22 @@ static bool packed_files_present(const unsigned char *data, size_t size,
         if (!asset_entry(&entry)) continue;
         char path[BONGO_CAT_PATH_CAP];
         uint64_t actual_size;
+        /*
+         * 磁盘上躺的是**解压后**的内容: 压缩条目的 payload_size 是压缩长度, 不能拿它比 ——
+         * 那样每个压缩过的资源 (locales 的 JSON、moc3 之类) 都会"大小不一致", 于是"缓存已
+         * 完整"的快路径永远命中不了, 每次启动都把整套资源重解一遍 (~1.2 秒 + 701 个文件)。
+         * 压缩条目的真实大小是负载头里的 uint32, 与 extract_pack 写出去的长度是同一个数。
+         */
+        uint64_t expected_size = entry.payload_size;
+        if (entry.flags & 1) {
+            if (entry.payload_size < 4) return false;
+            expected_size = read32(data + entry.payload_offset);
+        }
         if (!bongo_cat_path_join(path, sizeof(path), target, entry.name) ||
             !bongo_cat_path_file_size(path, &actual_size) ||
-            actual_size != entry.payload_size) return false;
-        if (verify_contents(entry.name) && !content_matches(path,
-            data + entry.payload_offset, entry.payload_size)) return false;
+            actual_size != expected_size) return false;
+        if (verify_contents(entry.name) &&
+            !payload_content_matches(path, data, &entry)) return false;
     }
     return true;
 }
