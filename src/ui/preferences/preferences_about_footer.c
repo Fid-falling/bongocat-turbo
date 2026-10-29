@@ -7,8 +7,9 @@
  * 2. 更新按钮是一个多态按钮, 文案和点击行为都由 update_snapshot 的 status 决定
  * (检查中/下载中 xx%/校验中/准备重启/有新版/商店版/不支持自更新/普通检查)。文案由
  * update_label 统一给出, 状态判断在这里重复了一次 —— 改动状态语义时两处要一起改。
- * 3. "查看发布版本"只在 ERROR 时出现: 检查失败后按钮只会重试, 得给用户一条不经过
- * GitHub API 的出路 (限流时 API 打不通, 发布页本身仍能打开)。
+ * 3. "查看发布版本"只在**用户主动检查**失败时出现: 检查失败后按钮只会重试, 得给用户一条
+ * 不经过 GitHub API 的出路 (限流时 API 打不通, 发布页本身仍能打开)。启动时的自动检查
+ * 失败是幕后的, 界面保持"什么都没发生"的样子, 不额外长出一个用户没要求的入口。
  * 版本号用 BONGO_CAT_VERSION_DISPLAY (带构建渠道信息), 不要再拼别的字符串。
  *
  * 一键更新的"下载中 -> 校验中 -> 准备重启"三段都体现在这个按钮上: 点击即开始, 百分比
@@ -283,9 +284,10 @@ void bongo_cat_preferences_about_footer(BongoCatPreferences *value,
         "View releases");
     const struct nk_user_font *small_font = logs_font(value);
     const char *version = BONGO_CAT_VERSION_DISPLAY;
-    /* 只有检查失败(限流、网络不通等)才多出这一个入口, 所以宽度也要一起算进
-       actions_width, 否则窄窗口下它会被右边裁掉。 */
-    bool show_releases = update_snapshot.status == BONGO_CAT_UPDATE_ERROR;
+    /* 只有用户主动检查失败 (限流、网络不通等) 才多出这一个入口, 所以宽度也要一起算进
+       actions_width, 否则窄窗口下它会被右边裁掉。自动检查失败不算: 它连失败提示都不显示。 */
+    bool show_releases = update_snapshot.status == BONGO_CAT_UPDATE_ERROR &&
+        update_snapshot.manual;
     float label_width = width(value->ui.caption_font, version_label) + 2;
     float version_width = width(value->ui.label_font, version) + 2;
     float update_text_width = width(value->ui.caption_font, update);

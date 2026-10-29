@@ -54,6 +54,10 @@ typedef struct BongoCatUpdateSnapshot {
        界面必须提示"已下载到 <manual_path>, 请手动替换"。 */
     bool manual_replace;
     char manual_path[BONGO_CAT_PATH_CAP];
+    /* 这一轮检查是用户点的 (true) 还是启动时自动跑的 (false)。
+       失败提示 (关于页底部状态条、"查看发布版本"链接) 只对用户主动发起的那次出现:
+       自动检查是幕后行为, 失败时不该在用户没要求的时候把限流文案摆到脸上。 */
+    bool manual;
 } BongoCatUpdateSnapshot;
 
 BongoCatUpdateService *bongo_cat_update_create(BongoCatApp *app);

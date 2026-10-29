@@ -325,6 +325,7 @@ void bongo_cat_update_snapshot(BongoCatUpdateService *service,
     snapshot->source_index = service->source_index;
     snapshot->source_count = service->source_count;
     snapshot->manual_replace = service->manual_replace;
+    snapshot->manual = service->manual;
     snprintf(snapshot->source, sizeof(snapshot->source), "%s",
         service->source_label);
     snprintf(snapshot->manual_path, sizeof(snapshot->manual_path), "%s",

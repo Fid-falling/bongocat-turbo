@@ -9,6 +9,9 @@
  *
  * 文案约定: 阶段标题里最多只有一个 %s (版本号), 百分比由本文件自己拼 —— 这样翻译只需要
  * 处理一个占位符, 少一类"某个语言写错格式串"的风险。找不到 key 时一律回退英文。
+ *
+ * 只服务"用户主动检查"这条交互线: 启动时的自动检查是幕后的, 它失败 (限流/断网) 就不该
+ * 在屏幕底部挂一条用户没要求的红字 —— 失败提示只在 manual 检查时才出现 (见 status_text)。
  */
 #include "preferences_update_status.h"
 #include "preferences_notice.h"
@@ -87,6 +90,9 @@ static bool status_text(BongoCatPreferences *value,
             "The update is ready; restarting BongoCat"));
         return true;
     case BONGO_CAT_UPDATE_ERROR:
+        /* 自动检查 (启动时那次) 失败: 静默。用户没点"检查更新"的话, 这里弹出的限流文案
+           既没有前因也没有下一步, 只是常驻在底部挡视线 —— 失败提示属于 manual 那条线。 */
+        if (!snapshot->manual) return false;
         if (snapshot->manual_replace && snapshot->manual_path[0]) {
             snprintf(title, title_capacity, "%s", tr(value,
                 "native.support.updateStatusManual",
