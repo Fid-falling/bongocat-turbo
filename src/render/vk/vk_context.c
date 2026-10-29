@@ -58,6 +58,15 @@ bool bongo_cat_vk_probe(BongoCatError *error) {
     static uint64_t failed_ns;    /* 上次失败的时刻, 只在失败窗口内有意义 */
     uint64_t now = SDL_GetTicksNS();
     if (cached == 1) return true;
+    /*
+     * 已经有一个活着的 Vulkan 上下文时, 这台机器显然有可用的设备 —— 不必再建一套
+     * instance/device 去证明 (那要 300ms 上下)。设置界面每帧都会走这里, 而它几乎总是在
+     * "程序正跑在 Vulkan 上"的时候问, 所以这一条短路是常态路径而不是特例。
+     */
+    if (current_context && current_context->device != VK_NULL_HANDLE) {
+        cached = 1;
+        return true;
+    }
     if (failed_ns && now - failed_ns < BONGO_CAT_VK_PROBE_RETRY_NS) return false;
     BongoCatVk probe = {0};
     BongoCatError local = {0};

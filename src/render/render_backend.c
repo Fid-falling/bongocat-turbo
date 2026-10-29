@@ -117,7 +117,18 @@ void bongo_cat_renderer_select(BongoCatRenderer requested) {
 
 void bongo_cat_renderer_select_source(BongoCatRenderer requested,
     BongoCatRenderer configured, bool command_line) {
-    bongo_cat_renderer_select(requested);
+    /*
+     * 已经**明确要求** Vulkan (设置里选的, 或命令行 --vulkan) 时不再先探测一次可用性:
+     * 探测本身要真建一套 VkInstance + VkDevice 再销毁 (实测 325ms), 紧接着建窗口又建一套
+     * —— 同一件事做两遍, 那是启动路径上白花的四分之一秒。
+     * 探测存在的意义是"在不动真格的情况下判断行不行", 对 AUTO 有意义 (它要据此选后端);
+     * 用户已经点名要 Vulkan 时, 真正建一次窗口就是最准的判断, 而失败那条路本来就有:
+     * 调用方 try_vulkan_window 失败会走 bongo_cat_renderer_fallback + 失败记录 + 可见提示。
+     */
+    if (requested == BONGO_CAT_RENDERER_VULKAN &&
+        bongo_cat_renderer_compiled_in(BONGO_CAT_RENDERER_VULKAN))
+        active_renderer = requested;
+    else bongo_cat_renderer_select(requested);
     /*
      * 来源单独一行: 命令行覆盖 (--renderer=/--opengl/--vulkan) 的优先级高于
      * settings.json, 而且**不写回**配置。用户看到"设置里明明是 OpenGL 却在跑
