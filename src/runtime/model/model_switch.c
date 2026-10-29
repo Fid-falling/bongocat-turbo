@@ -251,7 +251,12 @@ bool bongo_cat_app_model_switch_step(BongoCatApp *app, uint64_t now,
      * 分支时影子要么从未准备, 要么刚被 job_clear 释放成 NULL —— 完整提交会在主循环里空指针
      * 崩溃 (实测 0xC0000005, 帧序列直接断掉)。用户在设置页点当前已选中的模型、在右键菜单里选
      * 当前模型、或连点若干次后又绕回原模型, 都会命中这里, 所以它是一条常见路径而不是边角。 */
-    if (app->loaded_model[0] && strcmp(app->loaded_model, entry->id) == 0) {
+    if (app->loaded_model[0] && strcmp(app->loaded_model, entry->id) == 0 &&
+        !app->model_switch.force_reload &&
+        /* 已经开始加载这一轮 (started_ns != 0) 时不能走这条短路: 图集档位重载的目标就是
+           "已经加载的那个模型", 而 force 在 job_start 里已经清掉 —— 少了这个条件, 重载刚
+           起步就被下一帧的自己顶掉 (日志里表现为 shadow 准备之后紧跟 skipped_reload=1)。 */
+        !app->model_switch.started_ns) {
         bongo_cat_app_recommit_loaded_model(app, entry);
         bongo_cat_model_switch_release(app, &app->model_switch.shadow);
         app->model_switch.active = false;

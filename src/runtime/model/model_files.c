@@ -361,33 +361,49 @@ bool bongo_cat_app_select_model(BongoCatApp *app, const char *id) {
 }
 
 /*
- * 宠物被放大之后, 当前图集可能已经跟不上显示尺寸: 这时用一个**异步**切换把同一个模型按
- * 现在值得的图集上限重新加载一遍。几条边界:
- *  - 只升级不降级: 缩小宠物没必要为了省显存把画面重载一遍 (重载本身要一两秒, 还是一次
- *    可见的"闪一下"); 下次冷启动自然会按新尺寸解码;
- *  - 差得不够多不做: 1.5 倍以内的差距肉眼分不出来, 但会白付一次加载;
- *  - 加载期间旧模型照常显示, 所以放大不会黑屏 —— 这是复用切换队列而不是另开一条路的原因;
- *  - 两次升级之间至少隔 5 秒: 连续拖拽缩放时不要每松一次手就重载一遍。
+ * 图集档位重载: 当前图集的上限与"现在这个窗口/档位值得的上限"不一致时, 用一个**异步**切换
+ * 把同一个模型重新解码/上传一遍。几条边界:
+ *  - allow_downgrade: 窗口只是变大时只升级 (缩小宠物没必要为了省显存重载一次, 还是一次可见
+ *    的闪动; 下次冷启动自然按新尺寸解码); 用户显式改了画质档位/渲染精度时两个方向都算 ——
+ *    他选了更省的那档, 就应该真的降到那一档;
+ *  - 门槛: 上限是 512 对齐的离散档, 只要和已加载的不同就值得重载 (差一档在放大后看得出来);
+ *  - 加载期间旧模型照常显示, 所以重载不会黑屏 —— 这是复用切换队列而不是另开一条路的原因;
+ *  - 两次重载之间至少隔 5 秒: 连续拖拽缩放时不要每松一次手就重载一遍。
  */
-#define BONGO_CAT_TEXTURE_UPGRADE_RATIO_NUM 3
-#define BONGO_CAT_TEXTURE_UPGRADE_RATIO_DEN 2
-#define BONGO_CAT_TEXTURE_UPGRADE_COOLDOWN_NS 5000000000ull
+#define BONGO_CAT_TEXTURE_RELOAD_COOLDOWN_NS 5000000000ull
 
-void bongo_cat_app_upgrade_model_textures_if_needed(BongoCatApp *app) {
-    if (!app || !app->live2d || !app->loaded_model[0] || app->secondary_pet) return;
-    if (app->model_switch.active) return;
-    const int needed = bongo_cat_image_model_texture_limit();
-    const int loaded = app->model_texture_limit_loaded;
-    if (loaded <= 0 || needed <= loaded) return;
-    if ((long long)needed * BONGO_CAT_TEXTURE_UPGRADE_RATIO_DEN <
-        (long long)loaded * BONGO_CAT_TEXTURE_UPGRADE_RATIO_NUM) return;
+static void reload_model_textures(BongoCatApp *app, const char *reason,
+    int loaded, int needed) {
     const uint64_t now = SDL_GetTicksNS();
     if (app->model_texture_upgrade_ns &&
-        now - app->model_texture_upgrade_ns < BONGO_CAT_TEXTURE_UPGRADE_COOLDOWN_NS)
+        now - app->model_texture_upgrade_ns < BONGO_CAT_TEXTURE_RELOAD_COOLDOWN_NS)
         return;
     if (!bongo_cat_app_request_model_reload(app)) return;
     app->model_texture_upgrade_ns = now;
     SDL_LogInfo(BONGO_CAT_LOG_LIFECYCLE,
-        "[render] 宠物窗口放大: 图集上限 %d -> %d, 重新加载模型 %s 以恢复清晰度",
-        loaded, needed, app->loaded_model);
+        "[render] %s: 图集上限 %d -> %d, 重新加载模型 %s", reason, loaded, needed,
+        app->loaded_model);
+}
+
+/* 前置条件与两种触发共用的部分: 有模型、没有正在跑的切换、不是副宠。 */
+static bool reload_preconditions(BongoCatApp *app, int *loaded, int *needed) {
+    if (!app || !app->live2d || !app->loaded_model[0] || app->secondary_pet)
+        return false;
+    if (app->model_switch.active) return false;
+    *needed = bongo_cat_image_model_texture_limit();
+    *loaded = app->model_texture_limit_loaded;
+    return *loaded > 0 && *needed != *loaded;
+}
+
+void bongo_cat_app_upgrade_model_textures_if_needed(BongoCatApp *app) {
+    int loaded = 0, needed = 0;
+    if (!reload_preconditions(app, &loaded, &needed)) return;
+    if (needed <= loaded) return;
+    reload_model_textures(app, "宠物窗口放大", loaded, needed);
+}
+
+void bongo_cat_app_refresh_model_textures(BongoCatApp *app) {
+    int loaded = 0, needed = 0;
+    if (!reload_preconditions(app, &loaded, &needed)) return;
+    reload_model_textures(app, "画质设置改变", loaded, needed);
 }

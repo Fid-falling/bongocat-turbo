@@ -43,6 +43,10 @@ void bongo_cat_preferences_texture_quality_row(BongoCatApp *app,
     if (selected == app->settings.model.texture_quality) return;
     app->settings.model.texture_quality = selected;
     app->dirty = true;
-    /* 下发新上限: 图集尺寸在解码/上传那一刻就定死了, 已经在画的模型要等下次加载才会换 */
+    /* 下发新上限 (顺带按新档位算一次"这个窗口值得的上限") */
     bongo_cat_window_apply(app);
+    /* 图集尺寸在解码那一刻定死, 但用户刚明确选了一档 —— 现在就用异步切换把当前模型按新档
+       重新加载一遍, 否则他会以为"选了原生没反应"(窗口小时上限还会被显示尺寸压住)。
+       两个方向都算: 选了更省的那档, 也应该真的降下来。 */
+    bongo_cat_app_refresh_model_textures(app);
 }

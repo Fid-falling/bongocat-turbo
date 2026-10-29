@@ -296,6 +296,8 @@ static void performance_section(BongoCatPreferences *value,
             app->dirty = true;
             /* 立即下发: GL 每帧读设置, VK 要先把倍率交给呈现层 (见 shell/window.c) */
             bongo_cat_window_apply(app);
+            /* 渲染精度会改变"这个窗口值得的图集档": 显式改了就按新档重载一次 */
+            bongo_cat_app_refresh_model_textures(app);
         }
     }
 

@@ -239,8 +239,13 @@ bool bongo_cat_app_request_model_switch(BongoCatApp *app, const char *id,
  * model/model_switch.c 与 model/model_files.c)。 */
 bool bongo_cat_app_request_model_reload(BongoCatApp *app);
 /* 宠物窗口尺寸变化之后调用一次: 当前图集明显跟不上显示尺寸时, 异步重载同一个模型。
- * 只升级不降级, 有 1.5 倍差距门槛与 5 秒冷却, 加载期间旧模型照常显示。 */
+ * 只升级不降级, 有 5 秒冷却, 加载期间旧模型照常显示。 */
 void bongo_cat_app_upgrade_model_textures_if_needed(BongoCatApp *app);
+/* 用户显式改了画质档位/渲染精度之后调用一次: 与已加载的图集档不同就重载 (两个方向都算),
+ * 因为那是明确的选择, 不该被"只升级不降级"挡住。 */
+void bongo_cat_app_refresh_model_textures(BongoCatApp *app);
+/* 把窗口像素尺寸 (含渲染精度) 下发给图集上限的计算 (实现见 shell/window.c)。 */
+void bongo_cat_window_sync_model_display_size(BongoCatApp *app);
 bool bongo_cat_app_model_switch_step(BongoCatApp *app, uint64_t now,
     uint64_t budget_ns);
 bool bongo_cat_app_model_switch_active(const BongoCatApp *app);
