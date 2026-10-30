@@ -34,10 +34,16 @@ set(FRAMEWORK_SOURCE OpenGL)
 # 定义, 而我们的实现固定由 src/live2d/cubism_renderer_factory.cpp 提供, 所以配置
 # 阶段必须把 SDK 那两份关掉 (与是否启用 Vulkan 后端无关)。
 include(cmake/CubismRendererSelect.cmake)
+include(cmake/CubismVulkanBufferPool.cmake)
 bongo_cat_prepare_cubism_renderer_selection()
 if(BONGO_CAT_ENABLE_VULKAN)
 endif()
 add_subdirectory("${CUBISM_FRAMEWORK_PATH}" "${CMAKE_BINARY_DIR}/cubism-framework")
+if(MSVC)
+  # SDK 源码与我们的补丁源 (src/live2d/*) 都是 UTF-8 中文注释: 不声明编码时 MSVC 按代码页
+  # 936 解析, 每个这样的文件都要报一条 C4819。这里统一按 UTF-8 编, 与仓库里其它 target 一致。
+  target_compile_options(Framework PRIVATE /utf-8)
+endif()
 include(cmake/CubismUserModelSafety.cmake)
 bongo_cat_harden_cubism_user_model(Framework)
 include(cmake/CubismCoreProfile.cmake)
@@ -84,4 +90,7 @@ if(BONGO_CAT_ENABLE_VULKAN)
   set(BONGO_CAT_CUBISM_VK_SHADER_DIR
     "${CMAKE_BINARY_DIR}/cubism-vulkan-shaders/compiledShaders")
   message(STATUS "Cubism Vulkan 渲染器已启用, 着色器输出: ${BONGO_CAT_CUBISM_VK_SHADER_DIR}")
+  # 缓冲分配改为池式: SDK 原来每个缓冲单独 vkAllocateMemory, 313 drawable 的模型会变成近
+  # 两千次分配 (+500MB 提交内存、+1.1s 加载)。见 cmake/CubismVulkanBufferPool.cmake。
+  bongo_cat_pool_cubism_vulkan_buffers(Framework)
 endif()
