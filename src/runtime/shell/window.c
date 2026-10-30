@@ -233,22 +233,6 @@ BongoCatResult bongo_cat_window_create(BongoCatApp *app, BongoCatError *error) {
     return BONGO_CAT_ERROR_PLATFORM;
 }
 
-/*
- * 把"宠物在屏幕上到底占多少像素"下发给 media 层 (图集上限按它收缩, 见 media/image_limit.c)。
- * 渲染精度算进来: 离屏按 N 倍渲染时图集也要跟得上 N 倍采样, 但超过 2 倍不再叠加 (再多也看
- * 不出来)。窗口尺寸未知时传 0, 那边不做收缩。
- */
-void bongo_cat_window_sync_model_display_size(BongoCatApp *app) {
-    if (!app || !app->window) return;
-    int pixel_width = 0, pixel_height = 0;
-    if (!SDL_GetWindowSizeInPixels(app->window, &pixel_width, &pixel_height)) return;
-    const float render_scale = app->settings.model.render_scale;
-    const int supersample = render_scale > 1.0f
-        ? (render_scale < 2.0f ? (int)(render_scale + .5f) : 2) : 1;
-    bongo_cat_image_set_model_display_size(
-        (pixel_width > pixel_height ? pixel_width : pixel_height) * supersample);
-}
-
 void bongo_cat_window_apply(BongoCatApp *app) {
     BongoCatWindowPreferences *preferences = &app->settings.window;
     BongoCatWindowState *state = &app->session.window;
@@ -303,14 +287,8 @@ void bongo_cat_window_apply(BongoCatApp *app) {
         int quality = app->settings.model.texture_quality;
         if (quality < 0 || quality >= BONGO_CAT_TEXTURE_QUALITY_COUNT)
             quality = BONGO_CAT_TEXTURE_QUALITY_DEFAULT;
-        /* 先下发"宠物在屏幕上占多少像素", 再下发设置档位: 图集上限最后是两者里更小的那个
-           (见 media/image_limit.c)。窗口尺寸未知时不收缩。 */
-        bongo_cat_window_sync_model_display_size(app);
         bongo_cat_image_set_model_texture_limit(limits[quality]);
     }
-    /* 宠物被放大到当前图集已经不够清晰时, 用一个异步切换把同一个模型按新档位重新加载一遍。
-       放在最后: 上面的窗口尺寸/档位都已生效, 这里算出来的就是"现在这个窗口值得的上限"。 */
-    bongo_cat_app_upgrade_model_textures_if_needed(app);
 }
 
 void bongo_cat_window_apply_capture_only(BongoCatApp *app) {

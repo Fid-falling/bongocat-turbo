@@ -129,25 +129,19 @@ static void commit_model(BongoCatApp *app,
 }
 
 /* 切换的"影子准备"入口: 校验 id 与前置条件, 再把准备工作交给 model_switch_shadow.c。
- * 已经加载同一个 id 时只补一次 commit（模式可能变过）, 不重新加载也不建影子。
- * force 为真时上面这条短路失效: 图集档位升级要把同一个模型真的重新解码/上传一遍。 */
+ * 已经加载同一个 id 时只补一次 commit（模式可能变过）, 不重新加载也不建影子。 */
 bool bongo_cat_app_begin_model_switch(BongoCatApp *app,
     const BongoCatModelEntry *entry, BongoCatModelSwitchShadow *shadow,
-    bool force, BongoCatError *error) {
+    BongoCatError *error) {
     if (!app || !app->live2d || !entry || !shadow) {
         bongo_cat_error_set(error, BONGO_CAT_ERROR_ARGUMENT,
             "Cannot select a model without an active renderer and model id");
         return false;
     }
-    if (!force && app->loaded_model[0] &&
-        strcmp(app->loaded_model, entry->id) == 0) {
+    if (app->loaded_model[0] && strcmp(app->loaded_model, entry->id) == 0) {
         commit_model(app, entry, false, false);
         return false;
     }
-    /* 这一次加载用的图集上限记在 app 上: 宠物窗口放大之后要靠它判断"当前图集还够不够清晰"
-       (见 bongo_cat_app_upgrade_model_textures_if_needed)。上限在解码/上传那一刻就定死了,
-       所以在这里取一次, 之后它就是这一次加载的事实。 */
-    app->model_texture_limit_loaded = bongo_cat_image_model_texture_limit();
     if (!bongo_cat_model_switch_prepare(app, entry, shadow, error)) return false;
     model_runtime_stage(app, "started", entry);
     snprintf(app->loading_model, sizeof(app->loading_model), "%s", entry->id);
@@ -299,7 +293,7 @@ bool bongo_cat_app_select_model_with_error(BongoCatApp *app,
         return false;
     }
     BongoCatModelSwitchShadow shadow;
-    if (!bongo_cat_app_begin_model_switch(app, entry, &shadow, false, failure))
+    if (!bongo_cat_app_begin_model_switch(app, entry, &shadow, failure))
         /* 已经加载的就是这个模型: begin 只补了一次 commit, 算成功; 其余情况是真失败。 */
         return app->loaded_model[0] && strcmp(app->loaded_model, entry->id) == 0;
     char previous_model[BONGO_CAT_ID_CAP];
@@ -358,52 +352,4 @@ bool bongo_cat_app_select_model_with_error(BongoCatApp *app,
 
 bool bongo_cat_app_select_model(BongoCatApp *app, const char *id) {
     return bongo_cat_app_select_model_with_error(app, id, NULL);
-}
-
-/*
- * 图集档位重载: 当前图集的上限与"现在这个窗口/档位值得的上限"不一致时, 用一个**异步**切换
- * 把同一个模型重新解码/上传一遍。几条边界:
- *  - allow_downgrade: 窗口只是变大时只升级 (缩小宠物没必要为了省显存重载一次, 还是一次可见
- *    的闪动; 下次冷启动自然按新尺寸解码); 用户显式改了画质档位/渲染精度时两个方向都算 ——
- *    他选了更省的那档, 就应该真的降到那一档;
- *  - 门槛: 上限是 512 对齐的离散档, 只要和已加载的不同就值得重载 (差一档在放大后看得出来);
- *  - 加载期间旧模型照常显示, 所以重载不会黑屏 —— 这是复用切换队列而不是另开一条路的原因;
- *  - 两次重载之间至少隔 5 秒: 连续拖拽缩放时不要每松一次手就重载一遍。
- */
-#define BONGO_CAT_TEXTURE_RELOAD_COOLDOWN_NS 5000000000ull
-
-static void reload_model_textures(BongoCatApp *app, const char *reason,
-    int loaded, int needed) {
-    const uint64_t now = SDL_GetTicksNS();
-    if (app->model_texture_upgrade_ns &&
-        now - app->model_texture_upgrade_ns < BONGO_CAT_TEXTURE_RELOAD_COOLDOWN_NS)
-        return;
-    if (!bongo_cat_app_request_model_reload(app)) return;
-    app->model_texture_upgrade_ns = now;
-    SDL_LogInfo(BONGO_CAT_LOG_LIFECYCLE,
-        "[render] %s: 图集上限 %d -> %d, 重新加载模型 %s", reason, loaded, needed,
-        app->loaded_model);
-}
-
-/* 前置条件与两种触发共用的部分: 有模型、没有正在跑的切换、不是副宠。 */
-static bool reload_preconditions(BongoCatApp *app, int *loaded, int *needed) {
-    if (!app || !app->live2d || !app->loaded_model[0] || app->secondary_pet)
-        return false;
-    if (app->model_switch.active) return false;
-    *needed = bongo_cat_image_model_texture_limit();
-    *loaded = app->model_texture_limit_loaded;
-    return *loaded > 0 && *needed != *loaded;
-}
-
-void bongo_cat_app_upgrade_model_textures_if_needed(BongoCatApp *app) {
-    int loaded = 0, needed = 0;
-    if (!reload_preconditions(app, &loaded, &needed)) return;
-    if (needed <= loaded) return;
-    reload_model_textures(app, "宠物窗口放大", loaded, needed);
-}
-
-void bongo_cat_app_refresh_model_textures(BongoCatApp *app) {
-    int loaded = 0, needed = 0;
-    if (!reload_preconditions(app, &loaded, &needed)) return;
-    reload_model_textures(app, "画质设置改变", loaded, needed);
 }

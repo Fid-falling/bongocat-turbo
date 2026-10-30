@@ -259,8 +259,4 @@ void bongo_cat_window_apply_pending_resize(BongoCatApp *app) {
     bongo_cat_live2d_resize(app->live2d,
         app->resize_pixel_width, app->resize_pixel_height);
     bongo_cat_window_mark_hit_dirty(app);
-    /* 手势停下之后才判断要不要为了清晰度重载: 缩放过程中每松一格就重载一遍会很烦。
-       这里只下发新尺寸 + 触发升级判断; 缩小宠物 (降级) 什么都不做。 */
-    bongo_cat_window_sync_model_display_size(app);
-    bongo_cat_app_upgrade_model_textures_if_needed(app);
 }

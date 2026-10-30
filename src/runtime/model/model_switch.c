@@ -122,19 +122,6 @@ bool bongo_cat_app_request_model_switch(BongoCatApp *app, const char *id,
     return true;
 }
 
-/* 贴图档位升级: 把**当前已加载的**模型按现在的图集上限重新加载一遍。
- * 为什么复用切换队列而不是另开一条路径: 加载的每一步都只能在主线程、按帧预算推进, 而且
- * 提交之前不许动 loaded_model —— 这些不变量在队列里已经成立, 重写一遍只会多一份会走样的
- * 副本。唯一的差别是允许 target 等于 loaded_model (force_reload)。 */
-bool bongo_cat_app_request_model_reload(BongoCatApp *app) {
-    if (!app || !app->loaded_model[0]) return false;
-    app->model_switch.force_reload = true;
-    if (bongo_cat_app_request_model_switch(app, app->loaded_model, NULL))
-        return true;
-    app->model_switch.force_reload = false;
-    return false;
-}
-
 /* 失败收尾: 记录原因、通知界面、回到原模型。app->loaded_model 与 session 从来没被改过,
  * 所以"回退"这件事本身不需要额外动作 —— 要做的只是把仅加载期有效的显示状态清干净, 并让
  * 主循环重新出帧。 */
@@ -206,11 +193,8 @@ static bool job_start(BongoCatApp *app, const BongoCatModelEntry *entry,
     app->model_switch.started_ns = now;
     app->model_switch.deadline_ns = now + MODEL_SWITCH_TIMEOUT_NS;
     BongoCatError failure = {0};
-    const bool force = app->model_switch.force_reload;
-    /* force 只对本次加载有效: 用过就清, 免得后面某次普通切换被它带成"重载同一个模型"。 */
-    app->model_switch.force_reload = false;
     if (!bongo_cat_app_begin_model_switch(app, entry,
-            &app->model_switch.shadow, force, &failure)) {
+            &app->model_switch.shadow, &failure)) {
         /* begin 的两种失败: 参数不对 (前面已经挡过) 或"已经加载的就是它" (上层挡过), 所以
          * 走到这里只剩真失败。 */
         app->model_switch.error = failure;
@@ -251,12 +235,7 @@ bool bongo_cat_app_model_switch_step(BongoCatApp *app, uint64_t now,
      * 分支时影子要么从未准备, 要么刚被 job_clear 释放成 NULL —— 完整提交会在主循环里空指针
      * 崩溃 (实测 0xC0000005, 帧序列直接断掉)。用户在设置页点当前已选中的模型、在右键菜单里选
      * 当前模型、或连点若干次后又绕回原模型, 都会命中这里, 所以它是一条常见路径而不是边角。 */
-    if (app->loaded_model[0] && strcmp(app->loaded_model, entry->id) == 0 &&
-        !app->model_switch.force_reload &&
-        /* 已经开始加载这一轮 (started_ns != 0) 时不能走这条短路: 图集档位重载的目标就是
-           "已经加载的那个模型", 而 force 在 job_start 里已经清掉 —— 少了这个条件, 重载刚
-           起步就被下一帧的自己顶掉 (日志里表现为 shadow 准备之后紧跟 skipped_reload=1)。 */
-        !app->model_switch.started_ns) {
+    if (app->loaded_model[0] && strcmp(app->loaded_model, entry->id) == 0) {
         bongo_cat_app_recommit_loaded_model(app, entry);
         bongo_cat_model_switch_release(app, &app->model_switch.shadow);
         app->model_switch.active = false;

@@ -67,13 +67,6 @@ void bongo_cat_image_free(BongoCatImage *image);
 int bongo_cat_image_model_texture_limit(void);
 /* 设置页下发的上限 (0 = 回到默认)。下一个模型负载生效: 图集尺寸只在解码/上传时决定。 */
 void bongo_cat_image_set_model_texture_limit(int limit);
-/*
- * 宠物窗口在屏幕上占多少像素 (最长边)。图集的采样密度超过显示像素的一倍以上之后, 再加多少
- * 分辨率在屏幕上都已经看不出来, 代价却是解码/上传/建渲染器的平方级增长 —— 所以上限要按
- * "到底画多大"再收一次。
- * 0 表示尺寸未知 (窗口还没建), 此时不收缩, 完全按设置档位走。
- */
-void bongo_cat_image_set_model_display_size(int longest_side_pixels);
 /* 只做 CPU 处理: 载入图片, 超过上限时等比缩小 (不涉及任何 GPU 资源)。
    Vulkan 的界面纹理用它, OpenGL 侧继续用下面返回纹理名的接口。 */
 BongoCatResult bongo_cat_image_fit(const char *path, int max_width,

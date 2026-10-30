@@ -173,16 +173,8 @@ typedef struct BongoCatApp {
         uint64_t step_calls;
         uint64_t steps_taken;
         uint64_t slowest_step_ns;
-        /* 图集档位升级 (宠物窗口放大) 专用: 允许目标是"已经加载的那个模型"。
-         * 平时为假, 否则"再点一次当前模型"会变成一次白跑的重新加载。 */
-        bool force_reload;
         BongoCatError error;
     } model_switch;
-    /* 当前已加载图集用的工作尺寸上限 (见 media/image_limit.c)。窗口放大之后拿它和"现在这个
-     * 窗口值得的上限"比较, 只有明显不够清晰时才重载模型; 缩小则什么都不做。 */
-    int model_texture_limit_loaded;
-    /* 上一次因放大而重载的时刻: 连续缩放时不要每松一次手就重载一遍。 */
-    uint64_t model_texture_upgrade_ns;
     /* 分步加载的进度 (0..1): 设置页用它画"正在切换"的中间态, 加载期间有效。 */
     float model_load_progress;
     BongoCatModelMode loaded_mode;
