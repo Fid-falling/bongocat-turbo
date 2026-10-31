@@ -288,6 +288,43 @@ static void test_absolute_observation(void) {
     }
 }
 
+
+/*
+ * Minecraft (GLFW) 的锁定方式和 FPS 游戏不同: 它不用 ClipCursor, 而是每帧用 SetCursorPos
+ * 把光标钉回窗口中心, 并且把光标藏起来。我们因此拿不到"极小区裁剪"这条直接证据; 更糟的是
+ * 有些游戏独占鼠标, RIDEV_INPUTSINK 收不到位移报文 —— 于是"设备位移 + 位置钉死"的推断也
+ * 失效, 猫就跟着那个被钉在屏幕中心的假光标看。
+ * 这条用例描述的就是这种观察: 光标隐藏、位置一动不动、**完全没有位移报文**, 期望两窗之后
+ * 仍然判定为锁定; 光标重新出现并真的移动之后要解锁。
+ */
+static void test_hidden_pinned_without_motion(void) {
+    WindowsPointerDetection state = {0};
+    WindowsPointerObservation sample = observation();
+    sample.cursor_flags = 0;              /* 光标被藏起来了 */
+    CHECK(!bongo_cat_windows_pointer_detect(&state, &sample, 0));
+    /* 没有位移报文时窗口只在 256ms 处结束, 所以要两个窗口 (≈512ms) 才够 */
+    unsigned first_locked = 0;
+    for (unsigned t = 16; t <= 640; t += 16) {
+        bool locked = bongo_cat_windows_pointer_detect(&state, &sample, t);
+        if (locked && !first_locked) first_locked = t;
+        if (t < 512) CHECK(!locked);
+    }
+    if (!first_locked) fprintf(stderr, "hidden pinned: pinned=%u reason=%d\n",
+        state.pinned_windows, (int)state.reason);
+    CHECK(first_locked >= 512 && first_locked <= 560);
+    CHECK(state.reason == WINDOWS_POINTER_HIDDEN);
+    /* 停手不会解锁: 光标仍然隐藏、仍然钉在中心 */
+    for (unsigned t = 656; t <= 1280; t += 16)
+        CHECK(bongo_cat_windows_pointer_detect(&state, &sample, t));
+    /* 光标重新出现并真的移动 -> 解锁 */
+    sample.cursor_flags = CURSOR_SHOWING;
+    for (unsigned t = 1296; t <= 2800; t += 16) {
+        sample.position.x += 12;
+        bongo_cat_windows_pointer_detect(&state, &sample, t);
+    }
+    CHECK(!state.relative && state.reason == WINDOWS_POINTER_DESKTOP);
+}
+
 void test_windows_pointer_detection(void) {
     test_hidden_desktop_and_resume();
     test_absolute_observation();
@@ -299,4 +336,5 @@ void test_windows_pointer_detection(void) {
     test_focus_suspend_and_missing_position();
     test_transition_flicker();
     test_slow_sampling_and_edge_returns();
+    test_hidden_pinned_without_motion();
 }

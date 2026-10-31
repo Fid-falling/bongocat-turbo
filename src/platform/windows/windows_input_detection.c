@@ -14,6 +14,17 @@ static bool interior(POINT point, const RECT *bounds) {
         (long long)point.y < (long long)bounds->bottom - 1 - margin;
 }
 
+/* 日志用: 判定原因的可读名字 (排查"为什么游戏模式没生效"时就靠它)。 */
+const char *bongo_cat_windows_pointer_reason_name(WindowsPointerReason reason) {
+    switch (reason) {
+    case WINDOWS_POINTER_CLIPPED: return "clipped";
+    case WINDOWS_POINTER_HIDDEN: return "hidden";
+    case WINDOWS_POINTER_STALLED: return "stalled";
+    case WINDOWS_POINTER_RECENTERED: return "recentered";
+    case WINDOWS_POINTER_DESKTOP: default: return "desktop";
+    }
+}
+
 bool bongo_cat_windows_pointer_clip_locked(const RECT *clip) {
     if (!clip || clip->right < clip->left || clip->bottom < clip->top)
         return false;
@@ -46,6 +57,8 @@ static void begin_window(WindowsPointerDetection *state, POINT point,
     state->away = false;
     state->edge_seen = false;
     state->excursion = 0;
+    /* 注意: pinned_windows 故意**不**在这里清零 —— 它统计的是"连续多少个窗口",
+       窗口本身就应该是它的计数单位。*/
 }
 
 /*
@@ -118,6 +131,19 @@ bool bongo_cat_windows_pointer_detect(WindowsPointerDetection *state,
         bool evidence = !state->edge_seen && raw_travel && state->moving_samples >= 4;
         bool stalled = evidence && distance <= 1 && state->excursion <= 1;
         bool recentered = evidence && state->returns >= 2 && state->excursion <= 48;
+        /* 光标隐藏 + 位置在整窗内一动不动: 这是 Minecraft 这类"用 SetCursorPos 把光标
+           拉回中心"的游戏的特征 (它们不用 ClipCursor, 也就不满足上面的极小区判据)。
+           这条证据不需要设备位移报文 —— 有些游戏会独占鼠标, 我们的 RIDEV_INPUTSINK 收
+           不到报文, 但"隐藏且钉死"本身就说明用户在游戏里而不是在桌面上移动鼠标。
+           两窗 (≈256ms) 才算, 免得读长文/看视频时隐藏光标被误判。 */
+        bool pinned = hint == WINDOWS_POINTER_HIDDEN && !state->edge_seen &&
+            distance <= 1 && state->excursion <= 1;
+        state->pinned_windows = pinned ? state->pinned_windows + 1 : 0;
+        if (state->pinned_windows >= 2 && !state->relative) {
+            state->relative = true;
+            state->reason = WINDOWS_POINTER_HIDDEN;
+            state->evidence_ms = now_ms;
+        }
         if (hint != WINDOWS_POINTER_CLIPPED && (stalled || recentered)) {
             state->relative = true;
             state->reason = hint == WINDOWS_POINTER_HIDDEN ? WINDOWS_POINTER_HIDDEN :

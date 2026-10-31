@@ -47,6 +47,10 @@ typedef struct WindowsPointerDetection {
     double raw_x, raw_y;
     double absolute_x, absolute_y;
     unsigned moving_samples, returns;
+    /* 连续"光标隐藏 + 位置钉死"的窗口数。游戏 (Minecraft 这类 GLFW 游戏就是) 用
+       SetCursorPos 每帧把光标拉回窗口中心而不是 ClipCursor, 此时设备位移报文可能因为
+       别的进程独占鼠标而收不到 —— 但只要"隐藏且钉死"持续两窗, 就足以判定被锁。 */
+    unsigned pinned_windows;
     long long excursion;
     WindowsPointerReason reason;
 } WindowsPointerDetection;
@@ -54,6 +58,8 @@ typedef struct WindowsPointerDetection {
 /* 判定"这个裁剪矩形是不是小到等于锁定"(1x1 / 2x2 的裁剪是游戏惯用手法)。单独导出
    是为了能脱离探测流程直接测试这条判据。 */
 bool bongo_cat_windows_pointer_clip_locked(const RECT *clip);
+/* 判定原因的可读名字 (日志用)。 */
+const char *bongo_cat_windows_pointer_reason_name(WindowsPointerReason reason);
 /* 累积一次观察并给出结论。state 由调用方(模型线程)独占, 不需要加锁。
    返回 true 表示建议使用相对位移; 前台窗口变了或间隔太久会重置状态机并返回 false。 */
 bool bongo_cat_windows_pointer_detect(WindowsPointerDetection *state,

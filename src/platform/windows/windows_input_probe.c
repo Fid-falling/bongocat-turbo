@@ -53,7 +53,28 @@ bool bongo_cat_windows_input_pointer_locked(BongoCatPlatform *platform) {
         state->pointer_detection = (WindowsPointerDetection){0};
         state->pointer_generation = generation;
     }
-    return bongo_cat_windows_pointer_detect(&state->pointer_detection,
+    bool locked = bongo_cat_windows_pointer_detect(&state->pointer_detection,
         &sample, now_ms);
+    /* 只在判定变化时记一行: 每帧打日志会把日志淹掉, 而"游戏里鼠标被锁住"这类反馈
+       只有这一行能定位 (锁定原因 + 证据 + 前台进程)。 */
+    if ((int)locked != state->pointer_logged_locked ||
+        (int)state->pointer_detection.reason != state->pointer_logged_reason) {
+        state->pointer_logged_locked = (int)locked;
+        state->pointer_logged_reason = (int)state->pointer_detection.reason;
+        SDL_LogInfo(BONGO_CAT_LOG_INPUT,
+            "[input] 指针锁定判定: locked=%d reason=%s raw=(%.0f,%.0f) samples=%llu "
+            "cursor=%s clip=%ld,%ld,%ld,%ld foreground_pid=%lu",
+            locked ? 1 : 0,
+            bongo_cat_windows_pointer_reason_name(state->pointer_detection.reason),
+            state->pointer_detection.raw_x, state->pointer_detection.raw_y,
+            (unsigned long long)state->pointer_detection.moving_samples,
+            sample.cursor_known && sample.cursor_flags == 0 ? "hidden" : "shown",
+            sample.clip_known ? (long)sample.clip.left : -1L,
+            sample.clip_known ? (long)sample.clip.top : -1L,
+            sample.clip_known ? (long)sample.clip.right : -1L,
+            sample.clip_known ? (long)sample.clip.bottom : -1L,
+            (unsigned long)sample.pid);
+    }
+    return locked;
 }
 #endif

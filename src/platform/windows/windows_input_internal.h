@@ -88,6 +88,10 @@ typedef struct WindowsInputState {
     /* Model-thread-only state. The receiver publishes resets through generation. */
     WindowsPointerDetection pointer_detection;
     ULONGLONG pointer_probe_ms;
+    /* 上一次写进日志的判定 (locked + reason): 判定每帧都在算, 只在变化时记一行。
+       用户反馈"游戏里指针被锁住"这类问题时, 这一行是唯一能定位的证据。 */
+    int pointer_logged_locked;
+    int pointer_logged_reason;
     unsigned long long pointer_generation;
     bool pointer_probe_ready;
 } WindowsInputState;
