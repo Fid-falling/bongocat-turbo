@@ -177,9 +177,12 @@ bool bongo_cat_windows_pointer_detect(WindowsPointerDetection *state,
              */
             bool unlock = false;
             if (state->reason == WINDOWS_POINTER_HIDDEN) {
+                /* 250ms 是"回到归位点"的最大间隔: 游戏 recenter 是每帧的事 (实测一窗 16 次
+                   采样里有 11 次就在归位点上), 所以只要在游戏里就永远不会超过它; 而桌面上
+                   真的把鼠标移走之后这个间隔会一直增长 —— 1 秒太长, 会让"看视频时移开鼠标"
+                   之后有一秒不跟手, 所以压到 250ms。 */
                 unlock = hint == WINDOWS_POINTER_DESKTOP ||
-                    (state->home_known && state->excursion > 24 &&
-                        now_ms - state->last_home_ms >= 1000);
+                    (state->home_known && now_ms - state->last_home_ms >= 250);
             } else {
                 unlock = distance > 2 ||
                     state->reason == WINDOWS_POINTER_CLIPPED;
@@ -191,6 +194,11 @@ bool bongo_cat_windows_pointer_detect(WindowsPointerDetection *state,
             }
         }
         state->diag_excursion = state->excursion;
+        /* raw/samples 也要在 begin_window 清零前抓下来: 日志里那三个字段以前永远是 0,
+           看起来像"一个位移报文都没收到", 实际只是打印时机在清零之后。 */
+        state->diag_raw_x = state->raw_x;
+        state->diag_raw_y = state->raw_y;
+        state->diag_moving_samples = state->moving_samples;
         state->diag_distance = distance;
         state->diag_returns = state->returns;
         state->diag_anchor_hits = state->anchor_hits;

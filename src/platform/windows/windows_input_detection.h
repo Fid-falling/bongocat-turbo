@@ -63,6 +63,8 @@ typedef struct WindowsPointerDetection {
     ULONGLONG last_home_ms;
     /* 上一个窗口结束时的证据快照 (begin_window 会清零累积量, 日志要的是清零前的值) */
     long long diag_excursion;
+    double diag_raw_x, diag_raw_y;
+    unsigned diag_moving_samples;
     long long diag_distance;
     unsigned diag_returns;
     unsigned diag_anchor_hits;
