@@ -40,6 +40,10 @@ typedef struct BongoCatWindowsInstanceInfo {
 } BongoCatWindowsInstanceInfo;
 
 const wchar_t *bongo_cat_windows_instance_title(void);
+/* 0x0 永不显示的身份窗口: 标题 = instance_title, 供 FindWindowW 按标题找本实例
+   (更新交接)。主窗口标题改成跟模型走之后, 这个标识就不再由主窗口承担。 */
+bool bongo_cat_windows_identity_window_create(void);
+void bongo_cat_windows_identity_window_destroy(void);
 const wchar_t *bongo_cat_windows_update_shutdown_name(void);
 const wchar_t *bongo_cat_windows_instance_stopped_name(void);
 const wchar_t *bongo_cat_windows_instance_info_name(void);

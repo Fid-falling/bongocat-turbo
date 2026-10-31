@@ -99,7 +99,10 @@ BongoCatResult bongo_cat_platform_init(BongoCatPlatform *platform, SDL_Window *w
             "Raw Input is unavailable; the window will continue without global input");
     }
     HWND hwnd = native_window(platform);
-    SetWindowTextW(hwnd, bongo_cat_windows_instance_title());
+    /* 主窗口标题由 runtime 决定 (单桌宠 = 应用名, 多桌宠 = 模型名, 见
+       shell/window.c 的 pet_window_title); 这里只保证"按标题找本实例"的标识仍然存在 ——
+       挪到一个永不显示的身份窗口上, 两个用途不再抢同一个标题。 */
+    bongo_cat_windows_identity_window_create();
     bongo_cat_windows_borderless_install(hwnd);
     bool transparent = (SDL_GetWindowFlags(window) &
         SDL_WINDOW_TRANSPARENT) != 0;
@@ -133,6 +136,7 @@ void bongo_cat_platform_shutdown(BongoCatPlatform *platform) {
     HWND window = native_window(platform);
     if (window) bongo_cat_windows_borderless_uninstall(window);
     bongo_cat_windows_input_stop(platform);
+    bongo_cat_windows_identity_window_destroy();
     bongo_cat_windows_layered_destroy(platform->presenter);
     platform->presenter = NULL;
     SDL_SetWindowsMessageHook(NULL, NULL);

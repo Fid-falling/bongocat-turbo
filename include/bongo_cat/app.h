@@ -149,6 +149,9 @@ typedef struct BongoCatApp {
     unsigned pending_model_cover_attempts[BONGO_CAT_MODEL_COVER_PENDING_CAP];
     size_t pending_model_cover_count;
     char loaded_model[BONGO_CAT_ID_CAP];
+    /* 已经设到窗口上的标题: 多桌宠时窗口标题是模型名, 只有变了才真的 SDL_SetWindowTitle
+       (每次"应用设置"都发一次窗口列表通知没必要)。 */
+    char applied_window_title[128];
     char loading_model[BONGO_CAT_ID_CAP];
     /*
      * "换桌宠"这条路径的队列状态 (实现见 runtime/model/model_switch.c)。

@@ -68,6 +68,55 @@ const wchar_t *bongo_cat_windows_instance_title(void) {
     initialize_identity(); return instance_title;
 }
 
+/*
+ * 身份窗口: 一个 0x0、永不显示、也从不抢焦点的顶层窗口, 标题就是 instance_title。
+ *
+ * 为什么需要它: "找到本实例"的代码 (更新交接的 FindWindowW(标题), 以及将来任何按标题找
+ * 窗口的地方) 需要一个稳定标识; 而主窗口的标题现在**跟着模型走** —— 多桌宠时每个窗口都
+ * 要能在 OBS 的窗口采集列表里区分开, 标题就是唯一的区分手段。把标识从主窗口挪到这个
+ * 永不显示的窗口上, 两边都不再互相牵制。
+ *
+ * 类名按实例 id 区分: 同一台机器上跑多个实例 (测试/多开) 时, 各自的窗口标题与类名都不撞。
+ */
+static HWND identity_window;
+static wchar_t identity_class[128] = L"BongoCatIdentity";
+
+static LRESULT CALLBACK identity_window_proc(HWND window, UINT message,
+    WPARAM wparam, LPARAM lparam) {
+    /* 更新交接会对这个窗口 PostMessage(WM_CLOSE) 当"催一下", 真正让旧实例退出的还是事件
+       对象; 这里交给默认处理即可 (销毁走 DestroyWindow)。 */
+    return DefWindowProcW(window, message, wparam, lparam);
+}
+
+bool bongo_cat_windows_identity_window_create(void) {
+    if (identity_window) return true;
+    initialize_identity();
+    wchar_t class_name[128];
+    swprintf(class_name, sizeof(class_name) / sizeof(class_name[0]),
+        L"BongoCatIdentity.%ls", instance_title);
+    WNDCLASSEXW type = {0};
+    type.cbSize = sizeof(type);
+    type.lpfnWndProc = identity_window_proc;
+    type.hInstance = GetModuleHandleW(NULL);
+    type.lpszClassName = class_name;
+    if (!RegisterClassExW(&type) && GetLastError() != ERROR_CLASS_ALREADY_EXISTS)
+        return false;
+    identity_window = CreateWindowExW(0, class_name, instance_title, WS_OVERLAPPED,
+        0, 0, 0, 0, NULL, NULL, type.hInstance, NULL);
+    if (!identity_window) {
+        SDL_LogWarn(SDL_LOG_CATEGORY_APPLICATION,
+            "[runtime] 身份窗口创建失败, 更新交接将只能靠进程名匹配");
+        return false;
+    }
+    return true;
+}
+
+void bongo_cat_windows_identity_window_destroy(void) {
+    if (!identity_window) return;
+    DestroyWindow(identity_window);
+    identity_window = NULL;
+}
+
 const wchar_t *bongo_cat_windows_update_shutdown_name(void) {
     initialize_identity(); return instance_update_shutdown_name;
 }

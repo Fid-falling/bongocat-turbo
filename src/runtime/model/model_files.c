@@ -41,6 +41,8 @@ static void select_model_state(BongoCatApp *app, const BongoCatModelEntry *entry
     snprintf(app->session.active_model_id, sizeof(app->session.active_model_id), "%s",
         entry->id);
     app->loaded_mode = entry->mode;
+    /* 多桌宠时窗口标题 = 模型名: 这里刚把 active_model_id 写进去, 顺手同步一次 */
+    bongo_cat_window_sync_model_title(app);
     /* 记住「用过手柄模型」: 手柄子系统的首次初始化要 400~600ms, 只有真的用过它的人才值得在
        下次启动时预热 (见 app.c 里 bongo_cat_gamepads_prewarm 的调用点)。本次的启用照旧在
        下面立刻发生, 所以这里只影响下次启动的行为。 */

@@ -96,6 +96,9 @@ void bongo_cat_startup_ci_failure(BongoCatApp *app, const BongoCatError *error);
 /* --- 窗口: 应用设置、事件、几何/缩放、拖拽与命中 --- */
 void bongo_cat_window_destroy(BongoCatApp *app);
 void bongo_cat_window_apply(BongoCatApp *app);
+/* 多桌宠时窗口标题跟着模型走 (OBS 的窗口采集列表靠标题区分): 模型切换/改名字/开关多桌宠
+   之后调一次。单桌宠时标题是应用名, 调它也不会变。 */
+void bongo_cat_window_sync_model_title(BongoCatApp *app);
 /* 应用"只在录屏软件里显示"设置 (Windows: DWM 隐藏窗口, 桌面不显示但可采集) */
 void bongo_cat_window_apply_capture_only(BongoCatApp *app);
 bool bongo_cat_window_event(BongoCatApp *app, const SDL_Event *event);

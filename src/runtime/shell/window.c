@@ -9,6 +9,9 @@
 #include <SDL3/SDL_opengl.h>
 #include <stdio.h>
 
+/* 定义在文件后半 (紧挨 bongo_cat_window_apply): 两条建窗路径都要先用到它 */
+static void pet_window_title(const BongoCatApp *app, char *out, size_t capacity);
+
 static bool test_transparency_disabled(void) {
     return SDL_getenv("BONGO_CAT_TEST_DISABLE_PREFERENCES_TRANSPARENCY") != NULL;
 }
@@ -46,8 +49,12 @@ static bool try_vulkan_window(BongoCatApp *app, BongoCatError *error) {
     SDL_WindowFlags flags = SDL_WINDOW_VULKAN | SDL_WINDOW_BORDERLESS |
         SDL_WINDOW_HIGH_PIXEL_DENSITY | SDL_WINDOW_HIDDEN;
     if (transparent) flags |= SDL_WINDOW_TRANSPARENT;
-    app->window = SDL_CreateWindow(BONGO_CAT_PET_WINDOW_TITLE,
+    char title[128];
+    pet_window_title(app, title, sizeof(title));
+    app->window = SDL_CreateWindow(title,
         app->session.window.width, app->session.window.height, flags);
+    snprintf(app->applied_window_title, sizeof(app->applied_window_title), "%s",
+        title);
     if (!app->window) {
         bongo_cat_error_set(error, BONGO_CAT_ERROR_PLATFORM,
             "Vulkan 窗口创建失败: %s", SDL_GetError());
@@ -114,9 +121,13 @@ static bool try_window(BongoCatApp *app, bool transparent, int samples,
     SDL_WindowFlags flags = SDL_WINDOW_OPENGL | SDL_WINDOW_BORDERLESS |
         SDL_WINDOW_HIGH_PIXEL_DENSITY | SDL_WINDOW_HIDDEN;
     if (transparent) flags |= SDL_WINDOW_TRANSPARENT;
-    app->window = SDL_CreateWindow(BONGO_CAT_PET_WINDOW_TITLE,
+    char title[128];
+    pet_window_title(app, title, sizeof(title));
+    app->window = SDL_CreateWindow(title,
         app->session.window.width,
         app->session.window.height, flags);
+    snprintf(app->applied_window_title, sizeof(app->applied_window_title), "%s",
+        title);
     if (!app->window) {
         snprintf(failure, capacity, "Window creation: %s", SDL_GetError()); return false;
     }
@@ -233,6 +244,48 @@ BongoCatResult bongo_cat_window_create(BongoCatApp *app, BongoCatError *error) {
     return BONGO_CAT_ERROR_PLATFORM;
 }
 
+/*
+ * 单个桌宠窗口的标题。
+ *
+ * 为什么需要它: 多桌宠时每个窗口都叫 "BongoCat Turbo", 而 OBS/录屏的"窗口采集"列表是按窗口
+ * 标题区分的 —— 列表里三行全一样, 用户根本不知道哪一行对应哪只猫 (截图里的实际反馈)。
+ * 多桌宠开启时改成该窗口所属模型的名字; 单桌宠保持应用名不变, 不对单宠用户做无谓的改动。
+ *
+ * 取名优先级: 用户在设置里改过的名字 > 模型目录里的显示名 > 模型 id。
+ */
+static void pet_window_title(const BongoCatApp *app, char *out, size_t capacity) {
+    if (!out || !capacity) return;
+    const char *id = app ? app->session.active_model_id : NULL;
+    if (!app || !app->settings.model.multiple_pets || !id || !id[0]) {
+        snprintf(out, capacity, "%s", BONGO_CAT_PET_WINDOW_TITLE);
+        return;
+    }
+    const char *custom = bongo_cat_settings_model_label(&app->settings, id);
+    if (custom && custom[0]) {
+        snprintf(out, capacity, "%s", custom);
+        return;
+    }
+    const BongoCatModelEntry *entry = bongo_cat_models_find(&app->models, id);
+    if (entry && entry->display_name[0]) {
+        snprintf(out, capacity, "%s", entry->display_name);
+        return;
+    }
+    snprintf(out, capacity, "%s", id);
+}
+
+/* 模型名/多桌宠开关变化之后刷一次标题 (只在与当前标题不同时才真的设置, 免得每次应用设置
+   都往窗口列表里发一次通知)。 */
+void bongo_cat_window_sync_model_title(BongoCatApp *app) {
+    if (!app || !app->window) return;
+    char title[128];
+    pet_window_title(app, title, sizeof(title));
+    if (strcmp(title, app->applied_window_title) == 0) return;
+    SDL_SetWindowTitle(app->window, title);
+    snprintf(app->applied_window_title, sizeof(app->applied_window_title), "%s",
+        title);
+    SDL_LogInfo(BONGO_CAT_LOG_LIFECYCLE, "[window] 桌宠窗口标题 = %s", title);
+}
+
 void bongo_cat_window_apply(BongoCatApp *app) {
     BongoCatWindowPreferences *preferences = &app->settings.window;
     BongoCatWindowState *state = &app->session.window;
@@ -289,6 +342,8 @@ void bongo_cat_window_apply(BongoCatApp *app) {
             quality = BONGO_CAT_TEXTURE_QUALITY_DEFAULT;
         bongo_cat_image_set_model_texture_limit(limits[quality]);
     }
+    /* 多桌宠开关/模型名可能刚改过: 标题跟着变 */
+    bongo_cat_window_sync_model_title(app);
 }
 
 void bongo_cat_window_apply_capture_only(BongoCatApp *app) {
