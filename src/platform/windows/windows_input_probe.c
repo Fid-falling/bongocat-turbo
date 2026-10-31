@@ -63,11 +63,19 @@ bool bongo_cat_windows_input_pointer_locked(BongoCatPlatform *platform) {
         state->pointer_logged_reason = (int)state->pointer_detection.reason;
         SDL_LogInfo(BONGO_CAT_LOG_INPUT,
             "[input] 指针锁定判定: locked=%d reason=%s raw=(%.0f,%.0f) samples=%llu "
-            "cursor=%s clip=%ld,%ld,%ld,%ld foreground_pid=%lu",
+            "pinned=%u win_exc=%lld win_dist=%lld win_returns=%u win_anchor=%u win_hint=%d "
+            "unlocked=%d cursor=%s clip=%ld,%ld,%ld,%ld foreground_pid=%lu",
             locked ? 1 : 0,
             bongo_cat_windows_pointer_reason_name(state->pointer_detection.reason),
             state->pointer_detection.raw_x, state->pointer_detection.raw_y,
             (unsigned long long)state->pointer_detection.moving_samples,
+            state->pointer_detection.pinned_windows,
+            state->pointer_detection.diag_excursion,
+            state->pointer_detection.diag_distance,
+            state->pointer_detection.diag_returns,
+            state->pointer_detection.diag_anchor_hits,
+            state->pointer_detection.diag_hint,
+            state->pointer_detection.diag_unlocked ? 1 : 0,
             sample.cursor_known && sample.cursor_flags == 0 ? "hidden" : "shown",
             sample.clip_known ? (long)sample.clip.left : -1L,
             sample.clip_known ? (long)sample.clip.top : -1L,

@@ -9,6 +9,7 @@
  */
 #include "runtime.h"
 #include "mouse_internal.h"
+#include "bongo_cat/log.h"
 
 #include <SDL3/SDL.h>
 
@@ -159,6 +160,18 @@ void bongo_cat_app_apply_mouse(BongoCatApp *app) {
     }
     /* 没有移动、没有按键状态变化、也没有按钮事件时不下发: 空闲时不重复写同一批参数。 */
 
+    /* 相对跟随每小时(实为每秒)记一行: 排查"游戏里被定住/一抽一抽"时, 这是唯一能看出
+       "位移到底有没有在累加"的证据。每秒一行只在锁定期间出现, 平时不吵。 */
+    if (relative_requested && (!app->relative_log_ns ||
+            now - app->relative_log_ns >= 1000000000ull)) {
+        SDL_LogInfo(BONGO_CAT_LOG_INPUT,
+            "[input] 相对跟随: model=(%.0f,%.0f) 上次=(%.0f,%.0f) 本秒位移=(%.0f,%.0f)",
+            model_x, model_y, app->relative_log_x, app->relative_log_y,
+            model_x - app->relative_log_x, model_y - app->relative_log_y);
+        app->relative_log_ns = now ? now : 1;
+        app->relative_log_x = model_x;
+        app->relative_log_y = model_y;
+    } else if (!relative_requested) app->relative_log_ns = 0;
     if (model_moved || button_changed || pointer_mode_changed || button_event_pending)
         bongo_cat_app_apply_mouse_coordinates(app, &projection, model_x, model_y,
             cursor_locked ? model_x : target_x, cursor_locked ? model_y : target_y);

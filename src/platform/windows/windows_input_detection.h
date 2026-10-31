@@ -51,6 +51,16 @@ typedef struct WindowsPointerDetection {
        SetCursorPos 每帧把光标拉回窗口中心而不是 ClipCursor, 此时设备位移报文可能因为
        别的进程独占鼠标而收不到 —— 但只要"隐藏且钉死"持续两窗, 就足以判定被锁。 */
     unsigned pinned_windows;
+    /* 本窗口里"回到起点附近 (≤2px)"的采样次数。游戏逐帧 recenter 时它一直很大; 桌面上
+       真的在移动鼠标 (哪怕光标是隐藏的) 时它是 0 —— 解锁判据靠它区分这两种情况。 */
+    unsigned anchor_hits;
+    /* 上一个窗口结束时的证据快照 (begin_window 会清零累积量, 日志要的是清零前的值) */
+    long long diag_excursion;
+    long long diag_distance;
+    unsigned diag_returns;
+    unsigned diag_anchor_hits;
+    int diag_hint;
+    bool diag_unlocked;
     long long excursion;
     WindowsPointerReason reason;
 } WindowsPointerDetection;

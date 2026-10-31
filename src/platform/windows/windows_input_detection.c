@@ -57,6 +57,7 @@ static void begin_window(WindowsPointerDetection *state, POINT point,
     state->away = false;
     state->edge_seen = false;
     state->excursion = 0;
+    state->anchor_hits = 0;
     /* 注意: pinned_windows 故意**不**在这里清零 —— 它统计的是"连续多少个窗口",
        窗口本身就应该是它的计数单位。*/
 }
@@ -96,6 +97,7 @@ bool bongo_cat_windows_pointer_detect(WindowsPointerDetection *state,
     long long dy = llabs((long long)sample->position.y - state->anchor.y);
     long long distance = dx > dy ? dx : dy;
     if (distance > state->excursion) state->excursion = distance;
+    if (dx <= 2 && dy <= 2) state->anchor_hits++;
     if (distance > 2) state->away = true;
     else if (state->away) { state->returns++; state->away = false; }
     bool inside = sample->monitor_known &&
@@ -150,13 +152,38 @@ bool bongo_cat_windows_pointer_detect(WindowsPointerDetection *state,
                 stalled ? WINDOWS_POINTER_STALLED : WINDOWS_POINTER_RECENTERED;
             state->evidence_ms = now_ms;
         } else if (hint != WINDOWS_POINTER_CLIPPED && state->relative &&
-            now_ms - state->evidence_ms >= 192 &&
-            (distance > 2 || state->reason == WINDOWS_POINTER_CLIPPED ||
-                (hint == WINDOWS_POINTER_DESKTOP &&
-                    state->reason == WINDOWS_POINTER_HIDDEN))) {
-            state->relative = false;
-            state->reason = WINDOWS_POINTER_DESKTOP;
+            now_ms - state->evidence_ms >= 192) {
+            /* 解锁条件按"当初为什么锁上"分开:
+               - HIDDEN (游戏用 SetCursorPos 把光标钉住): 游戏里光标本来就一直在中心附近
+                 抖两三像素, 只要它还藏着就不能因为"位置动了 3 像素"解锁 —— 否则锁定状态
+                 每秒翻好几次, 模型位置被反复重置回那个假中心, 表现就是"一抽一抽";
+                 只有光标重新出现 (桌面) 并且真的移动了才算离开游戏。
+               - 其它 (极小区裁剪 / 停滞 / 回中): 沿用"位置真的动了"这条判据。 */
+            bool unlock = false;
+            if (state->reason == WINDOWS_POINTER_HIDDEN) {
+                /* 隐藏光标时用"整窗最大偏移"而不是"这一帧比窗口起点远 2 像素": 游戏把光标
+                   recenter 造成的三两像素抖动不该解锁, 只有真正的光标旅行 (几十像素以上)
+                   或者光标重新出现在桌面上, 才算离开游戏。 */
+                /* "来回跑"才是 recenter 的指纹: 游戏里每帧都有 (光标被拽走再拉回中心),
+                   而桌面上真的在移动鼠标 (哪怕光标是藏起来的) 是单程的。所以只有
+                   "光标重新出现" 或 "整窗偏移很大且一次都没回过起点" 才算离开游戏。 */
+                unlock = hint == WINDOWS_POINTER_DESKTOP ||
+                    (state->excursion > 24 && state->anchor_hits == 0);
+            } else {
+                unlock = distance > 2 ||
+                    state->reason == WINDOWS_POINTER_CLIPPED;
+            }
+            state->diag_unlocked = unlock;
+            if (unlock) {
+                state->relative = false;
+                state->reason = WINDOWS_POINTER_DESKTOP;
+            }
         }
+        state->diag_excursion = state->excursion;
+        state->diag_distance = distance;
+        state->diag_returns = state->returns;
+        state->diag_anchor_hits = state->anchor_hits;
+        state->diag_hint = (int)hint;
         /* A stationary inferred lock stays active until actual cursor travel
            disproves it; stopping the mouse must not reset the virtual position. */
         begin_window(state, sample->position, now_ms);

@@ -325,6 +325,40 @@ static void test_hidden_pinned_without_motion(void) {
     CHECK(!state.relative && state.reason == WINDOWS_POINTER_DESKTOP);
 }
 
+
+/*
+ * 同一个游戏里光标不会"正好"钉在中心: 它每帧被 recenter, 但我们 16ms 采一次, 总会抓到
+ * 中间那几像素。以前解锁判据只看"位置比窗口起点远了 2 像素", 于是锁定状态每秒翻好几次,
+ * 模型位置被反复重置回假中心 —— 用户看到的就是"一抽一抽"。这条用例锁的就是: 光标还藏着
+ * 的时候, 两三像素的抖动不许解锁; 光标重新出现并真的移动之后才允许解锁。
+ */
+static void test_hidden_jitter_keeps_lock(void) {
+    WindowsPointerDetection state = {0};
+    WindowsPointerObservation sample = observation();
+    sample.cursor_flags = 0;
+    CHECK(!bongo_cat_windows_pointer_detect(&state, &sample, 0));
+    unsigned t = 16;
+    for (; t <= 640; t += 16)
+        bongo_cat_windows_pointer_detect(&state, &sample, t);
+    CHECK(state.relative && state.reason == WINDOWS_POINTER_HIDDEN);
+    /* 2 秒的 ±3 像素抖动: 一次都不许解锁 */
+    for (; t <= 2640; t += 16) {
+        sample.position.x = 960 + ((t / 16) % 2 ? 3 : -3);
+        sample.position.y = 540 + ((t / 48) % 2 ? 2 : -2);
+        if (!bongo_cat_windows_pointer_detect(&state, &sample, t))
+            fprintf(stderr, "hidden jitter unlocked at t=%u\n", t);
+        CHECK(state.relative);
+        CHECK(state.reason == WINDOWS_POINTER_HIDDEN);
+    }
+    /* 光标重新出现并真的移动 -> 解锁 */
+    sample.cursor_flags = CURSOR_SHOWING;
+    for (; t <= 4200; t += 16) {
+        sample.position.x += 12;
+        bongo_cat_windows_pointer_detect(&state, &sample, t);
+    }
+    CHECK(!state.relative && state.reason == WINDOWS_POINTER_DESKTOP);
+}
+
 void test_windows_pointer_detection(void) {
     test_hidden_desktop_and_resume();
     test_absolute_observation();
@@ -337,4 +371,5 @@ void test_windows_pointer_detection(void) {
     test_transition_flicker();
     test_slow_sampling_and_edge_returns();
     test_hidden_pinned_without_motion();
+    test_hidden_jitter_keeps_lock();
 }

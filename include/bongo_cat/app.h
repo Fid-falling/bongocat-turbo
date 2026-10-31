@@ -152,6 +152,10 @@ typedef struct BongoCatApp {
     /* 已经设到窗口上的标题: 多桌宠时窗口标题是模型名, 只有变了才真的 SDL_SetWindowTitle
        (每次"应用设置"都发一次窗口列表通知没必要)。 */
     char applied_window_title[128];
+    /* 相对跟随诊断: 锁定状态每秒记一行"模型位置 + 这次动了多少"。用户反馈"游戏里被定住"
+       时, 这一行能直接看出是判定没进相对模式, 还是进了但位移没在累加。 */
+    uint64_t relative_log_ns;
+    double relative_log_x, relative_log_y;
     char loading_model[BONGO_CAT_ID_CAP];
     /*
      * "换桌宠"这条路径的队列状态 (实现见 runtime/model/model_switch.c)。
