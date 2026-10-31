@@ -82,9 +82,6 @@ typedef struct WindowsInputState {
     long long relative_x, relative_y;
     double absolute_x, absolute_y;
     unsigned long long relative_samples, absolute_samples, generation;
-    long long observed_x, observed_y;
-    double observed_absolute_x, observed_absolute_y;
-    unsigned long long observed_motion, observed_generation;
     /* Model-thread-only state. The receiver publishes resets through generation. */
     WindowsPointerDetection pointer_detection;
     ULONGLONG pointer_probe_ms;
@@ -96,12 +93,11 @@ typedef struct WindowsInputState {
     unsigned long long diagnostic_still_packets;
     int pointer_logged_locked;
     int pointer_logged_reason;
-    unsigned long long pointer_generation;
     bool pointer_probe_ready;
 } WindowsInputState;
 
 /* 下面的入口按调用线程分成三组: 接收线程(register / unregister / packet / key /
-   buttons / motion / flush / wake)、模型线程(take_observation 与 pointer 相关), 以及
+   buttons / motion / flush / wake)、模型线程(pointer 探测相关), 以及
    生命周期(receiver_create / destroy / dispatch)。跨组调用前先确认锁与所有权。 */
 bool bongo_cat_windows_input_push_event(WindowsInputState *state,
     BongoCatInputKind kind, const char *name, float value);
@@ -120,8 +116,6 @@ void bongo_cat_windows_input_buttons(WindowsInputState *state,
 void bongo_cat_windows_input_motion(WindowsInputState *state,
     WindowsRawDevice *device, const RAWMOUSE *mouse, const RECT *bounds);
 void bongo_cat_windows_input_clear_motion(WindowsInputState *state);
-unsigned long long bongo_cat_windows_input_take_observation(
-    WindowsInputState *state, WindowsPointerObservation *sample);
 bool bongo_cat_windows_input_register(WindowsInputState *state);
 void bongo_cat_windows_input_unregister(WindowsInputState *state);
 unsigned bongo_cat_windows_input_ownership(WindowsInputState *state);

@@ -4,10 +4,10 @@
 #include <string.h>
 
 /*
- * 鼠标位移的两条通道(接收线程, 由 relative_lock 保护):
- *   - observed_*: 给"游戏模式判定"用的观测累加器, 由 take_observation 取走;
- *   - relative_* / absolute_*: 给模型用的位移累加器, 只在 relative_active 时累加。
- * 两者互不清空对方 —— 判定器读观测不能把模型要用的位移吃掉(反过来也一样)。
+ * 鼠标位移的累加(接收线程, 由 relative_lock 保护):
+ *   - relative_* / absolute_*: 给模型用的位移, 只在 relative_active 时累加;
+ *   - diagnostic_move_packets / diagnostic_still_packets: 周期日志用的计数, 用来区分
+ *     "游戏把报文截走了"和"报文到了但位移是 0"(只看 mouse= 总数看不出来)。
  *
  * 相对设备直接累加 lLastX/lLastY; 绝对设备(触摸板、远程桌面)要先按 bounds 把
  * [0,65535] 映射成像素, 再取与上一次的差值 —— 绝对设备本身没有"位移"这个量。
@@ -21,9 +21,6 @@ void bongo_cat_windows_input_motion(WindowsInputState *state,
         device->absolute_known = false;
         if (mouse->lLastX || mouse->lLastY) {
             state->diagnostic_move_packets++;
-            state->observed_x += mouse->lLastX;
-            state->observed_y += mouse->lLastY;
-            state->observed_motion++;
             if (state->relative_active) {
                 state->relative_x += mouse->lLastX;
                 state->relative_y += mouse->lLastY;
@@ -47,9 +44,6 @@ void bongo_cat_windows_input_motion(WindowsInputState *state,
             device->generation == state->generation &&
             memcmp(bounds, &device->absolute_bounds, sizeof(*bounds)) == 0;
         if (baseline && (x != device->absolute_x || y != device->absolute_y)) {
-            state->observed_absolute_x += x - device->absolute_x;
-            state->observed_absolute_y += y - device->absolute_y;
-            state->observed_motion++;
             if (state->relative_active) {
                 state->absolute_x += x - device->absolute_x;
                 state->absolute_y += y - device->absolute_y;
@@ -72,34 +66,11 @@ static void clear_motion(WindowsInputState *state) {
     state->generation++;
 }
 
-/* 清空两组累加器并推进 generation: 主线程看到 generation 变化就知道先前取到的
-   观测已经作废(设备表被重建、注册状态变了)。 */
+/* 清空位移累加器: 设备表被重建、注册状态变化时必须调用, 否则旧设备的位移会算到新设备上。 */
 void bongo_cat_windows_input_clear_motion(WindowsInputState *state) {
     AcquireSRWLockExclusive(&state->relative_lock);
     clear_motion(state);
-    state->observed_x = state->observed_y = 0;
-    state->observed_absolute_x = state->observed_absolute_y = 0;
-    state->observed_motion = 0;
-    state->observed_generation++;
     ReleaseSRWLockExclusive(&state->relative_lock);
-}
-
-/* 取走观测并把观测累加器清零(取走即消费), 返回当前 generation。 */
-unsigned long long bongo_cat_windows_input_take_observation(
-    WindowsInputState *state, WindowsPointerObservation *sample) {
-    if (!state || !sample) return 0;
-    AcquireSRWLockExclusive(&state->relative_lock);
-    sample->raw_x = (double)state->observed_x;
-    sample->raw_y = (double)state->observed_y;
-    sample->absolute_x = state->observed_absolute_x;
-    sample->absolute_y = state->observed_absolute_y;
-    sample->motion_packets = state->observed_motion;
-    unsigned long long generation = state->observed_generation;
-    state->observed_x = state->observed_y = 0;
-    state->observed_absolute_x = state->observed_absolute_y = 0;
-    state->observed_motion = 0;
-    ReleaseSRWLockExclusive(&state->relative_lock);
-    return generation;
 }
 
 /* 取走给模型用的位移。可用性判断见下面原有的英文注释(已经投递过来的报文即使与

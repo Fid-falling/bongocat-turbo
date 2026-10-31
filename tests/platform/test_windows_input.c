@@ -211,7 +211,7 @@ static void test_motion_keeps_key_and_button_edges(void) {
     expect(&test, BONGO_CAT_INPUT_MOUSE_UP, "Left");
     expect(&test, BONGO_CAT_INPUT_KEY_UP, "KeyA");
     expect_empty(&test);
-    CHECK(test.state.observed_x == 8000);
+    CHECK(test.state.diagnostic_move_packets == 8000);   /* 位移报文都到了 (观测累加器已删) */
     CHECK(!test.state.retry_events);
     bongo_cat_windows_input_clear_devices(&test.state);
 }

@@ -2,6 +2,17 @@
 #include "windows_input_detection.h"
 #include <limits.h>
 
+/* 判定规则只有两条状态: 光标隐藏 / 被裁进 2x2。这里把每条都钉死, 顺便把"运动再多也不
+   改变结论"写进用例 —— 之前的"一抽一抽"就是因为让运动参与了判断。 */
+
+static WindowsPointerObservation observation(void) {
+    return (WindowsPointerObservation){.foreground = (HWND)(uintptr_t)1,
+        .pid = 2, .foreign = true, .position_known = true, .monitor_known = true,
+        .clip_known = true, .cursor_known = true, .cursor_flags = CURSOR_SHOWING,
+        .position = {960, 540}, .monitor = {0, 0, 1920, 1080},
+        .clip = {0, 0, 1920, 1080}};
+}
+
 static void test_clip_bounds(void) {
     static const struct {
         RECT clip;
@@ -32,351 +43,81 @@ static void test_clip_bounds(void) {
     }
 }
 
-static WindowsPointerObservation observation(void) {
-    return (WindowsPointerObservation){.foreground = (HWND)(uintptr_t)1,
-        .pid = 2, .foreign = true, .position_known = true, .monitor_known = true,
-        .clip_known = true, .cursor_known = true, .cursor_flags = CURSOR_SHOWING,
-        .position = {960, 540}, .monitor = {0, 0, 1920, 1080},
-        .clip = {0, 0, 1920, 1080}};
-}
-
-static void test_stalled_and_resume(void) {
-    WindowsPointerDetection state = {0};
-    WindowsPointerObservation sample = observation();
-    CHECK(!bongo_cat_windows_pointer_detect(&state, &sample, 0));
-    sample.raw_x = 12;
-    sample.motion_packets = 128;
-    for (unsigned t = 16; t < 128; t += 16)
-        CHECK(!bongo_cat_windows_pointer_detect(&state, &sample, t));
-    CHECK(bongo_cat_windows_pointer_detect(&state, &sample, 128));
-    CHECK(state.reason == WINDOWS_POINTER_STALLED);
-    sample.raw_x = 0;
-    sample.motion_packets = 0;
-    for (unsigned t = 144; t <= 1024; t += 16)
-        CHECK(bongo_cat_windows_pointer_detect(&state, &sample, t));
-    sample.raw_x = 10;
-    sample.motion_packets = 1;
-    for (unsigned t = 1040; t <= 1280; t += 16) {
-        sample.position.x += 10;
-        bongo_cat_windows_pointer_detect(&state, &sample, t);
-    }
-    CHECK(!state.relative && state.reason == WINDOWS_POINTER_DESKTOP);
-}
-
-static void test_recenter_and_real_travel(void) {
-    WindowsPointerDetection state = {0};
-    WindowsPointerObservation sample = observation();
-    CHECK(!bongo_cat_windows_pointer_detect(&state, &sample, 0));
-    sample.raw_x = 10;
-    sample.motion_packets = 1;
-    for (unsigned i = 1; i <= 8; ++i) {
-        sample.position.x = i % 2 ? 974 : 960;
-        bongo_cat_windows_pointer_detect(&state, &sample, i * 16);
-    }
-    CHECK(state.relative && state.reason == WINDOWS_POINTER_RECENTERED);
-    state = (WindowsPointerDetection){0};
-    sample = observation();
-    CHECK(!bongo_cat_windows_pointer_detect(&state, &sample, 0));
-    for (unsigned i = 1; i <= 64; ++i) {
-        sample.raw_x = i % 2 ? 14.0 : -14.0;
-        sample.motion_packets = 1;
-        sample.position.x = i % 2 ? 974 : 960;
-        CHECK(!bongo_cat_windows_pointer_detect(&state, &sample, i * 16));
-    }
-}
-
-static void test_desktop_edges_and_slow_motion(void) {
-    static const char *const scenarios[] = {
-        "monitor edge", "negative monitor edge", "clip edge",
-        "unknown monitor", "slow cursor travel", "small raw movement",
-        "alternating raw movement"
-    };
-    for (unsigned scenario = 0;
-        scenario < sizeof(scenarios) / sizeof(scenarios[0]); ++scenario) {
-        WindowsPointerDetection state = {0};
-        WindowsPointerObservation sample = observation();
-        if (scenario == 0) sample.position.x = 1919;
-        if (scenario == 1) {
-            sample.monitor = (RECT){-1920, -1080, 0, 0};
-            sample.clip = sample.monitor;
-            sample.position = (POINT){-1920, -500};
-        }
-        if (scenario == 2) sample.clip.right = 961;
-        if (scenario == 3) sample.monitor_known = false;
-        CHECK(!bongo_cat_windows_pointer_detect(&state, &sample, 0));
-        for (unsigned i = 1; i <= 64; ++i) {
-            sample.motion_packets = 128;
-            sample.raw_x = 32;
-            if (scenario == 4) sample.position.x += 1;
-            if (scenario == 5) sample.raw_x = 1;
-            if (scenario == 6) sample.raw_x = i % 2 ? 4.0 : -4.0;
-            bool relative = bongo_cat_windows_pointer_detect(&state, &sample, i * 16);
-            if (relative) {
-                fprintf(stderr, "desktop scenario=%s sample=%u reason=%d raw_x=%.1f\n",
-                    scenarios[scenario], i, (int)state.reason, sample.raw_x);
-                fprintf(stderr, "clip=(%ld,%ld,%ld,%ld)\n", sample.clip.left,
-                    sample.clip.top, sample.clip.right, sample.clip.bottom);
-            }
-            CHECK(!relative);
-        }
-    }
-}
-
-static void test_hidden_and_clipped(void) {
-    for (unsigned scenario = 0; scenario < 3; ++scenario) {
-        WindowsPointerDetection state = {0};
-        WindowsPointerObservation sample = observation();
-        if (scenario == 0) sample.cursor_flags = 0;
-        if (scenario == 1) sample.clip = (RECT){960, 540, 961, 541};
-        if (scenario == 2) sample.cursor_known = false;
-        CHECK(!bongo_cat_windows_pointer_detect(&state, &sample, 0));
-        /* A hidden cursor without mouse input must not activate tracking. */
-        for (unsigned t = 16; t <= 256; t += 16)
-            CHECK(!bongo_cat_windows_pointer_detect(&state, &sample, t));
-        sample.raw_y = 5;
-        sample.motion_packets = 1;
-        for (unsigned t = 272; t <= 304; t += 16)
-            bongo_cat_windows_pointer_detect(&state, &sample, t);
-        CHECK(state.relative == (scenario == 1));
-        for (unsigned t = 320; t <= 384; t += 16)
-            bongo_cat_windows_pointer_detect(&state, &sample, t);
-        CHECK(state.relative);
-        CHECK(state.reason == (scenario == 0 ? WINDOWS_POINTER_HIDDEN :
-            scenario == 1 ? WINDOWS_POINTER_CLIPPED : WINDOWS_POINTER_STALLED));
-        if (scenario == 2) continue;
-        sample.cursor_flags = CURSOR_SHOWING;
-        sample.clip = sample.monitor;
-        sample.raw_y = 0;
-        sample.motion_packets = 0;
-        for (unsigned t = 400; t <= 768; t += 16)
-            bongo_cat_windows_pointer_detect(&state, &sample, t);
-        CHECK(!state.relative);
-    }
-}
-
-static void test_focus_suspend_and_missing_position(void) {
-    for (unsigned scenario = 0; scenario < 6; ++scenario) {
-        WindowsPointerDetection state = {0};
-        WindowsPointerObservation sample = observation();
-        sample.cursor_flags = 0;
-        CHECK(!bongo_cat_windows_pointer_detect(&state, &sample, 0));
-        sample.raw_x = 8;
-        sample.motion_packets = 1;
-        for (unsigned t = 16; t <= 128; t += 16)
-            bongo_cat_windows_pointer_detect(&state, &sample, t);
-        CHECK(state.relative);
-        if (scenario == 0) sample.foreground = (HWND)(uintptr_t)3;
-        if (scenario == 1) sample.pid++;
-        if (scenario == 2) sample.foreign = false;
-        if (scenario == 3) sample.position_known = false;
-        ULONGLONG now = scenario == 4 ? 1000 : scenario == 5 ? 1 : 144;
-        CHECK(!bongo_cat_windows_pointer_detect(&state, &sample, now));
-        CHECK(!state.relative);
-    }
-}
-
-static void test_transition_flicker(void) {
-    WindowsPointerDetection state = {0};
-    WindowsPointerObservation sample = observation();
-    CHECK(!bongo_cat_windows_pointer_detect(&state, &sample, 0));
-    sample.raw_x = 8;
-    sample.motion_packets = 1;
-    for (unsigned i = 1; i <= 32; ++i) {
-        sample.position.x += 8;
-        sample.cursor_flags = i % 2 ? 0 : CURSOR_SHOWING;
-        CHECK(!bongo_cat_windows_pointer_detect(&state, &sample, i * 16));
-    }
-    sample.cursor_flags = 0;
-    for (unsigned t = 528; t <= 768; t += 16)
-        bongo_cat_windows_pointer_detect(&state, &sample, t);
-    CHECK(state.relative);
-    for (unsigned i = 1; i <= 16; ++i) {
-        sample.cursor_flags = i % 2 ? CURSOR_SHOWING : 0;
-        CHECK(bongo_cat_windows_pointer_detect(&state, &sample, 768 + i * 16));
-    }
-}
-
-static void test_slow_sampling_and_edge_returns(void) {
-    WindowsPointerDetection state = {0};
-    WindowsPointerObservation sample = observation();
-    CHECK(!bongo_cat_windows_pointer_detect(&state, &sample, 0));
-    sample.raw_x = 20;
-    sample.motion_packets = 1;
-    for (unsigned t = 60; t < 240; t += 60)
-        CHECK(!bongo_cat_windows_pointer_detect(&state, &sample, t));
-    CHECK(bongo_cat_windows_pointer_detect(&state, &sample, 240));
-    state = (WindowsPointerDetection){0};
-    sample = observation();
-    sample.position.x = 1910;
-    CHECK(!bongo_cat_windows_pointer_detect(&state, &sample, 0));
-    for (unsigned i = 1; i <= 32; ++i) {
-        sample.position.x = i % 2 ? 1919 : 1910;
-        sample.raw_x = 20;
-        sample.motion_packets = 1;
-        CHECK(!bongo_cat_windows_pointer_detect(&state, &sample, i * 16));
-    }
-    state = (WindowsPointerDetection){0};
-    sample = observation();
-    CHECK(!bongo_cat_windows_pointer_detect(&state, &sample, 0));
-    for (unsigned i = 1; i <= 16; ++i) {
-        /* One large packet is not sustained movement over the time window. */
-        sample.raw_x = i == 1 ? 10000 : 0;
-        sample.motion_packets = i == 1 ? 8000 : 0;
-        CHECK(!bongo_cat_windows_pointer_detect(&state, &sample, i * 16));
-    }
-}
-
-static void test_hidden_desktop_and_resume(void) {
-    for (unsigned scenario = 0; scenario < 4; ++scenario) {
-        WindowsPointerDetection state = {0};
-        WindowsPointerObservation sample = observation();
-        sample.cursor_flags = 0;
-        if (scenario == 2) {
-            sample.monitor = sample.clip = (RECT){-1920, -1080, 0, 0};
-            sample.position = (POINT){-1920, -500};
-        }
-        CHECK(!bongo_cat_windows_pointer_detect(&state, &sample, 0));
-        sample.motion_packets = 1;
-        for (unsigned i = 1; i <= 64; ++i) {
-            sample.raw_x = 8;
-            if (scenario == 0) sample.position.x += 8;
-            if (scenario == 1) sample.position.x += 1;
-            if (scenario == 3) {
-                sample.raw_x = i % 2 ? 14 : -14;
-                sample.position.x = i % 2 ? 974 : 960;
-            }
-            CHECK(!bongo_cat_windows_pointer_detect(&state, &sample, i * 16));
-        }
-    }
+static void test_hidden_and_shown_switch(void) {
     WindowsPointerDetection state = {0};
     WindowsPointerObservation sample = observation();
     sample.cursor_flags = 0;
-    CHECK(!bongo_cat_windows_pointer_detect(&state, &sample, 0));
-    sample.raw_x = 12;
-    sample.motion_packets = 1;
-    for (unsigned t = 16; t <= 256; t += 16) {
-        sample.position.x = t % 32 ? 974 : 960;
-        bongo_cat_windows_pointer_detect(&state, &sample, t);
-    }
-    CHECK(state.relative && state.reason == WINDOWS_POINTER_HIDDEN);
-    /* 光标一直藏着的时候, 无论位置怎么旅行都不解锁: 游戏里甩鼠标, 光标在 recenter 前
-       本来就会飞出去几百像素, 采样也常常落在漂移位置上 —— 用位置做解锁判据必然抖。
-       (以前这条用例期望"隐藏 + 真实旅行要解锁", 那是导致"甩快了就一抽一抽"的来源。)*/
-    for (unsigned t = 272; t <= 2000; t += 16) {
-        sample.position.x += 12;
-        CHECK(bongo_cat_windows_pointer_detect(&state, &sample, t));
-    }
-    CHECK(state.relative && state.reason == WINDOWS_POINTER_HIDDEN);
-    /* 光标重新出现 (离开游戏) 才解锁 */
-    sample.cursor_flags = CURSOR_SHOWING;
-    for (unsigned t = 2016; t <= 2400; t += 16)
-        bongo_cat_windows_pointer_detect(&state, &sample, t);
-    CHECK(!state.relative && state.reason == WINDOWS_POINTER_DESKTOP);
-}
-
-static void test_absolute_observation(void) {
-    for (unsigned scenario = 0; scenario < 4; ++scenario) {
-        WindowsPointerDetection state = {0};
-        WindowsPointerObservation sample = observation();
-        CHECK(!bongo_cat_windows_pointer_detect(&state, &sample, 0));
-        sample.motion_packets = 1;
-        for (unsigned i = 1; i <= 32; ++i) {
-            sample.absolute_x = 8;
-            if (scenario == 1) sample.position.x += 8;
-            if (scenario == 2) sample.absolute_x = i % 2 ? 8 : -8;
-            if (scenario == 3) {
-                /* Individually subthreshold signals must not be added. */
-                sample.absolute_x = 2;
-                sample.raw_x = 2;
-            }
-            bool relative = bongo_cat_windows_pointer_detect(&state, &sample, i * 16);
-            CHECK(relative == (scenario == 0 && i >= 8));
-        }
-    }
-}
-
-
-/*
- * Minecraft (GLFW) 的锁定方式和 FPS 游戏不同: 它不用 ClipCursor, 而是每帧用 SetCursorPos
- * 把光标钉回窗口中心, 并且把光标藏起来。我们因此拿不到"极小区裁剪"这条直接证据; 更糟的是
- * 有些游戏独占鼠标, RIDEV_INPUTSINK 收不到位移报文 —— 于是"设备位移 + 位置钉死"的推断也
- * 失效, 猫就跟着那个被钉在屏幕中心的假光标看。
- * 这条用例描述的就是这种观察: 光标隐藏、位置一动不动、**完全没有位移报文**, 期望两窗之后
- * 仍然判定为锁定; 光标重新出现并真的移动之后要解锁。
- */
-static void test_hidden_pinned_without_motion(void) {
-    WindowsPointerDetection state = {0};
-    WindowsPointerObservation sample = observation();
-    sample.cursor_flags = 0;              /* 光标被藏起来了 */
-    CHECK(!bongo_cat_windows_pointer_detect(&state, &sample, 0));
-    /* 没有位移报文时窗口只在 256ms 处结束, 所以要两个窗口 (≈512ms) 才够 */
-    unsigned first_locked = 0;
-    for (unsigned t = 16; t <= 640; t += 16) {
-        bool locked = bongo_cat_windows_pointer_detect(&state, &sample, t);
-        if (locked && !first_locked) first_locked = t;
-        if (t < 512) CHECK(!locked);
-    }
-    if (!first_locked) fprintf(stderr, "hidden pinned: pinned=%u reason=%d\n",
-        state.pinned_windows, (int)state.reason);
-    CHECK(first_locked >= 512 && first_locked <= 560);
+    CHECK(bongo_cat_windows_pointer_detect(&state, &sample));
     CHECK(state.reason == WINDOWS_POINTER_HIDDEN);
-    /* 停手不会解锁: 光标仍然隐藏、仍然钉在中心 */
-    for (unsigned t = 656; t <= 1280; t += 16)
-        CHECK(bongo_cat_windows_pointer_detect(&state, &sample, t));
-    /* 光标重新出现并真的移动 -> 解锁 */
     sample.cursor_flags = CURSOR_SHOWING;
-    for (unsigned t = 1296; t <= 2800; t += 16) {
-        sample.position.x += 12;
-        bongo_cat_windows_pointer_detect(&state, &sample, t);
+    CHECK(!bongo_cat_windows_pointer_detect(&state, &sample));
+    CHECK(state.reason == WINDOWS_POINTER_DESKTOP);
+    /* 来回切: 每次都是"隐藏=相对, 显示=绝对", 没有任何滞回 */
+    for (int i = 0; i < 20; ++i) {
+        sample.cursor_flags = i % 2 ? CURSOR_SHOWING : 0;
+        bool expected = (i % 2) == 0;
+        bool actual = bongo_cat_windows_pointer_detect(&state, &sample);
+        if (actual != expected)
+            fprintf(stderr, "switch round=%d actual=%d\n", i, (int)actual);
+        CHECK(actual == expected);
     }
-    CHECK(!state.relative && state.reason == WINDOWS_POINTER_DESKTOP);
 }
 
+static void test_clipped_means_relative(void) {
+    WindowsPointerDetection state = {0};
+    WindowsPointerObservation sample = observation();
+    sample.clip = (RECT){960, 540, 962, 542};
+    CHECK(bongo_cat_windows_pointer_detect(&state, &sample));
+    CHECK(state.reason == WINDOWS_POINTER_CLIPPED);
+    sample.clip = sample.monitor;
+    CHECK(!bongo_cat_windows_pointer_detect(&state, &sample));
+    /* 光标隐藏 + 极小区同时成立时报裁剪 (更强的那个原因) */
+    sample.cursor_flags = 0;
+    sample.clip = (RECT){960, 540, 961, 541};
+    CHECK(bongo_cat_windows_pointer_detect(&state, &sample));
+    CHECK(state.reason == WINDOWS_POINTER_CLIPPED);
+}
 
-/*
- * 同一个游戏里光标不会"正好"钉在中心: 它每帧被 recenter, 但我们 16ms 采一次, 总会抓到
- * 中间那几像素。以前解锁判据只看"位置比窗口起点远了 2 像素", 于是锁定状态每秒翻好几次,
- * 模型位置被反复重置回假中心 —— 用户看到的就是"一抽一抽"。这条用例锁的就是: 光标还藏着
- * 的时候, 两三像素的抖动不许解锁; 光标重新出现并真的移动之后才允许解锁。
- */
-static void test_hidden_jitter_keeps_lock(void) {
+static void test_motion_does_not_change_the_decision(void) {
     WindowsPointerDetection state = {0};
     WindowsPointerObservation sample = observation();
     sample.cursor_flags = 0;
-    CHECK(!bongo_cat_windows_pointer_detect(&state, &sample, 0));
-    unsigned t = 16;
-    for (; t <= 640; t += 16)
-        bongo_cat_windows_pointer_detect(&state, &sample, t);
-    CHECK(state.relative && state.reason == WINDOWS_POINTER_HIDDEN);
-    /* 2 秒的 ±3 像素抖动 (在归位点容差内): 一次都不许解锁 */
-    for (; t <= 2640; t += 16) {
-        sample.position.x = 960 + ((t / 16) % 2 ? 3 : -3);
-        sample.position.y = 540 + ((t / 48) % 2 ? 2 : -2);
-        if (!bongo_cat_windows_pointer_detect(&state, &sample, t))
-            fprintf(stderr, "hidden jitter unlocked at t=%u\n", t);
-        CHECK(state.relative);
-        CHECK(state.reason == WINDOWS_POINTER_HIDDEN);
+    /* 光标在游戏里被 recenter 前会飞出去几百像素: 结论必须是"一直是相对", 不能抖 */
+    for (int i = 0; i < 400; ++i) {
+        sample.position.x = (i % 40 < 20) ? 960 : 960 + (i % 300);
+        sample.position.y = 540 + (i % 120) - 60;
+        CHECK(bongo_cat_windows_pointer_detect(&state, &sample));
     }
-    /* 光标重新出现并真的移动 -> 解锁 */
+    /* 反过来: 光标显示着的时候, 位置怎么动都还是绝对 */
     sample.cursor_flags = CURSOR_SHOWING;
-    for (; t <= 4200; t += 16) {
-        sample.position.x += 12;
-        bongo_cat_windows_pointer_detect(&state, &sample, t);
+    for (int i = 0; i < 200; ++i) {
+        sample.position.x = 100 + i * 5;
+        CHECK(!bongo_cat_windows_pointer_detect(&state, &sample));
     }
-    CHECK(!state.relative && state.reason == WINDOWS_POINTER_DESKTOP);
+}
+
+static void test_foreign_and_unknown_cursor(void) {
+    WindowsPointerDetection state = {0};
+    WindowsPointerObservation sample = observation();
+    sample.cursor_flags = 0;
+    /* 前台是自己进程: 永远不切相对 (自己的窗口不会独占鼠标) */
+    sample.foreign = false;
+    CHECK(!bongo_cat_windows_pointer_detect(&state, &sample));
+    CHECK(state.reason == WINDOWS_POINTER_DESKTOP);
+    /* 光标状态取不到: 不猜 */
+    sample.foreign = true;
+    sample.cursor_known = false;
+    sample.clip_known = false;
+    CHECK(!bongo_cat_windows_pointer_detect(&state, &sample));
+    /* 样本为空也要安全退出 */
+    CHECK(!bongo_cat_windows_pointer_detect(&state, NULL));
+    CHECK(!bongo_cat_windows_pointer_detect(NULL, &sample));
 }
 
 void test_windows_pointer_detection(void) {
-    test_hidden_desktop_and_resume();
-    test_absolute_observation();
     test_clip_bounds();
-    test_stalled_and_resume();
-    test_recenter_and_real_travel();
-    test_desktop_edges_and_slow_motion();
-    test_hidden_and_clipped();
-    test_focus_suspend_and_missing_position();
-    test_transition_flicker();
-    test_slow_sampling_and_edge_returns();
-    test_hidden_pinned_without_motion();
-    test_hidden_jitter_keeps_lock();
+    test_hidden_and_shown_switch();
+    test_clipped_means_relative();
+    test_motion_does_not_change_the_decision();
+    test_foreign_and_unknown_cursor();
 }

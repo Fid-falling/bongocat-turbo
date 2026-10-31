@@ -2,12 +2,13 @@
 
 #ifdef _WIN32
 /*
- * "鼠标是不是被别的游戏/程序锁住了"的探测(模型线程, 由
- * bongo_cat_platform_pointer_locked 调用)。
+ * "现在该不该用相对位移"的采样侧: 每帧问一次, 结果缓存 16ms。
  *
- * 每次采样光标可见性、位置、裁剪矩形与所在显示器, 交给 windows_input_detection.c 里
- * 的判定器累积判断。只在前台不属于自己进程时才真正采样(见下), 因为我们自己的窗口
- * 不可能触发游戏模式。
+ * 判定本身在 windows_input_detection.c, 这里只负责把 Win32 的事实采齐:
+ *   - GetCursorInfo: 光标是显示还是隐藏 (游戏独占鼠标最直接的证据);
+ *   - GetClipCursor: 有没有被裁进 2x2 的小矩形 (老式做法);
+ *   - 前台窗口的进程号: 自己进程的前台不参与判定。
+ * 只在前台属于别的进程时才真正采光标状态, 否则交给判定器一个空样本, 让它回到绝对模式。
  */
 static void observe_cursor(WindowsPointerObservation *sample) {
     CURSORINFO cursor = {.cbSize = sizeof(cursor)};
@@ -26,8 +27,6 @@ static void observe_cursor(WindowsPointerObservation *sample) {
     }
 }
 
-/* 结果缓存 16ms: 这个函数每帧都会被问一次, 而 GetCursorInfo / GetClipCursor 都是
-   系统调用, 每次都问会明显浪费。 */
 bool bongo_cat_windows_input_pointer_locked(BongoCatPlatform *platform) {
     WindowsInputState *state = platform ? platform->native : NULL;
     if (!state) return false;
@@ -40,42 +39,20 @@ bool bongo_cat_windows_input_pointer_locked(BongoCatPlatform *platform) {
     sample.foreground = GetForegroundWindow();
     if (sample.foreground) GetWindowThreadProcessId(sample.foreground, &sample.pid);
     sample.foreign = sample.pid && sample.pid != GetCurrentProcessId();
-    /* Our own windows cannot trigger game mode. Still consume observations so
-       old desktop movement cannot leak into the next foreground application. */
-    /* 自己的窗口不会触发游戏模式, 但这次观测仍然要交给判定器(哪怕内容是空的):
-       否则切到别的程序时, 之前累积的桌面移动会被误当成"在那个程序里"的运动。 */
     if (sample.foreign) observe_cursor(&sample);
-    unsigned long long generation =
-        bongo_cat_windows_input_take_observation(state, &sample);
-    /* 接收线程重置过设备或运动状态时 generation 会变化, 这时必须把判定器清零:
-       旧的采样序列已经和新设备状态对不上了。 */
-    if (state->pointer_generation != generation) {
-        state->pointer_detection = (WindowsPointerDetection){0};
-        state->pointer_generation = generation;
-    }
     bool locked = bongo_cat_windows_pointer_detect(&state->pointer_detection,
-        &sample, now_ms);
+        &sample);
     /* 只在判定变化时记一行: 每帧打日志会把日志淹掉, 而"游戏里鼠标被锁住"这类反馈
-       只有这一行能定位 (锁定原因 + 证据 + 前台进程)。 */
+       只有这一行能定位。 */
     if ((int)locked != state->pointer_logged_locked ||
         (int)state->pointer_detection.reason != state->pointer_logged_reason) {
         state->pointer_logged_locked = (int)locked;
         state->pointer_logged_reason = (int)state->pointer_detection.reason;
         SDL_LogInfo(BONGO_CAT_LOG_INPUT,
-            "[input] 指针锁定判定: locked=%d reason=%s raw=(%.0f,%.0f) samples=%llu "
-            "pinned=%u win_exc=%lld win_dist=%lld win_returns=%u win_anchor=%u win_hint=%d "
-            "unlocked=%d cursor=%s clip=%ld,%ld,%ld,%ld foreground_pid=%lu",
+            "[input] 指针锁定判定: locked=%d reason=%s cursor=%s clip=%ld,%ld,%ld,%ld "
+            "foreground_pid=%lu",
             locked ? 1 : 0,
             bongo_cat_windows_pointer_reason_name(state->pointer_detection.reason),
-            state->pointer_detection.diag_raw_x, state->pointer_detection.diag_raw_y,
-            (unsigned long long)state->pointer_detection.diag_moving_samples,
-            state->pointer_detection.pinned_windows,
-            state->pointer_detection.diag_excursion,
-            state->pointer_detection.diag_distance,
-            state->pointer_detection.diag_returns,
-            state->pointer_detection.diag_anchor_hits,
-            state->pointer_detection.diag_hint,
-            state->pointer_detection.diag_unlocked ? 1 : 0,
             sample.cursor_known && sample.cursor_flags == 0 ? "hidden" : "shown",
             sample.clip_known ? (long)sample.clip.left : -1L,
             sample.clip_known ? (long)sample.clip.top : -1L,
