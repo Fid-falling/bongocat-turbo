@@ -296,6 +296,9 @@ static bool take_update_shutdown(BongoCatApp *app) {
 void bongo_cat_app_loop(BongoCatApp *app) {
     while (app->running) {
         /* 首帧看门狗: 只在"启动后 8 秒还没端出第一帧"时有事可做, 平时只是一次比较 */
+        /* 启动期排队的引导弹窗 (缺 Cubism Core 时才有): 放到主循环里弹, 这样桌宠和设置
+           窗口都已经画出来了, 模态框只盖在上面, 而不是把初始化卡住。 */
+        bongo_cat_preferences_live2d_core_onboarding_show(app);
         bongo_cat_first_frame_watchdog_update(app, SDL_GetTicksNS());
         bongo_cat_app_apply_frame_pacing(app);
         int wait_ms = bongo_cat_window_wait_timeout(app, SDL_GetTicksNS());

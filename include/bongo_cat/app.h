@@ -155,6 +155,8 @@ typedef struct BongoCatApp {
     /* 相对跟随诊断: 锁定状态每秒记一行"模型位置 + 这次动了多少"。用户反馈"游戏里被定住"
        时, 这一行能直接看出是判定没进相对模式, 还是进了但位移没在累加。 */
     uint64_t relative_log_ns;
+    /* 缺 Cubism Core 的引导弹窗已排队 (启动期只排队, 主循环第一帧才真正弹) */
+    bool live2d_core_onboarding_pending;
     double relative_log_x, relative_log_y;
     char loading_model[BONGO_CAT_ID_CAP];
     /*

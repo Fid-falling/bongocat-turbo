@@ -40,6 +40,8 @@ void bongo_cat_preferences_live2d_setup_notice(BongoCatApp *app);
  *     这个约定与 window_menu_actions.c / application_restart.c 里的模态框一致。
  */
 void bongo_cat_preferences_live2d_core_onboarding(BongoCatApp *app);
+/* 主循环调用: 有待显示的引导弹窗就弹 (模态)。启动期只排队不弹, 免得把初始化卡在模态框里。 */
+void bongo_cat_preferences_live2d_core_onboarding_show(BongoCatApp *app);
 /*
  * 主循环每帧调用: 导入 Core 成功后收口"要不要现在重启"。
  *

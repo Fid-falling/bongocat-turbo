@@ -165,7 +165,12 @@ static void onboarding_dialog(BongoCatApp *app) {
     SDL_MessageBoxData data;
     SDL_zero(data);
     data.flags = SDL_MESSAGEBOX_INFORMATION;
-    data.window = app->preferences ? app->preferences->window : NULL;
+    /* 弹窗的**所有者**给桌宠窗口, 而不是设置窗口。
+       桌宠是置顶窗口 (always-on-top), 而模态框自身不是置顶的: 所有者设成桌宠之后它一定
+       画在桌宠之上, 不会被那只猫盖住 —— 反馈里"这个窗口关不掉"很可能就是框被置顶的桌宠
+       压住, 用户根本点不到按钮。没有桌宠窗口时退回设置窗口。 */
+    data.window = app->window ? app->window :
+        (app->preferences ? app->preferences->window : NULL);
     data.title = title;
     data.message = message;
     data.numbuttons = (int)SDL_arraysize(buttons);
@@ -200,6 +205,18 @@ static void onboarding_dialog(BongoCatApp *app) {
             "[live2d] 用户选择稍后处理(按钮 %d): 设置里的入口照常在", pressed);
         return;
     }
+}
+
+/* 主循环每帧调一次: 有待显示的引导弹窗就弹出来 (模态, 阻塞到用户选完)。
+   启动期不弹的原因见上面第 4 条注释。 */
+void bongo_cat_preferences_live2d_core_onboarding_show(BongoCatApp *app) {
+    if (!app || !app->live2d_core_onboarding_pending) return;
+    app->live2d_core_onboarding_pending = false;
+    SDL_LogInfo(BONGO_CAT_LOG_LIFECYCLE,
+        "[live2d] 显示缺 Cubism Core 的引导弹窗, 等待用户选择(在此之前不会打开浏览器)");
+    onboarding_dialog(app);
+    SDL_LogInfo(BONGO_CAT_LOG_LIFECYCLE,
+        "[live2d] 缺 Cubism Core 的引导弹窗已关闭; 下次启动不再自动引导");
 }
 
 void bongo_cat_preferences_live2d_core_onboarding(BongoCatApp *app) {
@@ -249,13 +266,22 @@ void bongo_cat_preferences_live2d_core_onboarding(BongoCatApp *app) {
     bongo_cat_preferences_show(app->preferences);
     SDL_LogInfo(BONGO_CAT_LOG_LIFECYCLE,
         "[live2d] 缺 Cubism Core: 已自动打开设置窗口(导入入口在 Live2D 那一行)");
-    /* 3) 弹一次"下载教程": 内容与动作都在弹窗里, 打开链接必须由用户点按钮触发。 */
-    SDL_LogInfo(BONGO_CAT_LOG_LIFECYCLE,
-        "[live2d] 缺 Cubism Core: 显示引导弹窗, 等待用户选择(在此之前不会打开浏览器)");
-    onboarding_dialog(app);
-    /* 4) 记下"已经引导过一次": 这台机器上不会再自动来一遍(与用户在弹窗里选了什么无关)。 */
+    /*
+     * 3) 先记下"已经引导过一次"并**立刻落盘**, 然后才弹窗。
+     *
+     * 顺序很重要: 弹窗是模态阻塞的, 用户在它面前能做的只有点按钮 —— 如果他直接杀进程
+     * (反馈里"窗口关不掉"的那种情况), 标志没写回就会在下次启动原样重来一遍, 越看越像
+     * "永远关不掉"。先落盘之后, 最坏情况也只是这台机器只被打扰这一次。
+     */
     app->settings.app.live2d_core_prompt_shown = true;
     app->dirty = true;
+    bongo_cat_config_store_flush(app);
+    /*
+     * 4) 弹窗推迟到主循环的第一帧 (见 bongo_cat_preferences_live2d_core_onboarding_show):
+     * 启动期直接弹模态框会把整个程序卡在初始化里, 窗口还没画出来, 用户看到的是"一个关不掉的
+     * 框 + 背后什么都没有"。推迟一帧之后, 桌宠和设置窗口都已经在屏幕上, 弹窗只是盖在上面。
+     */
+    app->live2d_core_onboarding_pending = true;
     SDL_LogInfo(BONGO_CAT_LOG_LIFECYCLE,
-        "[live2d] 缺 Cubism Core 的引导已结束(设置窗口 + 弹窗); 下次启动不再自动引导");
+        "[live2d] 缺 Cubism Core 的引导已排队(设置窗口已开, 弹窗在主循环第一帧显示)");
 }
