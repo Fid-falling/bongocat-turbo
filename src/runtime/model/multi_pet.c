@@ -202,6 +202,12 @@ static void reload_secondary_settings(BongoCatApp *app) {
             app->settings.window.always_on_top);
         bongo_cat_window_mark_hit_dirty(app);
         bongo_cat_window_sync_click_through(app);
+        /*
+         * "仅在录屏软件中显示" 是 DWM 按窗口生效的: 子进程必须自己跟着开关, 否则用户一开
+         * 这个选项就变成"只有主进程那只猫从桌面消失, 其它照常显示" (实测反馈就是这样)。
+         * 父进程改设置 -> 写 settings.json -> 这里 2 秒内跟上。
+         */
+        bongo_cat_window_apply_capture_only(app);
     }
 }
 
