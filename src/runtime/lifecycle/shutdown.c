@@ -19,6 +19,28 @@
 
 #include <stdlib.h>
 
+/*
+ * 用户主动退出: 先隐藏窗口, 再让主循环收尾。
+ *
+ * 为什么不用 bongo_cat_window_set_visible(app, false): 那条路径会把 session.window.visible
+ * 一起写成 false, 于是"退出"被记成"用户隐藏了桌宠", 下次启动桌宠就不出来了。这里只动原生
+ * 窗口 (平台层), 不碰会话状态。
+ *
+ * 隐藏本身是一次窗口属性修改 (几十微秒), 真正贵的 Vulkan 设备/交换链销毁留在后面统一关停里,
+ * 那时窗口已经不在屏幕上, 用户看不到这段等待。
+ */
+void bongo_cat_app_request_quit(BongoCatApp *app) {
+    if (!app) return;
+    if (app->running && app->window) {
+        const uint64_t started = SDL_GetTicksNS();
+        bongo_cat_platform_set_visible(&app->platform, false);
+        SDL_LogInfo(BONGO_CAT_LOG_LIFECYCLE,
+            "[runtime] 退出: 桌宠窗口已先隐藏 (%.1fms), 开始清理",
+            (double)(SDL_GetTicksNS() - started) / 1e6);
+    }
+    app->running = false;
+}
+
 /* stage 与 exit_code 是"这次为什么退出"的唯一记录来源: 会写进 runtime-state.txt 与日志。 */
 void bongo_cat_app_shutdown(BongoCatApp *app, const char *stage,
     int exit_code) {

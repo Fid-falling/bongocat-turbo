@@ -29,7 +29,8 @@ static void handle_event(BongoCatApp *app, const SDL_Event *event) {
     if (bongo_cat_update_event(app->update, event)) return;
     if (bongo_cat_model_refresh_event(app, event)) return;
     if (bongo_cat_preferences_event(app->preferences, event)) return;
-    if (!bongo_cat_window_event(app, event)) app->running = false;
+    /* 窗口层要求退出 (SDL_EVENT_QUIT) 与用户点「退出」走同一条路: 先藏窗口再收尾 */
+    if (!bongo_cat_window_event(app, event)) bongo_cat_app_request_quit(app);
     if (event->type >= SDL_EVENT_GAMEPAD_AXIS_MOTION &&
         event->type <= SDL_EVENT_GAMEPAD_TOUCHPAD_UP) {
         bongo_cat_window_snapshot_end(app);
@@ -311,6 +312,8 @@ void bongo_cat_app_loop(BongoCatApp *app) {
                 handle_event(app, &event);
         }
         bongo_cat_preferences_input_end(app->preferences);
+        /* 刚才是退出请求: 窗口已隐藏, 别再渲染这一帧 (渲染会用到马上要拆的资源) */
+        if (!app->running) break;
         uint64_t now = SDL_GetTicksNS();
         bongo_cat_preferences_model_watch(app->preferences, now);
         bongo_cat_preferences_poll_imports(app->preferences);

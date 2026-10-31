@@ -84,6 +84,13 @@ void bongo_cat_runtime_log_preserve(void);
 void bongo_cat_runtime_clean_shutdown(BongoCatApp *app, int exit_code);
 void bongo_cat_app_shutdown(BongoCatApp *app, const char *stage,
     int exit_code);
+/*
+ * 用户点了「退出」: **先把桌宠窗口藏掉**再置 running=false, 让关停的脏活发生在用户看不见之后。
+ * 实测关停 119~194ms 里有 85~143ms 是在销毁 Vulkan 设备/交换链 (要等显卡空闲), 而窗口在那之前
+ * 一直留在屏幕上 —— 用户看到的就是"点了退出, 卡半拍才消失"。
+ * 所有"用户主动退出"的入口都该走它 (托盘、轮盘菜单、系统关闭事件)。
+ */
+void bongo_cat_app_request_quit(BongoCatApp *app);
 void bongo_cat_startup_failure(BongoCatApp *app, const BongoCatError *error);
 void bongo_cat_startup_ci_failure(BongoCatApp *app, const BongoCatError *error);
 /* --- 窗口: 应用设置、事件、几何/缩放、拖拽与命中 --- */

@@ -199,7 +199,7 @@ void bongo_cat_window_menu_action(BongoCatApp *app,
                 bongo_cat_platform_set_visible(&app->platform, false);
                 app->running = false;
             }
-        } else app->running = false;
+        } else bongo_cat_app_request_quit(app);
     }
     bongo_cat_preferences_invalidate(app->preferences);
 }

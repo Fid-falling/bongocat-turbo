@@ -85,7 +85,8 @@ static void on_tray_modal_frame(void *userdata) {
 
 void bongo_cat_tray_on_exit(void *userdata, SDL_TrayEntry *entry) {
     (void)entry;
-    ((BongoCatTray *)userdata)->app->running = false;
+    /* 先藏窗口再收尾: 关停里要等显卡空闲, 窗口不该跟着一起"卡"在那里 */
+    bongo_cat_app_request_quit(((BongoCatTray *)userdata)->app);
 }
 
 void bongo_cat_tray_on_restore(void *userdata) {
