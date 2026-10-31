@@ -259,8 +259,9 @@ static void test_hidden_desktop_and_resume(void) {
         bongo_cat_windows_pointer_detect(&state, &sample, t);
     }
     CHECK(state.relative && state.reason == WINDOWS_POINTER_HIDDEN);
-    /* Normal coordinate travel must release even while the cursor is hidden. */
-    for (unsigned t = 272; t <= 640; t += 16) {
+    /* 隐藏光标但真的在旅行 (一次都没回到过起点) 仍然要解锁 —— 新判据给它 1 秒的宽限,
+       因为游戏里甩鼠标时游戏也会把光标拽出去两百多像素, 但它几百毫秒内必然被拽回来。 */
+    for (unsigned t = 272; t <= 2000; t += 16) {
         sample.position.x += 12;
         bongo_cat_windows_pointer_detect(&state, &sample, t);
     }
@@ -341,7 +342,7 @@ static void test_hidden_jitter_keeps_lock(void) {
     for (; t <= 640; t += 16)
         bongo_cat_windows_pointer_detect(&state, &sample, t);
     CHECK(state.relative && state.reason == WINDOWS_POINTER_HIDDEN);
-    /* 2 秒的 ±3 像素抖动: 一次都不许解锁 */
+    /* 2 秒的 ±3 像素抖动 (在归位点容差内): 一次都不许解锁 */
     for (; t <= 2640; t += 16) {
         sample.position.x = 960 + ((t / 16) % 2 ? 3 : -3);
         sample.position.y = 540 + ((t / 48) % 2 ? 2 : -2);

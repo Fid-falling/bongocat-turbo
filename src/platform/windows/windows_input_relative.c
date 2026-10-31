@@ -20,6 +20,7 @@ void bongo_cat_windows_input_motion(WindowsInputState *state,
     if (!(mouse->usFlags & MOUSE_MOVE_ABSOLUTE)) {
         device->absolute_known = false;
         if (mouse->lLastX || mouse->lLastY) {
+            state->diagnostic_move_packets++;
             state->observed_x += mouse->lLastX;
             state->observed_y += mouse->lLastY;
             state->observed_motion++;
@@ -28,7 +29,7 @@ void bongo_cat_windows_input_motion(WindowsInputState *state,
                 state->relative_y += mouse->lLastY;
                 state->relative_samples++;
             }
-        }
+        } else state->diagnostic_still_packets++;
     } else {
         if (!bounds || bounds->right <= bounds->left ||
             bounds->bottom <= bounds->top || mouse->lLastX < 0 ||

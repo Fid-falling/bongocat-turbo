@@ -90,6 +90,10 @@ typedef struct WindowsInputState {
     ULONGLONG pointer_probe_ms;
     /* 上一次写进日志的判定 (locked + reason): 判定每帧都在算, 只在变化时记一行。
        用户反馈"游戏里指针被锁住"这类问题时, 这一行是唯一能定位的证据。 */
+    /* 位移计数 (接收线程累加, 周期日志里打印): move=带位移的鼠标报文数, still=位移为 0 的
+       鼠标报文数。游戏里"鼠标被独占"的两种表现 (根本没报文 / 只有按键报文) 靠这两个数分开。 */
+    unsigned long long diagnostic_move_packets;
+    unsigned long long diagnostic_still_packets;
     int pointer_logged_locked;
     int pointer_logged_reason;
     unsigned long long pointer_generation;

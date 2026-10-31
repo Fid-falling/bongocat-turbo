@@ -137,6 +137,7 @@ static void log_receiver(WindowsInputState *state, const char *phase) {
         "invalid=%llu device_drops=%llu read_failures=%llu device_changes=%llu "
         "owned=%u mouse_flags=%lu keyboard_flags=%lu desktop_unavailable=%d "
         "query_error=%lu recovery_error=%lu last_read_error=%lu devices=%u "
+        "move=%llu still=%llu "
         "monitors=%d foreground_pid=%lu foreground_monitor_known=%d "
         "foreground_primary=%d foreground_rect=%ld,%ld,%ld,%ld",
         phase, (unsigned long long)GetTickCount64(),
@@ -152,6 +153,8 @@ static void log_receiver(WindowsInputState *state, const char *phase) {
         state->desktop_unavailable, (unsigned long)state->registration_error,
         (unsigned long)state->recovery_error, (unsigned long)state->read_error,
         state->device_count,
+        (unsigned long long)state->diagnostic_move_packets,
+        (unsigned long long)state->diagnostic_still_packets,
         GetSystemMetrics(SM_CMONITORS), (unsigned long)pid, monitor_known,
         (monitor.dwFlags & MONITORINFOF_PRIMARY) != 0,
         monitor.rcMonitor.left, monitor.rcMonitor.top,
