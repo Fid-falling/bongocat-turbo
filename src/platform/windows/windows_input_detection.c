@@ -98,11 +98,6 @@ bool bongo_cat_windows_pointer_detect(WindowsPointerDetection *state,
     long long distance = dx > dy ? dx : dy;
     if (distance > state->excursion) state->excursion = distance;
     if (dx <= 2 && dy <= 2) state->anchor_hits++;
-    if (state->home_known) {
-        long long hx = llabs((long long)sample->position.x - state->home.x);
-        long long hy = llabs((long long)sample->position.y - state->home.y);
-        if (hx <= 4 && hy <= 4) state->last_home_ms = now_ms;
-    }
     if (distance > 2) state->away = true;
     else if (state->away) { state->returns++; state->away = false; }
     bool inside = sample->monitor_known &&
@@ -128,7 +123,6 @@ bool bongo_cat_windows_pointer_detect(WindowsPointerDetection *state,
         }
     } else state->hint_pending = false;
 
-    state->locked_before = state->relative;
     ULONGLONG window_age = now_ms - state->window_ms;
     if (window_age >= 128 && (state->moving_samples >= 4 || window_age >= 256)) {
         /* Net device counts reject ordinary back-and-forth movement. The
@@ -158,31 +152,21 @@ bool bongo_cat_windows_pointer_detect(WindowsPointerDetection *state,
                 stalled ? WINDOWS_POINTER_STALLED : WINDOWS_POINTER_RECENTERED;
             state->evidence_ms = now_ms;
         }
-        if (state->relative && !state->locked_before) {
-            state->home = sample->position;
-            state->home_known = true;
-            state->last_home_ms = now_ms;
-        }
         if (hint != WINDOWS_POINTER_CLIPPED && state->relative &&
             now_ms - state->evidence_ms >= 192) {
             /*
              * 解锁条件按"当初为什么锁上"分开:
-             *   - HIDDEN (游戏用 SetCursorPos 把光标钉住): 判据是"已经多久没回到归位点"。
-             *     玩家在游戏里甩鼠标时, 光标在被 recenter 前也会飞出去两百多像素 (实测
-             *     win_exc=239), 所以"位置偏移大就解锁"会每秒翻好几次 —— 每翻一次模型位置就
-             *     被重置回那个假中心, 用户看到的就是"一抽一抽"。而 recenter 是几十毫秒级的
-             *     事: 光标离开后很快就会回到同一点。所以在桌面上真的移动鼠标 (哪怕光标是
-             *     隐藏的) 才好 1 秒都回不来; 游戏里永远不会超过一帧。
+             *   - HIDDEN: 只认"光标重新出现"。位置判据在这里全都不能用 —— 玩家甩鼠标时
+             *     游戏 recenter 前光标会飞出去几百像素、采样也常常落在漂移位置上, 用"多久
+             *     没回到归位点"去做时间窗, 甩快一点就会触发解锁; 一解锁模型位置就退回那个
+             *     假中心, 再锁上又跳回累加位置 —— 用户看到的就是"一抽一抽"。而"光标是否
+             *     被隐藏"是游戏独占鼠标最稳定的特征: 玩的时候一直隐藏, 一旦 Alt+Tab 出去
+             *     或游戏让出光标就恢复显示。
              *   - 其它 (极小区裁剪 / 停滞 / 回中): 沿用"位置真的动了"这条判据。
              */
             bool unlock = false;
             if (state->reason == WINDOWS_POINTER_HIDDEN) {
-                /* 250ms 是"回到归位点"的最大间隔: 游戏 recenter 是每帧的事 (实测一窗 16 次
-                   采样里有 11 次就在归位点上), 所以只要在游戏里就永远不会超过它; 而桌面上
-                   真的把鼠标移走之后这个间隔会一直增长 —— 1 秒太长, 会让"看视频时移开鼠标"
-                   之后有一秒不跟手, 所以压到 250ms。 */
-                unlock = hint == WINDOWS_POINTER_DESKTOP ||
-                    (state->home_known && now_ms - state->last_home_ms >= 250);
+                unlock = hint == WINDOWS_POINTER_DESKTOP;
             } else {
                 unlock = distance > 2 ||
                     state->reason == WINDOWS_POINTER_CLIPPED;

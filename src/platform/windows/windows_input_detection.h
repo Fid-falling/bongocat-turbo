@@ -53,14 +53,6 @@ typedef struct WindowsPointerDetection {
     unsigned pinned_windows;
     /* 本窗口里"回到锚点附近 (≤2px)"的采样次数 (只用于日志)。 */
     unsigned anchor_hits;
-    /* "归位点": 游戏 recenter 时每帧把光标拽回来的那个位置。解锁判据不再看位置偏移,
-       改看"已经多久没回到归位点" —— 玩家甩鼠标时游戏里光标也会飞出去两百多像素, 但它
-       几百毫秒内必然被拽回来; 而在桌面上真的移动鼠标 (哪怕光标是隐藏的) 就再也回不来。 */
-    POINT home;
-    bool home_known;
-    /* 本窗口开始前是否已经锁着: 用来判断"是不是这一窗刚锁上" (刚锁上就记归位点) */
-    bool locked_before;
-    ULONGLONG last_home_ms;
     /* 上一个窗口结束时的证据快照 (begin_window 会清零累积量, 日志要的是清零前的值) */
     long long diag_excursion;
     double diag_raw_x, diag_raw_y;

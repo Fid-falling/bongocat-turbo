@@ -259,13 +259,19 @@ static void test_hidden_desktop_and_resume(void) {
         bongo_cat_windows_pointer_detect(&state, &sample, t);
     }
     CHECK(state.relative && state.reason == WINDOWS_POINTER_HIDDEN);
-    /* 隐藏光标但真的在旅行 (一次都没回到过起点) 仍然要解锁 —— 新判据给它 1 秒的宽限,
-       因为游戏里甩鼠标时游戏也会把光标拽出去两百多像素, 但它几百毫秒内必然被拽回来。 */
+    /* 光标一直藏着的时候, 无论位置怎么旅行都不解锁: 游戏里甩鼠标, 光标在 recenter 前
+       本来就会飞出去几百像素, 采样也常常落在漂移位置上 —— 用位置做解锁判据必然抖。
+       (以前这条用例期望"隐藏 + 真实旅行要解锁", 那是导致"甩快了就一抽一抽"的来源。)*/
     for (unsigned t = 272; t <= 2000; t += 16) {
         sample.position.x += 12;
-        bongo_cat_windows_pointer_detect(&state, &sample, t);
+        CHECK(bongo_cat_windows_pointer_detect(&state, &sample, t));
     }
-    CHECK(!state.relative);
+    CHECK(state.relative && state.reason == WINDOWS_POINTER_HIDDEN);
+    /* 光标重新出现 (离开游戏) 才解锁 */
+    sample.cursor_flags = CURSOR_SHOWING;
+    for (unsigned t = 2016; t <= 2400; t += 16)
+        bongo_cat_windows_pointer_detect(&state, &sample, t);
+    CHECK(!state.relative && state.reason == WINDOWS_POINTER_DESKTOP);
 }
 
 static void test_absolute_observation(void) {
