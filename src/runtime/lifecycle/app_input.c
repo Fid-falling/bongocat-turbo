@@ -43,7 +43,8 @@ static void log_input(BongoCatApp *app, uint64_t now) {
 }
 
 void bongo_cat_app_drain_input(BongoCatApp *app, bool allow_shortcuts) {
-    if (app && app->secondary_pet) allow_shortcuts = false;
+    /* 子进程也要跑快捷键: 但 bongo_cat_app_shortcuts 里会把子进程限制在"行为快捷键"
+       (Alt+1..0 这类), 全局快捷键仍然只有主进程执行。 */
     BongoCatInputEvent event;
     while (bongo_cat_input_pop(&app->input, &event)) {
         bool keyboard = event.kind == BONGO_CAT_INPUT_KEY_DOWN ||

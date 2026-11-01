@@ -87,6 +87,27 @@ static bool behavior_shortcut(BongoCatApp *app, const BongoCatInputEvent *event,
    否则每来一个不相干的按键都会重放音效。 */
 void bongo_cat_app_shortcuts(BongoCatApp *app, const BongoCatInputEvent *event) {
     if (!app || !event) return;
+    /*
+     * 多桌宠的子进程: 只跑**行为**快捷键 (含 Alt+1..0 别名)。
+     *
+     * 全局快捷键 (显示/隐藏、设置窗口、镜像、穿透、置顶) 由主进程负责: 子进程自己再跑一遍
+     * 会和主进程打架 (可见性由 control.txt 下发, 退出由父进程决定)。音效也不在这里放,
+     * 否则每只猫都会各放一遍。
+     *
+     * 这条分支修的是用户反馈: 多桌宠时 Alt+1 只有主进程那只猫的水印动作生效 —— 因为子进程
+     * 原本把全部快捷键都屏蔽了, 而"水印"这类效果在每只猫的模型行为表里各有一份。
+     */
+    if (app->secondary_pet) {
+        /* 手柄按键没有修饰键状态, 直接进行为分发; 键盘事件则**必须先推进快捷键状态机**,
+           否则 state->alt 之类的修饰位永远是 0, "Alt+1" 这类别名永远匹配不上。 */
+        if (event->kind == BONGO_CAT_INPUT_GAMEPAD_BUTTON) {
+            behavior_shortcut(app, event, false, false);
+            return;
+        }
+        (void)bongo_cat_shortcut_update(&app->shortcut_state, event);
+        behavior_shortcut(app, event, false, false);
+        return;
+    }
     bool sound_edge = false;
     /* 先过音效快捷键: 它自己维护"按住"状态, 返回值与 sound_edge 一起决定后面要不要
        放过音效行为 (handled 只是提示, 不改变事件流)。 */
