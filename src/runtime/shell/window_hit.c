@@ -74,6 +74,32 @@ bool bongo_cat_window_visible_at_pointer(BongoCatApp *app, float x, float y) {
     return pixel[3] > 8;
 }
 
+/*
+ * 这个点**有没有拿到** alpha 样本。
+ *
+ * Vulkan 路径的命中回读只覆盖指针附近的一小块 (BONGO_CAT_VK_HIT_TILE), 而且回读是异步的:
+ * 指针移动快一点、或者刚启动还没回读过, 查询点就可能落在缓存块之外。这种"没有数据"和
+ * "测到不透明"必须分开 —— 以前两者都按"不透明"处理, 于是窗口会**吃掉**透明像素上的点击
+ * (用户反馈: 开着穿透时点击桌宠附近透明区域没有穿透到后面)。
+ */
+bool bongo_cat_window_hit_sample_known(BongoCatApp *app, float x, float y) {
+    if (!app || !app->window || app->window_snapshot) return true;
+    if (bongo_cat_renderer_active() != BONGO_CAT_RENDERER_VULKAN) {
+        /* GL 路径拿不到缓存时直接 glReadPixels, 永远是"有数据" */
+        return true;
+    }
+    int width, height, pixel_width, pixel_height;
+    if (!SDL_GetWindowSize(app->window, &width, &height) ||
+        !SDL_GetWindowSizeInPixels(app->window, &pixel_width, &pixel_height) ||
+        width <= 0 || height <= 0 || pixel_width <= 0 || pixel_height <= 0)
+        return false;
+    uint8_t alpha = 0;
+    return bongo_cat_vk_hit_alpha(bongo_cat_vk_current(),
+        SDL_clamp((int)(x * pixel_width / width), 0, pixel_width - 1),
+        SDL_clamp((int)(y * pixel_height / height), 0, pixel_height - 1),
+        &alpha);
+}
+
 /* 指针移动时的即时采样。不支持动态命中的平台、强制穿透、悬停隐藏或鼠标按下期间都直接
    返回, 把判定留给 sync_click_through; 采样后清掉 dirty 与 deadline, 表示当前结果就是
    最新的。 */
@@ -219,8 +245,11 @@ void bongo_cat_window_sync_click_through(BongoCatApp *app) {
         float local_x, local_y;
         bool inside = bongo_cat_platform_pointer_local(&app->platform,
             app->pointer_x, app->pointer_y, &local_x, &local_y);
-        app->pointer_transparent = inside && !bongo_cat_window_visible_at_pointer(app,
-            local_x, local_y);
+        /* 没有 alpha 样本 (Vulkan 的小块回读没覆盖到这个点) 时保留上一次结论: 强行当成
+           "不透明"会让窗口吃掉本该穿透的点击。 */
+        if (!inside || bongo_cat_window_hit_sample_known(app, local_x, local_y))
+            app->pointer_transparent = inside &&
+                !bongo_cat_window_visible_at_pointer(app, local_x, local_y);
         app->pointer_hit_dirty = false;
         app->pointer_hit_deadline_ns = 0;
     }

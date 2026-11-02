@@ -178,8 +178,11 @@ bool bongo_cat_vk_render_main(BongoCatApp *app, bool present) {
         bongo_cat_vk_mask_corners(app->vk, width, height,
             SDL_clamp(app->settings.window.corner_radius_percent, 0.0f, 50.0f));
 
-    /* 命中测试: 需要采样时把指针附近的小块 alpha 拷回主机, 下一次绘制前取回 */
-    if (app->pointer_hit_dirty && app->pointer_known) {
+    /* 命中测试: 把指针附近的小块 alpha 拷回主机, 下一次绘制前取回。
+       以前这里带 pointer_hit_dirty 条件, 而 dirty 常常在同一帧的 sync_click_through 里就被
+       清掉了 —— 命中块于是停在旧位置, 之后查询点落在块外被当成"不透明", 透明像素上的点击
+       就穿透不过去 (用户反馈)。现在只要指针已知就每帧刷新, 16KB 的拷贝可以忽略。 */
+    if (app->pointer_known && app->session.window.visible) {
         float local_x = 0.0f, local_y = 0.0f;
         int window_width = 0, window_height = 0, pixel_width = 0, pixel_height = 0;
         if (bongo_cat_platform_pointer_local(&app->platform, app->pointer_x,

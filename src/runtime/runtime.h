@@ -107,6 +107,8 @@ void bongo_cat_window_background_rgba(const BongoCatApp *app, float rgba[4]);
 /* Vulkan 后端的主窗口一帧: 开始 -> 绘制 -> 提交呈现 */
 bool bongo_cat_vk_render_main(BongoCatApp *app, bool present);
 bool bongo_cat_window_visible_at_pointer(BongoCatApp *app, float x, float y);
+/* 上面那个查询有没有真的拿到 alpha 样本 (Vulkan 的小块回读可能没覆盖到该点)。 */
+bool bongo_cat_window_hit_sample_known(BongoCatApp *app, float x, float y);
 void bongo_cat_window_capture_pointer_hit(BongoCatApp *app);
 void bongo_cat_window_mark_hit_dirty(BongoCatApp *app);
 void bongo_cat_window_set_visible(BongoCatApp *app, bool visible);
