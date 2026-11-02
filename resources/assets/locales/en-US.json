@@ -77,6 +77,8 @@
           "hideFadeSeconds": "Fade Duration (s)",
           "maxFPS": "Max Frame Rate",
           "multiKeyDisplay": "Show multiple keys per hand",
+          "hideBubble": "Hide key bubbles",
+          "hideBubbleHint": "Do not show key bubbles for models that have one",
           "multiKeyDisplayHint": "Show every keycap held on the same hand",
           "bubbleMerge": "Merge into one bubble",
           "bubbleMergeHint": "Draw one bubble per hand and join the keys with +",

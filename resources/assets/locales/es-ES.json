@@ -77,6 +77,8 @@
           "hideFadeSeconds": "Duración del fundido (s)",
           "maxFPS": "Frecuencia máxima de fotogramas",
           "multiKeyDisplay": "Mostrar varias teclas por mano",
+          "hideBubble": "Ocultar burbujas de teclas",
+          "hideBubbleHint": "No mostrar burbujas en los modelos que las tienen",
           "multiKeyDisplayHint": "Mostrar todas las teclas mantenidas con la misma mano",
           "bubbleMerge": "Combinar en un solo globo",
           "bubbleMergeHint": "Un globo por mano, uniendo las teclas con +",

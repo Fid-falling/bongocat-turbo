@@ -77,6 +77,8 @@
           "hideFadeSeconds": "Ausblendedauer (s)",
           "maxFPS": "Maximale Bildrate",
           "multiKeyDisplay": "Mehrere Tasten pro Hand anzeigen",
+          "hideBubble": "Tastaturblasen ausblenden",
+          "hideBubbleHint": "Keine Tastaturblasen für Modelle mit Blase anzeigen",
           "multiKeyDisplayHint": "Alle auf derselben Hand gehaltenen Tasten anzeigen",
           "bubbleMerge": "In einer Sprechblase zusammenfassen",
           "bubbleMergeHint": "Nur eine Sprechblase pro Hand, Tasten mit + verbunden",

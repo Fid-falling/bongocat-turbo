@@ -77,6 +77,8 @@
           "hideFadeSeconds": "Duração do fade (s)",
           "maxFPS": "Taxa Máxima de Quadros",
           "multiKeyDisplay": "Mostrar várias teclas por mão",
+          "hideBubble": "Ocultar balões de teclas",
+          "hideBubbleHint": "Não mostrar balões nos modelos que os possuem",
           "multiKeyDisplayHint": "Mostrar todas as teclas mantidas na mesma mão",
           "bubbleMerge": "Mesclar em um balão",
           "bubbleMergeHint": "Um balão por mão, unindo as teclas com +",

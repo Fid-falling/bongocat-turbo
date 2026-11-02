@@ -116,6 +116,10 @@ void bongo_cat_overlay_draw_keys(BongoCatOverlay *value, bool mirror) {
     for (int side = 0; side < 2; ++side) {
         const OverlaySide *hand = &value->sides[side];
         if (hand->count == 0) continue;
+        /* 屏蔽按键气泡: 自带气泡素材的模型整层不画 (它的按键图本身就是"气泡 + 手",
+           画出来必然带气泡)。内置模型没有气泡素材, 不受影响。 */
+        if (value->bubble_hidden && bongo_cat_overlay_side_bubble(value, side))
+            continue;
         if (hand->count > 1 && bongo_cat_overlay_side_bubble(value, side)) {
             /* 临时诊断 (定位完删除): 只在分支结果变化时记一行 */
             static int logged[2] = {-1, -1};

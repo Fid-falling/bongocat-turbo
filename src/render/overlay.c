@@ -177,6 +177,14 @@ void bongo_cat_overlay_set_key_display(BongoCatOverlay *value, bool multi,
  * 画法画的, 不重拼就会一直是旧样子。这里只是把 dirty 立起来, 真正的重拼在绘制时做
  * (见 overlay_bubble.c 的 refresh_bubble, 那里也要解码整图, 不能每帧干)。
  */
+void bongo_cat_overlay_set_bubble_hidden(BongoCatOverlay *value, bool hidden) {
+    if (!value || value->bubble_hidden == hidden) return;
+    value->bubble_hidden = hidden;
+    /* 合成图是按"可见"算的: 恢复显示时要重算一次。 */
+    value->bubble_dirty[0] = true;
+    value->bubble_dirty[1] = true;
+}
+
 void bongo_cat_overlay_set_bubble_merge(BongoCatOverlay *value, bool merge) {
     if (!value || value->bubble_merge == merge) return;
     value->bubble_merge = merge;

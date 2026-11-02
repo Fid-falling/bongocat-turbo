@@ -91,6 +91,7 @@ static bool read_model(yyjson_val *object, BongoCatModelPreferences *value,
         !read_int(object, "multiKeyDisplay", &value->multi_key_display, error) ||
         !read_int(object, "multiKeyLimit", &value->multi_key_limit, error) ||
         !read_int(object, "bubbleMerge", &value->bubble_merge, error) ||
+        !read_int(object, "hideBubble", &value->bubble_hidden, error) ||
         /* 可选读: 老配置缺这个键时保持默认 0 (标准图集上限) */
         !read_int(object, "textureQuality", &value->texture_quality, error))
         return false;

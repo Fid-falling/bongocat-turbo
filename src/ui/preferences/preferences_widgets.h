@@ -20,6 +20,9 @@ void bongo_cat_pref_row_icon(struct nk_context *context,
     BongoCatPrefIcon icon);
 bool bongo_cat_pref_toggle(struct nk_context *context, const char *id,
     const char *title, const char *description, bool *value);
+/* 同上, 但 enabled=false 时只渲染不响应输入 (用于"被别的选项互斥掉"的行)。 */
+bool bongo_cat_pref_toggle_enabled(struct nk_context *context, const char *id,
+    const char *title, const char *description, bool *value, bool enabled);
 bool bongo_cat_pref_toggle_float(struct nk_context *context, const char *id,
     const char *title, bool *enabled, float minimum, float *value,
     float maximum, float step, float default_value);

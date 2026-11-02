@@ -77,6 +77,8 @@
           "hideFadeSeconds": "フェード時間 (秒)",
           "maxFPS": "最大フレームレート",
           "multiKeyDisplay": "同じ手の複数キーを表示",
+          "hideBubble": "キーバブルを隠す",
+          "hideBubbleHint": "バブル付きのモデルではキーバブルを表示しません",
           "multiKeyDisplayHint": "同じ手で押しているキーキャップをすべて表示します",
           "bubbleMerge": "1つの吹き出しにまとめる",
           "bubbleMergeHint": "同じ手の複数キーを1つの吹き出しに + で連結して表示",

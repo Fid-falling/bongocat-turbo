@@ -261,14 +261,23 @@ void bongo_cat_preferences_options_end(BongoCatPreferences *value,
     nk_layout_row_dynamic(context, 6, 1);
     nk_spacing(context, 1);
 }
-bool bongo_cat_pref_toggle(struct nk_context *context, const char *id,
-    const char *title, const char *detail, bool *value) {
+bool bongo_cat_pref_toggle_enabled(struct nk_context *context, const char *id,
+    const char *title, const char *detail, bool *value, bool enabled) {
     int lines = bongo_cat_pref_detail_lines(context, detail); FormStyle saved;
     if (!form_begin(context, id, lines, &saved)) return false;
     bongo_cat_pref_form_title_sized(context, title, 80.0f);
-    bool changed = bongo_cat_pref_control_toggle(context, id, value);
+    struct nk_rect cell;
+    bool changed = false;
+    if (nk_widget(&cell, context) != NK_WIDGET_INVALID)
+        changed = bongo_cat_pref_control_toggle_rect(context, id, value, cell,
+            enabled);
     nk_layout_row_end(context); bongo_cat_pref_description(context, detail, lines);
     form_end(context, &saved); return changed;
+}
+
+bool bongo_cat_pref_toggle(struct nk_context *context, const char *id,
+    const char *title, const char *detail, bool *value) {
+    return bongo_cat_pref_toggle_enabled(context, id, title, detail, value, true);
 }
 bool bongo_cat_pref_obs_background(struct nk_context *context, const char *id,
     const char *title, const char *question, const char *reply, bool *enabled,

@@ -16,6 +16,8 @@ bool bongo_cat_overlay_effect(BongoCatOverlay *overlay, const char *path);
 void bongo_cat_overlay_set_key_display(BongoCatOverlay *overlay, bool multi,
     int limit);
 void bongo_cat_overlay_set_bubble_merge(BongoCatOverlay *overlay, bool merge);
+/* 屏蔽按键气泡: 自带气泡素材的模型不再画按键气泡 (内置模型本来没有气泡, 不受影响)。 */
+void bongo_cat_overlay_set_bubble_hidden(BongoCatOverlay *overlay, bool hidden);
 bool bongo_cat_overlay_hand_active(const BongoCatOverlay *overlay, bool right);
 bool bongo_cat_overlay_mver_pointer_enabled(const BongoCatOverlay *overlay);
 bool bongo_cat_overlay_mver_pointer_left_handed(const BongoCatOverlay *overlay);

@@ -104,6 +104,8 @@ struct BongoCatOverlay {
     /* 1 = 同侧多键合并成一个气泡 ("A + S"), 0 = 每个键各占一个气泡并排。来自设置
        (bongo_cat_overlay_set_bubble_merge 写入), 只对有气泡素材的模型有效。 */
     bool bubble_merge;
+    /* 屏蔽按键气泡 (设置页 model.bubbleHidden): 自带气泡素材的模型不再画"气泡 + 手"那一层。 */
+    bool bubble_hidden;
     /*
      * 每侧"模型自带按键气泡素材"的 uv 矩形 (x0,y0,x1,y1 归一化; x1<=x0 = 没有气泡素材)。
      * BongoCat-X 的模型按键图是"气泡 + 手"的整图, 气泡在各键图上画在同一位置、只有里面的

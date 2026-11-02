@@ -143,6 +143,13 @@ typedef struct BongoCatModelPreferences {
      */
     int bubble_merge;
     /*
+     * 1 = 屏蔽按键气泡: 自带气泡素材的模型不再画"气泡 + 手"那层按键图 (内置模型本来就没有
+     * 气泡, 不受影响)。它让"多键显示 / 合并气泡"两个选项失去意义, 所以设置页里三者互斥:
+     * 打开这一项会把那两个关掉并把它们置灰。
+     * 同样用 int + 可选读: 老配置里缺这个键时保持默认 0。
+     */
+    int bubble_hidden;
+    /*
      * 渲染精度: 以 N 倍分辨率渲染后再线性缩回窗口尺寸 (见 BONGO_CAT_RENDER_SCALE_*)。
      * 用 float + 可选读 read_float: 老配置里没有 renderScale 这个键时保持默认 1.0,
      * 不会因为"键不存在"判定配置损坏。校验时 clamp 到 [0.1, 4.0] 并按 0.1 取整,

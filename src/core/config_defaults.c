@@ -338,6 +338,7 @@ void bongo_cat_settings_defaults(BongoCatSettings *config) {
     config->model.multi_key_limit = BONGO_CAT_MULTI_KEY_LIMIT_DEFAULT;
     /* 默认合并: 一个气泡里 "A + S" 比并排 N 个气泡更接近"用户按了什么"的直觉读法 */
     config->model.bubble_merge = 1;
+    config->model.bubble_hidden = 0;
     /* 渲染精度默认 1.0 = 按窗口尺寸直接渲染, 与 1.17.0 逐像素一致: 更高的默认值等于
        替用户付显卡/显存的代价, 只有用户自己要求时才该升级。 */
     config->model.render_scale = BONGO_CAT_RENDER_SCALE_DEFAULT;
@@ -411,6 +412,7 @@ void bongo_cat_settings_validate(BongoCatSettings *config) {
         config->model.renderer = BONGO_CAT_RENDERER_OPENGL;
     config->model.multi_key_display = config->model.multi_key_display != 0;
     config->model.bubble_merge = config->model.bubble_merge != 0;
+    config->model.bubble_hidden = config->model.bubble_hidden != 0;
     if (config->model.multi_key_limit < 1 ||
         config->model.multi_key_limit > BONGO_CAT_MULTI_KEY_LIMIT_MAX)
         config->model.multi_key_limit = BONGO_CAT_MULTI_KEY_LIMIT_DEFAULT;

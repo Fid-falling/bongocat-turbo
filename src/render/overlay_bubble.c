@@ -377,6 +377,7 @@ bool bongo_cat_overlay_refresh_bubble(BongoCatOverlay *value, int side) {
     int reason = 0;
     if (limit < 2) reason = 1;
     else if (count < 2) reason = 2;
+    else if (value->bubble_hidden) reason = 6;
     else if (!bongo_cat_overlay_side_bubble(value, side)) reason = 3;
     else if (!value->bubble_dirty[side]) reason = 4;
     if (reason != 0) {

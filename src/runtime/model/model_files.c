@@ -229,6 +229,8 @@ bool bongo_cat_app_commit_model_switch(BongoCatApp *app,
         app->settings.model.multi_key_limit);
     bongo_cat_overlay_set_bubble_merge(app->overlay,
         app->settings.model.bubble_merge != 0);
+    bongo_cat_overlay_set_bubble_hidden(app->overlay,
+        app->settings.model.bubble_hidden != 0);
     snprintf(app->loaded_model, sizeof(app->loaded_model), "%s", entry->id);
     /*
      * 切换完成即作废 Vulkan 里上一模型残留的整帧回读, 让封面捕获的 take 只能等到
