@@ -38,7 +38,15 @@ typedef struct WindowsPointerDetection {
     DWORD pid;
     bool initialized, relative;
     WindowsPointerReason reason;
+    /* 防抖: 光标"隐藏/显示"在某些游戏里会逐帧来回翻 (日志实测 30ms 内 hidden -> shown ->
+       hidden), 直接跟着切会把模型位置反复重置, 表现就是抖动。这里要求新状态持续
+       BONGO_CAT_POINTER_SWITCH_MS 才真正切换。 */
+    bool pending;
+    ULONGLONG pending_ms;
 } WindowsPointerDetection;
+
+/* 切换相对/绝对模式前, 新状态需要持续多久 (毫秒)。 */
+#define BONGO_CAT_POINTER_SWITCH_MS 120
 
 /* 判定"这个裁剪矩形是不是小到等于锁定"(1x1 / 2x2 的裁剪是游戏惯用手法)。单独导出
    是为了能脱离探测流程直接测试这条判据。 */
@@ -48,6 +56,6 @@ const char *bongo_cat_windows_pointer_reason_name(WindowsPointerReason reason);
 /* 给出结论: true = 用相对位移累加, false = 用绝对坐标。
    前台属于本进程、或光标状态不可知时一律 false (不猜)。 */
 bool bongo_cat_windows_pointer_detect(WindowsPointerDetection *state,
-    const WindowsPointerObservation *sample);
+    const WindowsPointerObservation *sample, ULONGLONG now_ms);
 #endif
 #endif

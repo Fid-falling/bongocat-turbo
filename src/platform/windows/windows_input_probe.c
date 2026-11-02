@@ -41,7 +41,7 @@ bool bongo_cat_windows_input_pointer_locked(BongoCatPlatform *platform) {
     sample.foreign = sample.pid && sample.pid != GetCurrentProcessId();
     if (sample.foreign) observe_cursor(&sample);
     bool locked = bongo_cat_windows_pointer_detect(&state->pointer_detection,
-        &sample);
+        &sample, now_ms);
     /* 只在判定变化时记一行: 每帧打日志会把日志淹掉, 而"游戏里鼠标被锁住"这类反馈
        只有这一行能定位。 */
     if ((int)locked != state->pointer_logged_locked ||
