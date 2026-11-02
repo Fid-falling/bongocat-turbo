@@ -258,9 +258,19 @@ bool bongo_cat_windows_borderless_preserve_screen(HWND window, bool enabled) {
         SetPropW(window, preserve_screen_property, (HANDLE)1);
 }
 
-/* 设置穿透强度。两种表示要同时维护: 窗口属性(给 WM_NCHITTEST 用, 立即生效)和
-   WS_EX_TRANSPARENT(给系统与 DWM 用)。只有 forced 才加扩展样式 —— "透明处穿透"
-   若也加了, 整窗都不再接收鼠标, 就没法按像素判断了。 */
+/* 我们为了让整窗穿透而**额外加上**的 WS_EX_LAYERED 标记: 关掉穿透时只撤掉自己加的那一层,
+   不动呈现路径本来就需要的分层。 */
+static const wchar_t forced_layered_property[] = L"BongoCat.ForcedLayered";
+
+/* 设置穿透强度。三种表示要同时维护:
+     - 窗口属性: 给 WM_NCHITTEST 用, 立即生效;
+     - WS_EX_TRANSPARENT: 给系统与 DWM 用;
+     - WS_EX_LAYERED: 实测(Windows 11 + DWM)只有 WS_EX_TRANSPARENT 时**点击仍然被窗口吃掉**,
+       加上分层样式后同样的一次点击才会落到后面的窗口上。所以整窗穿透时两层样式都要有 ——
+       以前只在呈现路径本来就分层(透明背景+GL 代理)时才有, 于是“非分层窗口 + 穿透”下点击
+       被吃掉, 表现为"开着鼠标穿透, 点猫背后的桌面图标没反应"。
+   逐像素穿透 (forced=false 且 pointer_transparent=true) 只设属性, 不碰样式 —— 否则整窗都
+   不接收鼠标, 就没法按像素判断了。 */
 void bongo_cat_windows_borderless_set_click_through(HWND window,
     bool forced, bool pointer_transparent) {
     if (!window) return;
@@ -269,9 +279,22 @@ void bongo_cat_windows_borderless_set_click_through(HWND window,
     if (mode) SetPropW(window, click_through_property, (HANDLE)mode);
     else RemovePropW(window, click_through_property);
     LONG_PTR style = GetWindowLongPtrW(window, GWL_EXSTYLE);
-    LONG_PTR next = forced ? style | WS_EX_TRANSPARENT :
-        style & ~WS_EX_TRANSPARENT;
+    LONG_PTR next = style & ~WS_EX_TRANSPARENT;
+    bool layered_added = false;
+    if (forced) {
+        next |= WS_EX_TRANSPARENT;
+        if (!(style & WS_EX_LAYERED)) {
+            next |= WS_EX_LAYERED;
+            layered_added = true;
+            SetPropW(window, forced_layered_property, (HANDLE)1);
+        }
+    } else if (GetPropW(window, forced_layered_property)) {
+        next &= ~WS_EX_LAYERED;
+        RemovePropW(window, forced_layered_property);
+    }
     /* The hit-test property is immediate; a frame refresh flickers OpenGL windows. */
     if (next != style) SetWindowLongPtrW(window, GWL_EXSTYLE, next);
+    /* 刚加上分层的窗口必须给一个 alpha, 否则它会被当成全透明/直接不显示。 */
+    if (layered_added) SetLayeredWindowAttributes(window, 0, 255, LWA_ALPHA);
 }
 #endif
