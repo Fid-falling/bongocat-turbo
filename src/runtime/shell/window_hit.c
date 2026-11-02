@@ -257,13 +257,18 @@ void bongo_cat_window_sync_click_through(BongoCatApp *app) {
     bool pointer_transparent = !forced && app->pointer_known && app->pointer_transparent;
     bool forced_changed = !app->click_through_valid ||
         app->click_through_forced_applied != forced;
-    /* forced (整窗穿透) 每帧都重新下发: 平台侧只是 GetWindowLongPtr 比较样式, 成本可以
-       忽略, 但它能**自愈** —— 任何一次窗口样式重设 (borderless_install、主题/可见性变化、
-       代理窗口重建) 之后都会在下一帧补回来。以前靠"记录里已经应用过"的缓存跳过下发, 一旦
-       某次应用发生在窗口还没准备好时, 穿透就永久失效 (用户反馈: 开着穿透, 点窗口内
-       非模型的位置却打不穿, 只有悬停隐藏之后才透)。 */
-    if (!forced && app->click_through_valid && !forced_changed &&
-        app->click_through_applied == pointer_transparent) return;
+    /*
+     * 每帧都重新下发穿透状态, 不做"已经应用过就跳过"的缓存。
+     *
+     * 平台侧的代价只是一个 SetPropW 加一次 GetWindowLongPtr 比较 (样式一致时不会调用
+     * SetWindowLongPtr), 可以忽略; 换来的是**自愈**: 任何一次窗口样式重设 (无边框重建、
+     * 主题/DPI 变化、代理窗口重建、可见性切换) 之后, 下一帧就会按当前设置补回来。
+     *
+     * 以前这里有缓存: `valid && !forced_changed && applied == pointer_transparent` 就直接
+     * return。一旦某次下发发生在窗口还没准备好、或者样式随后被重设掉, 记录里却已经是
+     * "已应用", 穿透就永久失效 —— 用户反馈的"开着鼠标穿透, 点窗口内非模型的位置却打不穿,
+     * 只有把鼠标移到猫身上触发隐藏之后才透"正是这一条。
+     */
     bongo_cat_platform_set_click_through(&app->platform, forced, pointer_transparent);
     /* 状态变化时记一行: "开着穿透却点不穿"这类反馈只能靠它对上号 (整窗穿透 / 逐像素 /
        都没开)。每帧都变才打, 平时不吵。 */
