@@ -7,6 +7,7 @@
  * "可点击", 否则桌宠会变成点不到。
  */
 #include "runtime.h"
+#include "bongo_cat/log.h"
 #include "bongo_cat/image.h"
 #include "bongo_cat/preferences.h"
 #include "bongo_cat/render.h"
@@ -256,9 +257,21 @@ void bongo_cat_window_sync_click_through(BongoCatApp *app) {
     bool pointer_transparent = !forced && app->pointer_known && app->pointer_transparent;
     bool forced_changed = !app->click_through_valid ||
         app->click_through_forced_applied != forced;
-    if (app->click_through_valid && !forced_changed &&
+    /* forced (整窗穿透) 每帧都重新下发: 平台侧只是 GetWindowLongPtr 比较样式, 成本可以
+       忽略, 但它能**自愈** —— 任何一次窗口样式重设 (borderless_install、主题/可见性变化、
+       代理窗口重建) 之后都会在下一帧补回来。以前靠"记录里已经应用过"的缓存跳过下发, 一旦
+       某次应用发生在窗口还没准备好时, 穿透就永久失效 (用户反馈: 开着穿透, 点窗口内
+       非模型的位置却打不穿, 只有悬停隐藏之后才透)。 */
+    if (!forced && app->click_through_valid && !forced_changed &&
         app->click_through_applied == pointer_transparent) return;
     bongo_cat_platform_set_click_through(&app->platform, forced, pointer_transparent);
+    /* 状态变化时记一行: "开着穿透却点不穿"这类反馈只能靠它对上号 (整窗穿透 / 逐像素 /
+       都没开)。每帧都变才打, 平时不吵。 */
+    if (forced_changed ||
+        app->click_through_applied != pointer_transparent)
+        SDL_LogInfo(BONGO_CAT_LOG_LIFECYCLE,
+            "[runtime] 点击穿透: 整窗=%d 光标处透明=%d", forced ? 1 : 0,
+            pointer_transparent ? 1 : 0);
     app->click_through_applied = pointer_transparent;
     app->click_through_forced_applied = forced;
     app->click_through_valid = true;
