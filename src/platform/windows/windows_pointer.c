@@ -95,7 +95,14 @@ void bongo_cat_platform_set_click_through(BongoCatPlatform *platform,
     }
     platform->click_through_forced = forced;
     HWND proxy = bongo_cat_windows_layered_proxy(window);
-    bongo_cat_windows_borderless_set_click_through(proxy ? proxy : window, forced,
+    if (forced) {
+        /* 整窗穿透: 真实窗口和代理窗口**都要挂上**, 否则留下那一层看不见但可命中的窗口
+           会把点击吃掉 (代理模式下真实窗口仍然存在)。 */
+        bongo_cat_windows_borderless_set_click_through(window, true, false);
+        if (proxy) bongo_cat_windows_borderless_set_click_through(proxy, true, false);
+        return;
+    }
+    bongo_cat_windows_borderless_set_click_through(proxy ? proxy : window, false,
         pointer_transparent);
 }
 

@@ -234,8 +234,24 @@ void bongo_cat_window_sync_click_through(BongoCatApp *app) {
         app->click_through_valid = false;
     }
     bool forced = app->settings.window.pass_through || app->hover_hidden;
-    if (forced && app->window_snapshot) bongo_cat_window_snapshot_end(app);
-    if (!forced && !bongo_cat_platform_dynamic_hit_supported()) {
+    if (forced) {
+        /*
+         * 整窗穿透 = 只做一件事: 把窗口设成全穿透。**不再做任何逐像素判断** ——
+         * 之前即使在 forced 状态下也可能残留上一次的"光标处透明"结论、或让别的路径把窗口
+         * 属性改回逐像素模式, 于是"开着穿透却打不穿"。这里把命中相关的状态全部清掉并直接
+         * 下发, 语义只有一条: 穿透开着 -> 整个窗口都不接收鼠标。
+         */
+        if (app->window_snapshot) bongo_cat_window_snapshot_end(app);
+        app->pointer_transparent = false;
+        app->pointer_hit_dirty = false;
+        app->pointer_hit_deadline_ns = 0;
+        bongo_cat_platform_set_click_through(&app->platform, true, false);
+        app->click_through_applied = false;
+        app->click_through_forced_applied = true;
+        app->click_through_valid = true;
+        return;
+    }
+    if (!bongo_cat_platform_dynamic_hit_supported()) {
         app->pointer_transparent = false;
         app->pointer_hit_dirty = false;
     }
