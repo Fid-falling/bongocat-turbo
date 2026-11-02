@@ -183,6 +183,9 @@ void bongo_cat_overlay_set_bubble_hidden(BongoCatOverlay *value, bool hidden) {
     /* 合成图是按"可见"算的: 恢复显示时要重算一次。 */
     value->bubble_dirty[0] = true;
     value->bubble_dirty[1] = true;
+    /* 按键贴图也要重挑: 屏蔽时用"挖掉气泡"的那一版, 关掉时用原图。 */
+    bongo_cat_overlay_refresh_keys(value, 0);
+    bongo_cat_overlay_refresh_keys(value, 1);
 }
 
 void bongo_cat_overlay_set_bubble_merge(BongoCatOverlay *value, bool merge) {

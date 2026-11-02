@@ -18,6 +18,9 @@ typedef struct TextureSlot {
     /* LRU 时间戳: 来自下面 value->clock 的逻辑时钟, 值越大越新, 淘汰时挑最小者。
        0 表示这个槽位从没被用过 (也同时是"空槽"的判定依据之一)。 */
     uint64_t used;
+    /* 这张贴图是不是"挖掉气泡"的版本 (屏蔽按键气泡时用): 同一个路径会有两个版本,
+       匹配时必须连它一起比, 否则切换开关会命中错误的缓存。 */
+    bool masked;
 } TextureSlot;
 
 /* 每侧最多同时显示的按键数量, 与设置里的 multi_key_limit 上限是同一个数 */
@@ -195,6 +198,11 @@ bool bongo_cat_overlay_key_path(const BongoCatOverlay *value, int side,
 bool bongo_cat_overlay_refresh_bubble(BongoCatOverlay *value, int side);
 BongoCatTexture *bongo_cat_overlay_cached_texture(BongoCatOverlay *value,
     const char *path);
+/* 同上, 但把 mask (归一化 uv 的 {x0,y0,x1,y1}) 范围内的 alpha 清零: "只屏蔽气泡不屏蔽手"
+   用它 —— 那类模型的按键图是"气泡 + 手"整图, 挖掉气泡矩形即可只留手。mask 传 NULL 等价于
+   上面的普通版本。 */
+BongoCatTexture *bongo_cat_overlay_cached_texture_masked(BongoCatOverlay *value,
+    const char *path, const float mask[4]);
 #endif
 
 #endif

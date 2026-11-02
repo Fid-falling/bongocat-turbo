@@ -83,7 +83,14 @@ void bongo_cat_overlay_refresh_keys(BongoCatOverlay *value, int side) {
             continue;
         if (i == 0) snprintf(side_path, BONGO_CAT_PATH_CAP, "%s", path);
 #ifdef BONGO_CAT_HAS_CUBISM
-        key->texture = bongo_cat_overlay_cached_texture(value, path);
+        /* 屏蔽按键气泡 (只屏蔽气泡、不屏蔽手): 这类模型的按键图是"气泡 + 手"整图, 用按
+           气泡矩形挖掉 alpha 的版本来画, 手照常显示。 */
+        const bool mask_bubble = value->bubble_hidden &&
+            bongo_cat_overlay_side_bubble(value, side);
+        key->texture = mask_bubble
+            ? bongo_cat_overlay_cached_texture_masked(value, path,
+                value->bubble_rect[side])
+            : bongo_cat_overlay_cached_texture(value, path);
 #else
         /* 非 Cubism 构建把左右手合成进一张图, 这里只需要一个"有效"标记 */
         key->texture = (BongoCatTexture *)1;

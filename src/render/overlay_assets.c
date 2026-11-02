@@ -153,14 +153,34 @@ static bool slot_pinned(const BongoCatOverlay *value, const TextureSlot *slot) {
  *  - 槽位全被钉住时返回 NULL: 宁可这一层不画, 也不能回收正在被引用的贴图。
  *  - 加载失败同样清空 path 并刷新 used, 否则坏路径会在每次查询时被反复重试。
  */
-BongoCatTexture *bongo_cat_overlay_cached_texture(BongoCatOverlay *value,
-    const char *path) {
+/* 把 image 里 rect (归一化 uv) 范围内的像素 alpha 清零 —— "只屏蔽气泡不屏蔽手": 这类
+   模型的按键图是"气泡 + 手"整图, 气泡与手在同一张图上, 只能按探测到的气泡矩形把它挖掉。 */
+static void clear_alpha_in_rect(BongoCatImage *image, const float rect[4]) {
+    if (!image || !rect || image->width <= 0 || image->height <= 0) return;
+    int x0 = (int)(rect[0] * (float)image->width);
+    int y0 = (int)(rect[1] * (float)image->height);
+    int x1 = (int)(rect[2] * (float)image->width) + 1;
+    int y1 = (int)(rect[3] * (float)image->height) + 1;
+    if (x0 < 0) x0 = 0;
+    if (y0 < 0) y0 = 0;
+    if (x1 > image->width) x1 = image->width;
+    if (y1 > image->height) y1 = image->height;
+    for (int y = y0; y < y1; ++y) {
+        unsigned char *row = image->pixels +
+            (size_t)y * (size_t)image->width * 4;
+        for (int x = x0; x < x1; ++x) row[x * 4 + 3] = 0;
+    }
+}
+
+BongoCatTexture *bongo_cat_overlay_cached_texture_masked(BongoCatOverlay *value,
+    const char *path, const float mask[4]) {
     value->clock++;
     TextureSlot *oldest = NULL;
+    const bool want_mask = mask != NULL;
     for (size_t i = 0; i < BONGO_CAT_OVERLAY_CACHE_CAP; ++i) {
         TextureSlot *slot = &value->cache[i];
         if (bongo_cat_texture_ready(&slot->texture) &&
-            strcmp(slot->path, path) == 0) {
+            strcmp(slot->path, path) == 0 && slot->masked == want_mask) {
             slot->used = value->clock;
             return &slot->texture;
         }
@@ -175,14 +195,33 @@ BongoCatTexture *bongo_cat_overlay_cached_texture(BongoCatOverlay *value,
        OpenGL 侧因为当前帧还没提交, 也不会有命令缓冲在用它。 */
     bongo_cat_texture_release(&oldest->texture);
     BongoCatError ignored = {0};
-    if (!bongo_cat_texture_from_file(&oldest->texture, path, &ignored)) {
+    bool loaded;
+    if (want_mask) {
+        BongoCatImage image = {0};
+        loaded = bongo_cat_image_load(path, &image, &ignored) == BONGO_CAT_OK;
+        if (loaded) {
+            clear_alpha_in_rect(&image, mask);
+            loaded = bongo_cat_texture_from_image(&oldest->texture, &image,
+                false, &ignored);
+            bongo_cat_image_free(&image);
+        }
+    } else loaded = bongo_cat_texture_from_file(&oldest->texture, path,
+        &ignored);
+    if (!loaded) {
         oldest->path[0] = '\0';
+        oldest->masked = false;
         oldest->used = value->clock;
         return NULL;
     }
     snprintf(oldest->path, sizeof(oldest->path), "%s", path);
+    oldest->masked = want_mask;
     oldest->used = value->clock;
     return &oldest->texture;
+}
+
+BongoCatTexture *bongo_cat_overlay_cached_texture(BongoCatOverlay *value,
+    const char *path) {
+    return bongo_cat_overlay_cached_texture_masked(value, path, NULL);
 }
 #endif
 

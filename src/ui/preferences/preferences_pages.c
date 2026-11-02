@@ -425,11 +425,8 @@ static void input_section(BongoCatPreferences *value, struct nk_context *context
                 tr(app, "pages.preference.cat.labels.hideBubbleHint",
                     "对自带气泡的模型不显示按键气泡"), &hidden)) {
             model->bubble_hidden = hidden ? 1 : 0;
-            if (hidden) {
-                /* 互斥: 气泡都不画了, 多键显示与合并气泡一并关掉 */
-                model->multi_key_display = 0;
-                model->bubble_merge = 0;
-            }
+            /* 互斥不改数值: 下面两项只是"暂时不生效"(灰色不可点), 用户关掉屏蔽后按原样
+               恢复 —— 所以这里刻意不把它们清零, 否则用户的选择就被吞掉了。 */
             app->dirty = true;
             bongo_cat_overlay_set_bubble_hidden(app->overlay, hidden);
             bongo_cat_overlay_set_key_display(app->overlay,
