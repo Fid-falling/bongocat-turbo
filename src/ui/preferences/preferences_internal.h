@@ -136,6 +136,11 @@ void bongo_cat_preferences_renderer_fallback(BongoCatApp *app,
     struct nk_context *context);
 /* [性能] 区的"纹理质量"下拉 (model.texture_quality)。定义在
    preferences_texture_quality_row.c: 图集上传前的工作尺寸上限, 默认标准档 (2048)。 */
+/* 屏蔽按键气泡 / 同侧多键显示 / 合并为一个气泡 这三行 (互斥逻辑在同一个文件里),
+   见 preferences_bubble_row.c。 */
+void bongo_cat_preferences_bubble_rows(BongoCatApp *app,
+    struct nk_context *context);
+
 void bongo_cat_preferences_texture_quality_row(BongoCatApp *app,
     struct nk_context *context);
 void bongo_cat_preferences_cache_path_browse(BongoCatPreferences *value);

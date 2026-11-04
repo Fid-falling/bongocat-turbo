@@ -294,6 +294,11 @@ BONGOCAT_ENABLE_EVDEV=1 ./build/BongoCatTurbo
 
 
 [linux.do](https://linux.do/t/topic/2845597)
+
+* [BongoCat-X](https://github.com/TianMengLucky/BongoCat-X) —— 同为 BongoCat 的分支。本项目的部分
+  行为语义（多键超出显示数量时仍保持按住、默认以管理员身份运行）以及对其“气泡 + 手”模型格式的
+  兼容，参考了这个项目；仅参考设计与行为，未复制其代码。BongoCat-X 与本项目同为 AGPL-3.0-only。
+
 ---
 
 <div align="center">

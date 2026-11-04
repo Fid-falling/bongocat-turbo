@@ -413,66 +413,8 @@ static void input_section(BongoCatPreferences *value, struct nk_context *context
         app->pointer_known = false;
         app->dirty = true;
     }
-    {
-        /*
-         * 屏蔽按键气泡 (只对自带气泡素材的模型有效)。它与下面"多键显示 / 合并气泡"互斥:
-         * 气泡不画了, 那两个选项也就没有意义 —— 打开它时把两者关掉, 并把那一行置灰。
-         */
-        bool hidden = model->bubble_hidden != 0;
-        bongo_cat_pref_row_icon(context, BONGO_CAT_PREF_ICON_MULTIPLE_MODELS);
-        if (bongo_cat_pref_toggle(context, "hide-bubble", tr(app,
-                "pages.preference.cat.labels.hideBubble", "Hide key bubbles"),
-                tr(app, "pages.preference.cat.labels.hideBubbleHint",
-                    "对自带气泡的模型不显示按键气泡"), &hidden)) {
-            model->bubble_hidden = hidden ? 1 : 0;
-            /* 互斥不改数值: 下面两项只是"暂时不生效"(灰色不可点), 用户关掉屏蔽后按原样
-               恢复 —— 所以这里刻意不把它们清零, 否则用户的选择就被吞掉了。 */
-            app->dirty = true;
-            bongo_cat_overlay_set_bubble_hidden(app->overlay, hidden);
-            bongo_cat_overlay_set_key_display(app->overlay,
-                model->multi_key_display != 0, model->multi_key_limit);
-            bongo_cat_overlay_set_bubble_merge(app->overlay,
-                model->bubble_merge != 0);
-        }
-        /* 互斥的另一半: 屏蔽气泡期间下面两行只渲染、不响应输入 */
-        const bool bubble_options_enabled = model->bubble_hidden == 0;
-        /*
-         * 多键显示: 同一侧同时按住的键全部画出来 (一只手 + N 个高亮键帽), 而不是只留
-         * 最后按下的那一个。关掉即退回旧行为 —— 每侧只画最早按下的键。
-         */
-        bool multi = model->multi_key_display != 0;
-        bongo_cat_pref_row_icon(context, BONGO_CAT_PREF_ICON_MULTIPLE_MODELS);
-        if (bongo_cat_pref_toggle_enabled(context, "multi-key-display", tr(app,
-                "pages.preference.cat.labels.multiKeyDisplay",
-                "Show multiple keys per hand"),
-                tr(app, "pages.preference.cat.labels.multiKeyDisplayHint",
-                    "同侧多键时显示所有按下的键帽"), &multi,
-                bubble_options_enabled)) {
-            model->multi_key_display = multi ? 1 : 0;
-            app->dirty = true;
-            bongo_cat_overlay_set_key_display(app->overlay, multi,
-                model->multi_key_limit);
-        }
-        /*
-         * 多键显示的画法: 合并成一个气泡 (里面用 "+" 连起键名) 还是每个键各占一个气泡。
-         * 关掉多键显示时这一行没有意义, 不画 —— 只对自带气泡素材的模型有区别, 内置模型
-         * 两种取值下都是"一只手 + N 块彩色键帽", 但选项本身仍然可调。
-         */
-        if (multi) {
-            bool merge = model->bubble_merge != 0;
-            bongo_cat_pref_row_icon(context, BONGO_CAT_PREF_ICON_MULTIPLE_MODELS);
-            if (bongo_cat_pref_toggle_enabled(context, "bubble-merge", tr(app,
-                    "pages.preference.cat.labels.bubbleMerge",
-                    "Merge into one bubble"),
-                    tr(app, "pages.preference.cat.labels.bubbleMergeHint",
-                        "同侧多键只画一个气泡, 用 + 连接键名"), &merge,
-                    bubble_options_enabled)) {
-                model->bubble_merge = merge ? 1 : 0;
-                app->dirty = true;
-                bongo_cat_overlay_set_bubble_merge(app->overlay, merge);
-            }
-        }
-    }
+    /* 按键气泡三行 (屏蔽 / 多键 / 合并) 互相约束, 整块在 preferences_bubble_row.c */
+    bongo_cat_preferences_bubble_rows(app, context);
     bongo_cat_preferences_options_end(value, context);
     }
 }

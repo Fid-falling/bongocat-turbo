@@ -227,7 +227,6 @@ static void compact_removed_models(BongoCatSettings *config) {
         sizeof(config->removed_models[0]));
     config->removed_model_count = output_count;
 }
-
 static void compact_hidden_models(BongoCatSettings *config) {
     size_t input_count = config->hidden_model_count;
     if (input_count > BONGO_CAT_MODEL_CAP) input_count = BONGO_CAT_MODEL_CAP;
@@ -336,7 +335,7 @@ void bongo_cat_settings_defaults(BongoCatSettings *config) {
        看不到自己按了什么。关掉它才需要理由, 所以默认值是 1。 */
     config->model.multi_key_display = 1;
     config->model.multi_key_limit = BONGO_CAT_MULTI_KEY_LIMIT_DEFAULT;
-    /* 默认合并: 一个气泡里 "A + S" 比并排 N 个气泡更接近"用户按了什么"的直觉读法 */
+    /* 默认合并: "A + S" 比并排 N 个气泡更接近"用户按了什么"的直觉读法 */
     config->model.bubble_merge = 1;
     config->model.bubble_hidden = 0;
     /* 渲染精度默认 1.0 = 按窗口尺寸直接渲染, 与 1.17.0 逐像素一致: 更高的默认值等于
@@ -387,8 +386,8 @@ void bongo_cat_settings_defaults(BongoCatSettings *config) {
 }
 
 /*
- * 幂等的收口函数: 读配置、改配置、写配置之前都会被调用。它只做钳制与整理,
- * 不改变语义, 所以调用多少次结果都一样, 调用方不需要判断"是否已经校验过"。
+ * 幂等的收口函数: 读配置、改配置、写配置之前都会被调用。只做钳制与整理, 不改变语义,
+ * 所以调用多少次结果都一样, 调用方不需要判断"是否已经校验过"。
  * 末尾再跑一次 compact_behavior_overrides, 是因为 validate_shortcuts 可能
  * 刚把某些 shortcut 清空, 清空之后又会多出空条目。
  */

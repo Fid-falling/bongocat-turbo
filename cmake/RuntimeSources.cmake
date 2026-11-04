@@ -357,6 +357,8 @@ set(BONGO_CAT_UI_PREFERENCES_SOURCES
   # [应用] 区与 macOS 输入监控区 (从 preferences_pages.c 拆出, 见行数策略)
   src/ui/preferences/preferences_general_page.c
   src/ui/preferences/preferences_pages.c
+  # 按键气泡三行 (屏蔽 / 多键 / 合并, 互相约束; 从 preferences_pages.c 拆出, 见行数策略)
+  src/ui/preferences/preferences_bubble_row.c
   # 模型页的"随机"标签页: 三个随机分区 + 顺序轮换 (从 preferences_pages.c 拆出, 见行数策略)
   src/ui/preferences/preferences_random_page.c
   # 互动页的 [音效] 区: 总音量 / 全部静音 / 当前模型逐条开关

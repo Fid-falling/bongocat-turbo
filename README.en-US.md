@@ -414,6 +414,12 @@ Pick a backend in Settings (`renderer`), or force it with the same key in
 
 
 [linux.do](https://linux.do/t/topic/2845597)
+
+* [BongoCat-X](https://github.com/TianMengLucky/BongoCat-X) — a fellow fork of BongoCat. Some of
+  our behaviour (keeping extra keys held, running as administrator by default) and our support
+  for its "bubble + hand" model format were informed by it; design and behaviour only, no code
+  copied. BongoCat-X is licensed AGPL-3.0-only, same as this project.
+
 ---
 
 <div align="center">
