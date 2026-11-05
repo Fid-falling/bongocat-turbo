@@ -19,6 +19,15 @@
 #include <stdlib.h>
 #include <string.h>
 
+/* 还在跑的采集线程数。停用的是 detach, 所以"停了"不等于"线程退出了"; 想重建
+   (切换 CPU/GPU 后端、换摄像头) 必须等它归零 —— 否则新旧两个线程会同时 feed 同一个
+   组件实例 (组件内部是 DLL 级全局单例), 表现为"一开 GPU 推理就崩"。 */
+static atomic_int g_active_threads = 0;
+
+int bongo_cat_face_capture_active_threads(void) {
+    return atomic_load(&g_active_threads);
+}
+
 struct BongoCatFaceCapture {
     /* 组件 (可选): 句柄与符号 */
     SDL_SharedObject *module;
@@ -102,6 +111,7 @@ static bool capture_from_video(BongoCatFaceCapture *capture, const char *path,
 
 static int capture_thread(void *userdata) {
     BongoCatFaceCapture *capture = userdata;
+    atomic_fetch_add(&g_active_threads, 1);
     /* 测试视频源优先: 有它就完全不碰摄像头 */
     {
         const char *video = SDL_getenv("BONGO_CAT_FACE_VIDEO");
@@ -110,7 +120,12 @@ static int capture_thread(void *userdata) {
             const char *h = SDL_getenv("BONGO_CAT_FACE_VIDEO_H");
             const int vw = w && w[0] ? atoi(w) : 640;
             const int vh = h && h[0] ? atoi(h) : 480;
-            if (capture_from_video(capture, video, vw, vh)) return 0;
+            if (capture_from_video(capture, video, vw, vh)) {
+                /* capture_from_video 里已经回收过 capture (orphan 时), 这里只还计数 ——
+                   少这一次减会让"活跃线程数"永远不归零, 之后所有重建都被挡住。 */
+                atomic_fetch_sub(&g_active_threads, 1);
+                return 0;
+            }
         }
     }
     /* 摄像头是独立的 SDL 子系统: 主程序只初始化了 VIDEO/EVENTS, 这里不显式初始化的话
@@ -195,6 +210,7 @@ static int capture_thread(void *userdata) {
         SDL_UnlockMutex(capture->lock);
     }
     SDL_CloseCamera(camera);
+    atomic_fetch_sub(&g_active_threads, 1);
     atomic_store(&capture->camera_open, false);
     atomic_store(&capture->running, false);
     SDL_LogInfo(BONGO_CAT_LOG_LIFECYCLE, "[face] 摄像头已关闭");

@@ -58,6 +58,9 @@ bool bongo_cat_face_capture_sync(BongoCatApp *app) {
         return true;
     }
     if (app->face_capture) return true;   // 已经开着
+    /* 上一个采集线程还没退出 (stop 是 detach): 现在重建会变成两个线程同时 feed 同一个
+       组件实例, 直接崩。等下一帧再试 —— 调用方 (设置页/主循环) 每帧都会来一次。 */
+    if (bongo_cat_face_capture_active_threads() > 0) return false;
 
     char root[BONGO_CAT_PATH_CAP] = {0};
     if (!bongo_cat_face_capture_root(app, root, sizeof(root))) {

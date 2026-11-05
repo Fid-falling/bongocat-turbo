@@ -245,8 +245,10 @@ void bongo_cat_preferences_face_content(BongoCatApp *app,
                 &use_gpu)) {
             model->face_capture_gpu = use_gpu ? 1 : 0;
             app->dirty = true;
+            /* 换后端必须重开会话 (set_backend 只在 open 之前生效)。这里只停、置空,
+               由主循环等旧线程退出后重建 —— 立刻重建会和还在跑的线程抢同一个组件实例。 */
             bongo_cat_face_capture_stop(app->face_capture);
-            bongo_cat_face_capture_sync(app);
+            app->face_capture = NULL;
         }
     }
 
@@ -283,9 +285,9 @@ void bongo_cat_preferences_face_content(BongoCatApp *app,
             if (picked != selected) {
                 model->face_capture_camera = picked == 0 ? 0 : (int)ids[picked - 1];
                 app->dirty = true;
-                /* 设备换了: 关掉再开, 让采集线程用新 id 重连 */
+                /* 设备换了: 同样交给主循环重建 */
                 bongo_cat_face_capture_stop(app->face_capture);
-                bongo_cat_face_capture_sync(app);
+                app->face_capture = NULL;
             }
         }
     }
