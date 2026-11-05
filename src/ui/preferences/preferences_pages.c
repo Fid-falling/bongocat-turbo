@@ -176,6 +176,28 @@ static void window_style_section(BongoCatPreferences *value,
         BONGO_CAT_DEFAULT_WINDOW_OPACITY_PERCENT);
     if (old_opacity != window_state->opacity_percent)
         bongo_cat_window_cancel_wheel_animation(app);
+    /*
+     * 旋转角度 + 一键复位。角度本身由 Alt+滚轮 调 (见 window_wheel.c), 这里只显示当前值;
+     * 复位走"取消手势动画 + 角度归零 + 让窗口按新角度重新贴合"三步, 否则残留的
+     * wheel_rotation_target 会把角度又拉回去。
+     */
+    char rotation_status[96];
+    snprintf(rotation_status, sizeof(rotation_status), "%s %.1f°",
+        tr(app, "pages.preference.cat.labels.rotationCurrent", "当前角度"),
+        (double)window_state->rotation_deg);
+    bongo_cat_pref_row_icon(context, BONGO_CAT_PREF_ICON_WINDOW_SIZE);
+    if (bongo_cat_pref_button(context, "rotation-reset", tr(app,
+        "pages.preference.cat.labels.rotation", "Model Rotation"),
+        rotation_status,
+        tr(app, "pages.preference.cat.labels.rotationReset", "Reset"))) {
+        bongo_cat_window_cancel_wheel_animation(app);
+        window_state->rotation_deg = 0.0f;
+        app->wheel_rotation_target = 0.0f;
+        /* 窗口按 |cos|+|sin|=1 缩回去; 失败(窗口不可用)不是错误, 下一帧还会再对齐 */
+        (void)bongo_cat_window_apply_rotation(app);
+        bongo_cat_window_mark_hit_dirty(app);
+        app->dirty = true;
+    }
     if (old_opacity != window_state->opacity_percent && !app->hover_hidden) {
         bongo_cat_app_cancel_hover_fade(app);
         bongo_cat_platform_set_opacity(&app->platform,
