@@ -149,6 +149,12 @@ void bongo_cat_preferences_face_content(BongoCatApp *app,
             done_mb, total_mb, speed);
     } else if (download.state == BONGO_CAT_FACETRACK_INSTALL_FAILED) {
         snprintf(status, sizeof(status), "%s", download.error);
+    } else if (download.state == BONGO_CAT_FACETRACK_INSTALL_DONE &&
+            download.latest_version[0] && !download.update_available) {
+        snprintf(status, sizeof(status), "%s (%s %s)", face_tr(app,
+            "pages.preference.cat.labels.faceUpToDate", "组件已是最新"),
+            face_tr(app, "pages.preference.cat.labels.faceVersion", "版本"),
+            download.latest_version);
     } else if (!ready) {
         snprintf(status, sizeof(status), "%s", face_tr(app,
             "pages.preference.cat.labels.faceCaptureMissing", "组件未安装或不可用"));
@@ -178,6 +184,42 @@ void bongo_cat_preferences_face_content(BongoCatApp *app,
             /* 与首次下载同一个确认框: 用户同意后再下 */
             if (bongo_cat_face_capture_confirm_download(app))
                 bongo_cat_face_capture_download(app);
+        }
+    }
+
+    /* 手动检查更新: 自动检查每次会话只跑一次, 而且可能因为网络失败; 给用户一个重试入口 */
+    if (ready) {
+        char detail[128];
+        if (download.state == BONGO_CAT_FACETRACK_INSTALL_CHECKING) {
+            snprintf(detail, sizeof(detail), "%s", face_tr(app,
+                "pages.preference.cat.labels.faceChecking", "正在检查…"));
+        } else if (download.state == BONGO_CAT_FACETRACK_INSTALL_FAILED &&
+                download.error[0]) {
+            snprintf(detail, sizeof(detail), "%s", download.error);
+        } else if (download.installed_version[0]) {
+            snprintf(detail, sizeof(detail), "%s v%s", face_tr(app,
+                "pages.preference.cat.labels.faceVersion", "版本"),
+                download.installed_version);
+        } else {
+            detail[0] = 0;
+        }
+        bongo_cat_pref_row_icon(context, BONGO_CAT_PREF_ICON_RENDERER);
+        if (bongo_cat_pref_button(context, "face-page-check-update",
+                face_tr(app, "pages.preference.cat.labels.faceCheckUpdate",
+                    "检查组件更新"), detail,
+                face_tr(app, "pages.preference.cat.labels.faceCheckUpdateAction",
+                    "检查"))) {
+            char root[BONGO_CAT_PATH_CAP] = {0};
+            if (bongo_cat_face_capture_root(app, root, sizeof(root))) {
+                if (app->facetrack_install) {
+                    bongo_cat_facetrack_install_destroy(app->facetrack_install);
+                    app->facetrack_install = NULL;
+                }
+                app->facetrack_install = bongo_cat_facetrack_install_create(root);
+                if (app->facetrack_install)
+                    bongo_cat_facetrack_install_check_start(app->facetrack_install);
+                app->facetrack_checked = true;
+            }
         }
     }
 
