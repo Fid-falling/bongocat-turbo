@@ -125,6 +125,15 @@ bool bongo_cat_app_initialize(BongoCatApp *app, int argc, char **argv,
     bongo_cat_models_init(&app->models);
     if (!bongo_cat_startup_prepare(app, argc, argv, error)) return false;
     bongo_cat_config_store_load(app);
+    /*
+     * 旋转系数在 session 里是"已经生效过"的状态: 上次退出时窗口尺寸就是按当时的
+     * |cos|+|sin| 存下来的。所以启动时要把 rotation_applied_factor 直接设成当前角度对应的
+     * 系数, 而不是留 0(=1) —— 否则每次启动都会把窗口再放大一次, 几次重启后窗口能涨到几千
+     * 像素 (真实踩过: 2713x2713), 模型被 1/k 缩得看不见, 看起来就像"只有气泡在转"。
+     */
+    app->rotation_applied_factor =
+        bongo_cat_window_rotation_factor(app->session.window.rotation_deg);
+    app->wheel_rotation_target = app->session.window.rotation_deg;
     /* The settings cache_path is only known after the config store loads, so
        re-apply it here. A CLI override was already handled during path prep. */
     {
@@ -234,6 +243,13 @@ bool bongo_cat_app_initialize(BongoCatApp *app, int argc, char **argv,
     scan_models(app);
     show_startup_placeholder(app);
     if (!load_selected_model(app, error)) return false;
+    /*
+     * 模型已经就绪: 把启动占位图 (盖在叠加层 effect 通道上的封面) 撤掉, 否则它会一直
+     * 画在模型上面 —— 表现是"宠物不动了/旋转只对气泡生效"(封面是静态图, 实测两帧逐字节
+     * 相同)。这里必须无条件清一次: 占位图只在模型还没就绪时才有意义。
+     */
+    bongo_cat_overlay_effect(app->overlay, NULL);
+    app->dirty = true;
     bongo_cat_startup_stage(app, "model-ready");
     /* --ci-sound-test: 模型已就绪, 用真实播放路径把音效策略走一遍 (无参数时零开销) */
     bongo_cat_sound_self_test(app);
