@@ -45,6 +45,9 @@ typedef struct BongoCatFacetrackInstallSnapshot {
     char latest_version[32];
     char installed_version[32];
     bool update_available;
+    /* true = 这次只是"查版本", 不是下载。两者都会走到 DONE, 页面必须区分:
+       检查完成绝不能当成"组件刚装好"去重建面捕 (那会平白无故把面捕打开, 甚至崩)。 */
+    bool check_mode;
     char error[192];
 } BongoCatFacetrackInstallSnapshot;
 

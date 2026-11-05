@@ -251,8 +251,9 @@ void bongo_cat_preferences_face_content(BongoCatApp *app,
         face_download_bar(context, &download, palette, bar_text);
     }
 
-    /* 下载完成: 立刻装载并打开摄像头 */
-    if (download.state == BONGO_CAT_FACETRACK_INSTALL_DONE) {
+    /* 下载完成: 立刻装载并打开摄像头。**检查完成不算** —— 两者都停在 DONE,
+       但检查模式下把组件当"刚装好"会平白把面捕打开并重建采集线程 (实测会崩)。 */
+    if (download.state == BONGO_CAT_FACETRACK_INSTALL_DONE && !download.check_mode) {
         bongo_cat_facetrack_install_destroy(app->facetrack_install);
         app->facetrack_install = NULL;
         model->face_capture = 1;

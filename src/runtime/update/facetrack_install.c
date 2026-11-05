@@ -433,6 +433,7 @@ static bool start_thread(BongoCatFacetrackInstall *install, bool check_only) {
     memset(&install->snapshot, 0, sizeof(install->snapshot));
     install->snapshot.state = check_only ? BONGO_CAT_FACETRACK_INSTALL_CHECKING
         : BONGO_CAT_FACETRACK_INSTALL_WORKING;
+    install->snapshot.check_mode = check_only;
     SDL_UnlockMutex(install->lock);
     atomic_store(&install->stop, false);
     atomic_store(&install->running, true);
