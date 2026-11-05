@@ -58,8 +58,13 @@ static void update_modifiers(BongoCatInputState *state, const BongoCatInputEvent
             strcmp(event->name, "ShiftRight") == 0 ? 2 : 0;
     }
     if (!mask) {
+        /* Windows 的键名表把 Alt 归一成 "Alt"/"AltGr"(见 windows_keys.c: VK_MENU 靠
+           E0 标志区分左右), 而不是 SDL 的 AltLeft/AltRight —— 两种写法都认, 否则
+           Alt+滚轮 永远读不到按下状态, 手势会退回成普通缩放 (真实踩过)。 */
         value = &state->alt;
-        mask = strcmp(event->name, "AltLeft") == 0 ? 1 :
+        mask = strcmp(event->name, "Alt") == 0 ||
+            strcmp(event->name, "AltLeft") == 0 ? 1 :
+            strcmp(event->name, "AltGr") == 0 ||
             strcmp(event->name, "AltRight") == 0 ? 2 : 0;
     }
     if (!mask) return;
