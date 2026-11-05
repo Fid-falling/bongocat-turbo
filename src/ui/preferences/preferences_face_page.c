@@ -164,6 +164,23 @@ void bongo_cat_preferences_face_content(BongoCatApp *app,
     }
     bongo_cat_pref_status(context, "face-page-status", face_tr(app,
         "pages.preference.cat.labels.faceCaptureStatus", "状态"), status);
+    /* 有新版本: 给一行"更新"按钮, 点了弹确认再下载 */
+    if (download.update_available && download.latest_version[0] &&
+            download.state != BONGO_CAT_FACETRACK_INSTALL_WORKING) {
+        char label[96];
+        snprintf(label, sizeof(label), "%s %s", face_tr(app,
+            "pages.preference.cat.labels.faceUpdateAvailable", "组件有新版本"),
+            download.latest_version);
+        bongo_cat_pref_row_icon(context, BONGO_CAT_PREF_ICON_RENDERER);
+        if (bongo_cat_pref_button(context, "face-page-update", label, "",
+                face_tr(app, "pages.preference.cat.labels.faceUpdateAction",
+                    "Update"))) {
+            /* 与首次下载同一个确认框: 用户同意后再下 */
+            if (bongo_cat_face_capture_confirm_download(app))
+                bongo_cat_face_capture_download(app);
+        }
+    }
+
     /* 底部进度条: 只在"正在下载"和"刚下完"两种状态下出现, 用户要求放在页面下方 */
     if (download.state == BONGO_CAT_FACETRACK_INSTALL_WORKING ||
             download.state == BONGO_CAT_FACETRACK_INSTALL_DONE) {
@@ -201,6 +218,17 @@ void bongo_cat_preferences_face_content(BongoCatApp *app,
         bongo_cat_face_capture_sync(app);
     }
 
+    /* 页面首次打开时查一次组件版本 (后台线程, 不挡界面) */
+    if (ready && !app->facetrack_install && !app->facetrack_checked) {
+        char root[BONGO_CAT_PATH_CAP] = {0};
+        if (bongo_cat_face_capture_root(app, root, sizeof(root))) {
+            app->facetrack_install = bongo_cat_facetrack_install_create(root);
+            if (app->facetrack_install &&
+                    bongo_cat_facetrack_install_check_start(app->facetrack_install))
+                app->facetrack_checked = true;
+        }
+    }
+
     if (!model->face_capture) {
         /* 没开时不显示后面的调节项, 免得用户以为它们在起作用 */
         return;
@@ -215,6 +243,51 @@ void bongo_cat_preferences_face_content(BongoCatApp *app,
         model->face_capture_gain = gain_percent / 100.0f;
         app->dirty = true;
     }
+    /* 摄像头选择: 枚举设备, 第一项是"系统默认"。切换后要重启采集线程。 */
+    {
+        static uint32_t ids[16];
+        static char names[16 * 64];
+        const int count = bongo_cat_face_capture_cameras(ids, names, 64, 16);
+        if (count > 0) {
+            static const char *items[17];
+            static char labels[17][96];
+            items[0] = face_tr(app,
+                "pages.preference.cat.labels.faceCameraDefault", "系统默认");
+            int selected = 0;
+            for (int i = 0; i < count; ++i) {
+                snprintf(labels[i], sizeof(labels[i]), "%s", names + i * 64);
+                items[i + 1] = labels[i];
+                if ((uint32_t)model->face_capture_camera == ids[i]) selected = i + 1;
+            }
+            bongo_cat_pref_row_icon(context, BONGO_CAT_PREF_ICON_MULTIPLE_MODELS);
+            const int picked = bongo_cat_pref_combo(context, "face-page-camera",
+                face_tr(app, "pages.preference.cat.labels.faceCamera",
+                    "Camera"), "", items, count + 1, selected);
+            if (picked != selected) {
+                model->face_capture_camera = picked == 0 ? 0 : (int)ids[picked - 1];
+                app->dirty = true;
+                /* 设备换了: 关掉再开, 让采集线程用新 id 重连 */
+                bongo_cat_face_capture_stop(app->face_capture);
+                bongo_cat_face_capture_sync(app);
+            }
+        }
+    }
+
+    /* 中心校准 (等同 VTS 的"重新校准中心"): 组件 v1.1.0 起才有 */
+    if (app->face_capture && bongo_cat_face_capture_has_recalibrate(app->face_capture)) {
+        bongo_cat_pref_row_icon(context, BONGO_CAT_PREF_ICON_MOUSE_CENTERED);
+        if (bongo_cat_pref_button(context, "face-page-recalibrate", face_tr(app,
+                "pages.preference.cat.labels.faceRecalibrate", "Center Calibration"),
+                face_tr(app, "pages.preference.cat.labels.faceRecalibrateHint",
+                    "正对摄像头后点击，重新采样中性表情"), face_tr(app,
+                "pages.preference.cat.labels.faceRecalibrateAction", "Recalibrate"))) {
+            bongo_cat_face_capture_recalibrate(app->face_capture);
+            bongo_cat_preferences_notice_show(app, face_tr(app,
+                "pages.preference.cat.labels.faceRecalibrateStarted",
+                "正在重新校准，请保持正对摄像头"), false);
+        }
+    }
+
     bool flip_h = model->face_capture_flip_h != 0;
     bongo_cat_pref_row_icon(context, BONGO_CAT_PREF_ICON_MIRROR);
     if (bongo_cat_pref_toggle(context, "face-page-flip-h", face_tr(app,

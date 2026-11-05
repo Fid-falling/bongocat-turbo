@@ -19,6 +19,8 @@
  */
 typedef enum BongoCatFacetrackInstallState {
     BONGO_CAT_FACETRACK_INSTALL_IDLE = 0,
+    /* 只查版本不下载 (用于"已装组件, 看看有没有新版") */
+    BONGO_CAT_FACETRACK_INSTALL_CHECKING,
     BONGO_CAT_FACETRACK_INSTALL_WORKING,
     BONGO_CAT_FACETRACK_INSTALL_DONE,
     BONGO_CAT_FACETRACK_INSTALL_FAILED
@@ -39,6 +41,10 @@ typedef struct BongoCatFacetrackInstallSnapshot {
     /* 最近测到的平均速度 (字节/秒), 0 = 还没测出 (刚开始或已结束)。
        设置页拿它显示 "约 120 KB/s", 用户能判断"要不要等"。 */
     uint64_t bytes_per_second;
+    /* 清单里报的最新版本, 以及"是否比本地已装的新" (check 模式下有意义) */
+    char latest_version[32];
+    char installed_version[32];
+    bool update_available;
     char error[192];
 } BongoCatFacetrackInstallSnapshot;
 
@@ -50,6 +56,14 @@ void bongo_cat_facetrack_install_destroy(BongoCatFacetrackInstall *install);
 
 /* 开始下载 (幂等: 正在跑就返回 true)。 */
 bool bongo_cat_facetrack_install_start(BongoCatFacetrackInstall *install);
+/* 只查版本 (不下载)。结果在 snapshot 的 latest_version/update_available 里。 */
+bool bongo_cat_facetrack_install_check_start(BongoCatFacetrackInstall *install);
+/* 已装版本 (读 <root>/version.txt); 没装过返回 false。 */
+bool bongo_cat_facetrack_install_version(const char *root, char *output,
+    size_t capacity);
+/* 安装成功后写版本号 (facetrack_version.c)。 */
+void bongo_cat_facetrack_install_write_version(const char *root,
+    const char *version);
 /* 请求停止并等线程退出。 */
 void bongo_cat_facetrack_install_stop(BongoCatFacetrackInstall *install);
 

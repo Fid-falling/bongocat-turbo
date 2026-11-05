@@ -51,12 +51,15 @@ struct BongoCatFacetrackInstall {
     /* 速度估算的滑动窗口 (只有工作线程写, 读在锁内) */
     Uint64 speed_mark_ticks;
     uint64_t speed_mark_bytes;
+    char latest_version[32];
     /* 下载源 (与主程序更新器共用同一份默认列表: direct + 公共加速前缀 + 自建镜像)。
        直连 GitHub 在国内经常只有十几 KB/s, 11 MB 的 ONNX Runtime 要跑六七分钟, 所以
        必须按列表顺序试; 成功的源会被记下来给后面的文件优先用。 */
     BongoCatUpdateSourceList sources;
     size_t preferred_source;
     bool source_raced;
+    /* true = 只查版本, 不下载文件 */
+    bool check_only;
 };
 
 static void lock_set_status(BongoCatFacetrackInstall *install,
@@ -115,6 +118,7 @@ typedef struct ManifestFetchContext {
     size_t capacity;
 } ManifestFetchContext;
 
+
 /* 从清单 JSON 里取出 base_url 与每个文件 (path / sha256 / size)。 */
 static bool parse_manifest(BongoCatFacetrackInstall *install, const char *json,
     size_t length, char *error, size_t capacity) {
@@ -125,6 +129,7 @@ static bool parse_manifest(BongoCatFacetrackInstall *install, const char *json,
     }
     bool ok = false;
     yyjson_val *root = yyjson_doc_get_root(doc);
+    yyjson_val *version = yyjson_obj_get(root, "version");
     yyjson_val *base = yyjson_obj_get(root, "base_url");
     yyjson_val *files = yyjson_obj_get(root, "files");
     if (!yyjson_is_str(base) || !yyjson_is_arr(files)) {
@@ -133,6 +138,9 @@ static bool parse_manifest(BongoCatFacetrackInstall *install, const char *json,
     }
     snprintf(install->base_url, sizeof(install->base_url), "%s",
         yyjson_get_str(base));
+    if (yyjson_is_str(version))
+        snprintf(install->latest_version, sizeof(install->latest_version), "%s",
+            yyjson_get_str(version));
     install->file_count = 0;
     yyjson_val *item;
     yyjson_arr_iter iter = yyjson_arr_iter_with(files);
@@ -334,6 +342,29 @@ static int install_thread(void *userdata) {
         atomic_store(&install->running, false);
         return 0;
     }
+    /* 只查版本: 比较完就把结果写进快照, 不下载任何文件 */
+    if (install->check_only) {
+        char installed[32] = {0};
+        const bool have = bongo_cat_facetrack_install_version(install->target_root,
+            installed, sizeof(installed));
+        const bool newer = !have || !installed[0] ||
+            bongo_cat_update_compare_versions(install->latest_version, installed) > 0;
+        SDL_LockMutex(install->lock);
+        snprintf(install->snapshot.latest_version,
+            sizeof(install->snapshot.latest_version), "%s", install->latest_version);
+        snprintf(install->snapshot.installed_version,
+            sizeof(install->snapshot.installed_version), "%s",
+            have ? installed : "");
+        install->snapshot.update_available = newer;
+        install->snapshot.state = BONGO_CAT_FACETRACK_INSTALL_DONE;
+        SDL_UnlockMutex(install->lock);
+        SDL_LogInfo(BONGO_CAT_LOG_LIFECYCLE,
+            "[face] 版本检查: 已装 %s, 最新 %s, %s", have ? installed : "(无)",
+            install->latest_version, newer ? "有新版本" : "已最新");
+        atomic_store(&install->running, false);
+        return 0;
+    }
+
     SDL_LockMutex(install->lock);
     install->snapshot.file_count = (uint32_t)install->file_count;
     install->snapshot.total = 0;
@@ -355,9 +386,17 @@ static int install_thread(void *userdata) {
     const bool stopped = atomic_load(&install->stop);
     lock_set_status(install, stopped ? BONGO_CAT_FACETRACK_INSTALL_FAILED
         : BONGO_CAT_FACETRACK_INSTALL_DONE, stopped ? "已取消" : NULL);
-    if (!stopped)
-        SDL_LogInfo(BONGO_CAT_LOG_LIFECYCLE, "[face] 组件下载完成: %s",
-            install->target_root);
+    if (!stopped) {
+        bongo_cat_facetrack_install_write_version(install->target_root,
+            install->latest_version);
+        SDL_LockMutex(install->lock);
+        snprintf(install->snapshot.installed_version,
+            sizeof(install->snapshot.installed_version), "%s",
+            install->latest_version);
+        SDL_UnlockMutex(install->lock);
+        SDL_LogInfo(BONGO_CAT_LOG_LIFECYCLE, "[face] 组件下载完成 (v%s): %s",
+            install->latest_version, install->target_root);
+    }
     atomic_store(&install->running, false);
     return 0;
 }
@@ -386,13 +425,14 @@ void bongo_cat_facetrack_install_destroy(BongoCatFacetrackInstall *install) {
     free(install);
 }
 
-bool bongo_cat_facetrack_install_start(BongoCatFacetrackInstall *install) {
+static bool start_thread(BongoCatFacetrackInstall *install, bool check_only) {
     if (!install) return false;
-    if (atomic_load(&install->running)) return true;
+    install->check_only = check_only;
     if (!bongo_cat_path_create_directory(install->target_root)) return false;
     SDL_LockMutex(install->lock);
     memset(&install->snapshot, 0, sizeof(install->snapshot));
-    install->snapshot.state = BONGO_CAT_FACETRACK_INSTALL_WORKING;
+    install->snapshot.state = check_only ? BONGO_CAT_FACETRACK_INSTALL_CHECKING
+        : BONGO_CAT_FACETRACK_INSTALL_WORKING;
     SDL_UnlockMutex(install->lock);
     atomic_store(&install->stop, false);
     atomic_store(&install->running, true);
@@ -404,6 +444,18 @@ bool bongo_cat_facetrack_install_start(BongoCatFacetrackInstall *install) {
         return false;
     }
     return true;
+}
+
+bool bongo_cat_facetrack_install_check_start(BongoCatFacetrackInstall *install) {
+    if (!install) return false;
+    if (atomic_load(&install->running)) return true;
+    return start_thread(install, true);
+}
+
+bool bongo_cat_facetrack_install_start(BongoCatFacetrackInstall *install) {
+    if (!install) return false;
+    if (atomic_load(&install->running)) return true;
+    return start_thread(install, false);
 }
 
 void bongo_cat_facetrack_install_stop(BongoCatFacetrackInstall *install) {

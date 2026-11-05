@@ -118,6 +118,8 @@ typedef struct BongoCatApp {
     struct BongoCatFaceCapture *face_capture;
     /* 面捕组件下载器 (只在用户点"下载"时创建, 用完销毁) */
     struct BongoCatFacetrackInstall *facetrack_install;
+    /* 本次会话是否已经查过组件版本 (自动检查更新, 每次启动一次) */
+    bool facetrack_checked;
     BongoCatPreferences *preferences;
     BongoCatMultiPetRuntime *multi_pet;
     BongoCatModelRefresh *model_refresh;

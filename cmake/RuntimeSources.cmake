@@ -117,6 +117,7 @@ set(BONGO_CAT_RUNTIME_UPDATE_SOURCES
   # 面捕组件的按需下载: manifest + 逐文件 SHA256, 解压免谈 (见 facetrack_install.h)
  src/runtime/update/facetrack_http.c
  src/runtime/update/facetrack_install.c
+ src/runtime/update/facetrack_version.c
  src/runtime/update/update_download.c
   # 替换/重启的调度与启动收尾 (.old 备份、失败回执)
   src/runtime/update/update_install.c

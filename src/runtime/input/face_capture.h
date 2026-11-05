@@ -58,6 +58,14 @@ bool bongo_cat_face_capture_download(BongoCatApp *app);
 /* 按设置里的开关创建/销毁面捕运行时 (幂等)。缺组件时只记日志并返回 false。 */
 bool bongo_cat_face_capture_sync(BongoCatApp *app);
 
+/* 重新做中性基线标定 (组件 v1.1.0 起的可选能力; 老组件上是空操作)。 */
+void bongo_cat_face_capture_recalibrate(BongoCatFaceCapture *capture);
+bool bongo_cat_face_capture_has_recalibrate(const BongoCatFaceCapture *capture);
+
+/* 枚举摄像头: 返回个数 (<= capacity), ids/names 可为 NULL。names 每条 name_stride 字节。 */
+int bongo_cat_face_capture_cameras(uint32_t *ids, char *names, int name_stride,
+    int capacity);
+
 /* 组件是否已装载且 ABI 匹配。 */
 bool bongo_cat_face_capture_available(const BongoCatFaceCapture *capture);
 

@@ -26,6 +26,8 @@ struct BongoCatFaceCapture {
     int (*open)(const char *, char *, size_t);
     int (*feed)(const unsigned char *, int, int, int, BongoCatFaceFrame *);
     void (*close)(void);
+    /* 可选符号: 组件 v1.1.0 起才有, 缺了就不显示"中心校准"按钮 */
+    void (*recalibrate)(void);
 
     SDL_Thread *thread;
     SDL_Mutex *lock;
@@ -147,6 +149,8 @@ static bool load_module(BongoCatFaceCapture *capture, const char *dll_path,
         "bongo_cat_facetrack_feed");
     capture->close = (void (*)(void))(void *)SDL_LoadFunction(capture->module,
         "bongo_cat_facetrack_close");
+    capture->recalibrate = (void (*)(void))(void *)SDL_LoadFunction(capture->module,
+        "bongo_cat_facetrack_recalibrate");
     if (!capture->abi || !capture->open || !capture->feed || !capture->close) {
         if (err) snprintf(err, err_cap, "组件导出符号不全 (不是 BongoCat 面捕组件)");
         return false;
@@ -250,4 +254,31 @@ bool bongo_cat_face_capture_head_active(BongoCatFaceCapture *capture) {
 
 bool bongo_cat_face_capture_available(const BongoCatFaceCapture *capture) {
     return capture && capture->feed != NULL;
+}
+
+void bongo_cat_face_capture_recalibrate(BongoCatFaceCapture *capture) {
+    if (capture && capture->recalibrate) capture->recalibrate();
+}
+
+bool bongo_cat_face_capture_has_recalibrate(const BongoCatFaceCapture *capture) {
+    return capture && capture->recalibrate != NULL;
+}
+
+int bongo_cat_face_capture_cameras(uint32_t *ids, char *names, int name_stride,
+    int capacity) {
+    if (!SDL_InitSubSystem(SDL_INIT_CAMERA)) return -1;
+    int count = 0;
+    SDL_CameraID *devices = SDL_GetCameras(&count);
+    if (!devices) return 0;
+    int written = 0;
+    for (int i = 0; i < count && written < capacity; ++i) {
+        if (ids) ids[written] = (uint32_t)devices[i];
+        if (names && name_stride > 0) {
+            char *slot = names + (size_t)written * (size_t)name_stride;
+            snprintf(slot, (size_t)name_stride, "%s", SDL_GetCameraName(devices[i]));
+        }
+        ++written;
+    }
+    SDL_free(devices);
+    return written;
 }
