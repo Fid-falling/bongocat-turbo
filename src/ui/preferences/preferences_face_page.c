@@ -103,19 +103,9 @@ void bongo_cat_preferences_face_content(BongoCatApp *app,
             face_tr(app, "pages.preference.cat.labels.faceCaptureHint",
                 "用摄像头驱动表情"), &enabled)) {
         if (enabled && !ready) {
-            /* 组件还没下载: 不直接开, 先问用户 (要联网下 6.6 MB), 确认后自动下 */
-            if (bongo_cat_face_capture_confirm_download(app)) {
-                /* 起不来就把开关退回去: 否则开关是亮的、却什么都不发生,
-                   用户只能看到"点了没反应"(实测过一次, 根因是存储根目录解析为空)。 */
-                if (bongo_cat_face_capture_download(app)) {
-                    model->face_capture = 1;
-                    app->dirty = true;
-                } else {
-                    bongo_cat_preferences_notice_show(app, face_tr(app,
-                        "pages.preference.cat.labels.faceCaptureDownloadFailed",
-                        "下载启动失败，请检查磁盘权限后重试"), true);
-                }
-            }
+            /* 组件还没下载: 不直接开, 延到帧末弹确认框 (见 app.h 的说明) */
+            app->face_confirm_pending = true;
+            app->face_confirm_update = false;
         } else {
             model->face_capture = enabled ? 1 : 0;
             app->dirty = true;
@@ -181,9 +171,9 @@ void bongo_cat_preferences_face_content(BongoCatApp *app,
         if (bongo_cat_pref_button(context, "face-page-update", label, "",
                 face_tr(app, "pages.preference.cat.labels.faceUpdateAction",
                     "Update"))) {
-            /* 与首次下载同一个确认框: 用户同意后再下 */
-            if (bongo_cat_face_capture_confirm_download(app))
-                bongo_cat_face_capture_download(app);
+            /* 与首次下载同一个确认框, 同样延到帧末 */
+            app->face_confirm_pending = true;
+            app->face_confirm_update = true;
         }
     }
 

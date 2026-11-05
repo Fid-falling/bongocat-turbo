@@ -150,8 +150,6 @@ void bongo_cat_preferences_page_face(BongoCatPreferences *value,
     struct nk_context *context);
 void bongo_cat_preferences_face_content(BongoCatApp *app,
     struct nk_context *context);
-/* 开启面捕前的确认框 (说明要下载约 6.6 MB 的组件), 见 preferences_face_confirm.c。 */
-bool bongo_cat_face_capture_confirm_download(BongoCatApp *app);
 
 void bongo_cat_preferences_texture_quality_row(BongoCatApp *app,
     struct nk_context *context);

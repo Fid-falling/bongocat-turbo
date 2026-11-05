@@ -117,6 +117,7 @@ set(BONGO_CAT_RUNTIME_UPDATE_SOURCES
   # 面捕组件的按需下载: manifest + 逐文件 SHA256, 解压免谈 (见 facetrack_install.h)
  src/runtime/update/facetrack_http.c
  src/runtime/update/facetrack_install.c
+ src/runtime/update/facetrack_manifest.c
  src/runtime/update/facetrack_version.c
  src/runtime/update/update_download.c
   # 替换/重启的调度与启动收尾 (.old 备份、失败回执)
@@ -160,6 +161,7 @@ set(BONGO_CAT_RUNTIME_INPUT_SOURCES
   src/runtime/input/face_capture.c
   src/runtime/input/face_capture_map.c
   src/runtime/input/face_capture_sync.c
+  src/runtime/input/face_capture_confirm.c
   src/runtime/input/mouse_pipeline.c
   src/runtime/input/shortcuts.c
   src/runtime/input/sound_shortcuts.c)
@@ -369,7 +371,6 @@ set(BONGO_CAT_UI_PREFERENCES_SOURCES
   src/ui/preferences/preferences_bubble_row.c
   src/ui/preferences/preferences_face_row.c
   src/ui/preferences/preferences_face_page.c
-  src/ui/preferences/preferences_face_confirm.c
   # 模型页的"随机"标签页: 三个随机分区 + 顺序轮换 (从 preferences_pages.c 拆出, 见行数策略)
   src/ui/preferences/preferences_random_page.c
   # 互动页的 [音效] 区: 总音量 / 全部静音 / 当前模型逐条开关

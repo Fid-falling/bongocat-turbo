@@ -2,6 +2,7 @@
 #define BONGO_CAT_FACETRACK_INSTALL_H
 
 #include "bongo_cat/common.h"
+#include "bongo_cat/update.h"
 
 #include <stdbool.h>
 #include <stddef.h>
@@ -25,6 +26,26 @@ typedef enum BongoCatFacetrackInstallState {
     BONGO_CAT_FACETRACK_INSTALL_DONE,
     BONGO_CAT_FACETRACK_INSTALL_FAILED
 } BongoCatFacetrackInstallState;
+
+#define BONGO_CAT_FACETRACK_MAX_FILES 8
+
+typedef struct BongoCatFacetrackFile {
+    char name[64];
+    char path[160];
+    char sha256[BONGO_CAT_UPDATE_DIGEST_CAP];
+    uint64_t size;
+} BongoCatFacetrackFile;
+
+typedef struct BongoCatFacetrackManifest {
+    char version[32];
+    char base_url[BONGO_CAT_UPDATE_URL_CAP];
+    BongoCatFacetrackFile files[BONGO_CAT_FACETRACK_MAX_FILES];
+    size_t count;
+} BongoCatFacetrackManifest;
+
+/* 解析清单 (实现在 facetrack_manifest.c)。 */
+bool bongo_cat_facetrack_parse_manifest(const char *json, size_t length,
+    BongoCatFacetrackManifest *manifest, char *error, size_t capacity);
 
 typedef struct BongoCatFacetrackInstallSnapshot {
     BongoCatFacetrackInstallState state;
@@ -72,6 +93,9 @@ void bongo_cat_facetrack_install_stop(BongoCatFacetrackInstall *install);
 
 void bongo_cat_facetrack_install_snapshot(BongoCatFacetrackInstall *install,
     BongoCatFacetrackInstallSnapshot *out);
+
+/* 还在跑的安装/检查线程数 (销毁是 detach 的, 重建前要等它归零)。 */
+int bongo_cat_facetrack_install_active_threads(void);
 
 /* 组件是否已经完整落盘 (DLL + 模型都在)。用于决定状态行显示"下载"还是"可用"。 */
 bool bongo_cat_facetrack_install_present(const char *target_root);

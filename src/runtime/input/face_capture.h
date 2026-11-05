@@ -1,6 +1,7 @@
 #ifndef BONGO_CAT_FACE_CAPTURE_H
 #define BONGO_CAT_FACE_CAPTURE_H
 
+#include "bongo_cat/app.h"
 #include "bongo_cat/config.h"
 #include "bongo_cat/facetrack_abi.h"
 
@@ -58,6 +59,10 @@ bool bongo_cat_face_capture_download(BongoCatApp *app);
 
 /* 还在运行的采集线程数: detach 之后要等它归零才能重建 (换后端/换摄像头)。 */
 int bongo_cat_face_capture_active_threads(void);
+
+/* 弹"要不要下载组件"的确认框 (原生模态)。**只能在帧外调用** —— 在 Nuklear 帧里弹
+   模态框等于绘制中途重入消息循环。 */
+bool bongo_cat_face_capture_confirm_download(BongoCatApp *app);
 
 /* 面捕是否处于启用状态: 设置里开着, 或本次启动带了 --face-capture (演示/录屏)。
    参数映射与"鼠标让位"都必须用它判断, 否则会出现"组件在跑但完全没有效果"。 */

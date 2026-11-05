@@ -122,6 +122,11 @@ typedef struct BongoCatApp {
     bool facetrack_checked;
     /* --face-capture: 本次启动强制开启面捕 (演示/录屏/自动化), 不写回配置 */
     bool force_face_capture;
+    /* 面捕的确认框必须**延到帧末**再弹: 在 Nuklear 帧里弹原生模态框等于在绘制中途
+       重入消息循环 (项目里文件对话框也是这么延后的)。true 表示"下一帧开头弹"。 */
+    bool face_confirm_pending;
+    /* 确认框的用途: false = 首次启用要下载, true = 更新到新版本 */
+    bool face_confirm_update;
     BongoCatPreferences *preferences;
     BongoCatMultiPetRuntime *multi_pet;
     BongoCatModelRefresh *model_refresh;

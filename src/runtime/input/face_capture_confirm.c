@@ -7,7 +7,7 @@
  * 用系统原生对话框 (SDL_ShowMessageBox) 而不是自绘模态: 这是一个一次性的、阻塞的"要不要"
  * 询问, 原生框在用户关掉设置窗口/切到别的程序时行为最稳, 也不需要跟着主题适配。
  */
-#include "preferences_state.h"
+#include "face_capture.h"
 
 #include "bongo_cat/i18n.h"
 #include "bongo_cat/log.h"

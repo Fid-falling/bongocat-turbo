@@ -37,21 +37,27 @@ typedef struct ManifestFile {
     uint64_t size;
 } ManifestFile;
 
+/* 还在跑的安装器线程数: 销毁是 detach 的, 需要它来判断"上一轮真的结束了"。 */
+static atomic_int g_install_threads = 0;
+
+int bongo_cat_facetrack_install_active_threads(void) {
+    return atomic_load(&g_install_threads);
+}
+
 struct BongoCatFacetrackInstall {
     char target_root[BONGO_CAT_PATH_CAP];
     SDL_Thread *thread;
     SDL_Mutex *lock;
     atomic_bool running;
     atomic_bool stop;
+    /* 销毁时置位: 线程退出后自己释放结构 (网络请求可能卡很久, 不能 join) */
+    atomic_bool orphan;
     BongoCatFacetrackInstallSnapshot snapshot;
-    /* 工作线程私有 (不跨线程读) */
-    ManifestFile files[FACETRACK_MAX_FILES];
-    size_t file_count;
-    char base_url[BONGO_CAT_UPDATE_URL_CAP];
+    /* 工作线程私有 (不跨线程读): 清单解析结果 (解析器在 facetrack_manifest.c) */
+    BongoCatFacetrackManifest manifest;
     /* 速度估算的滑动窗口 (只有工作线程写, 读在锁内) */
     Uint64 speed_mark_ticks;
     uint64_t speed_mark_bytes;
-    char latest_version[32];
     /* 下载源 (与主程序更新器共用同一份默认列表: direct + 公共加速前缀 + 自建镜像)。
        直连 GitHub 在国内经常只有十几 KB/s, 11 MB 的 ONNX Runtime 要跑六七分钟, 所以
        必须按列表顺序试; 成功的源会被记下来给后面的文件优先用。 */
@@ -119,60 +125,6 @@ typedef struct ManifestFetchContext {
 } ManifestFetchContext;
 
 
-/* 从清单 JSON 里取出 base_url 与每个文件 (path / sha256 / size)。 */
-static bool parse_manifest(BongoCatFacetrackInstall *install, const char *json,
-    size_t length, char *error, size_t capacity) {
-    yyjson_doc *doc = yyjson_read(json, length, 0);
-    if (!doc) {
-        snprintf(error, capacity, "组件清单不是合法 JSON");
-        return false;
-    }
-    bool ok = false;
-    yyjson_val *root = yyjson_doc_get_root(doc);
-    yyjson_val *version = yyjson_obj_get(root, "version");
-    yyjson_val *base = yyjson_obj_get(root, "base_url");
-    yyjson_val *files = yyjson_obj_get(root, "files");
-    if (!yyjson_is_str(base) || !yyjson_is_arr(files)) {
-        snprintf(error, capacity, "组件清单缺少 base_url / files");
-        goto done;
-    }
-    snprintf(install->base_url, sizeof(install->base_url), "%s",
-        yyjson_get_str(base));
-    if (yyjson_is_str(version))
-        snprintf(install->latest_version, sizeof(install->latest_version), "%s",
-            yyjson_get_str(version));
-    install->file_count = 0;
-    yyjson_val *item;
-    yyjson_arr_iter iter = yyjson_arr_iter_with(files);
-    while ((item = yyjson_arr_iter_next(&iter))) {
-        if (install->file_count >= FACETRACK_MAX_FILES) break;
-        yyjson_val *name = yyjson_obj_get(item, "name");
-        yyjson_val *path = yyjson_obj_get(item, "path");
-        yyjson_val *sha = yyjson_obj_get(item, "sha256");
-        yyjson_val *size = yyjson_obj_get(item, "size");
-        if (!yyjson_is_str(name) || !yyjson_is_str(path) || !yyjson_is_str(sha))
-            continue;
-        ManifestFile *file = &install->files[install->file_count];
-        snprintf(file->name, sizeof(file->name), "%s", yyjson_get_str(name));
-        snprintf(file->path, sizeof(file->path), "%s", yyjson_get_str(path));
-        if (!bongo_cat_update_sha256_text(yyjson_get_str(sha), file->sha256)) {
-            snprintf(error, capacity, "组件清单里 %s 的 SHA256 不合法", file->name);
-            goto done;
-        }
-        file->size = yyjson_is_uint(size) ? (uint64_t)yyjson_get_uint(size) : 0;
-        install->file_count++;
-    }
-    if (install->file_count == 0) {
-        snprintf(error, capacity, "组件清单里没有可下载的文件");
-        goto done;
-    }
-    ok = true;
-
-done:
-    yyjson_doc_free(doc);
-    return ok;
-}
-
 /* 让 <target_root>/<relative> 的父目录存在。 */
 static bool ensure_parent(const char *target_root, const char *relative) {
     char full[BONGO_CAT_PATH_CAP];
@@ -223,10 +175,11 @@ static bool manifest_fetch_cb(const char *url, void *user) {
 }
 
 /* 下载一个文件到 .part -> 校验 -> 改名。 */
-static bool install_file(BongoCatFacetrackInstall *install, const ManifestFile *file,
+static bool install_file(BongoCatFacetrackInstall *install,
+    const BongoCatFacetrackFile *file,
     char *error, size_t capacity) {
     char url[BONGO_CAT_UPDATE_URL_CAP];
-    if (snprintf(url, sizeof(url), "%s%s", install->base_url, file->name) >=
+    if (snprintf(url, sizeof(url), "%s%s", install->manifest.base_url, file->name) >=
             (int)sizeof(url)) {
         snprintf(error, capacity, "下载地址过长");
         return false;
@@ -324,6 +277,7 @@ static bool install_file(BongoCatFacetrackInstall *install, const ManifestFile *
 
 static int install_thread(void *userdata) {
     BongoCatFacetrackInstall *install = userdata;
+    atomic_fetch_add(&g_install_threads, 1);
     char error[192] = {0};
     char *json = NULL;
     size_t length = 0;
@@ -333,13 +287,16 @@ static int install_thread(void *userdata) {
     if (!got_manifest) {
         lock_set_status(install, BONGO_CAT_FACETRACK_INSTALL_FAILED, error);
         atomic_store(&install->running, false);
+        atomic_fetch_sub(&g_install_threads, 1);
         return 0;
     }
-    bool ok = parse_manifest(install, json, length, error, sizeof(error));
+    bool ok = bongo_cat_facetrack_parse_manifest(json, length, &install->manifest,
+        error, sizeof(error));
     free(json);
     if (!ok) {
         lock_set_status(install, BONGO_CAT_FACETRACK_INSTALL_FAILED, error);
         atomic_store(&install->running, false);
+        atomic_fetch_sub(&g_install_threads, 1);
         return 0;
     }
     /* 只查版本: 比较完就把结果写进快照, 不下载任何文件 */
@@ -348,10 +305,10 @@ static int install_thread(void *userdata) {
         const bool have = bongo_cat_facetrack_install_version(install->target_root,
             installed, sizeof(installed));
         const bool newer = !have || !installed[0] ||
-            bongo_cat_update_compare_versions(install->latest_version, installed) > 0;
+            bongo_cat_update_compare_versions(install->manifest.version, installed) > 0;
         SDL_LockMutex(install->lock);
         snprintf(install->snapshot.latest_version,
-            sizeof(install->snapshot.latest_version), "%s", install->latest_version);
+            sizeof(install->snapshot.latest_version), "%s", install->manifest.version);
         snprintf(install->snapshot.installed_version,
             sizeof(install->snapshot.installed_version), "%s",
             have ? installed : "");
@@ -360,26 +317,28 @@ static int install_thread(void *userdata) {
         SDL_UnlockMutex(install->lock);
         SDL_LogInfo(BONGO_CAT_LOG_LIFECYCLE,
             "[face] 版本检查: 已装 %s, 最新 %s, %s", have ? installed : "(无)",
-            install->latest_version, newer ? "有新版本" : "已最新");
+            install->manifest.version, newer ? "有新版本" : "已最新");
         atomic_store(&install->running, false);
+        atomic_fetch_sub(&g_install_threads, 1);
         return 0;
     }
 
     SDL_LockMutex(install->lock);
-    install->snapshot.file_count = (uint32_t)install->file_count;
+    install->snapshot.file_count = (uint32_t)install->manifest.count;
     install->snapshot.total = 0;
-    for (size_t i = 0; i < install->file_count; ++i)
-        install->snapshot.total += install->files[i].size;
+    for (size_t i = 0; i < install->manifest.count; ++i)
+        install->snapshot.total += install->manifest.files[i].size;
     SDL_UnlockMutex(install->lock);
 
-    for (size_t i = 0; i < install->file_count; ++i) {
+    for (size_t i = 0; i < install->manifest.count; ++i) {
         if (atomic_load(&install->stop)) break;
         SDL_LockMutex(install->lock);
         install->snapshot.file_index = (uint32_t)i + 1;
         SDL_UnlockMutex(install->lock);
-        if (!install_file(install, &install->files[i], error, sizeof(error))) {
+        if (!install_file(install, &install->manifest.files[i], error, sizeof(error))) {
             lock_set_status(install, BONGO_CAT_FACETRACK_INSTALL_FAILED, error);
             atomic_store(&install->running, false);
+            atomic_fetch_sub(&g_install_threads, 1);
             return 0;
         }
     }
@@ -388,16 +347,21 @@ static int install_thread(void *userdata) {
         : BONGO_CAT_FACETRACK_INSTALL_DONE, stopped ? "已取消" : NULL);
     if (!stopped) {
         bongo_cat_facetrack_install_write_version(install->target_root,
-            install->latest_version);
+            install->manifest.version);
         SDL_LockMutex(install->lock);
         snprintf(install->snapshot.installed_version,
             sizeof(install->snapshot.installed_version), "%s",
-            install->latest_version);
+            install->manifest.version);
         SDL_UnlockMutex(install->lock);
         SDL_LogInfo(BONGO_CAT_LOG_LIFECYCLE, "[face] 组件下载完成 (v%s): %s",
-            install->latest_version, install->target_root);
+            install->manifest.version, install->target_root);
     }
     atomic_store(&install->running, false);
+    atomic_fetch_sub(&g_install_threads, 1);
+    if (atomic_load(&install->orphan)) {
+        if (install->lock) SDL_DestroyMutex(install->lock);
+        free(install);
+    }
     return 0;
 }
 
@@ -420,13 +384,23 @@ BongoCatFacetrackInstall *bongo_cat_facetrack_install_create(
 
 void bongo_cat_facetrack_install_destroy(BongoCatFacetrackInstall *install) {
     if (!install) return;
-    bongo_cat_facetrack_install_stop(install);
+    /* **不要 join**: 检查/下载线程可能正卡在 WinHTTP 里十几秒, join 会把设置窗口冻住,
+       用户看到的就是"未响应"。改成 detach, 线程退出时自己释放结构。 */
+    atomic_store(&install->stop, true);
+    if (install->thread) {
+        SDL_DetachThread(install->thread);
+        install->thread = NULL;
+        atomic_store(&install->orphan, true);
+        return;
+    }
     if (install->lock) SDL_DestroyMutex(install->lock);
     free(install);
 }
 
 static bool start_thread(BongoCatFacetrackInstall *install, bool check_only) {
     if (!install) return false;
+    /* 上一轮线程还没退出: 现在起新的会同时写同一份快照, 等下一帧再试 */
+    if (bongo_cat_facetrack_install_active_threads() > 0) return false;
     install->check_only = check_only;
     if (!bongo_cat_path_create_directory(install->target_root)) return false;
     SDL_LockMutex(install->lock);
