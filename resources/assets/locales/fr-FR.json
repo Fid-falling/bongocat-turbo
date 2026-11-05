@@ -112,6 +112,7 @@
           "faceChecking": "Vérification…",
           "faceCheckUpdate": "Rechercher des mises à jour du composant",
           "faceCheckUpdateAction": "Vérifier",
+          "faceUpdateRestart": "Composant mis à jour — redémarrez pour appliquer",
           "faceCaptureDownload": "Télécharger le composant (6,6 Mo)",
           "faceCaptureDownloadHint": "Une seule fois — aucun réseau ensuite",
           "hideBubbleHint": "Ne pas afficher les bulles pour les modèles qui en ont",

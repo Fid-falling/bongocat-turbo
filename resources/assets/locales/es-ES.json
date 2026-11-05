@@ -112,6 +112,7 @@
           "faceChecking": "Comprobando…",
           "faceCheckUpdate": "Buscar actualizaciones del componente",
           "faceCheckUpdateAction": "Comprobar",
+          "faceUpdateRestart": "Componente actualizado: reinicia para aplicar",
           "faceCaptureDownload": "Descargar componente (6,6 MB)",
           "faceCaptureDownloadHint": "Solo una vez — después sin red",
           "hideBubbleHint": "No mostrar burbujas en los modelos que las tienen",

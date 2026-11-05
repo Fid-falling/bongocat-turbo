@@ -112,6 +112,7 @@
           "faceChecking": "Checking…",
           "faceCheckUpdate": "Check for component updates",
           "faceCheckUpdateAction": "Check",
+          "faceUpdateRestart": "Component updated — restart to apply",
           "faceCaptureDownload": "Download Component (6.6 MB)",
           "faceCaptureDownloadHint": "Only needed once — no network afterwards",
           "hideBubbleHint": "Do not show key bubbles for models that have one",

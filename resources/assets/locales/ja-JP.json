@@ -112,6 +112,7 @@
           "faceChecking": "確認中…",
           "faceCheckUpdate": "コンポーネントの更新を確認",
           "faceCheckUpdateAction": "確認",
+          "faceUpdateRestart": "コンポーネントを更新しました。再起動で反映されます",
           "faceCaptureDownload": "コンポーネントをダウンロード (6.6 MB)",
           "faceCaptureDownloadHint": "一度だけ必要です（以後は通信しません）",
           "hideBubbleHint": "バブル付きのモデルではキーバブルを表示しません",

@@ -112,6 +112,7 @@
           "faceChecking": "正在检查…",
           "faceCheckUpdate": "检查组件更新",
           "faceCheckUpdateAction": "检查",
+          "faceUpdateRestart": "组件已更新，重启后生效",
           "faceCaptureDownload": "下载组件（约 6.6 MB）",
           "faceCaptureDownloadHint": "只需下载一次，之后不再联网",
           "hideBubbleHint": "对自带气泡的模型不显示按键气泡",

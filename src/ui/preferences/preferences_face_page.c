@@ -248,7 +248,15 @@ void bongo_cat_preferences_face_content(BongoCatApp *app,
         app->facetrack_install = NULL;
         model->face_capture = 1;
         app->dirty = true;
-        bongo_cat_face_capture_sync(app);
+        /* 正在跑的组件是"已装载的旧 DLL", 新文件要重启后才用得上 —— 如实告诉用户,
+           不要让人以为"更新完了却还是旧行为"。 */
+        if (app->face_capture) {
+            bongo_cat_face_capture_stop(app->face_capture);
+            app->face_capture = NULL;
+        }
+        bongo_cat_preferences_notice_show(app, face_tr(app,
+            "pages.preference.cat.labels.faceUpdateRestart",
+            "组件已更新，重启后生效"), false);
     }
 
     /* 页面首次打开时查一次组件版本 (后台线程, 不挡界面) */

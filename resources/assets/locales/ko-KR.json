@@ -112,6 +112,7 @@
           "faceChecking": "확인 중…",
           "faceCheckUpdate": "구성 요소 업데이트 확인",
           "faceCheckUpdateAction": "확인",
+          "faceUpdateRestart": "구성 요소가 업데이트되었습니다. 다시 시작하면 적용됩니다",
           "faceCaptureDownload": "구성 요소 다운로드 (6.6 MB)",
           "faceCaptureDownloadHint": "한 번만 받으면 됩니다",
           "hideBubbleHint": "버블이 있는 모델에서는 키 버블을 표시하지 않습니다",

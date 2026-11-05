@@ -112,6 +112,7 @@
           "faceChecking": "Verificando…",
           "faceCheckUpdate": "Verificar atualizações do componente",
           "faceCheckUpdateAction": "Verificar",
+          "faceUpdateRestart": "Componente atualizado — reinicie para aplicar",
           "faceCaptureDownload": "Baixar componente (6,6 MB)",
           "faceCaptureDownloadHint": "Só uma vez — depois sem rede",
           "hideBubbleHint": "Não mostrar balões nos modelos que os possuem",

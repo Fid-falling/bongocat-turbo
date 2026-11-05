@@ -67,6 +67,9 @@ bool bongo_cat_face_capture_sync(BongoCatApp *app) {
         SDL_LogWarn(SDL_LOG_CATEGORY_APPLICATION, "[face] 面捕不可用: 没有存储根目录");
         return false;
     }
+    /* 上次更新留下的 .old (组件替换时"改名让路"的产物): 那时文件被占用删不掉,
+       现在进程刚起、还没装载组件, 正是清掉的时候。 */
+    bongo_cat_facetrack_cleanup_backups(root);
     char dll[BONGO_CAT_PATH_CAP] = {0};
     char models[BONGO_CAT_PATH_CAP] = {0};
     if (!bongo_cat_path_join(dll, sizeof(dll), root, "bongo_facetrack.dll") ||

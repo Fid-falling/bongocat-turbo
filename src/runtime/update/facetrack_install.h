@@ -97,6 +97,9 @@ void bongo_cat_facetrack_install_snapshot(BongoCatFacetrackInstall *install,
 /* 还在跑的安装/检查线程数 (销毁是 detach 的, 重建前要等它归零)。 */
 int bongo_cat_facetrack_install_active_threads(void);
 
+/* 清掉上次更新留下的 .old 文件 (组件替换时"改名让路"的产物)。 */
+void bongo_cat_facetrack_cleanup_backups(const char *root);
+
 /* 组件是否已经完整落盘 (DLL + 模型都在)。用于决定状态行显示"下载"还是"可用"。 */
 bool bongo_cat_facetrack_install_present(const char *target_root);
 

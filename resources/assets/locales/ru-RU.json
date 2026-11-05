@@ -112,6 +112,7 @@
           "faceChecking": "Проверка…",
           "faceCheckUpdate": "Проверить обновления компонента",
           "faceCheckUpdateAction": "Проверить",
+          "faceUpdateRestart": "Компонент обновлён — перезапустите приложение",
           "faceCaptureDownload": "Загрузить компонент (6,6 МБ)",
           "faceCaptureDownloadHint": "Только один раз — дальше без сети",
           "hideBubbleHint": "Не показывать пузыри клавиш у моделей с ними",
