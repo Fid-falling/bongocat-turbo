@@ -96,6 +96,7 @@
           "faceCaptureMissing": "组件未安装或不可用",
           "faceCaptureReady": "组件已就绪",
           "faceCaptureDownloading": "下载中",
+          "faceCaptureDownloadFailed": "下载启动失败，请检查磁盘权限后重试",
           "faceCaptureDownload": "下载组件（约 6.6 MB）",
           "faceCaptureDownloadHint": "只需下载一次，之后不再联网",
           "hideBubbleHint": "对自带气泡的模型不显示按键气泡",

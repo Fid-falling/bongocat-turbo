@@ -96,6 +96,7 @@
           "faceCaptureMissing": "Component missing or unavailable",
           "faceCaptureReady": "Component ready",
           "faceCaptureDownloading": "Downloading",
+          "faceCaptureDownloadFailed": "Could not start the download. Check disk permissions and retry.",
           "faceCaptureDownload": "Download Component (6.6 MB)",
           "faceCaptureDownloadHint": "Only needed once — no network afterwards",
           "hideBubbleHint": "Do not show key bubbles for models that have one",

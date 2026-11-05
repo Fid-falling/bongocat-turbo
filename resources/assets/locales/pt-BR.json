@@ -96,6 +96,7 @@
           "faceCaptureMissing": "Componente ausente ou indisponível",
           "faceCaptureReady": "Componente pronto",
           "faceCaptureDownloading": "Baixando",
+          "faceCaptureDownloadFailed": "Não foi possível iniciar o download. Verifique as permissões do disco.",
           "faceCaptureDownload": "Baixar componente (6,6 MB)",
           "faceCaptureDownloadHint": "Só uma vez — depois sem rede",
           "hideBubbleHint": "Não mostrar balões nos modelos que os possuem",

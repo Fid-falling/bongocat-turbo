@@ -96,6 +96,7 @@
           "faceCaptureMissing": "Componente ausente o no disponible",
           "faceCaptureReady": "Componente listo",
           "faceCaptureDownloading": "Descargando",
+          "faceCaptureDownloadFailed": "No se pudo iniciar la descarga. Revisa los permisos del disco.",
           "faceCaptureDownload": "Descargar componente (6,6 MB)",
           "faceCaptureDownloadHint": "Solo una vez — después sin red",
           "hideBubbleHint": "No mostrar burbujas en los modelos que las tienen",

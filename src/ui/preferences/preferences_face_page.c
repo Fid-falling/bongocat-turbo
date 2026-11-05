@@ -11,6 +11,7 @@
  *   3. 组件已就位时开关直接生效, 不再弹确认框。
  */
 #include "preferences_state.h"
+#include "preferences_notice.h"
 #include "preferences_internal.h"
 
 #include "preferences_widgets.h"
@@ -104,9 +105,16 @@ void bongo_cat_preferences_face_content(BongoCatApp *app,
         if (enabled && !ready) {
             /* 组件还没下载: 不直接开, 先问用户 (要联网下 6.6 MB), 确认后自动下 */
             if (bongo_cat_face_capture_confirm_download(app)) {
-                model->face_capture = 1;
-                app->dirty = true;
-                bongo_cat_face_capture_download(app);
+                /* 起不来就把开关退回去: 否则开关是亮的、却什么都不发生,
+                   用户只能看到"点了没反应"(实测过一次, 根因是存储根目录解析为空)。 */
+                if (bongo_cat_face_capture_download(app)) {
+                    model->face_capture = 1;
+                    app->dirty = true;
+                } else {
+                    bongo_cat_preferences_notice_show(app, face_tr(app,
+                        "pages.preference.cat.labels.faceCaptureDownloadFailed",
+                        "下载启动失败，请检查磁盘权限后重试"), true);
+                }
             }
         } else {
             model->face_capture = enabled ? 1 : 0;

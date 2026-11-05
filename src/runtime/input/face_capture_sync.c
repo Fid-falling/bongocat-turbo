@@ -13,6 +13,7 @@
 #include "face_capture.h"
 
 #include "../update/facetrack_install.h"
+#include "../lifecycle/storage_paths.h"
 
 #include "bongo_cat/log.h"
 #include "bongo_cat/path.h"
@@ -29,9 +30,15 @@ bool bongo_cat_face_capture_root(BongoCatApp *app, char *output,
         snprintf(output, capacity, "%s", override);
         return true;
     }
-    if (!app->storage_root[0]) return false;
-    return bongo_cat_path_join(output, capacity, app->storage_root,
-        "components/facetrack");
+    /* app->storage_root 只有用户显式传 --storage-root 时才有值; 正常安装/便携启动下
+       它是空的, 得问 storage_paths 要解析后的根目录 —— 之前只看 storage_root, 于是
+       正常启动的用户点"下载"毫无反应 (实测: 开关变蓝, 状态仍是"组件未安装")。 */
+    char base[BONGO_CAT_PATH_CAP] = {0};
+    if (app && app->storage_root[0])
+        snprintf(base, sizeof(base), "%s", app->storage_root);
+    else if (!bongo_cat_storage_paths_root(base, sizeof(base)) || !base[0])
+        return false;
+    return bongo_cat_path_join(output, capacity, base, "components/facetrack");
 }
 
 bool bongo_cat_face_capture_sync(BongoCatApp *app) {
@@ -91,7 +98,11 @@ bool bongo_cat_face_capture_download(BongoCatApp *app) {
         app->facetrack_install = bongo_cat_facetrack_install_create(root);
         if (!app->facetrack_install) return false;
     }
-    if (!bongo_cat_facetrack_install_start(app->facetrack_install)) return false;
+    if (!bongo_cat_facetrack_install_start(app->facetrack_install)) {
+        SDL_LogWarn(SDL_LOG_CATEGORY_APPLICATION,
+            "[face] 下载启动失败 (目录不可写?): %s", root);
+        return false;
+    }
     SDL_LogInfo(BONGO_CAT_LOG_LIFECYCLE, "[face] 开始下载组件到 %s", root);
     return true;
 }
