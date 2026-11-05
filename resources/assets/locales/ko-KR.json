@@ -7,7 +7,16 @@
       }
     },
     "preference": {
-      "live2dSetup": {
+              "face": {
+          "title": "얼굴 캡처",
+          "section": "얼굴 캡처",
+          "confirmTitle": "얼굴 캡처",
+          "confirmBody": "얼굴 캡처는 구성 요소(약 6.6 MB)를 한 번 받아야 합니다. 이후에는 오프라인으로 동작합니다.",
+          "confirmAsk": "지금 받을까요?",
+          "confirmCancel": "취소",
+          "confirmOk": "다운로드"
+        },
+"live2dSetup": {
         "title": "Live2D 런타임 (Cubism Core)",
         "description": "Live2D Cubism Core 가 아직 없습니다. Live2D 공식 사이트에서 Cubism SDK for Native 를 내려받은 뒤 여기에서 ZIP 이나 Core 파일을 선택해 가져오세요. 이 런타임은 함께 배포되지 않으며 자동으로 내려받지도 않습니다.",
         "installed": "Cubism Core 를 가져왔습니다. Live2D 렌더링을 사용할 수 있습니다",
@@ -85,6 +94,7 @@
           "faceFlipV": "상하 반전",
           "faceCaptureStatus": "상태",
           "faceCaptureMissing": "구성 요소가 없거나 사용할 수 없음",
+          "faceCaptureReady": "구성 요소 준비됨",
           "faceCaptureDownload": "구성 요소 다운로드 (6.6 MB)",
           "faceCaptureDownloadHint": "한 번만 받으면 됩니다",
           "hideBubbleHint": "버블이 있는 모델에서는 키 버블을 표시하지 않습니다",

@@ -7,7 +7,16 @@
       }
     },
     "preference": {
-      "live2dSetup": {
+              "face": {
+          "title": "Захват лица",
+          "section": "Захват лица",
+          "confirmTitle": "Захват лица",
+          "confirmBody": "Для захвата лица нужно один раз загрузить компонент (около 6,6 МБ). Дальше он работает без сети.",
+          "confirmAsk": "Загрузить сейчас?",
+          "confirmCancel": "Отмена",
+          "confirmOk": "Загрузить"
+        },
+"live2dSetup": {
         "title": "Среда Live2D (Cubism Core)",
         "description": "Live2D Cubism Core еще не установлен. Скачайте Cubism SDK for Native с официального сайта Live2D и выберите здесь ZIP-архив или библиотеку Core. Эта среда не входит в поставку и не загружается автоматически.",
         "installed": "Cubism Core импортирован; отрисовка Live2D доступна",
@@ -85,6 +94,7 @@
           "faceFlipV": "Отразить по вертикали",
           "faceCaptureStatus": "Состояние",
           "faceCaptureMissing": "Компонент не установлен или недоступен",
+          "faceCaptureReady": "Компонент готов",
           "faceCaptureDownload": "Загрузить компонент (6,6 МБ)",
           "faceCaptureDownloadHint": "Только один раз — дальше без сети",
           "hideBubbleHint": "Не показывать пузыри клавиш у моделей с ними",

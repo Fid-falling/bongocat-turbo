@@ -7,7 +7,16 @@
       }
     },
     "preference": {
-      "live2dSetup": {
+              "face": {
+          "title": "Gesichtserfassung",
+          "section": "Gesichtserfassung",
+          "confirmTitle": "Gesichtserfassung",
+          "confirmBody": "Die Gesichtserfassung benötigt einen einmaligen Komponenten-Download (ca. 6,6 MB). Danach funktioniert sie offline.",
+          "confirmAsk": "Jetzt herunterladen?",
+          "confirmCancel": "Abbrechen",
+          "confirmOk": "Herunterladen"
+        },
+"live2dSetup": {
         "title": "Live2D-Laufzeit (Cubism Core)",
         "description": "Live2D Cubism Core ist noch nicht installiert. Lade Cubism SDK for Native von der offiziellen Live2D-Seite herunter und waehle hier die ZIP-Datei oder die Core-Bibliothek aus. Diese Laufzeit wird weder mitgeliefert noch automatisch geladen.",
         "installed": "Cubism Core installiert; Live2D-Darstellung ist verfuegbar",
@@ -85,6 +94,7 @@
           "faceFlipV": "Vertikal spiegeln",
           "faceCaptureStatus": "Status",
           "faceCaptureMissing": "Komponente fehlt oder nicht verfügbar",
+          "faceCaptureReady": "Komponente bereit",
           "faceCaptureDownload": "Komponente herunterladen (6.6 MB)",
           "faceCaptureDownloadHint": "Nur einmal nötig — danach kein Netzwerk",
           "hideBubbleHint": "Keine Tastaturblasen für Modelle mit Blase anzeigen",

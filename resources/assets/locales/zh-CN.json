@@ -7,7 +7,16 @@
       }
     },
     "preference": {
-      "live2dSetup": {
+              "face": {
+          "title": "面部捕捉",
+          "section": "面部捕捉",
+          "confirmTitle": "面部捕捉",
+          "confirmBody": "面部捕捉需要先下载组件（约 6.6 MB），只需下载一次，之后离线可用。",
+          "confirmAsk": "现在下载吗？",
+          "confirmCancel": "取消",
+          "confirmOk": "下载"
+        },
+"live2dSetup": {
         "title": "Live2D 渲染库 (Cubism Core)",
         "description": "尚未导入 Live2D Cubism Core。请到 Live2D 官网下载 Cubism SDK for Native, 再在这里选中压缩包或 Core 文件导入。程序不附带、也不代为下载这个运行库。",
         "installed": "已导入 Cubism Core, Live2D 渲染可用",
@@ -85,6 +94,7 @@
           "faceFlipV": "上下反转",
           "faceCaptureStatus": "状态",
           "faceCaptureMissing": "组件未安装或不可用",
+          "faceCaptureReady": "组件已就绪",
           "faceCaptureDownload": "下载组件（约 6.6 MB）",
           "faceCaptureDownloadHint": "只需下载一次，之后不再联网",
           "hideBubbleHint": "对自带气泡的模型不显示按键气泡",

@@ -7,7 +7,16 @@
       }
     },
     "preference": {
-      "live2dSetup": {
+              "face": {
+          "title": "顔キャプチャ",
+          "section": "顔キャプチャ",
+          "confirmTitle": "顔キャプチャ",
+          "confirmBody": "顔キャプチャにはコンポーネントのダウンロード（約 6.6 MB）が必要です。一度だけ必要で、以後はオフラインで使えます。",
+          "confirmAsk": "今すぐダウンロードしますか？",
+          "confirmCancel": "キャンセル",
+          "confirmOk": "ダウンロード"
+        },
+"live2dSetup": {
         "title": "Live2D ランタイム (Cubism Core)",
         "description": "Live2D Cubism Core はまだ取り込まれていません。Live2D 公式サイトから Cubism SDK for Native をダウンロードし, ここで ZIP か Core ファイルを選んで取り込んでください。このランタイムは同梱も自動ダウンロードもされません。",
         "installed": "Cubism Core を取り込み済み, Live2D 描画を利用できます",
@@ -85,6 +94,7 @@
           "faceFlipV": "上下反転",
           "faceCaptureStatus": "状態",
           "faceCaptureMissing": "コンポーネントが未インストールまたは使用不可",
+          "faceCaptureReady": "コンポーネント準備完了",
           "faceCaptureDownload": "コンポーネントをダウンロード (6.6 MB)",
           "faceCaptureDownloadHint": "一度だけ必要です（以後は通信しません）",
           "hideBubbleHint": "バブル付きのモデルではキーバブルを表示しません",

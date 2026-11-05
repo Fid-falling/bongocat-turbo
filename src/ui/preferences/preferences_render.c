@@ -94,11 +94,14 @@ static bool draw_shell(BongoCatPreferences *value, struct nk_context *context,
         "page-settings", "page-model", "page-shortcuts", "page-about"};
     static const int menu_icons[] = {
         BONGO_CAT_UI_ICON_CAT, BONGO_CAT_UI_ICON_WAND,
-        BONGO_CAT_UI_ICON_KEYBOARD, BONGO_CAT_UI_ICON_HEART};
+        BONGO_CAT_UI_ICON_KEYBOARD, BONGO_CAT_UI_ICON_SMILE,
+        BONGO_CAT_UI_ICON_HEART};
     const char *menus[] = {
         tr(value, "pages.preference.cat.title", "Preferences"),
         tr(value, "pages.preference.model.title", "Model"),
         tr(value, "pages.preference.shortcut.title", "Shortcuts"),
+        /* 面捕独立成一页: 它自带组件下载与设备选择, 塞在「互动」里会把那一页撑爆 */
+        tr(value, "pages.preference.face.title", "Face Capture"),
         tr(value, "native.support.title", "Support the Developer")};
     bool modal = bongo_cat_preferences_remove_dialog_active(value->app) ||
         bongo_cat_preferences_behavior_dialog_active(value) ||
@@ -131,7 +134,7 @@ static bool draw_shell(BongoCatPreferences *value, struct nk_context *context,
         update_snapshot.status == BONGO_CAT_UPDATE_INSTALLING ||
         (update_snapshot.status == BONGO_CAT_UPDATE_ERROR &&
             update_snapshot.release.version[0]);
-    bongo_cat_ui_tabs(context, menus, menu_icons, 4, &value->page,
+    bongo_cat_ui_tabs(context, menus, menu_icons, 5, &value->page,
         !modal, dark, interior_height, about_badge,
         draw_icon, value);
     if (!value->page_seen) {

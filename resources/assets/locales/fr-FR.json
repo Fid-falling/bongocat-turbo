@@ -7,7 +7,16 @@
       }
     },
     "preference": {
-      "live2dSetup": {
+              "face": {
+          "title": "Capture du visage",
+          "section": "Capture du visage",
+          "confirmTitle": "Capture du visage",
+          "confirmBody": "La capture du visage nécessite un téléchargement unique du composant (environ 6,6 Mo). Elle fonctionne ensuite hors ligne.",
+          "confirmAsk": "Télécharger maintenant ?",
+          "confirmCancel": "Annuler",
+          "confirmOk": "Télécharger"
+        },
+"live2dSetup": {
         "title": "Runtime Live2D (Cubism Core)",
         "description": "Live2D Cubism Core n'est pas encore installe. Telechargez Cubism SDK for Native depuis le site officiel de Live2D, puis selectionnez ici le ZIP ou la bibliotheque Core. Ce runtime n'est ni fourni ni telecharge automatiquement.",
         "installed": "Cubism Core importe; le rendu Live2D est disponible",
@@ -85,6 +94,7 @@
           "faceFlipV": "Miroir vertical",
           "faceCaptureStatus": "État",
           "faceCaptureMissing": "Composant absent ou indisponible",
+          "faceCaptureReady": "Composant prêt",
           "faceCaptureDownload": "Télécharger le composant (6,6 Mo)",
           "faceCaptureDownloadHint": "Une seule fois — aucun réseau ensuite",
           "hideBubbleHint": "Ne pas afficher les bulles pour les modèles qui en ont",

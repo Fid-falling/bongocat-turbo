@@ -7,7 +7,16 @@
       }
     },
     "preference": {
-      "live2dSetup": {
+              "face": {
+          "title": "Face Capture",
+          "section": "Face Capture",
+          "confirmTitle": "Face Capture",
+          "confirmBody": "Face capture needs a one-time component download (about 6.6 MB). It works offline afterwards.",
+          "confirmAsk": "Download now?",
+          "confirmCancel": "Cancel",
+          "confirmOk": "Download"
+        },
+"live2dSetup": {
         "title": "Live2D runtime (Cubism Core)",
         "description": "Live2D Cubism Core is not installed yet. Download Cubism SDK for Native from the official Live2D site, then select the ZIP or the Core library here to import it. This runtime library is neither bundled nor downloaded for you.",
         "installed": "Cubism Core imported; Live2D rendering is available",
@@ -85,6 +94,7 @@
           "faceFlipV": "Flip Vertically",
           "faceCaptureStatus": "Status",
           "faceCaptureMissing": "Component missing or unavailable",
+          "faceCaptureReady": "Component ready",
           "faceCaptureDownload": "Download Component (6.6 MB)",
           "faceCaptureDownloadHint": "Only needed once — no network afterwards",
           "hideBubbleHint": "Do not show key bubbles for models that have one",
