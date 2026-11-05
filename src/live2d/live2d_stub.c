@@ -180,6 +180,9 @@ void bongo_cat_live2d_set_mirror(BongoCatLive2D *live2d, bool mirror) {
 void bongo_cat_live2d_set_vertical_flip(BongoCatLive2D *live2d, bool flipped) {
     (void)live2d; (void)flipped;
 }
+void bongo_cat_live2d_set_rotation(BongoCatLive2D *live2d, float degrees) {
+    (void)live2d; (void)degrees;
+}
 void bongo_cat_live2d_set_render_options(BongoCatLive2D *live2d,
     const BongoCatLive2DRenderOptions *options) {
     (void)live2d; (void)options;

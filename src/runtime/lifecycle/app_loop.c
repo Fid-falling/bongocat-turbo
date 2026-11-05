@@ -140,6 +140,7 @@ static bool render(BongoCatApp *app, bool present) {
     bongo_cat_live2d_set_mirror(app->live2d, app->settings.model.mirror);
     bongo_cat_live2d_set_vertical_flip(app->live2d,
         app->settings.model.vertical_flip);
+    bongo_cat_live2d_set_rotation(app->live2d, app->session.window.rotation_deg);
     bongo_cat_first_frame_stage("gl:live2d-draw");
     bongo_cat_live2d_draw(app->live2d);
     bongo_cat_first_frame_stage("gl:overlay");
@@ -329,6 +330,8 @@ void bongo_cat_app_loop(BongoCatApp *app) {
         if (take_update_shutdown(app)) continue;
         now = SDL_GetTicksNS();
         bongo_cat_window_update_wheel_animation(app, now);
+        /* 旋转角度与窗口尺寸对齐 (启动恢复上次角度时也靠这一句把窗口放大) */
+        bongo_cat_window_apply_rotation(app);
         bongo_cat_window_snapshot_update(app, now);
         bongo_cat_multi_pet_update(app, now);
         bongo_cat_random_expression_update(app, now);

@@ -184,6 +184,10 @@ void op_set_vertical_flip(void *instance, bool flipped) {
     bongo_cat_live2d_set_vertical_flip((BongoCatLive2D *)instance, flipped);
 }
 
+void op_set_rotation(void *instance, float degrees) {
+    bongo_cat_live2d_set_rotation((BongoCatLive2D *)instance, degrees);
+}
+
 void op_set_render_options(void *instance,
     const BongoCatLive2DRenderOptions *options) {
     bongo_cat_live2d_set_render_options((BongoCatLive2D *)instance, options);
@@ -368,7 +372,8 @@ const BongoCatRendererModule module = {
         op_vulkan_target_info, op_vulkan_release_target,
         op_vulkan_target_generation,
         op_vulkan_create_texture, op_vulkan_create_texture_attached,
-        op_vulkan_destroy_texture, op_vulkan_bind_texture
+        op_vulkan_destroy_texture, op_vulkan_bind_texture,
+        op_set_rotation
     }
 };
 

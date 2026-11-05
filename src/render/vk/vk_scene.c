@@ -121,6 +121,7 @@ bool bongo_cat_vk_render_main(BongoCatApp *app, bool present) {
     bongo_cat_live2d_set_mirror(app->live2d, app->settings.model.mirror);
     bongo_cat_live2d_set_vertical_flip(app->live2d,
         app->settings.model.vertical_flip);
+    bongo_cat_live2d_set_rotation(app->live2d, app->session.window.rotation_deg);
     /* 用户报告的故障就卡在下一步里 (create_renderer 之后无输出): 这个阶段标记
        让首帧看门狗的 ERROR 能直接说出"卡在 vk:live2d-draw"。 */
     bongo_cat_first_frame_stage("vk:live2d-draw");

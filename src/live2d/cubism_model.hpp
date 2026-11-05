@@ -61,6 +61,9 @@ public:
     void draw();
     void set_mirror(bool mirror);
     void set_vertical_flip(bool flipped);
+    /* 整体旋转 (度): 在 build_projection 里绕画布中心转, 并按 1/(|cos|+|sin|) 缩小,
+       窗口那一侧同时按 |cos|+|sin| 放大, 于是视觉大小不变、只是转了。 */
+    void set_rotation(float degrees);
     void set_render_options(const BongoCatLive2DRenderOptions &options);
     void set_dragging(float x, float y, bool angle_z = false);
     void prepare_viewer_audit();
@@ -256,6 +259,8 @@ private:
     bool automatic_idle_ = true;
     bool mirror_ = false;
     bool vertical_flip_ = false;
+    /* 整体旋转角度 (度)。0 表示不转, 此时投影矩阵与旧版完全一致。 */
+    float rotation_deg_ = 0.0f;
     BongoCatLive2DRenderOptions render_options_{};
     bool direct_textures_ = false;
     bool parameter_overrides_applied_ = false;

@@ -25,6 +25,7 @@ void bongo_cat_input_init(BongoCatInputState *state) {
     atomic_init(&state->mouse_dirty, false);
     atomic_init(&state->control, 0);
     atomic_init(&state->shift, 0);
+    atomic_init(&state->alt, 0);
     atomic_init(&state->dropped, 0);
     atomic_init(&state->next_sequence, 0);
     memset(state->recovery, 0, sizeof(state->recovery));
@@ -55,6 +56,11 @@ static void update_modifiers(BongoCatInputState *state, const BongoCatInputEvent
         value = &state->shift;
         mask = strcmp(event->name, "ShiftLeft") == 0 ? 1 :
             strcmp(event->name, "ShiftRight") == 0 ? 2 : 0;
+    }
+    if (!mask) {
+        value = &state->alt;
+        mask = strcmp(event->name, "AltLeft") == 0 ? 1 :
+            strcmp(event->name, "AltRight") == 0 ? 2 : 0;
     }
     if (!mask) return;
     if (event->kind == BONGO_CAT_INPUT_KEY_DOWN)
@@ -166,6 +172,10 @@ bool bongo_cat_input_control_down(const BongoCatInputState *state) {
 
 bool bongo_cat_input_shift_down(const BongoCatInputState *state) {
     return state && atomic_load_explicit(&state->shift, memory_order_acquire) != 0;
+}
+
+bool bongo_cat_input_alt_down(const BongoCatInputState *state) {
+    return state && atomic_load_explicit(&state->alt, memory_order_acquire) != 0;
 }
 
 static size_t release_index(const BongoCatInputState *state, const char *name) {

@@ -138,7 +138,9 @@ BongoCatResult bongo_cat_session_load(const char *path,
             read_float(window, "scalePercent",
                 &loaded.window.scale_percent, error) &&
             read_float(window, "opacityPercent",
-                &loaded.window.opacity_percent, error);
+                &loaded.window.opacity_percent, error) &&
+            read_float(window, "rotationDeg",
+                &loaded.window.rotation_deg, error);
         yyjson_val *position = NULL;
         yyjson_val *size = NULL;
         if (valid) valid = read_object(
@@ -252,7 +254,9 @@ BongoCatResult bongo_cat_session_save(const char *path,
         yyjson_mut_obj_add_real(doc, window, "scalePercent",
             canonical.window.scale_percent) &&
         yyjson_mut_obj_add_real(doc, window, "opacityPercent",
-            canonical.window.opacity_percent);
+            canonical.window.opacity_percent) &&
+        yyjson_mut_obj_add_real(doc, window, "rotationDeg",
+            canonical.window.rotation_deg);
     if (built && canonical.window.position_known) {
         yyjson_mut_val *position =
             yyjson_mut_obj_add_obj(doc, window, "position");

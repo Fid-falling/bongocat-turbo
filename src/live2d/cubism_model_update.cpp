@@ -106,6 +106,34 @@ bool NativeModel::update(float delta_seconds) {
     return result;
 }
 
+/*
+ * 整体旋转 (度): 绕画布中心转, 并按 1/(|cos|+|sin|) 缩小。
+ *
+ * 为什么两件事必须成对: 旋转后模型的外接矩形变成 |cos|+|sin| 倍, 窗口会同步放大这么多
+ * (见 window_scale.c); 如果模型投影不缩小回去, 视觉上就变成"边转边放大"。反过来只缩窗口
+ * 不缩模型则会裁掉四角。
+ *
+ * 为什么往模型空间里乘: CubismMatrix44 是行主序 + 列向量, MultiplyByMatrix(m) 得到
+ * m·P, 也就是 m 先作用 —— 在画布空间(各向同性)旋转, 不会被非方形窗口的纵横比拉斜。
+ * 旋转中心是画布原点 (Live2D 的画布坐标以中心为 0,0)。
+ */
+static void apply_rotation(Csm::CubismMatrix44 &projection, float degrees) {
+    if (fabsf(degrees) < 0.01f) return;
+    const float rad = degrees * 3.14159265358979f / 180.0f;
+    const float c = cosf(rad), s = sinf(rad);
+    const float ext = fabsf(c) + fabsf(s);
+    const float inv = ext > 0.0001f ? 1.0f / ext : 1.0f;
+    Csm::CubismMatrix44 rot;
+    rot.LoadIdentity();
+    float *m = rot.GetArray();
+    /* 行主序: [0][1] 是第二列... 这里直接按 2D 旋转 + 等比缩放填前两行两列 */
+    m[0] = c * inv;
+    m[1] = -s * inv;
+    m[4] = s * inv;
+    m[5] = c * inv;
+    projection.MultiplyByMatrix(&rot);
+}
+
 void NativeModel::build_projection(Csm::CubismMatrix44 &projection,
     int width, int height) {
     if (!_model || width <= 0 || height <= 0) return;
@@ -140,6 +168,7 @@ void NativeModel::build_projection(Csm::CubismMatrix44 &projection,
         matrix[4] *= mver_core_canvas_scale;
         matrix[5] *= mver_core_canvas_scale;
     }
+    apply_rotation(projection, rotation_deg_);
 }
 
 void NativeModel::draw() {
@@ -188,6 +217,12 @@ void NativeModel::draw() {
 void NativeModel::set_mirror(bool mirror) { mirror_ = mirror; }
 
 void NativeModel::set_vertical_flip(bool flipped) { vertical_flip_ = flipped; }
+
+void NativeModel::set_rotation(float degrees) {
+    /* 只在真正变化时记, 调用方每帧都会下发 */
+    if (rotation_deg_ == degrees) return;
+    rotation_deg_ = degrees;
+}
 
 void NativeModel::set_render_options(const BongoCatLive2DRenderOptions &options) {
     render_options_ = options;

@@ -142,6 +142,11 @@ bool bongo_cat_window_content_size(BongoCatApp *app,
 bool bongo_cat_window_apply_geometry(BongoCatApp *app, int x, int y,
     float scale, int width, int height);
 bool bongo_cat_window_set_scale(BongoCatApp *app, float scale);
+/* 旋转 degree 度后, 模型外接矩形是原来的多少倍 (=|cos|+|sin|, 0 度时 1)。窗口尺寸乘它,
+   模型投影除它, 于是视觉大小不变、四角不被裁。 */
+float bongo_cat_window_rotation_factor(float degrees);
+/* 旋转角度变了就按系数放大/缩小窗口 (中心不动, 幂等), 见 window_scale.c。 */
+bool bongo_cat_window_apply_rotation(BongoCatApp *app);
 bool bongo_cat_window_apply_scale_centered(BongoCatApp *app, float scale,
     int base_width, int base_height, float base_scale,
     float center_x, float center_y);

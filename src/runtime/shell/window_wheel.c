@@ -9,6 +9,9 @@
 
 #define WHEEL_OPACITY_STEP 5.0f
 #define WHEEL_SCALE_STEP 2.0f
+/* Alt+滚轮 每格转多少度。3 度在 120 格的鼠标上一圈约 45 度, 微调够细、转大角度也不费劲。 */
+#define WHEEL_ROTATION_STEP 3.0f
+#define WHEEL_ROTATION_SPEED_PER_SECOND 180.0f
 #define WHEEL_SCALE_TARGET_LEAD (2.0f * WHEEL_SCALE_STEP)
 #define WHEEL_OPACITY_RESPONSE_SECONDS 0.05f
 #define WHEEL_SCALE_RESPONSE_SECONDS 0.025f
@@ -63,6 +66,9 @@ static bool initialize_targets(BongoCatApp *app, bool reset) {
         return false;
     app->wheel_opacity_target = app->session.window.opacity_percent;
     app->wheel_scale_target = app->session.window.scale_percent;
+    app->wheel_rotation_target = app->session.window.rotation_deg;
+    app->rotation_applied_factor = bongo_cat_window_rotation_factor(
+        app->session.window.rotation_deg);
     app->wheel_center_x = x + width * 0.5f;
     app->wheel_center_y = y + height * 0.5f;
     app->wheel_geometry_scale = app->session.window.scale_percent;
@@ -97,13 +103,21 @@ void bongo_cat_window_wheel(BongoCatApp *app, const SDL_MouseWheelEvent *event) 
     app->wheel_gesture_active = true;
     float old_opacity_target = app->wheel_opacity_target;
     float old_scale_target = app->wheel_scale_target;
+    float old_rotation_target = app->wheel_rotation_target;
+    bool alt = bongo_cat_input_alt_down(&app->input);
     bool control = bongo_cat_input_control_down(&app->input);
 #ifndef _WIN32
     control = control || (SDL_GetModState() & SDL_KMOD_CTRL) != 0;
 #endif
     /* Windows Raw Input tracks releases without keyboard focus; SDL's
        cached modifiers can retain Ctrl after it has been released. */
-    if (!control) {
+    if (alt) {
+        /* Alt+滚轮 = 旋转模型 (任意角度)。方向与缩放一致: 往上滚角度减小(逆时针),
+           范围 ±180, 到边就停, 不绕圈。 */
+        bongo_cat_window_snapshot_end(app);
+        app->wheel_rotation_target = SDL_clamp(app->wheel_rotation_target -
+            delta * WHEEL_ROTATION_STEP, -180.0f, 180.0f);
+    } else if (!control) {
         float minimum = SDL_max(10.0f,
             app->session.window.scale_percent - WHEEL_SCALE_TARGET_LEAD);
         float maximum = SDL_min(500.0f,
@@ -118,7 +132,8 @@ void bongo_cat_window_wheel(BongoCatApp *app, const SDL_MouseWheelEvent *event) 
     /* event_ns 用于判定手势是否连续, 动画一律用这里的 SDL_GetTicksNS 时钟 (两者不同源)。 */
     uint64_t input_ns = SDL_GetTicksNS();
     if (old_opacity_target == app->wheel_opacity_target &&
-        old_scale_target == app->wheel_scale_target) {
+        old_scale_target == app->wheel_scale_target &&
+        old_rotation_target == app->wheel_rotation_target) {
         if (app->wheel_animation_active) app->wheel_input_ns = input_ns;
         return;
     }
@@ -202,9 +217,22 @@ void bongo_cat_window_update_wheel_animation(BongoCatApp *app, uint64_t now) {
         }
     }
     apply_scale(app, scale);
+    /* 旋转: 角度变化后要把窗口按 |cos|+|sin| 的比例放大 (模型投影那边会同步缩小),
+       这样视觉大小不变、四角也不会被裁。窗口缩放走同一条"中心不动"的路径。 */
+    float rotation = approach(app->session.window.rotation_deg,
+        app->wheel_rotation_target, elapsed_seconds, WHEEL_SCALE_RESPONSE_SECONDS,
+        WHEEL_ROTATION_SPEED_PER_SECOND, 0.05f);
+    if (SDL_fabsf(rotation - app->session.window.rotation_deg) > 0.001f) {
+        app->session.window.rotation_deg = rotation;
+        /* 窗口放大/缩小的判断与执行都在 window_scale.c 里, 启动恢复与手势共用一份 */
+        (void)bongo_cat_window_apply_rotation(app);
+        app->dirty = true;
+    }
     bool reached =
         SDL_fabsf(app->session.window.opacity_percent - app->wheel_opacity_target) < 0.01f &&
-        SDL_fabsf(app->session.window.scale_percent - app->wheel_scale_target) < 0.01f;
+        SDL_fabsf(app->session.window.scale_percent - app->wheel_scale_target) < 0.01f &&
+        SDL_fabsf(app->session.window.rotation_deg -
+            app->wheel_rotation_target) < 0.05f;
     bool recent_input = now >= app->wheel_input_ns &&
         now - app->wheel_input_ns < BONGO_CAT_WHEEL_GESTURE_IDLE_NS;
     app->wheel_animation_active = !reached || recent_input;
