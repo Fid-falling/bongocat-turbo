@@ -41,10 +41,14 @@ bool bongo_cat_face_capture_root(BongoCatApp *app, char *output,
     return bongo_cat_path_join(output, capacity, base, "components/facetrack");
 }
 
+bool bongo_cat_face_capture_enabled(const BongoCatApp *app) {
+    return app && (app->settings.model.face_capture != 0 ||
+        app->force_face_capture);
+}
+
 bool bongo_cat_face_capture_sync(BongoCatApp *app) {
     if (!app) return false;
-    const bool wanted = app->settings.model.face_capture != 0 ||
-        app->force_face_capture;
+    const bool wanted = bongo_cat_face_capture_enabled(app);
     if (!wanted) {
         if (app->face_capture) {
             SDL_LogInfo(BONGO_CAT_LOG_LIFECYCLE, "[face] 面捕已关闭");
@@ -136,32 +140,4 @@ bool bongo_cat_face_capture_install_blocking(BongoCatApp *app, int timeout_secon
         snapshot.error[0] ? ": " : "", snapshot.error);
     bongo_cat_facetrack_install_destroy(install);
     return ok;
-}
-
-/* TEMP-REPRO: 复现"面捕运行中关闭会崩"。阶段:
-   0 = 关, 1 = 已开启等待, 2 = 关闭并退出。由 update_model 每帧推进 (主线程 + 设置窗口
-   正在绘制的真实时序)。 */
-static int g_selftest_stage = -1;
-static Uint64 g_selftest_deadline = 0;
-
-void bongo_cat_face_capture_toggle_selftest(BongoCatApp *app) {
-    if (!SDL_getenv("BONGO_CAT_FACE_TOGGLE_TEST")) return;
-    if (g_selftest_stage >= 0 || !app) return;
-    SDL_LogInfo(BONGO_CAT_LOG_LIFECYCLE, "[face][selftest] 打开");
-    app->settings.model.face_capture = 1;
-    bongo_cat_face_capture_sync(app);
-    g_selftest_stage = 1;
-    g_selftest_deadline = SDL_GetTicks() + 3000;
-}
-
-void bongo_cat_face_capture_toggle_selftest_tick(BongoCatApp *app) {
-    if (g_selftest_stage != 1 || !app) return;
-    if (SDL_GetTicks() < g_selftest_deadline) return;
-    SDL_LogInfo(BONGO_CAT_LOG_LIFECYCLE, "[face][selftest] 关闭 (主循环第 %d 帧后)",
-        g_selftest_stage);
-    app->settings.model.face_capture = 0;
-    bongo_cat_face_capture_sync(app);
-    SDL_LogInfo(BONGO_CAT_LOG_LIFECYCLE, "[face][selftest] 关闭完成");
-    g_selftest_stage = 2;
-    app->running = false;
 }

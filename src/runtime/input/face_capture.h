@@ -56,10 +56,12 @@ bool bongo_cat_face_capture_root(BongoCatApp *app, char *output, size_t capacity
 bool bongo_cat_face_capture_install_blocking(BongoCatApp *app, int timeout_seconds);
 bool bongo_cat_face_capture_download(BongoCatApp *app);
 
+/* 面捕是否处于启用状态: 设置里开着, 或本次启动带了 --face-capture (演示/录屏)。
+   参数映射与"鼠标让位"都必须用它判断, 否则会出现"组件在跑但完全没有效果"。 */
+bool bongo_cat_face_capture_enabled(const BongoCatApp *app);
+
 /* 按设置里的开关创建/销毁面捕运行时 (幂等)。缺组件时只记日志并返回 false。 */
 bool bongo_cat_face_capture_sync(BongoCatApp *app);
-void bongo_cat_face_capture_toggle_selftest(BongoCatApp *app);
-void bongo_cat_face_capture_toggle_selftest_tick(BongoCatApp *app);
 
 /* 重新做中性基线标定 (组件 v1.1.0 起的可选能力; 老组件上是空操作)。 */
 void bongo_cat_face_capture_recalibrate(BongoCatFaceCapture *capture);

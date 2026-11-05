@@ -12,7 +12,7 @@
 #include "face_capture.h"
 
 #include <math.h>
-#include <string.h>
+
 
 static bool has_parameter(BongoCatLive2D *live2d, const char *id) {
     BongoCatParameterRange range = {0};
@@ -22,7 +22,8 @@ static bool has_parameter(BongoCatLive2D *live2d, const char *id) {
 /* 写入并按模型自己声明的范围夹取: 不同模型的 ParamAngleX 可能是 ±30 也可能是 ±10。 */
 static void write_parameter(BongoCatLive2D *live2d, const char *id, float value) {
     BongoCatParameterRange range = {0};
-    if (!bongo_cat_live2d_parameter(live2d, id, &range)) return;
+    const bool found = bongo_cat_live2d_parameter(live2d, id, &range);
+    if (!found) return;
     if (range.maximum > range.minimum)
         value = fminf(fmaxf(value, range.minimum), range.maximum);
     bongo_cat_live2d_set_parameter(live2d, id, value);

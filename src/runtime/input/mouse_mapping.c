@@ -117,7 +117,7 @@ void bongo_cat_app_apply_mouse_coordinates(BongoCatApp *app,
      * 手和键盘不受影响: 上面 ParamMouseX/Y 已经写过了。
      */
     const bool face_drives_head = app->face_capture &&
-        app->settings.model.face_capture &&
+        bongo_cat_face_capture_enabled(app) &&
         bongo_cat_face_capture_head_active(app->face_capture);
     /* Pointer and window messages are not atomic during a native window move. */
     if (!face_drives_head &&
