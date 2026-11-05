@@ -120,6 +120,8 @@ typedef struct BongoCatApp {
     struct BongoCatFacetrackInstall *facetrack_install;
     /* 本次会话是否已经查过组件版本 (自动检查更新, 每次启动一次) */
     bool facetrack_checked;
+    /* --face-capture: 本次启动强制开启面捕 (演示/录屏/自动化), 不写回配置 */
+    bool force_face_capture;
     BongoCatPreferences *preferences;
     BongoCatMultiPetRuntime *multi_pet;
     BongoCatModelRefresh *model_refresh;

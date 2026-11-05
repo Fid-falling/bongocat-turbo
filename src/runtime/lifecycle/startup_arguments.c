@@ -232,6 +232,8 @@ bool bongo_cat_startup_arguments(BongoCatApp *app, int argc, char **argv,
         }
         else if (strcmp(arg, "--install-facetrack") == 0)
         app->install_facetrack_only = true;
+    else if (strcmp(arg, "--face-capture") == 0)
+        app->force_face_capture = true;
     else if (strcmp(arg, "--ci-smoke") == 0) app->smoke = true;
         else if (strcmp(arg, "--ci-preferences") == 0) app->smoke_preferences = true;
         else if (strcmp(arg, "--ci-preference-shortcut") == 0)

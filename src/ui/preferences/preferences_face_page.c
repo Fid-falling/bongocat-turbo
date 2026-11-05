@@ -233,6 +233,23 @@ void bongo_cat_preferences_face_content(BongoCatApp *app,
         /* 没开时不显示后面的调节项, 免得用户以为它们在起作用 */
         return;
     }
+    /* GPU 推理开关: 默认关 —— 这套模型太小, 实测 CPU 26.7ms/帧、GPU 45.6ms/帧,
+       GPU 只对 CPU 很弱的老机器有意义。改后端要重建推理会话, 所以切换后重启采集。 */
+    {
+        bool use_gpu = model->face_capture_gpu != 0;
+        bongo_cat_pref_row_icon(context, BONGO_CAT_PREF_ICON_RENDERER);
+        if (bongo_cat_pref_toggle(context, "face-page-gpu", face_tr(app,
+                "pages.preference.cat.labels.faceGpu", "GPU 推理"),
+                face_tr(app, "pages.preference.cat.labels.faceGpuHint",
+                    "用显卡推理（DirectML）。模型很小，通常比 CPU 更慢，仅老 CPU 有收益"),
+                &use_gpu)) {
+            model->face_capture_gpu = use_gpu ? 1 : 0;
+            app->dirty = true;
+            bongo_cat_face_capture_stop(app->face_capture);
+            bongo_cat_face_capture_sync(app);
+        }
+    }
+
     /* 滑杆控件统一按百分比显示 ("%"), 所以这里用 20%..300% 表示 0.2..3.0 倍;
        直接传 1.0 会显示成 "1%" (截图里就是这样)。 */
     float gain_percent = model->face_capture_gain * 100.0f;

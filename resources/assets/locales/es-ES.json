@@ -105,6 +105,8 @@
           "faceRecalibrateStarted": "Recalibrando: mantén la cara frente a la cámara",
           "faceUpdateAvailable": "Actualización del componente",
           "faceUpdateAction": "Actualizar",
+          "faceGpu": "Inferencia GPU",
+          "faceGpuHint": "Calcular en la GPU (DirectML). El modelo es diminuto y suele ser más lento que la CPU",
           "faceCaptureDownload": "Descargar componente (6,6 MB)",
           "faceCaptureDownloadHint": "Solo una vez — después sin red",
           "hideBubbleHint": "No mostrar burbujas en los modelos que las tienen",

@@ -25,6 +25,7 @@ void bongo_cat_settings_face_capture_defaults(BongoCatModelPreferences *model) {
     model->face_capture_flip_h = 0;
     model->face_capture_flip_v = 0;
     model->face_capture_camera = 0;
+    model->face_capture_gpu = 0;
 }
 
 void bongo_cat_settings_face_capture_validate(BongoCatModelPreferences *model) {
@@ -34,4 +35,5 @@ void bongo_cat_settings_face_capture_validate(BongoCatModelPreferences *model) {
     model->face_capture_flip_h = model->face_capture_flip_h != 0;
     model->face_capture_flip_v = model->face_capture_flip_v != 0;
     if (model->face_capture_camera < 0) model->face_capture_camera = 0;
+    model->face_capture_gpu = model->face_capture_gpu != 0;
 }

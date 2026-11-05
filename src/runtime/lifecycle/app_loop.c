@@ -47,6 +47,7 @@ static void update_model(BongoCatApp *app, uint64_t now) {
     if (elapsed > 0.25f) elapsed = 0.25f;
     app->last_frame_ns = now;
     if (!app->smoke_freeze_model) bongo_cat_app_step_live2d(app, elapsed);
+    bongo_cat_face_capture_toggle_selftest_tick(app);
     /* 面捕: 每帧把最新快照写进模型。放在 step 之后、draw 之前, 这样这一帧画出来的就是
        刚采到的表情; 鼠标驱动头部在 mouse_mapping.c 里被跳过 (面部优先)。 */
     if (app->face_capture && app->settings.model.face_capture)

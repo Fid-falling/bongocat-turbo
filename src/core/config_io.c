@@ -97,6 +97,7 @@ static bool read_model(yyjson_val *object, BongoCatModelPreferences *value,
         !read_int(object, "faceFlipH", &value->face_capture_flip_h, error) ||
         !read_int(object, "faceFlipV", &value->face_capture_flip_v, error) ||
         !read_int(object, "faceCamera", &value->face_capture_camera, error) ||
+        !read_int(object, "faceGpu", &value->face_capture_gpu, error) ||
         /* 可选读: 老配置缺这个键时保持默认 0 (标准图集上限) */
         !read_int(object, "textureQuality", &value->texture_quality, error))
         return false;

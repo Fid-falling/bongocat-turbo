@@ -105,6 +105,8 @@
           "faceRecalibrateStarted": "Recalibrating — keep facing the camera",
           "faceUpdateAvailable": "Component update available",
           "faceUpdateAction": "Update",
+          "faceGpu": "GPU inference",
+          "faceGpuHint": "Run on the GPU (DirectML). The model is tiny and usually slower than CPU; only helps weak CPUs",
           "faceCaptureDownload": "Download Component (6.6 MB)",
           "faceCaptureDownloadHint": "Only needed once — no network afterwards",
           "hideBubbleHint": "Do not show key bubbles for models that have one",

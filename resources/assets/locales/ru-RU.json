@@ -105,6 +105,8 @@
           "faceRecalibrateStarted": "Идёт калибровка — смотрите в камеру",
           "faceUpdateAvailable": "Доступно обновление компонента",
           "faceUpdateAction": "Обновить",
+          "faceGpu": "GPU-инференс",
+          "faceGpuHint": "Считать на GPU (DirectML). Модель крошечная и обычно медленнее CPU",
           "faceCaptureDownload": "Загрузить компонент (6,6 МБ)",
           "faceCaptureDownloadHint": "Только один раз — дальше без сети",
           "hideBubbleHint": "Не показывать пузыри клавиш у моделей с ними",

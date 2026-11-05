@@ -105,6 +105,8 @@
           "faceRecalibrateStarted": "보정 중입니다. 카메라를 정면으로 봐 주세요",
           "faceUpdateAvailable": "구성 요소 업데이트 있음",
           "faceUpdateAction": "업데이트",
+          "faceGpu": "GPU 추론",
+          "faceGpuHint": "GPU(DirectML)로 추론합니다. 모델이 작아 보통 CPU보다 느리며 구형 CPU에서만 이득입니다",
           "faceCaptureDownload": "구성 요소 다운로드 (6.6 MB)",
           "faceCaptureDownloadHint": "한 번만 받으면 됩니다",
           "hideBubbleHint": "버블이 있는 모델에서는 키 버블을 표시하지 않습니다",

@@ -105,6 +105,8 @@
           "faceRecalibrateStarted": "正在重新校准，请保持正对摄像头",
           "faceUpdateAvailable": "组件有新版本",
           "faceUpdateAction": "更新",
+          "faceGpu": "GPU 推理",
+          "faceGpuHint": "用显卡推理（DirectML）。模型很小，通常比 CPU 更慢，仅老 CPU 有收益",
           "faceCaptureDownload": "下载组件（约 6.6 MB）",
           "faceCaptureDownloadHint": "只需下载一次，之后不再联网",
           "hideBubbleHint": "对自带气泡的模型不显示按键气泡",

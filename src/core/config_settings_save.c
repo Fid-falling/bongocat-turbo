@@ -55,6 +55,8 @@ static bool write_model(yyjson_mut_doc *doc, yyjson_mut_val *object,
             value->face_capture_flip_v) &&
         yyjson_mut_obj_add_int(doc, object, "faceCamera",
             value->face_capture_camera) &&
+        yyjson_mut_obj_add_int(doc, object, "faceGpu",
+            value->face_capture_gpu) &&
         /* 键名/类型与 config_io.c 的 read_float("renderScale") 一一对齐。1.0 也照常写:
            "缺键"与"显式 1.0"读出来是同一个值, 写全是为了让用户能手改。 */
         yyjson_mut_obj_add_real(doc, object, "renderScale",

@@ -30,8 +30,9 @@ typedef struct BongoCatFaceSnapshot {
 } BongoCatFaceSnapshot;
 
 /* 创建运行时 (不打开摄像头)。dll_path 为空时按默认目录找组件。 */
+/* use_gpu = 1 时请求 DirectML 后端 (组件 v1.2.0+ 才支持, 不支持时自动用 CPU)。 */
 BongoCatFaceCapture *bongo_cat_face_capture_create(const char *dll_path,
-    const char *models_dir, char *err, size_t err_cap);
+    const char *models_dir, bool use_gpu, char *err, size_t err_cap);
 void bongo_cat_face_capture_destroy(BongoCatFaceCapture *capture);
 
 /* 打开/关闭摄像头与推理线程 (幂等)。camera_id = 0 表示系统默认摄像头。 */
@@ -57,6 +58,8 @@ bool bongo_cat_face_capture_download(BongoCatApp *app);
 
 /* 按设置里的开关创建/销毁面捕运行时 (幂等)。缺组件时只记日志并返回 false。 */
 bool bongo_cat_face_capture_sync(BongoCatApp *app);
+void bongo_cat_face_capture_toggle_selftest(BongoCatApp *app);
+void bongo_cat_face_capture_toggle_selftest_tick(BongoCatApp *app);
 
 /* 重新做中性基线标定 (组件 v1.1.0 起的可选能力; 老组件上是空操作)。 */
 void bongo_cat_face_capture_recalibrate(BongoCatFaceCapture *capture);

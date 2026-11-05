@@ -105,6 +105,8 @@
           "faceRecalibrateStarted": "再キャリブレーション中。カメラに正対してください",
           "faceUpdateAvailable": "コンポーネントの更新があります",
           "faceUpdateAction": "更新",
+          "faceGpu": "GPU 推論",
+          "faceGpuHint": "GPU (DirectML) で推論します。モデルが小さいため通常は CPU より遅く、古い CPU でのみ有利です",
           "faceCaptureDownload": "コンポーネントをダウンロード (6.6 MB)",
           "faceCaptureDownloadHint": "一度だけ必要です（以後は通信しません）",
           "hideBubbleHint": "バブル付きのモデルではキーバブルを表示しません",

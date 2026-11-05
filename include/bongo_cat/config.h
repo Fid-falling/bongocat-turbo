@@ -162,6 +162,9 @@ typedef struct BongoCatModelPreferences {
     int face_capture_flip_v;
     /* 摄像头设备 id, 0 = 系统默认 (SDL_CameraID) */
     int face_capture_camera;
+    /* 1 = 用 GPU (DirectML) 推理。默认 0: 这套模型很小, CPU 反而更快 (实测 26.7ms vs 45.6ms),
+       GPU 开关留给 CPU 很弱的老机器。 */
+    int face_capture_gpu;
     /*
      * 渲染精度: 以 N 倍分辨率渲染后再线性缩回窗口尺寸 (见 BONGO_CAT_RENDER_SCALE_*)。
      * 用 float + 可选读 read_float: 老配置里没有 renderScale 这个键时保持默认 1.0,
