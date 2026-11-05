@@ -121,7 +121,6 @@ bool bongo_cat_vk_render_main(BongoCatApp *app, bool present) {
     bongo_cat_live2d_set_mirror(app->live2d, app->settings.model.mirror);
     bongo_cat_live2d_set_vertical_flip(app->live2d,
         app->settings.model.vertical_flip);
-    bongo_cat_live2d_set_rotation(app->live2d, app->session.window.rotation_deg);
     /* 用户报告的故障就卡在下一步里 (create_renderer 之后无输出): 这个阶段标记
        让首帧看门狗的 ERROR 能直接说出"卡在 vk:live2d-draw"。 */
     bongo_cat_first_frame_stage("vk:live2d-draw");
@@ -153,14 +152,6 @@ bool bongo_cat_vk_render_main(BongoCatApp *app, bool present) {
         bongo_cat_vk_set_viewport(app->vk, content_x,
             height - content_y - content_height, content_width, content_height);
     bongo_cat_first_frame_stage("vk:overlay");
-    /* 气泡与手/按键 必须跟着模型转: 角度与 1/k 缩放和模型一致, 尺寸取 content 视口 ——
-       叠加层画在模型画布那个视口里, 传播口尺寸会把气泡挪位。 */
-    bongo_cat_vk_set_overlay_rotation(app->vk,
-        app->session.window.rotation_deg,
-        1.0f / bongo_cat_window_rotation_factor(
-            app->session.window.rotation_deg),
-        content_viewport ? content_width : width,
-        content_viewport ? content_height : height);
     bongo_cat_overlay_draw_background(app->overlay, app->settings.model.mirror);
     bongo_cat_vk_set_viewport(app->vk, 0, 0, width, height);
     /*

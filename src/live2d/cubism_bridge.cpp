@@ -295,9 +295,6 @@ extern "C" void bongo_cat_live2d_set_mirror(BongoCatLive2D *runtime, bool mirror
 extern "C" void bongo_cat_live2d_set_vertical_flip(BongoCatLive2D *runtime,
     bool flipped) {
     if (runtime && runtime->model) runtime->model->set_vertical_flip(flipped); }
-extern "C" void bongo_cat_live2d_set_rotation(BongoCatLive2D *runtime,
-    float degrees) {
-    if (runtime && runtime->model) runtime->model->set_rotation(degrees); }
 extern "C" void bongo_cat_live2d_set_render_options(BongoCatLive2D *runtime,
     const BongoCatLive2DRenderOptions *options) {
     if (runtime && runtime->model && options)

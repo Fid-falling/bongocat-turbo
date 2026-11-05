@@ -131,15 +131,6 @@ static bool render(BongoCatApp *app, bool present) {
     if (content_viewport)
         bongo_cat_gl_scale_viewport(render_scale, content_x, content_y,
             content_width, content_height);
-    /* 气泡与手/按键 跟着模型一起转 (GL 侧: 矩阵存在 overlay 里, 顶点着色器直接乘)。
-       尺寸必须用 content 视口: 叠加层是画在模型画布那个视口里的, 用整窗尺寸算会把气泡
-       挪到别处 (真实踩过: 头顶多出一块白椭圆)。 */
-    bongo_cat_overlay_set_rotation(app->overlay,
-        app->session.window.rotation_deg,
-        1.0f / bongo_cat_window_rotation_factor(
-            app->session.window.rotation_deg),
-        content_viewport ? content_width : width,
-        content_viewport ? content_height : height);
     bongo_cat_overlay_draw_background(app->overlay,
         app->settings.model.mirror);
     bool cover_requested = !present && bongo_cat_model_cover_pending(app);
@@ -149,7 +140,6 @@ static bool render(BongoCatApp *app, bool present) {
     bongo_cat_live2d_set_mirror(app->live2d, app->settings.model.mirror);
     bongo_cat_live2d_set_vertical_flip(app->live2d,
         app->settings.model.vertical_flip);
-    bongo_cat_live2d_set_rotation(app->live2d, app->session.window.rotation_deg);
     bongo_cat_first_frame_stage("gl:live2d-draw");
     bongo_cat_live2d_draw(app->live2d);
     bongo_cat_first_frame_stage("gl:overlay");
@@ -339,8 +329,6 @@ void bongo_cat_app_loop(BongoCatApp *app) {
         if (take_update_shutdown(app)) continue;
         now = SDL_GetTicksNS();
         bongo_cat_window_update_wheel_animation(app, now);
-        /* 旋转角度与窗口尺寸对齐 (启动恢复上次角度时也靠这一句把窗口放大) */
-        bongo_cat_window_apply_rotation(app);
         bongo_cat_window_snapshot_update(app, now);
         bongo_cat_multi_pet_update(app, now);
         bongo_cat_random_expression_update(app, now);

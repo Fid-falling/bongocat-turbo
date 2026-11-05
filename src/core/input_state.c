@@ -25,7 +25,6 @@ void bongo_cat_input_init(BongoCatInputState *state) {
     atomic_init(&state->mouse_dirty, false);
     atomic_init(&state->control, 0);
     atomic_init(&state->shift, 0);
-    atomic_init(&state->alt, 0);
     atomic_init(&state->dropped, 0);
     atomic_init(&state->next_sequence, 0);
     memset(state->recovery, 0, sizeof(state->recovery));
@@ -56,16 +55,6 @@ static void update_modifiers(BongoCatInputState *state, const BongoCatInputEvent
         value = &state->shift;
         mask = strcmp(event->name, "ShiftLeft") == 0 ? 1 :
             strcmp(event->name, "ShiftRight") == 0 ? 2 : 0;
-    }
-    if (!mask) {
-        /* Windows 的键名表把 Alt 归一成 "Alt"/"AltGr"(见 windows_keys.c: VK_MENU 靠
-           E0 标志区分左右), 而不是 SDL 的 AltLeft/AltRight —— 两种写法都认, 否则
-           Alt+滚轮 永远读不到按下状态, 手势会退回成普通缩放 (真实踩过)。 */
-        value = &state->alt;
-        mask = strcmp(event->name, "Alt") == 0 ||
-            strcmp(event->name, "AltLeft") == 0 ? 1 :
-            strcmp(event->name, "AltGr") == 0 ||
-            strcmp(event->name, "AltRight") == 0 ? 2 : 0;
     }
     if (!mask) return;
     if (event->kind == BONGO_CAT_INPUT_KEY_DOWN)
@@ -177,10 +166,6 @@ bool bongo_cat_input_control_down(const BongoCatInputState *state) {
 
 bool bongo_cat_input_shift_down(const BongoCatInputState *state) {
     return state && atomic_load_explicit(&state->shift, memory_order_acquire) != 0;
-}
-
-bool bongo_cat_input_alt_down(const BongoCatInputState *state) {
-    return state && atomic_load_explicit(&state->alt, memory_order_acquire) != 0;
 }
 
 static size_t release_index(const BongoCatInputState *state, const char *name) {

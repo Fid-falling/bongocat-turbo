@@ -44,8 +44,6 @@ typedef struct BongoCatInputState {
     atomic_bool mouse_dirty;
     atomic_uint_fast8_t control;
     atomic_uint_fast8_t shift;
-    /* Alt 的按下状态 (左右各一位), 供 Alt+滚轮这类手势读取。 */
-    atomic_uint_fast8_t alt;
     atomic_uint_fast64_t dropped;
     atomic_uint_fast64_t next_sequence;
     BongoCatInputEvent recovery[BONGO_CAT_INPUT_RECOVERY_CAP];
@@ -65,7 +63,6 @@ bool bongo_cat_input_mouse(BongoCatInputState *state, double x, double y);
 bool bongo_cat_input_take_mouse(BongoCatInputState *state, double *x, double *y);
 bool bongo_cat_input_control_down(const BongoCatInputState *state);
 bool bongo_cat_input_shift_down(const BongoCatInputState *state);
-bool bongo_cat_input_alt_down(const BongoCatInputState *state);
 void bongo_cat_input_schedule_release(BongoCatInputState *state,
     const BongoCatInputEvent *event, uint64_t delay_ms);
 bool bongo_cat_input_take_scheduled_release(BongoCatInputState *state,

@@ -57,7 +57,6 @@ bool STUB(update)(BongoCatLive2D *live2d, float delta_seconds);
 void STUB(draw)(BongoCatLive2D *live2d);
 void STUB(set_mirror)(BongoCatLive2D *live2d, bool mirror);
 void STUB(set_vertical_flip)(BongoCatLive2D *live2d, bool flipped);
-void STUB(set_rotation)(BongoCatLive2D *live2d, float degrees);
 void STUB(set_render_options)(BongoCatLive2D *live2d,
     const BongoCatLive2DRenderOptions *options);
 void STUB(set_dragging)(BongoCatLive2D *live2d, float x, float y);
@@ -230,15 +229,6 @@ void bongo_cat_live2d_set_vertical_flip(BongoCatLive2D *live2d, bool flipped) {
         return;
     }
     STUB(set_vertical_flip)(live2d, flipped);
-}
-
-void bongo_cat_live2d_set_rotation(BongoCatLive2D *live2d, float degrees) {
-    const BongoCatRendererModuleOps *active = component_used ? ops() : NULL;
-    if (active && active->set_rotation) {
-        active->set_rotation(live2d, degrees);
-        return;
-    }
-    STUB(set_rotation)(live2d, degrees);
 }
 
 void bongo_cat_live2d_set_render_options(BongoCatLive2D *live2d,

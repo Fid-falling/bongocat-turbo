@@ -36,7 +36,6 @@ void bongo_cat_session_defaults(BongoCatSessionState *session) {
     session->window.scale_percent = BONGO_CAT_DEFAULT_WINDOW_SCALE_PERCENT;
     session->window.opacity_percent =
         BONGO_CAT_DEFAULT_WINDOW_OPACITY_PERCENT;
-    session->window.rotation_deg = 0.0f;
     session->window.width = 612;
     session->window.height = 354;
     session->window.content_width = 612;
@@ -116,9 +115,6 @@ void bongo_cat_session_validate(BongoCatSessionState *session) {
     session->window.opacity_percent = clampf_or(
         session->window.opacity_percent, 10.0f, 100.0f,
         BONGO_CAT_DEFAULT_WINDOW_OPACITY_PERCENT);
-    /* 旋转角度: 手改 session.json 填超范围/非数字都收口到 ±180 */
-    session->window.rotation_deg = clampf_or(
-        session->window.rotation_deg, -180.0f, 180.0f, 0.0f);
     if (session->window.width < 64) session->window.width = 64;
     if (session->window.height < 64) session->window.height = 64;
     if (session->window.width > 8192) session->window.width = 8192;

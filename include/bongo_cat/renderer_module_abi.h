@@ -213,9 +213,6 @@ typedef struct BongoCatRendererModuleOps {
         int height);
     void (*vulkan_destroy_texture)(void *texture);
     bool (*vulkan_bind_texture)(void *renderer, void *texture);
-    /* 模型整体旋转 (度)。真正的结构体末尾: 老组件不导出这个指针时宿主判空回落到
-       "不旋转", 因此不需要动 abi_version。字段顺序是 ABI 的一部分, 只能往后加。 */
-    void (*set_rotation)(void *instance, float degrees);
 } BongoCatRendererModuleOps;
 
 /* 描述符: 组件唯一的导出符号返回它。字段顺序是 ABI 的一部分, 不得重排。 */

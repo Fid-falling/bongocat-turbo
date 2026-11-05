@@ -82,8 +82,6 @@ static void draw(BongoCatOverlay *value, const BongoCatTexture *texture,
     value->gl.uniform_1i(value->erase_left_location, erase_left);
     value->gl.uniform_1i(value->erase_right_location, erase_right);
     value->gl.uniform_1i(value->keycap_location, keycap_only);
-    value->gl.uniform_matrix_4fv(value->transform_location, 1, GL_FALSE,
-        value->transform);
     value->gl.active_texture(GL_TEXTURE0);
     glBindTexture(GL_TEXTURE_2D, texture->gl);
     value->gl.bind_vertex_array(value->vao);

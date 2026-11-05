@@ -248,15 +248,6 @@ typedef struct BongoCatWindowState {
     bool position_known;
     float scale_percent;
     float opacity_percent;
-    /*
-     * 模型整体旋转角度 (度, -180..180)。和 scale/opacity 一样是"窗口状态", 由 Alt+滚轮
-     * 改、存 session 而不是 settings。
-     *
-     * 旋转改变模型外接矩形: 窗口尺寸按 |cos|+|sin| 放大, 模型投影按 1/k 缩小, 视觉上猫的
-     * 大小不变、只是转了 —— 所以转到任意角度都不会被窗口裁掉 (见 window_scale.c 的
-     * bongo_cat_window_rotation_factor 与 cubism_model_update.cpp 的 build_projection)。
-     */
-    float rotation_deg;
     int x;
     int y;
     int width;

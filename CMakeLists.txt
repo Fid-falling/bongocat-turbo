@@ -115,7 +115,7 @@ if(EXISTS "${CUBISM_CORE_HEADER}")
     # 只在"有分发层"的构建里改名: 没有 SDK 的诊断构建里 stub 就是唯一实现, 保持原名。
     set(BONGO_CAT_LIVE2D_STUB_METHODS
       create destroy load ready canvas_size frame viewport overlay_viewport resize
-      reshape update draw set_mirror set_vertical_flip set_rotation set_render_options
+      reshape update draw set_mirror set_vertical_flip set_render_options
       set_dragging set_centered_dragging set_parameter parameter start_motion
       restore_motion_state preview_motion restore_motion_preview
       commit_motion_preview motion_selected motion_persistent motion_visible

@@ -369,11 +369,6 @@ typedef struct BongoCatApp {
     int resize_pixel_width, resize_pixel_height;
     uint64_t wheel_animation_ns, wheel_input_ns, wheel_event_ns;
     float wheel_opacity_target, wheel_scale_target;
-    /* Alt+滚轮 的旋转目标 (度)。和 scale/opacity 同一套平滑动画。 */
-    float wheel_rotation_target;
-    /* 上一次真正应用过的旋转系数 (|cos|+|sin|)。旋转动画按它算窗口该放大多少,
-       初始 1.0 = 没转过。 */
-    float rotation_applied_factor;
     float wheel_center_x, wheel_center_y;
     float wheel_geometry_scale;
     int wheel_base_width, wheel_base_height;

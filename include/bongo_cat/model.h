@@ -204,8 +204,6 @@ bool bongo_cat_live2d_update(BongoCatLive2D *live2d, float delta_seconds);
 void bongo_cat_live2d_draw(BongoCatLive2D *live2d);
 void bongo_cat_live2d_set_mirror(BongoCatLive2D *live2d, bool mirror);
 void bongo_cat_live2d_set_vertical_flip(BongoCatLive2D *live2d, bool flipped);
-/* 模型整体旋转角度 (度)。旋转在 MVP 矩阵里做, 两条后端共用同一处实现。 */
-void bongo_cat_live2d_set_rotation(BongoCatLive2D *live2d, float degrees);
 void bongo_cat_live2d_set_render_options(BongoCatLive2D *live2d,
     const BongoCatLive2DRenderOptions *options);
 void bongo_cat_live2d_set_dragging(BongoCatLive2D *live2d, float x, float y);

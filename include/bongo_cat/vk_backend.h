@@ -182,9 +182,6 @@ int bongo_cat_vk_texture_height(const BongoCatVkTexture *texture);
  *    模型不走这条通道 —— 它的多键画法在 CPU 侧合成 (见 src/render/overlay_bubble.c)。
  *  - draw_triangles: 通用顶点色/纹理三角形列表 (三角形扇/带已由调用方展开)。
  */
-/* 气泡与手/按键跟随模型旋转: 每帧画叠加层之前调用一次 (degrees 与模型旋转一致)。 */
-void bongo_cat_vk_set_overlay_rotation(BongoCatVk *vk, float degrees,
-    float inverse_scale, int width, int height);
 bool bongo_cat_vk_draw_overlay_quad(BongoCatVk *vk, BongoCatVkTexture *texture,
     bool mirror, int reference_width, int reference_height, bool erase_left,
     bool erase_right, bool premultiply, bool keycap_only);

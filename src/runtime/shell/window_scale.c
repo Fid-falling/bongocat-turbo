@@ -5,36 +5,6 @@
  */
 #include "runtime.h"
 
-/* 旋转 degree 度后模型外接矩形的放大倍数: 0 度 = 1, 45 度 = 1.414, 90 度 = 1。
-   窗口尺寸乘它、模型投影除它, 视觉大小不变而四角不被裁 (见 cubism_model_update.cpp)。 */
-float bongo_cat_window_rotation_factor(float degrees) {
-    if (SDL_fabsf(degrees) < 0.01f) return 1.0f;
-    const float rad = degrees * 3.14159265358979f / 180.0f;
-    return SDL_fabsf(SDL_cosf(rad)) + SDL_fabsf(SDL_sinf(rad));
-}
-
-/*
- * 让窗口尺寸与当前旋转角度一致: 旋转系数变了就按 factor/old_factor 放大/缩小窗口,
- * 走"中心不动"的缩放路径。幂等 —— 系数没变直接返回 false。
- *
- * 模型投影那一侧会同步乘 1/k, 所以视觉上猫的大小不变、只是转了。启动时(恢复上次的角度)
- * 与 Alt+滚轮 动画里都调它, 逻辑只有这一份。
- */
-bool bongo_cat_window_apply_rotation(BongoCatApp *app) {
-    if (!app || !app->window) return false;
-    const float factor = bongo_cat_window_rotation_factor(
-        app->session.window.rotation_deg);
-    const float previous = app->rotation_applied_factor > 0.0f
-        ? app->rotation_applied_factor : 1.0f;
-    if (SDL_fabsf(factor - previous) < 0.0005f) return false;
-    const float target = app->session.window.scale_percent * factor / previous;
-    if (!bongo_cat_window_set_scale(app, target)) return false;
-    if (SDL_fabsf(app->session.window.scale_percent - target) < 0.01f)
-        app->rotation_applied_factor = factor;
-    app->dirty = true;
-    return true;
-}
-
 /* 屏幕坐标可以是负数, 所以按符号决定取整偏移 (int 截断朝零, 否则负半像素会偏)。 */
 static int round_position(double value) {
     return (int)(value + (value < 0.0 ? -0.5 : 0.5));

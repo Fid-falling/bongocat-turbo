@@ -81,19 +81,18 @@ struct BongoCatVkTexture {
 
 /* 推送常量布局, 必须与 src/render/vk/shaders/*.vert|frag 的 std430 声明一致 */
 typedef struct OverlayPush {
-    /* 叠加层整体的旋转+缩放矩阵, 放在最前: mat4 要求 16 字节对齐, 放后面就得手算 padding,
-       两条语言各写一份 padding 迟早会错位 (见 overlay_transform.h)。 */
-    float transform[16];
     float reference[2];
     float image_size[2];
     int mirror;
     int erase_left;
     int erase_right;
-    /* 1 = 贴图是直通 alpha, 片元里要预乘; 0 = 贴图已经是预乘值 (Live2D 离屏结果)。 */
+    /* 1 = 贴图是直通 alpha, 片元里要预乘; 0 = 贴图已经是预乘值 (Live2D 离屏结果)。
+       多乘一次就是 color*a^2, 所以这个标志由调用点按贴图来源显式给出。 */
     int premultiply;
-    /* 1 = 只保留"够亮 + 够彩"的按键提示像素 (多键显示里非首个按键的键帽通道)。 */
+    /* 1 = 只保留"够亮 + 够彩"的按键提示像素 (多键显示里非首个按键的键帽通道), 见
+       overlay.frag。自带气泡素材的模型不走这条通道: 它的多键画法在 CPU 侧合成
+       (见 src/render/overlay_bubble.c)。 */
     int keycap_only;
-    int padding[3];
 } OverlayPush;
 
 typedef struct PointerPush {
@@ -209,8 +208,6 @@ struct BongoCatVk {
     VkPipelineLayout pointer_layout;
     VkPipelineLayout corner_layout;
     VkPipelineLayout ui_layout;
-    /* 当前叠加层的旋转+缩放矩阵 (每帧由 vk_scene 按 session 的旋转角设置) */
-    float overlay_transform[16];
     VkPipeline overlay_pipeline;
     VkPipeline pointer_pipeline;
     VkPipeline corner_pipeline;

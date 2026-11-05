@@ -66,28 +66,6 @@ void test_input(void) {
     CHECK(output.kind == BONGO_CAT_INPUT_KEY_UP);
     CHECK(!bongo_cat_input_pop(&state, &output));
 
-    /* Alt: Windows 的键名表把它归一成 "Alt"/"AltGr" (不是 SDL 的 AltLeft/Right),
-       两种写法都必须能置位 —— Alt+滚轮 旋转就是踩在这上面 (只认 AltLeft 时手势退回缩放)。 */
-    memcpy(event.name, "Alt", sizeof("Alt"));
-    event.kind = BONGO_CAT_INPUT_KEY_DOWN;
-    CHECK(bongo_cat_input_push(&state, &event));
-    CHECK(bongo_cat_input_alt_down(&state));
-    event.kind = BONGO_CAT_INPUT_KEY_UP;
-    CHECK(bongo_cat_input_push(&state, &event));
-    CHECK(!bongo_cat_input_alt_down(&state));
-    CHECK(bongo_cat_input_pop(&state, &output));
-    CHECK(bongo_cat_input_pop(&state, &output));
-
-    memcpy(event.name, "AltLeft", sizeof("AltLeft"));
-    event.kind = BONGO_CAT_INPUT_KEY_DOWN;
-    CHECK(bongo_cat_input_push(&state, &event));
-    CHECK(bongo_cat_input_alt_down(&state));
-    event.kind = BONGO_CAT_INPUT_KEY_UP;
-    CHECK(bongo_cat_input_push(&state, &event));
-    CHECK(!bongo_cat_input_alt_down(&state));
-    CHECK(bongo_cat_input_pop(&state, &output));
-    CHECK(bongo_cat_input_pop(&state, &output));
-
     memcpy(event.name, "ShiftRight", sizeof("ShiftRight"));
     event.kind = BONGO_CAT_INPUT_KEY_DOWN;
     CHECK(bongo_cat_input_push(&state, &event));
