@@ -15,6 +15,8 @@
 
 #include "preferences_widgets.h"
 
+#include "../theme/ui_catime.h"
+
 #include "../../runtime/input/face_capture.h"
 #include "../../runtime/update/facetrack_install.h"
 
@@ -46,6 +48,44 @@ void bongo_cat_preferences_page_face(BongoCatPreferences *value,
 }
 
 /* 正文: 由 preferences_face_row.c 提供 (行控件在那里), 这里只负责页面骨架。 */
+/*
+ * 页面底部的下载进度条。
+ *
+ * 为什么不用 nk_progress: 它要求 NK_PROGRESSBAR 打开, 样式也是方格填充, 和这里其它
+ * 圆角/柔和元素不搭。自己画: 圆角轨道 + 圆角填充 + 居中说明文字。
+ * 位置按用户要求放在内容区最后一行 (页面下方), 不挤在状态行里。
+ */
+static void face_download_bar(struct nk_context *context,
+    const BongoCatFacetrackInstallSnapshot *download, BongoCatUIPalette palette,
+    const char *text) {
+    nk_layout_row_dynamic(context, 40.0f, 1);
+    struct nk_rect bounds;
+    if (nk_widget(&bounds, context) == NK_WIDGET_INVALID) return;
+    struct nk_command_buffer *canvas = nk_window_get_canvas(context);
+    const float rounding = bounds.h * 0.5f;
+    nk_fill_rect(canvas, bounds, rounding, palette.field);
+    float ratio = download->total
+        ? (float)((double)download->bytes / (double)download->total) : 0.0f;
+    if (ratio < 0.0f) ratio = 0.0f;
+    if (ratio > 1.0f) ratio = 1.0f;
+    if (ratio > 0.0f)
+        nk_fill_rect(canvas, nk_rect(bounds.x, bounds.y, bounds.w * ratio,
+            bounds.h), rounding, palette.accent);
+    if (text && text[0]) {
+        const struct nk_user_font *font = context->style.font;
+        if (font) {
+            const float text_width = font->width(font->userdata, font->height,
+                text, nk_strlen(text));
+            const struct nk_rect label = nk_rect(
+                bounds.x + (bounds.w - text_width) * 0.5f,
+                bounds.y + (bounds.h - font->height) * 0.5f, text_width + 1.0f,
+                font->height);
+            nk_draw_text(canvas, label, text, nk_strlen(text), font,
+                nk_rgba(0, 0, 0, 0), palette.text);
+        }
+    }
+}
+
 void bongo_cat_preferences_face_content(BongoCatApp *app,
     struct nk_context *context) {
     BongoCatModelPreferences *model = &app->settings.model;
@@ -116,6 +156,34 @@ void bongo_cat_preferences_face_content(BongoCatApp *app,
     }
     bongo_cat_pref_status(context, "face-page-status", face_tr(app,
         "pages.preference.cat.labels.faceCaptureStatus", "状态"), status);
+    /* 底部进度条: 只在"正在下载"和"刚下完"两种状态下出现, 用户要求放在页面下方 */
+    if (download.state == BONGO_CAT_FACETRACK_INSTALL_WORKING ||
+            download.state == BONGO_CAT_FACETRACK_INSTALL_DONE) {
+        char bar_text[128];
+        if (download.state == BONGO_CAT_FACETRACK_INSTALL_DONE) {
+            snprintf(bar_text, sizeof(bar_text), "%s 100%%",
+                face_tr(app, "pages.preference.cat.labels.faceCaptureDownloading",
+                    "下载中"));
+        } else {
+            const int percent = download.total
+                ? (int)(download.bytes * 100u / download.total) : 0;
+            char speed[32];
+            if (download.bytes_per_second >= 1024u * 1024u)
+                snprintf(speed, sizeof(speed), "%.1f MB/s",
+                    (double)download.bytes_per_second / (1024.0 * 1024.0));
+            else if (download.bytes_per_second)
+                snprintf(speed, sizeof(speed), "%llu KB/s",
+                    (unsigned long long)(download.bytes_per_second / 1024u));
+            else
+                snprintf(speed, sizeof(speed), "…");
+            snprintf(bar_text, sizeof(bar_text), "%d%%  ·  %.1f/%.1f MB  ·  %s",
+                percent, (double)download.bytes / (1024.0 * 1024.0),
+                (double)download.total / (1024.0 * 1024.0), speed);
+        }
+        BongoCatUIPalette palette = bongo_cat_ui_palette(bongo_cat_ui_dark(context));
+        face_download_bar(context, &download, palette, bar_text);
+    }
+
     /* 下载完成: 立刻装载并打开摄像头 */
     if (download.state == BONGO_CAT_FACETRACK_INSTALL_DONE) {
         bongo_cat_facetrack_install_destroy(app->facetrack_install);
@@ -156,3 +224,5 @@ void bongo_cat_preferences_face_content(BongoCatApp *app,
         app->dirty = true;
     }
 }
+
+
