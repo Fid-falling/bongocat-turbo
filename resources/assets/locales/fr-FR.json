@@ -9,7 +9,7 @@
     "preference": {
               "face": {
           "title": "Capture du visage",
-          "section": "Capture du visage",
+          "section": "Réglages",
           "confirmTitle": "Capture du visage",
           "confirmBody": "La capture du visage nécessite un téléchargement unique du composant (environ 6,6 Mo). Elle fonctionne ensuite hors ligne.",
           "confirmAsk": "Télécharger maintenant ?",

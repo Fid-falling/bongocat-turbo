@@ -217,9 +217,13 @@ struct BongoCatPreferences {
      * 把用户的滚动位置冲掉, 所以首帧只读不写。
      * 切页时这三者刻意都不重置 (见 page_cache_clear 的注释)。
      */
-    float scroll_current[4];
-    float scroll_target[4];
-    bool scroll_ready[4];
+    /* 侧栏页数: 偏好设置 / 模型 / 快捷键 / 面捕 / 关于。
+       下面三个数组按页下标索引, 加页时必须一起改大 —— 少改一处就是越界写, 表现就是
+       "打开设置直接崩"(加面捕页时踩过: 数组还是 4, 而 value->page 能到 4)。 */
+    #define BONGO_CAT_PREFERENCES_PAGE_COUNT 5
+    float scroll_current[BONGO_CAT_PREFERENCES_PAGE_COUNT];
+    float scroll_target[BONGO_CAT_PREFERENCES_PAGE_COUNT];
+    bool scroll_ready[BONGO_CAT_PREFERENCES_PAGE_COUNT];
     bool page_seen;
     int last_page;
     uint64_t page_transition_ns;

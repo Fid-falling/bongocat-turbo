@@ -46,7 +46,7 @@ void bongo_cat_preferences_apply_theme(BongoCatPreferences *value) {
  * 职责划分: 这里只管随页面进退的纹理/资源缓存; 滚动位置不归它管 ——
  * scroll_current/scroll_target/scroll_ready 是按页号索引的数组, 每页各存一份,
  * 切页天然互不污染, 所以既不需要也不能在这里重置, 否则来回切页会丢掉用户
- * 滚到的位置。下标 3 是"关于"页, 它加载的支持者素材是四页里最重的, 离开时立刻
+ * 滚到的位置。最后一个下标是"关于"页, 它加载的支持者素材是所有页里最重的, 离开时立刻
  * 归还, 并通过 memory_policy 汇报"UI 资源已卸载"。previous_page == next_page
  * 时是空操作。调用点在 draw_shell 检测到 page 变化的那一帧。
  */
@@ -54,7 +54,9 @@ void bongo_cat_preferences_page_cache_clear(BongoCatPreferences *value,
     int previous_page, int next_page) {
     if (!value || previous_page == next_page) return;
     bool released = false;
-    if (previous_page == 3 && next_page != 3) {
+    /* 下标 4 = 关于页 (侧栏加了面捕页之后从 3 挪到 4)。 */
+    const int about_page = BONGO_CAT_PREFERENCES_PAGE_COUNT - 1;
+    if (previous_page == about_page && next_page != about_page) {
         bongo_cat_preferences_support_assets_clear(value);
         released = true;
     }

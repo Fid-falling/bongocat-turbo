@@ -49,8 +49,10 @@ void bongo_cat_preferences_page_face(BongoCatPreferences *value,
 void bongo_cat_preferences_face_content(BongoCatApp *app,
     struct nk_context *context) {
     BongoCatModelPreferences *model = &app->settings.model;
+    /* 不画分区标题: 页面标题本身就叫「面部捕捉」, 再来一个同名分区会重复两遍
+       (截图里一眼就能看出来)。 */
     bongo_cat_pref_section(context, face_tr(app,
-        "pages.preference.face.section", "面部捕捉"));
+        "pages.preference.face.section", "设置"));
 
     bool enabled = model->face_capture != 0;
     const bool ready = component_ready(app);

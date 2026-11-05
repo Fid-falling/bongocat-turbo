@@ -134,7 +134,8 @@ static bool draw_shell(BongoCatPreferences *value, struct nk_context *context,
         update_snapshot.status == BONGO_CAT_UPDATE_INSTALLING ||
         (update_snapshot.status == BONGO_CAT_UPDATE_ERROR &&
             update_snapshot.release.version[0]);
-    bongo_cat_ui_tabs(context, menus, menu_icons, 5, &value->page,
+    bongo_cat_ui_tabs(context, menus, menu_icons,
+        BONGO_CAT_PREFERENCES_PAGE_COUNT, &value->page,
         !modal, dark, interior_height, about_badge,
         draw_icon, value);
     if (!value->page_seen) {

@@ -10,6 +10,8 @@
  * 不认识的参数静默忽略 —— Windows 会往命令行里塞一些系统注入的参数。
  */
 #include "runtime.h"
+
+#include "../ui/preferences/preferences_state.h"
 #include "bongo_cat/i18n.h"
 #include "bongo_cat/render.h"
 
@@ -250,7 +252,9 @@ bool bongo_cat_startup_arguments(BongoCatApp *app, int argc, char **argv,
             app->smoke_sound_toggle = (unsigned)atoi(arg + 18);
         else if (strncmp(arg, "--ci-preference-page=", 21) == 0) {
             int page = atoi(arg + 21);
-            if (page >= 0 && page < 4) app->smoke_preference_page = page;
+            /* 页数跟着侧栏走: 加页时这里少改就会表现为"指定新页的冒烟测试永远跑旧页" */
+        if (page >= 0 && page < BONGO_CAT_PREFERENCES_PAGE_COUNT)
+            app->smoke_preference_page = page;
         } else if (strncmp(arg, "--ci-language=", 14) == 0) {
             BongoCatLanguage language;
             if (bongo_cat_language_parse(arg + 14, &language))

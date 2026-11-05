@@ -9,7 +9,7 @@
     "preference": {
               "face": {
           "title": "Gesichtserfassung",
-          "section": "Gesichtserfassung",
+          "section": "Einstellungen",
           "confirmTitle": "Gesichtserfassung",
           "confirmBody": "Die Gesichtserfassung benötigt einen einmaligen Komponenten-Download (ca. 6,6 MB). Danach funktioniert sie offline.",
           "confirmAsk": "Jetzt herunterladen?",

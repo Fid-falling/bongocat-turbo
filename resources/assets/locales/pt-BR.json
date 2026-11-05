@@ -9,7 +9,7 @@
     "preference": {
               "face": {
           "title": "Captura facial",
-          "section": "Captura facial",
+          "section": "Ajustes",
           "confirmTitle": "Captura facial",
           "confirmBody": "A captura facial exige baixar o componente uma única vez (cerca de 6,6 MB). Depois funciona offline.",
           "confirmAsk": "Baixar agora?",

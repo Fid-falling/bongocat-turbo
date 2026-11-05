@@ -9,7 +9,7 @@
     "preference": {
               "face": {
           "title": "Face Capture",
-          "section": "Face Capture",
+          "section": "Settings",
           "confirmTitle": "Face Capture",
           "confirmBody": "Face capture needs a one-time component download (about 6.6 MB). It works offline afterwards.",
           "confirmAsk": "Download now?",
