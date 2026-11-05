@@ -38,6 +38,8 @@ set(BONGO_CAT_RENDER_SOURCES
   src/render/overlay.c
   src/render/overlay_assets.c
   src/render/overlay_bubble.c
+  # 叠加层(气泡+手)与模型同步旋转的变换矩阵 (GL/VK 共用一份数学)
+  src/render/overlay_transform.c
   # 键名贴片的抠取 (掩码 + 填充色学取, 从 overlay_bubble.c 拆出: 见行数策略)
   src/render/overlay_bubble_glyph.c
   src/render/overlay_input.c

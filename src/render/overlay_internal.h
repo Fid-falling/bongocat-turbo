@@ -72,6 +72,9 @@ struct BongoCatOverlay {
     GLint erase_right_location;
     /* 1 = 只保留"按键高亮"像素 (多键显示里非首个按键走这条通道), 见 overlay.c 的片元着色器 */
     GLint keycap_location;
+    /* 叠加层整体的旋转+缩放矩阵 (气泡与手要跟模型一起转, 见 overlay_transform.h) */
+    GLint transform_location;
+    float transform[16];
 
     GLuint vao;
     GLuint vbo;

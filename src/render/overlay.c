@@ -1,5 +1,7 @@
 #include "overlay_internal.h"
 
+#include "bongo_cat/overlay_transform.h"
+
 #include <stdlib.h>
 
 /*
@@ -33,7 +35,7 @@ static const char *vertex_source =
     "if(reference_width>0&&reference_height>0){"
     "vec2 extent=vec2(textureSize(image,0))/vec2(reference_width,reference_height);"
     "p=(p+vec2(1,-1))*extent+vec2(-1,1);}"
-    "if(mirror)p.x=-p.x;gl_Position=vec4(p,0,1);tex=uv;}";
+    "if(mirror)p.x=-p.x;gl_Position=transform*vec4(p,0,1);tex=uv;}";
 static const char *fragment_source =
     "#version 330 core\n"
     "in vec2 tex; out vec4 color; uniform sampler2D image;\n"
@@ -70,6 +72,7 @@ BongoCatOverlay *bongo_cat_overlay_create(BongoCatError *error) {
     value->key_limit = BONGO_CAT_MULTI_KEY_LIMIT_DEFAULT;
     /* 默认合并 (与设置里的默认值一致): 一个气泡里用 "+" 连起所有键名 */
     value->bubble_merge = true;
+    for (int i = 0; i < 16; ++i) value->transform[i] = (i % 5) == 0 ? 1.0f : 0.0f;
     /* Vulkan 后端没有 OpenGL 上下文: 着色器/VAO/VBO 都不创建, 绘制走
        vk_backend 的管线。 */
     if (bongo_cat_renderer_active() == BONGO_CAT_RENDERER_VULKAN) return value;
@@ -88,6 +91,8 @@ BongoCatOverlay *bongo_cat_overlay_create(BongoCatError *error) {
     value->erase_left_location = value->gl.uniform_location(value->program, "erase_left");
     value->erase_right_location = value->gl.uniform_location(value->program, "erase_right");
     value->keycap_location = value->gl.uniform_location(value->program, "keycap_only");
+    value->transform_location = value->gl.uniform_location(value->program,
+        "transform");
     const float vertices[] = {-1, -1, 0, 1, 1, -1, 1, 1, -1, 1, 0, 0, 1, 1, 1, 0};
     value->gl.gen_vertex_arrays(1, &value->vao);
     value->gl.bind_vertex_array(value->vao);
@@ -186,6 +191,13 @@ void bongo_cat_overlay_set_bubble_hidden(BongoCatOverlay *value, bool hidden) {
     /* 按键贴图也要重挑: 屏蔽时用"挖掉气泡"的那一版, 关掉时用原图。 */
     bongo_cat_overlay_refresh_keys(value, 0);
     bongo_cat_overlay_refresh_keys(value, 1);
+}
+
+void bongo_cat_overlay_set_rotation(BongoCatOverlay *value, float degrees,
+    float inverse_scale, int width, int height) {
+    if (!value) return;
+    bongo_cat_overlay_rotation_matrix(degrees, inverse_scale, width, height,
+        value->transform);
 }
 
 void bongo_cat_overlay_set_bubble_merge(BongoCatOverlay *value, bool merge) {

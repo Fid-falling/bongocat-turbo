@@ -95,6 +95,9 @@ static BongoCatVk *create_context(SDL_Window *window, const BongoCatVk *owner,
         return NULL;
     }
     BongoCatVk *vk = calloc(1, sizeof(*vk));
+    if (vk)
+        for (int i = 0; i < 16; ++i)
+            vk->overlay_transform[i] = (i % 5) == 0 ? 1.0f : 0.0f;
     if (!vk) {
         bongo_cat_error_set(error, BONGO_CAT_ERROR_MEMORY, "Vulkan 后端状态分配失败");
         return NULL;

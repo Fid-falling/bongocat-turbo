@@ -131,6 +131,11 @@ static bool render(BongoCatApp *app, bool present) {
     if (content_viewport)
         bongo_cat_gl_scale_viewport(render_scale, content_x, content_y,
             content_width, content_height);
+    /* 气泡与手/按键 跟着模型一起转 (GL 侧: 矩阵存在 overlay 里, 顶点着色器直接乘) */
+    bongo_cat_overlay_set_rotation(app->overlay,
+        app->session.window.rotation_deg,
+        1.0f / bongo_cat_window_rotation_factor(
+            app->session.window.rotation_deg), width, height);
     bongo_cat_overlay_draw_background(app->overlay,
         app->settings.model.mirror);
     bool cover_requested = !present && bongo_cat_model_cover_pending(app);

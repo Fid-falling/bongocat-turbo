@@ -153,6 +153,11 @@ bool bongo_cat_vk_render_main(BongoCatApp *app, bool present) {
         bongo_cat_vk_set_viewport(app->vk, content_x,
             height - content_y - content_height, content_width, content_height);
     bongo_cat_first_frame_stage("vk:overlay");
+    /* 气泡与手/按键 必须跟着模型转: 用同一个角度 + 同一个 1/k 缩放, 视口取整窗尺寸 */
+    bongo_cat_vk_set_overlay_rotation(app->vk,
+        app->session.window.rotation_deg,
+        1.0f / bongo_cat_window_rotation_factor(
+            app->session.window.rotation_deg), width, height);
     bongo_cat_overlay_draw_background(app->overlay, app->settings.model.mirror);
     bongo_cat_vk_set_viewport(app->vk, 0, 0, width, height);
     /*

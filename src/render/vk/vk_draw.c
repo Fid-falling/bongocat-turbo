@@ -1,4 +1,6 @@
 #include "vk_internal.h"
+
+#include "bongo_cat/overlay_transform.h"
 #include <math.h>
 #include "bongo_cat/log.h"
 
@@ -160,6 +162,17 @@ static void destroy_arena(BongoCatVk *vk, BongoCatVkArena *arena) {
     arena->offset = 0;
 }
 
+/*
+ * 叠加层(气泡 + 手/按键)与模型同步旋转: 每帧在画叠加层之前调用一次, 把变换矩阵算好存进
+ * 上下文, 之后的每个四边形都用它 (同一个变换, 否则气泡和手会各转各的)。
+ */
+void bongo_cat_vk_set_overlay_rotation(BongoCatVk *vk, float degrees,
+    float inverse_scale, int width, int height) {
+    if (!vk) return;
+    bongo_cat_overlay_rotation_matrix(degrees, inverse_scale, width, height,
+        vk->overlay_transform);
+}
+
 bool bongo_cat_vk_draw_overlay_quad(BongoCatVk *vk, BongoCatVkTexture *texture,
     bool mirror, int reference_width, int reference_height, bool erase_left,
     bool erase_right, bool premultiply, bool keycap_only) {
@@ -168,6 +181,8 @@ bool bongo_cat_vk_draw_overlay_quad(BongoCatVk *vk, BongoCatVkTexture *texture,
     VkDeviceSize offset = 0;
     if (!arena_push(vk, k_overlay_quad, sizeof(k_overlay_quad), &offset)) return false;
     OverlayPush push = {{0}};
+    /* 一律由 vk_scene 每帧写入 (创建时初始化为单位矩阵), 这里只做拷贝 */
+    for (int i = 0; i < 16; ++i) push.transform[i] = vk->overlay_transform[i];
     push.reference[0] = (float)reference_width;
     push.reference[1] = (float)reference_height;
     push.image_size[0] = (float)texture->width;
