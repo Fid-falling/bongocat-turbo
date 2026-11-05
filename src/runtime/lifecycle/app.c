@@ -173,6 +173,17 @@ bool bongo_cat_app_initialize(BongoCatApp *app, int argc, char **argv,
     app->startup_visibility_pending = app->session.window.visible;
     bongo_cat_startup_stage(app, "configuration-ready");
     /*
+     * --install-facetrack: 只下载面捕组件然后退出。
+     * **必须在这里做**: 再往后窗口就建出来了, 而下载是阻塞的 —— 窗口画不出来也不响应
+     * 消息, Windows 会直接给用户弹"BongoCat Turbo 未响应"(实测过)。
+     */
+    if (app->install_facetrack_only) {
+        const bool ok = bongo_cat_face_capture_install_blocking(app, 600);
+        app->exit_code = ok ? 0 : 1;
+        app->running = false;
+        return true;
+    }
+    /*
      * "以管理员身份运行"开启、且当前不是管理员时以管理员身份重启自己
      * (ShellExecuteExW 的 runas), 旧进程退出。放在这里是因为要先读配置。
      * 副宠/冒烟不主动提权 (它们是被主进程/自动化拉起来的)。用户取消 UAC 或

@@ -116,6 +116,8 @@ typedef struct BongoCatApp {
     BongoCatOverlay *overlay;
     /* 面捕运行时 (装载按需下载的 bongo_facetrack 组件); NULL = 没开启/不可用 */
     struct BongoCatFaceCapture *face_capture;
+    /* 面捕组件下载器 (只在用户点"下载"时创建, 用完销毁) */
+    struct BongoCatFacetrackInstall *facetrack_install;
     BongoCatPreferences *preferences;
     BongoCatMultiPetRuntime *multi_pet;
     BongoCatModelRefresh *model_refresh;
@@ -210,6 +212,8 @@ typedef struct BongoCatApp {
     uint64_t startup_raise_due_ns;
     uint64_t model_load_last_frame_ns;
     bool smoke;
+    /* --install-facetrack: 只下载面捕组件然后退出 (脚本/离线安装用, 不开窗口) */
+    bool install_facetrack_only;
     bool smoke_preferences;
     bool smoke_preference_shortcut;
     bool smoke_preference_model_select;

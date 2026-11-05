@@ -85,6 +85,8 @@
           "faceFlipV": "Miroir vertical",
           "faceCaptureStatus": "État",
           "faceCaptureMissing": "Composant absent ou indisponible",
+          "faceCaptureDownload": "Télécharger le composant (6,6 Mo)",
+          "faceCaptureDownloadHint": "Une seule fois — aucun réseau ensuite",
           "hideBubbleHint": "Ne pas afficher les bulles pour les modèles qui en ont",
           "multiKeyDisplayHint": "Afficher toutes les touches maintenues sur la même main",
           "bubbleMerge": "Fusionner en une bulle",

@@ -15,6 +15,8 @@
 #include "bongo_cat/log.h"
 
 #include "../../runtime/input/face_capture.h"
+#include "../../runtime/update/facetrack_install.h"
+#include "bongo_cat/path.h"
 
 #include <SDL3/SDL.h>
 
@@ -42,19 +44,64 @@ void bongo_cat_preferences_face_rows(BongoCatApp *app,
     }
     if (!model->face_capture) return;
 
-    char status[192];
-    if (app->face_capture && bongo_cat_face_capture_available(app->face_capture)) {
-        BongoCatFaceSnapshot snapshot;
-        bongo_cat_face_capture_snapshot(app->face_capture, &snapshot);
-        snprintf(status, sizeof(status), "%s",
-            snapshot.status[0] ? snapshot.status : "已开启");
+    /* 组件缺失时先给"下载"，下完了自动接上；已经装的直接显示运行状态。 */
+    char root[BONGO_CAT_PATH_CAP] = {0};
+    const bool have_root = bongo_cat_face_capture_root(app, root, sizeof(root));
+    const bool present = have_root && bongo_cat_facetrack_install_present(root);
+    if (!present) {
+        BongoCatFacetrackInstallSnapshot download = {0};
+        if (app->facetrack_install)
+            bongo_cat_facetrack_install_snapshot(app->facetrack_install, &download);
+        if (download.state == BONGO_CAT_FACETRACK_INSTALL_WORKING) {
+            char status[192];
+            snprintf(status, sizeof(status), "%u/%u %s  %.1f/%.1f MB",
+                download.file_index, download.file_count, download.file_name,
+                (double)download.bytes / (1024.0 * 1024.0),
+                (double)download.total / (1024.0 * 1024.0));
+            bongo_cat_pref_status(context, "face-capture-status", tr(app,
+                "pages.preference.cat.labels.faceCaptureStatus", "状态"), status);
+        } else {
+            if (download.state == BONGO_CAT_FACETRACK_INSTALL_DONE) {
+                /* 刚下完: 立刻装载组件, 状态行下一帧就会变成"正在跟踪" */
+                bongo_cat_facetrack_install_destroy(app->facetrack_install);
+                app->facetrack_install = NULL;
+                bongo_cat_face_capture_sync(app);
+            }
+            /* 借用开关行的整行点击当"下载"按钮: 点一下就开始, 打开状态的开关只表示
+               "本次要下", 真正的进度在状态行里显示。失败原因挂在说明文字里。 */
+            bool download_wanted = download.state == BONGO_CAT_FACETRACK_INSTALL_WORKING;
+            const char *hint = download.state == BONGO_CAT_FACETRACK_INSTALL_FAILED
+                ? download.error : tr(app,
+                    "pages.preference.cat.labels.faceCaptureDownloadHint",
+                    "组件约 6.6 MB，只需下载一次");
+            bongo_cat_pref_row_icon(context, BONGO_CAT_PREF_ICON_MULTIPLE_MODELS);
+            if (bongo_cat_pref_toggle(context, "face-capture-download", tr(app,
+                    "pages.preference.cat.labels.faceCaptureDownload",
+                    "Download Component (6.6 MB)"), hint, &download_wanted))
+                bongo_cat_face_capture_download(app);
+            bongo_cat_pref_status(context, "face-capture-status", tr(app,
+                "pages.preference.cat.labels.faceCaptureStatus", "状态"),
+                download.state == BONGO_CAT_FACETRACK_INSTALL_IDLE
+                    ? tr(app, "pages.preference.cat.labels.faceCaptureMissing",
+                        "组件未安装或不可用")
+                    : (download.state == BONGO_CAT_FACETRACK_INSTALL_FAILED
+                        ? download.error : "下载中…"));
+        }
     } else {
-        snprintf(status, sizeof(status), "%s", tr(app,
-            "pages.preference.cat.labels.faceCaptureMissing",
-            "组件未安装或不可用"));
+        char status[192];
+        if (app->face_capture && bongo_cat_face_capture_available(app->face_capture)) {
+            BongoCatFaceSnapshot snapshot;
+            bongo_cat_face_capture_snapshot(app->face_capture, &snapshot);
+            snprintf(status, sizeof(status), "%s",
+                snapshot.status[0] ? snapshot.status : "已开启");
+        } else {
+            snprintf(status, sizeof(status), "%s", tr(app,
+                "pages.preference.cat.labels.faceCaptureMissing",
+                "组件未安装或不可用"));
+        }
+        bongo_cat_pref_status(context, "face-capture-status", tr(app,
+            "pages.preference.cat.labels.faceCaptureStatus", "状态"), status);
     }
-    bongo_cat_pref_status(context, "face-capture-status", tr(app,
-        "pages.preference.cat.labels.faceCaptureStatus", "状态"), status);
 
     float gain = model->face_capture_gain;
     bongo_cat_pref_row_icon(context, BONGO_CAT_PREF_ICON_MOUSE_CENTERED);

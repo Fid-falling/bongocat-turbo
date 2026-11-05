@@ -301,6 +301,9 @@ static bool take_update_shutdown(BongoCatApp *app) {
 }
 
 void bongo_cat_app_loop(BongoCatApp *app) {
+    /* --install-facetrack: 组件已经在初始化阶段装好, 这里直接收工, 不进主循环
+       (也就不建窗口/不跑渲染)。靠 running 标志不可靠: 初始化后半段会把它置回 true。 */
+    if (app->install_facetrack_only) return;
     while (app->running) {
         /* 首帧看门狗: 只在"启动后 8 秒还没端出第一帧"时有事可做, 平时只是一次比较 */
         /* 启动期排队的引导弹窗 (缺 Cubism Core 时才有): 放到主循环里弹, 这样桌宠和设置

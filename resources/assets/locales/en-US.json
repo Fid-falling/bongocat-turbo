@@ -85,6 +85,8 @@
           "faceFlipV": "Flip Vertically",
           "faceCaptureStatus": "Status",
           "faceCaptureMissing": "Component missing or unavailable",
+          "faceCaptureDownload": "Download Component (6.6 MB)",
+          "faceCaptureDownloadHint": "Only needed once — no network afterwards",
           "hideBubbleHint": "Do not show key bubbles for models that have one",
           "multiKeyDisplayHint": "Show every keycap held on the same hand",
           "bubbleMerge": "Merge into one bubble",

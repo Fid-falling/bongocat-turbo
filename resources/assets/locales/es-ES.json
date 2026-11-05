@@ -85,6 +85,8 @@
           "faceFlipV": "Invertir vertical",
           "faceCaptureStatus": "Estado",
           "faceCaptureMissing": "Componente ausente o no disponible",
+          "faceCaptureDownload": "Descargar componente (6,6 MB)",
+          "faceCaptureDownloadHint": "Solo una vez — después sin red",
           "hideBubbleHint": "No mostrar burbujas en los modelos que las tienen",
           "multiKeyDisplayHint": "Mostrar todas las teclas mantenidas con la misma mano",
           "bubbleMerge": "Combinar en un solo globo",

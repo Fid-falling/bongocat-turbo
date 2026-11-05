@@ -85,6 +85,8 @@
           "faceFlipV": "Отразить по вертикали",
           "faceCaptureStatus": "Состояние",
           "faceCaptureMissing": "Компонент не установлен или недоступен",
+          "faceCaptureDownload": "Загрузить компонент (6,6 МБ)",
+          "faceCaptureDownloadHint": "Только один раз — дальше без сети",
           "hideBubbleHint": "Не показывать пузыри клавиш у моделей с ними",
           "multiKeyDisplayHint": "Показывать все удерживаемые клавиши одной руки",
           "bubbleMerge": "Объединить в один пузырь",

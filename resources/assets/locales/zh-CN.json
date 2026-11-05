@@ -85,6 +85,8 @@
           "faceFlipV": "上下反转",
           "faceCaptureStatus": "状态",
           "faceCaptureMissing": "组件未安装或不可用",
+          "faceCaptureDownload": "下载组件（约 6.6 MB）",
+          "faceCaptureDownloadHint": "只需下载一次，之后不再联网",
           "hideBubbleHint": "对自带气泡的模型不显示按键气泡",
           "multiKeyDisplayHint": "同一侧同时按下多个键时全部显示",
           "bubbleMerge": "合并为一个气泡",

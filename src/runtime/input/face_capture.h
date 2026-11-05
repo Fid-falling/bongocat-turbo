@@ -46,6 +46,15 @@ void bongo_cat_face_capture_snapshot(BongoCatFaceCapture *capture,
 /* 这一帧是否真的有人在驱动头部 (有脸且置信度够)。鼠标驱动头部据此让位。 */
 bool bongo_cat_face_capture_head_active(BongoCatFaceCapture *capture);
 
+/* 组件根目录 (<storage>/components/facetrack, 环境变量优先)。 */
+bool bongo_cat_face_capture_root(BongoCatApp *app, char *output, size_t capacity);
+
+/* 开始下载组件 (幂等)。返回 false = 起不来 (写不了目录 / 已在下载)。 */
+
+/* 阻塞式安装 (只给 --install-facetrack 用): 下载、校验、打印结果。 */
+bool bongo_cat_face_capture_install_blocking(BongoCatApp *app, int timeout_seconds);
+bool bongo_cat_face_capture_download(BongoCatApp *app);
+
 /* 按设置里的开关创建/销毁面捕运行时 (幂等)。缺组件时只记日志并返回 false。 */
 bool bongo_cat_face_capture_sync(BongoCatApp *app);
 

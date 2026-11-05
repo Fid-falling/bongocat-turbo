@@ -12,6 +12,8 @@
 #include "runtime.h"
 #include "face_capture.h"
 
+#include "../update/facetrack_install.h"
+
 #include "bongo_cat/log.h"
 #include "bongo_cat/path.h"
 
@@ -20,7 +22,8 @@
 #include <string.h>
 
 /* 组件根目录: 环境变量优先 (测试/高级用户手动放置), 否则 <storage>/components/facetrack */
-static bool facetrack_root(BongoCatApp *app, char *output, size_t capacity) {
+bool bongo_cat_face_capture_root(BongoCatApp *app, char *output,
+    size_t capacity) {
     const char *override = SDL_getenv("BONGO_CAT_FACETRACK_DIR");
     if (override && override[0]) {
         snprintf(output, capacity, "%s", override);
@@ -45,7 +48,7 @@ bool bongo_cat_face_capture_sync(BongoCatApp *app) {
     if (app->face_capture) return true;   // 已经开着
 
     char root[BONGO_CAT_PATH_CAP] = {0};
-    if (!facetrack_root(app, root, sizeof(root))) {
+    if (!bongo_cat_face_capture_root(app, root, sizeof(root))) {
         SDL_LogWarn(SDL_LOG_CATEGORY_APPLICATION, "[face] 面捕不可用: 没有存储根目录");
         return false;
     }
@@ -78,4 +81,47 @@ bool bongo_cat_face_capture_sync(BongoCatApp *app) {
     app->face_capture = capture;
     SDL_LogInfo(BONGO_CAT_LOG_LIFECYCLE, "[face] 面捕已开启 (%s)", root);
     return true;
+}
+
+bool bongo_cat_face_capture_download(BongoCatApp *app) {
+    if (!app) return false;
+    char root[BONGO_CAT_PATH_CAP] = {0};
+    if (!bongo_cat_face_capture_root(app, root, sizeof(root))) return false;
+    if (!app->facetrack_install) {
+        app->facetrack_install = bongo_cat_facetrack_install_create(root);
+        if (!app->facetrack_install) return false;
+    }
+    if (!bongo_cat_facetrack_install_start(app->facetrack_install)) return false;
+    SDL_LogInfo(BONGO_CAT_LOG_LIFECYCLE, "[face] 开始下载组件到 %s", root);
+    return true;
+}
+
+bool bongo_cat_face_capture_install_blocking(BongoCatApp *app, int timeout_seconds) {
+    if (!app) return false;
+    char root[BONGO_CAT_PATH_CAP] = {0};
+    if (!bongo_cat_face_capture_root(app, root, sizeof(root))) return false;
+    if (bongo_cat_facetrack_install_present(root)) {
+        printf("[face] 组件已就位: %s\n", root);
+        return true;
+    }
+    SDL_LogInfo(BONGO_CAT_LOG_LIFECYCLE, "[face] 开始下载组件: %s", root);
+    BongoCatFacetrackInstall *install = bongo_cat_facetrack_install_create(root);
+    if (!install) return false;
+    if (!bongo_cat_facetrack_install_start(install)) {
+        bongo_cat_facetrack_install_destroy(install);
+        return false;
+    }
+    const Uint64 deadline = SDL_GetTicks() + (Uint64)timeout_seconds * 1000u;
+    BongoCatFacetrackInstallSnapshot snapshot = {0};
+    while (SDL_GetTicks() < deadline) {
+        bongo_cat_facetrack_install_snapshot(install, &snapshot);
+        if (snapshot.state == BONGO_CAT_FACETRACK_INSTALL_DONE ||
+            snapshot.state == BONGO_CAT_FACETRACK_INSTALL_FAILED) break;
+        SDL_Delay(100);
+    }
+    const bool ok = snapshot.state == BONGO_CAT_FACETRACK_INSTALL_DONE;
+    printf("[face] 下载%s%s%s\n", ok ? "完成" : "失败",
+        snapshot.error[0] ? ": " : "", snapshot.error);
+    bongo_cat_facetrack_install_destroy(install);
+    return ok;
 }

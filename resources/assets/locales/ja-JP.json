@@ -85,6 +85,8 @@
           "faceFlipV": "上下反転",
           "faceCaptureStatus": "状態",
           "faceCaptureMissing": "コンポーネントが未インストールまたは使用不可",
+          "faceCaptureDownload": "コンポーネントをダウンロード (6.6 MB)",
+          "faceCaptureDownloadHint": "一度だけ必要です（以後は通信しません）",
           "hideBubbleHint": "バブル付きのモデルではキーバブルを表示しません",
           "multiKeyDisplayHint": "同じ手で押しているキーキャップをすべて表示します",
           "bubbleMerge": "1つの吹き出しにまとめる",
