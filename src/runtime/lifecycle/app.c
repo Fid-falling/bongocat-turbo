@@ -298,6 +298,24 @@ bool bongo_cat_app_initialize(BongoCatApp *app, int argc, char **argv,
      */
     if (SDL_getenv("BONGO_CAT_TEST_PREFS_WINDOW"))
         bongo_cat_preferences_show(app->preferences);
+    /*
+     * 测试钩子: BONGO_CAT_TEST_FAKE_KEY=键名 时启动就按住一个键, 用来在没有真实键盘输入
+     * (合成输入进不了 Raw Input) 的环境里验证"气泡 + 手"这一层。只影响叠加层的显示,
+     * 不改快捷键/模型状态。多个键用逗号分隔, 例如 BONGO_CAT_TEST_FAKE_KEY=Alt,Ctrl。
+     */
+    const char *fake_key = SDL_getenv("BONGO_CAT_TEST_FAKE_KEY");
+    if (fake_key) {
+        char buffer[64];
+        snprintf(buffer, sizeof(buffer), "%s", fake_key);
+        char *name = buffer;
+        while (name && *name) {
+            char *comma = strchr(name, ',');
+            if (comma) *comma = 0;
+            bongo_cat_overlay_key(app->overlay, name, true);
+            name = comma ? comma + 1 : NULL;
+        }
+        app->dirty = true;
+    }
     if (app->smoke_shortcuts && !bongo_cat_app_shortcuts_self_test(app)) {
         BongoCatError shortcut_error = {0};
         bongo_cat_error_set(&shortcut_error, BONGO_CAT_ERROR_PLATFORM, "Shortcut action self-test failed");
