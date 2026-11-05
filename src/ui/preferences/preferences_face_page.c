@@ -214,8 +214,9 @@ void bongo_cat_preferences_face_content(BongoCatApp *app,
     }
 
     /* 底部进度条: 只在"正在下载"和"刚下完"两种状态下出现, 用户要求放在页面下方 */
-    if (download.state == BONGO_CAT_FACETRACK_INSTALL_WORKING ||
-            download.state == BONGO_CAT_FACETRACK_INSTALL_DONE) {
+    if (!download.check_mode &&
+            (download.state == BONGO_CAT_FACETRACK_INSTALL_WORKING ||
+             download.state == BONGO_CAT_FACETRACK_INSTALL_DONE)) {
         char bar_text[128];
         if (download.state == BONGO_CAT_FACETRACK_INSTALL_DONE) {
             snprintf(bar_text, sizeof(bar_text), "%s 100%%",
