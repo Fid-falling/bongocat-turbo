@@ -95,6 +95,7 @@
           "faceCaptureStatus": "Состояние",
           "faceCaptureMissing": "Компонент не установлен или недоступен",
           "faceCaptureReady": "Компонент готов",
+          "faceCaptureDownloading": "Загрузка",
           "faceCaptureDownload": "Загрузить компонент (6,6 МБ)",
           "faceCaptureDownloadHint": "Только один раз — дальше без сети",
           "hideBubbleHint": "Не показывать пузыри клавиш у моделей с ними",

@@ -79,10 +79,24 @@ void bongo_cat_preferences_face_content(BongoCatApp *app,
     if (app->facetrack_install)
         bongo_cat_facetrack_install_snapshot(app->facetrack_install, &download);
     if (download.state == BONGO_CAT_FACETRACK_INSTALL_WORKING) {
-        snprintf(status, sizeof(status), "%u/%u %s  %.1f/%.1f MB",
-            download.file_index, download.file_count, download.file_name,
-            (double)download.bytes / (1024.0 * 1024.0),
-            (double)download.total / (1024.0 * 1024.0));
+        /* 下载进度要说到能判断"要不要等"的程度: 百分比 + 当前文件 + 已下/总量 + 速度。 */
+        const double done_mb = (double)download.bytes / (1024.0 * 1024.0);
+        const double total_mb = (double)download.total / (1024.0 * 1024.0);
+        const int percent = download.total
+            ? (int)(download.bytes * 100u / download.total) : 0;
+        char speed[32];
+        if (download.bytes_per_second >= 1024u * 1024u)
+            snprintf(speed, sizeof(speed), "%.1f MB/s",
+                (double)download.bytes_per_second / (1024.0 * 1024.0));
+        else if (download.bytes_per_second)
+            snprintf(speed, sizeof(speed), "%llu KB/s",
+                (unsigned long long)(download.bytes_per_second / 1024u));
+        else
+            snprintf(speed, sizeof(speed), "…");
+        snprintf(status, sizeof(status), "%s %d%%  ·  %u/%u %s  ·  %.1f/%.1f MB  ·  %s",
+            face_tr(app, "pages.preference.cat.labels.faceCaptureDownloading", "下载中"),
+            percent, download.file_index, download.file_count, download.file_name,
+            done_mb, total_mb, speed);
     } else if (download.state == BONGO_CAT_FACETRACK_INSTALL_FAILED) {
         snprintf(status, sizeof(status), "%s", download.error);
     } else if (!ready) {

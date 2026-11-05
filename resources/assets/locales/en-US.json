@@ -95,6 +95,7 @@
           "faceCaptureStatus": "Status",
           "faceCaptureMissing": "Component missing or unavailable",
           "faceCaptureReady": "Component ready",
+          "faceCaptureDownloading": "Downloading",
           "faceCaptureDownload": "Download Component (6.6 MB)",
           "faceCaptureDownloadHint": "Only needed once — no network afterwards",
           "hideBubbleHint": "Do not show key bubbles for models that have one",

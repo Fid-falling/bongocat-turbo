@@ -48,6 +48,9 @@ struct BongoCatFacetrackInstall {
     ManifestFile files[FACETRACK_MAX_FILES];
     size_t file_count;
     char base_url[BONGO_CAT_UPDATE_URL_CAP];
+    /* 速度估算的滑动窗口 (只有工作线程写, 读在锁内) */
+    Uint64 speed_mark_ticks;
+    uint64_t speed_mark_bytes;
     /* 下载源 (与主程序更新器共用同一份默认列表: direct + 公共加速前缀 + 自建镜像)。
        直连 GitHub 在国内经常只有十几 KB/s, 11 MB 的 ONNX Runtime 要跑六七分钟, 所以
        必须按列表顺序试; 成功的源会被记下来给后面的文件优先用。 */
@@ -177,9 +180,23 @@ static bool ensure_parent(const char *target_root, const char *relative) {
 static bool progress_trampoline(uint64_t received, uint64_t total, void *user) {
     BongoCatFacetrackInstall *install = user;
     if (atomic_load(&install->stop)) return false;
+    const Uint64 now = SDL_GetTicks();
     SDL_LockMutex(install->lock);
     install->snapshot.file_bytes = received;
     install->snapshot.file_total = total;
+    /* 速度用"每 ~半秒的增量"估算, 不做指数平滑: 用户要的是"现在大概多快",
+       半秒粒度已经够稳, 而平滑会让刚换源时的跳变看不出来。 */
+    if (install->speed_mark_ticks == 0) {
+        install->speed_mark_ticks = now;
+        install->speed_mark_bytes = received;
+    } else if (now - install->speed_mark_ticks >= 500) {
+        const Uint64 elapsed = now - install->speed_mark_ticks;
+        const uint64_t delta = received > install->speed_mark_bytes
+            ? received - install->speed_mark_bytes : 0;
+        install->snapshot.bytes_per_second = delta * 1000u / elapsed;
+        install->speed_mark_ticks = now;
+        install->speed_mark_bytes = received;
+    }
     SDL_UnlockMutex(install->lock);
     return true;
 }

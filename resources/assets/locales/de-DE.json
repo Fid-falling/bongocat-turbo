@@ -95,6 +95,7 @@
           "faceCaptureStatus": "Status",
           "faceCaptureMissing": "Komponente fehlt oder nicht verfügbar",
           "faceCaptureReady": "Komponente bereit",
+          "faceCaptureDownloading": "Wird geladen",
           "faceCaptureDownload": "Komponente herunterladen (6.6 MB)",
           "faceCaptureDownloadHint": "Nur einmal nötig — danach kein Netzwerk",
           "hideBubbleHint": "Keine Tastaturblasen für Modelle mit Blase anzeigen",

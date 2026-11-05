@@ -95,6 +95,7 @@
           "faceCaptureStatus": "状態",
           "faceCaptureMissing": "コンポーネントが未インストールまたは使用不可",
           "faceCaptureReady": "コンポーネント準備完了",
+          "faceCaptureDownloading": "ダウンロード中",
           "faceCaptureDownload": "コンポーネントをダウンロード (6.6 MB)",
           "faceCaptureDownloadHint": "一度だけ必要です（以後は通信しません）",
           "hideBubbleHint": "バブル付きのモデルではキーバブルを表示しません",

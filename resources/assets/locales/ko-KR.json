@@ -95,6 +95,7 @@
           "faceCaptureStatus": "상태",
           "faceCaptureMissing": "구성 요소가 없거나 사용할 수 없음",
           "faceCaptureReady": "구성 요소 준비됨",
+          "faceCaptureDownloading": "다운로드 중",
           "faceCaptureDownload": "구성 요소 다운로드 (6.6 MB)",
           "faceCaptureDownloadHint": "한 번만 받으면 됩니다",
           "hideBubbleHint": "버블이 있는 모델에서는 키 버블을 표시하지 않습니다",

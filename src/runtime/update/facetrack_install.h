@@ -36,6 +36,9 @@ typedef struct BongoCatFacetrackInstallSnapshot {
     /* 整体: 已完成的文件字节 + 当前文件已收 */
     uint64_t bytes;
     uint64_t total;
+    /* 最近测到的平均速度 (字节/秒), 0 = 还没测出 (刚开始或已结束)。
+       设置页拿它显示 "约 120 KB/s", 用户能判断"要不要等"。 */
+    uint64_t bytes_per_second;
     char error[192];
 } BongoCatFacetrackInstallSnapshot;
 
