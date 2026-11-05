@@ -141,6 +141,10 @@ void bongo_cat_preferences_renderer_fallback(BongoCatApp *app,
 void bongo_cat_preferences_bubble_rows(BongoCatApp *app,
     struct nk_context *context);
 
+/* 面捕四行 (开关 / 状态 / 灵敏度 / 反转), 见 preferences_face_row.c。 */
+void bongo_cat_preferences_face_rows(BongoCatApp *app,
+    struct nk_context *context);
+
 void bongo_cat_preferences_texture_quality_row(BongoCatApp *app,
     struct nk_context *context);
 void bongo_cat_preferences_cache_path_browse(BongoCatPreferences *value);

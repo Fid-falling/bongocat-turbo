@@ -415,6 +415,8 @@ static void input_section(BongoCatPreferences *value, struct nk_context *context
     }
     /* 按键气泡三行 (屏蔽 / 多键 / 合并) 互相约束, 整块在 preferences_bubble_row.c */
     bongo_cat_preferences_bubble_rows(app, context);
+    /* 面捕四行: 开关 / 状态 / 灵敏度 / 反转 */
+    bongo_cat_preferences_face_rows(app, context);
     bongo_cat_preferences_options_end(value, context);
     }
 }
