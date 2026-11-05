@@ -152,6 +152,10 @@ set(BONGO_CAT_RUNTIME_INPUT_SOURCES
   src/runtime/input/mouse.c
   src/runtime/input/mouse_bounds.c
   src/runtime/input/mouse_mapping.c
+  # 面捕: 组件装载 + 摄像头线程 + 快照 -> Cubism 参数 (按需下载的组件, 缺失时安静降级)
+  src/runtime/input/face_capture.c
+  src/runtime/input/face_capture_map.c
+  src/runtime/input/face_capture_sync.c
   src/runtime/input/mouse_pipeline.c
   src/runtime/input/shortcuts.c
   src/runtime/input/sound_shortcuts.c)

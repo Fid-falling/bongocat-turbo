@@ -7,6 +7,8 @@
  * 会让手臂瞬间跳到左上角。只有 map_pointer 成功且位置真的变了, 才值得往下写参数。
  */
 #include "runtime.h"
+
+#include "face_capture.h"
 #include "mouse_internal.h"
 #include "bongo_cat/overlay.h"
 
@@ -109,8 +111,17 @@ void bongo_cat_app_apply_mouse_coordinates(BongoCatApp *app,
         set_parameter(app, "ParamMouseY", hand_x_ratio, hand_y_ratio,
             horizontal_mirror);
     }
+    /*
+     * 面捕开着并且这一帧真的有人脸时, 头部/眼睛/身体由摄像头驱动 —— 这里必须跳过
+     * dragging, 否则鼠标和面捕会同时写 ParamAngleX/Y, 表现为"头在抖/方向不对"。
+     * 手和键盘不受影响: 上面 ParamMouseX/Y 已经写过了。
+     */
+    const bool face_drives_head = app->face_capture &&
+        app->settings.model.face_capture &&
+        bongo_cat_face_capture_head_active(app->face_capture);
     /* Pointer and window messages are not atomic during a native window move. */
-    if (!app->settings.model.mouse_centered || !app->window_drag_active) {
+    if (!face_drives_head &&
+        (!app->settings.model.mouse_centered || !app->window_drag_active)) {
         if (app->settings.model.mouse_centered)
             bongo_cat_live2d_set_centered_dragging(app->live2d, drag_x, drag_y);
         else bongo_cat_live2d_set_dragging(app->live2d, drag_x, drag_y);

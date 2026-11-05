@@ -150,6 +150,19 @@ typedef struct BongoCatModelPreferences {
      */
     int bubble_hidden;
     /*
+     * 面捕 (需要按需下载的 bongo_facetrack 组件)。1 = 开启。
+     * 开启后**头部/眼睛/嘴/眉毛/身体**由摄像头驱动, 鼠标不再驱动头部 (手和键盘照旧),
+     * 两边各管一段, 不会互相打架。用 int + 可选读, 老配置缺键时保持 0。
+     */
+    int face_capture;
+    /* 面捕灵敏度 (0.2..3.0, 1.0 = 组件输出的原始幅度) */
+    float face_capture_gain;
+    /* 摄像头画面/跟踪方向反转 (手机当摄像头时常需要) */
+    int face_capture_flip_h;
+    int face_capture_flip_v;
+    /* 摄像头设备 id, 0 = 系统默认 (SDL_CameraID) */
+    int face_capture_camera;
+    /*
      * 渲染精度: 以 N 倍分辨率渲染后再线性缩回窗口尺寸 (见 BONGO_CAT_RENDER_SCALE_*)。
      * 用 float + 可选读 read_float: 老配置里没有 renderScale 这个键时保持默认 1.0,
      * 不会因为"键不存在"判定配置损坏。校验时 clamp 到 [0.1, 4.0] 并按 0.1 取整,

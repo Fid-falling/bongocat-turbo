@@ -15,6 +15,8 @@ if(WIN32)
     src/platform/windows/windows_capture.c
     src/platform/windows/windows_transparency.c
     src/platform/windows/windows_elevate.c
+    # 面捕组件的运行库预装载 (先把组件自带的 onnxruntime.dll 装进来)
+    src/platform/windows/windows_facetrack_runtime.c
     src/platform/windows/windows_pointer.c
     src/platform/windows/windows_snapshot.c
     src/platform/windows/windows_snapshot_image.c

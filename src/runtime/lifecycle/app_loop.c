@@ -11,6 +11,8 @@
  * 都假设渲染只发生在这些地方。
  */
 #include "runtime.h"
+
+#include "face_capture.h"
 #include "bongo_cat/audio.h"
 #include "bongo_cat/gl_scale.h"
 #include "bongo_cat/log.h"
@@ -45,6 +47,11 @@ static void update_model(BongoCatApp *app, uint64_t now) {
     if (elapsed > 0.25f) elapsed = 0.25f;
     app->last_frame_ns = now;
     if (!app->smoke_freeze_model) bongo_cat_app_step_live2d(app, elapsed);
+    /* 面捕: 每帧把最新快照写进模型。放在 step 之后、draw 之前, 这样这一帧画出来的就是
+       刚采到的表情; 鼠标驱动头部在 mouse_mapping.c 里被跳过 (面部优先)。 */
+    if (app->face_capture && app->settings.model.face_capture)
+        bongo_cat_face_capture_apply(app->face_capture, app->live2d,
+            &app->settings.model);
 }
 
 /* present=false 是离屏截帧 (模型封面 / 冒烟回读): 照常画一帧但不交换缓冲。返回 false

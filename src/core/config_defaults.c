@@ -1,4 +1,5 @@
 #include "bongo_cat/config.h"
+#include "config_internal.h"
 #include "bongo_cat/utf8.h"
 
 #include <ctype.h>
@@ -7,8 +8,7 @@
 #include <string.h>
 
 /*
- * 默认值与合法性钳制的唯一来源。配置可能来自手改或旧版本, 所以读进来之后
- * 一律要过一遍 bongo_cat_settings_validate; 之后渲染/输入侧就可以直接相信
+ * 默认值与合法性钳制的唯一来源。配置可能来自手改或旧版本, 所以读进来之后一律要过一遍 bongo_cat_settings_validate; 之后渲染/输入侧就可以直接相信
  * 结构里的数值都在允许范围内, 不必到处再判一次。
  */
 /*
@@ -283,8 +283,7 @@ static void compact_random_disabled(BongoCatSettings *config) {
 }
 
 /*
- * 音效禁用集合: 与 random_disabled 同一套收口 —— 截断超长 id、丢弃空/非法条目、
- * 按字符串去重、把剩余槽位清零。写盘前必过, 所以文件里不会留下上次的垃圾。
+ * 音效禁用集合: 与 random_disabled 同一套收口 —— 截断超长 id、丢弃空/非法条目、按字符串去重、把剩余槽位清零。写盘前必过, 所以文件里不会留下上次的垃圾。
  */
 static void compact_sound_disabled(BongoCatSettings *config) {
     size_t input_count = config->sound.disabled_count;
@@ -338,6 +337,7 @@ void bongo_cat_settings_defaults(BongoCatSettings *config) {
     /* 默认合并: "A + S" 比并排 N 个气泡更接近"用户按了什么"的直觉读法 */
     config->model.bubble_merge = 1;
     config->model.bubble_hidden = 0;
+    bongo_cat_settings_face_capture_defaults(&config->model);
     /* 渲染精度默认 1.0 = 按窗口尺寸直接渲染, 与 1.17.0 逐像素一致: 更高的默认值等于
        替用户付显卡/显存的代价, 只有用户自己要求时才该升级。 */
     config->model.render_scale = BONGO_CAT_RENDER_SCALE_DEFAULT;
@@ -386,8 +386,7 @@ void bongo_cat_settings_defaults(BongoCatSettings *config) {
 }
 
 /*
- * 幂等的收口函数: 读配置、改配置、写配置之前都会被调用。只做钳制与整理, 不改变语义,
- * 所以调用多少次结果都一样, 调用方不需要判断"是否已经校验过"。
+ * 幂等的收口函数: 读配置、改配置、写配置之前都会被调用。只做钳制与整理, 不改变语义,所以调用多少次结果都一样, 调用方不需要判断"是否已经校验过"。
  * 末尾再跑一次 compact_behavior_overrides, 是因为 validate_shortcuts 可能
  * 刚把某些 shortcut 清空, 清空之后又会多出空条目。
  */
@@ -412,6 +411,7 @@ void bongo_cat_settings_validate(BongoCatSettings *config) {
     config->model.multi_key_display = config->model.multi_key_display != 0;
     config->model.bubble_merge = config->model.bubble_merge != 0;
     config->model.bubble_hidden = config->model.bubble_hidden != 0;
+    bongo_cat_settings_face_capture_validate(&config->model);
     if (config->model.multi_key_limit < 1 ||
         config->model.multi_key_limit > BONGO_CAT_MULTI_KEY_LIMIT_MAX)
         config->model.multi_key_limit = BONGO_CAT_MULTI_KEY_LIMIT_DEFAULT;

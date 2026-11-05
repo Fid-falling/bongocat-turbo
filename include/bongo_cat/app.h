@@ -114,6 +114,8 @@ typedef struct BongoCatApp {
     BongoCatAudio *audio;
     BongoCatTray *tray;
     BongoCatOverlay *overlay;
+    /* 面捕运行时 (装载按需下载的 bongo_facetrack 组件); NULL = 没开启/不可用 */
+    struct BongoCatFaceCapture *face_capture;
     BongoCatPreferences *preferences;
     BongoCatMultiPetRuntime *multi_pet;
     BongoCatModelRefresh *model_refresh;

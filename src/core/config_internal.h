@@ -2,6 +2,10 @@
 #define BONGO_CAT_CONFIG_INTERNAL_H
 
 #include "bongo_cat/config.h"
+
+/* 面捕字段的默认值与收口 (见 config_face_capture.c; 拆出去是为了守行数策略) */
+void bongo_cat_settings_face_capture_defaults(BongoCatModelPreferences *model);
+void bongo_cat_settings_face_capture_validate(BongoCatModelPreferences *model);
 #include <yyjson.h>
 
 /*

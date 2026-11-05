@@ -37,7 +37,10 @@ if(BONGO_CAT_FETCH_DEPS)
   set(SDL_METAL OFF CACHE BOOL "" FORCE)
   set(SDL_OFFSCREEN OFF CACHE BOOL "" FORCE)
   set(SDL_VIRTUAL_JOYSTICK OFF CACHE BOOL "" FORCE)
-  set(SDL_CAMERA OFF CACHE BOOL "" FORCE)
+  # 面捕需要摄像头: SDL3 的 Windows 后端走 Media Foundation, 关掉它时 SDL_OpenCamera
+  # 直接返回 "SDL not built with camera support"。只有开启面捕的人才会真正打开设备,
+  # 不开的人没有任何额外开销 (不初始化、不枚举)。
+  set(SDL_CAMERA ON CACHE BOOL "" FORCE)
   set(SDL_AUDIO OFF CACHE BOOL "" FORCE)
   set(SDL_HAPTIC OFF CACHE BOOL "" FORCE)
   set(SDL_POWER OFF CACHE BOOL "" FORCE)

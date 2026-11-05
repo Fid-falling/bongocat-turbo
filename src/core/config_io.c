@@ -92,6 +92,11 @@ static bool read_model(yyjson_val *object, BongoCatModelPreferences *value,
         !read_int(object, "multiKeyLimit", &value->multi_key_limit, error) ||
         !read_int(object, "bubbleMerge", &value->bubble_merge, error) ||
         !read_int(object, "hideBubble", &value->bubble_hidden, error) ||
+        !read_int(object, "faceCapture", &value->face_capture, error) ||
+        !read_float(object, "faceCaptureGain", &value->face_capture_gain, error) ||
+        !read_int(object, "faceFlipH", &value->face_capture_flip_h, error) ||
+        !read_int(object, "faceFlipV", &value->face_capture_flip_v, error) ||
+        !read_int(object, "faceCamera", &value->face_capture_camera, error) ||
         /* 可选读: 老配置缺这个键时保持默认 0 (标准图集上限) */
         !read_int(object, "textureQuality", &value->texture_quality, error))
         return false;

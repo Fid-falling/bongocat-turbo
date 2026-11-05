@@ -14,6 +14,8 @@
  * 副进程 (--secondary-pet=, 多宠) 跳过托盘/设置/更新, 并且初始强制不可见。
  */
 #include "runtime.h"
+
+#include "face_capture.h"
 #include "bongo_cat/log.h"
 #include "storage_paths.h"
 #include "bongo_cat/audio.h"
@@ -234,6 +236,8 @@ bool bongo_cat_app_initialize(BongoCatApp *app, int argc, char **argv,
     scan_models(app);
     show_startup_placeholder(app);
     if (!load_selected_model(app, error)) return false;
+    /* 面捕: 设置里开着就尝试装载组件并开摄像头。缺组件不算启动失败。 */
+    bongo_cat_face_capture_sync(app);
     /*
      * 模型已就绪: 撤掉启动占位图 (盖在叠加层 effect 通道上的封面)。否则那张静态封面会一直
      * 画在模型上面, 表现是"宠物不动了"。这一步与旋转功能无关, 是独立的真实修复。

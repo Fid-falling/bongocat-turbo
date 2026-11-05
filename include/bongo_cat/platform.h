@@ -141,6 +141,10 @@ bool bongo_cat_platform_pointer_local(BongoCatPlatform *platform, double screen_
     double screen_y, float *local_x, float *local_y);
 /* Reports a foreground application's fixed/locked system cursor state. */
 bool bongo_cat_platform_pointer_locked(BongoCatPlatform *platform);
+/* 面捕组件装载前, 先把组件目录里的 onnxruntime.dll 显式装进来。
+   不做这一步时 Windows 会按 PATH 搜索同名 DLL, 撞上系统里别的版本就会 ABI 不匹配。
+   dll_path 是组件自身的完整路径; 其它平台是空实现。 */
+void bongo_cat_platform_preload_facetrack_runtime(const char *dll_path);
 bool bongo_cat_platform_relative_pointer(BongoCatPlatform *platform,
     double *x, double *y);
 void bongo_cat_platform_relative_pointer_reset(BongoCatPlatform *platform);
