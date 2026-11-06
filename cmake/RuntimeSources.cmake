@@ -118,6 +118,7 @@ set(BONGO_CAT_RUNTIME_UPDATE_SOURCES
  src/runtime/update/facetrack_http.c
  src/runtime/update/facetrack_install.c
  src/runtime/update/facetrack_manifest.c
+ src/runtime/update/facetrack_files.c
  src/runtime/update/facetrack_version.c
  src/runtime/update/update_download.c
   # 替换/重启的调度与启动收尾 (.old 备份、失败回执)

@@ -11,7 +11,8 @@
           "title": "Capture du visage",
           "section": "Réglages",
           "confirmTitle": "Capture du visage",
-          "confirmBody": "La capture du visage nécessite un téléchargement unique du composant (environ 6,6 Mo). Elle fonctionne ensuite hors ligne.",
+          "confirmBody": "La capture du visage nécessite un téléchargement unique du composant (environ %s). Elle fonctionne ensuite hors ligne.\n\nTélécharger maintenant ?",
+          "confirmBodyNoSize": "La capture du visage nécessite un téléchargement unique du composant. Elle fonctionne ensuite hors ligne.\n\nTélécharger maintenant ?",
           "confirmAsk": "Télécharger maintenant ?",
           "confirmCancel": "Annuler",
           "confirmOk": "Télécharger"

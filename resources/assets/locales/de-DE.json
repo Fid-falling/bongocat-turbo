@@ -11,7 +11,8 @@
           "title": "Gesichtserfassung",
           "section": "Einstellungen",
           "confirmTitle": "Gesichtserfassung",
-          "confirmBody": "Die Gesichtserfassung benötigt einen einmaligen Komponenten-Download (ca. 6,6 MB). Danach funktioniert sie offline.",
+          "confirmBody": "Die Gesichtserfassung benötigt einen einmaligen Komponenten-Download (ca. %s). Danach funktioniert sie offline.\n\nJetzt herunterladen?",
+          "confirmBodyNoSize": "Die Gesichtserfassung benötigt einen einmaligen Komponenten-Download. Danach funktioniert sie offline.\n\nJetzt herunterladen?",
           "confirmAsk": "Jetzt herunterladen?",
           "confirmCancel": "Abbrechen",
           "confirmOk": "Herunterladen"

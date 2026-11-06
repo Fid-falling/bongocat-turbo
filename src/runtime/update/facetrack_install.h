@@ -97,6 +97,11 @@ void bongo_cat_facetrack_install_snapshot(BongoCatFacetrackInstall *install,
 /* 还在跑的安装/检查线程数 (销毁是 detach 的, 重建前要等它归零)。 */
 int bongo_cat_facetrack_install_active_threads(void);
 
+/* 用一个刚下好的 .part 替换目标文件; 目标被本进程装载时先改名为 .old 让路。
+   实现在 facetrack_files.c。 */
+bool bongo_cat_facetrack_replace_file(const char *path, const char *part_path,
+    char *error, size_t capacity);
+
 /* 清掉上次更新留下的 .old 文件 (组件替换时"改名让路"的产物)。 */
 void bongo_cat_facetrack_cleanup_backups(const char *root);
 

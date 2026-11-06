@@ -138,26 +138,32 @@ static bool ensure_parent(const char *target_root, const char *relative) {
     return bongo_cat_path_create_directory(full);
 }
 
+/* 速度估算 (调用方持锁): 每半秒算一次增量速度。 */
+static void update_speed(BongoCatFacetrackInstall *install, uint64_t received) {
+    const Uint64 now = SDL_GetTicks();
+    if (install->speed_mark_ticks == 0) {
+        install->speed_mark_ticks = now;
+        install->speed_mark_bytes = received;
+        return;
+    }
+    if (now - install->speed_mark_ticks < 500) return;
+    const Uint64 elapsed = now - install->speed_mark_ticks;
+    const uint64_t delta = received > install->speed_mark_bytes
+        ? received - install->speed_mark_bytes : 0;
+    install->snapshot.bytes_per_second = delta * 1000u / elapsed;
+    install->speed_mark_ticks = now;
+    install->speed_mark_bytes = received;
+}
+
 static bool progress_trampoline(uint64_t received, uint64_t total, void *user) {
     BongoCatFacetrackInstall *install = user;
     if (atomic_load(&install->stop)) return false;
-    const Uint64 now = SDL_GetTicks();
     SDL_LockMutex(install->lock);
     install->snapshot.file_bytes = received;
     install->snapshot.file_total = total;
     /* 速度用"每 ~半秒的增量"估算, 不做指数平滑: 用户要的是"现在大概多快",
        半秒粒度已经够稳, 而平滑会让刚换源时的跳变看不出来。 */
-    if (install->speed_mark_ticks == 0) {
-        install->speed_mark_ticks = now;
-        install->speed_mark_bytes = received;
-    } else if (now - install->speed_mark_ticks >= 500) {
-        const Uint64 elapsed = now - install->speed_mark_ticks;
-        const uint64_t delta = received > install->speed_mark_bytes
-            ? received - install->speed_mark_bytes : 0;
-        install->snapshot.bytes_per_second = delta * 1000u / elapsed;
-        install->speed_mark_ticks = now;
-        install->speed_mark_bytes = received;
-    }
+    update_speed(install, received);
     SDL_UnlockMutex(install->lock);
     return true;
 }
@@ -175,40 +181,6 @@ static bool manifest_fetch_cb(const char *url, void *user) {
         ctx->error, ctx->capacity);
 }
 
-
-/* 把 <path> 换成本进程刚下好的那份。
-   坑: 组件 DLL/onnxruntime.dll 往往正被本进程装载 —— 对已装载的映像, Windows 允许
-   **改名**但不允许删除/覆盖。所以先把它改成一个 .old 名字让路, 再把 .new 顶上去;
-   下次启动时 .old 会被清掉 (cleanup_stale_backups)。 */
-static bool replace_file(const char *path, const char *part_path, char *error,
-    size_t capacity) {
-    if (remove(path) == 0 || GetLastError() == ERROR_FILE_NOT_FOUND) {
-        if (rename(part_path, path) == 0) return true;
-    }
-    char backup[BONGO_CAT_PATH_CAP];
-    snprintf(backup, sizeof(backup), "%s.old", path);
-    remove(backup);
-    if (MoveFileExA(path, backup, MOVEFILE_REPLACE_EXISTING)) {
-        if (rename(part_path, path) == 0) return true;
-        MoveFileExA(backup, path, MOVEFILE_REPLACE_EXISTING);   /* 失败就还原 */
-    }
-    snprintf(error, capacity, "无法替换 %s (文件被占用)", path);
-    return false;
-}
-
-/* 启动时清掉上次更新留下的 .old (那时文件已经不被占用) */
-void bongo_cat_facetrack_cleanup_backups(const char *root) {
-    if (!root || !root[0]) return;
-    static const char *names[] = { "bongo_facetrack.dll", "onnxruntime.dll",
-        "models/mnv3_detection_opt.onnx", "models/lm_model0_opt.onnx" };
-    for (size_t i = 0; i < sizeof(names) / sizeof(names[0]); ++i) {
-        char path[BONGO_CAT_PATH_CAP];
-        char backup[BONGO_CAT_PATH_CAP];
-        if (!bongo_cat_path_join(path, sizeof(path), root, names[i])) continue;
-        snprintf(backup, sizeof(backup), "%s.old", path);
-        remove(backup);
-    }
-}
 
 /* 下载一个文件到 .part -> 校验 -> 改名。 */
 static bool install_file(BongoCatFacetrackInstall *install,
@@ -299,7 +271,8 @@ static bool install_file(BongoCatFacetrackInstall *install,
         snprintf(error, capacity, "%s 校验失败, 请重试", file->name);
         return false;
     }
-    if (!replace_file(final_path, part_path, error, capacity)) {
+    if (!bongo_cat_facetrack_replace_file(final_path, part_path, error,
+            capacity)) {
         remove(part_path);
         return false;
     }
@@ -307,6 +280,35 @@ static bool install_file(BongoCatFacetrackInstall *install,
     install->snapshot.bytes += file->size ? file->size : downloaded;
     SDL_UnlockMutex(install->lock);
     return true;
+}
+
+/* 只查版本: 比较已装与清单版本, 把结果写进快照就结束 (不下载任何文件)。 */
+static void finish_check(BongoCatFacetrackInstall *install) {
+    char installed[32] = {0};
+    const bool have = bongo_cat_facetrack_install_version(install->target_root,
+        installed, sizeof(installed));
+    const bool newer = !have || !installed[0] ||
+        bongo_cat_update_compare_versions(install->manifest.version, installed) > 0;
+    SDL_LockMutex(install->lock);
+    snprintf(install->snapshot.latest_version,
+        sizeof(install->snapshot.latest_version), "%s", install->manifest.version);
+    snprintf(install->snapshot.installed_version,
+        sizeof(install->snapshot.installed_version), "%s",
+        have ? installed : "");
+    install->snapshot.update_available = newer;
+    /* 顺手把总大小与文件数填上: 确认框要用清单里的真实大小, 而不是写死的数字 */
+    install->snapshot.file_count = (uint32_t)install->manifest.count;
+    uint64_t total = 0;
+    for (size_t i = 0; i < install->manifest.count; ++i)
+        total += install->manifest.files[i].size;
+    install->snapshot.total = total;
+    install->snapshot.state = BONGO_CAT_FACETRACK_INSTALL_DONE;
+    SDL_UnlockMutex(install->lock);
+    SDL_LogInfo(BONGO_CAT_LOG_LIFECYCLE,
+        "[face] 版本检查: 已装 %s, 最新 %s, %s", have ? installed : "(无)",
+        install->manifest.version, newer ? "有新版本" : "已最新");
+    atomic_store(&install->running, false);
+    atomic_fetch_sub(&g_install_threads, 1);
 }
 
 static int install_thread(void *userdata) {
@@ -333,27 +335,8 @@ static int install_thread(void *userdata) {
         atomic_fetch_sub(&g_install_threads, 1);
         return 0;
     }
-    /* 只查版本: 比较完就把结果写进快照, 不下载任何文件 */
     if (install->check_only) {
-        char installed[32] = {0};
-        const bool have = bongo_cat_facetrack_install_version(install->target_root,
-            installed, sizeof(installed));
-        const bool newer = !have || !installed[0] ||
-            bongo_cat_update_compare_versions(install->manifest.version, installed) > 0;
-        SDL_LockMutex(install->lock);
-        snprintf(install->snapshot.latest_version,
-            sizeof(install->snapshot.latest_version), "%s", install->manifest.version);
-        snprintf(install->snapshot.installed_version,
-            sizeof(install->snapshot.installed_version), "%s",
-            have ? installed : "");
-        install->snapshot.update_available = newer;
-        install->snapshot.state = BONGO_CAT_FACETRACK_INSTALL_DONE;
-        SDL_UnlockMutex(install->lock);
-        SDL_LogInfo(BONGO_CAT_LOG_LIFECYCLE,
-            "[face] 版本检查: 已装 %s, 最新 %s, %s", have ? installed : "(无)",
-            install->manifest.version, newer ? "有新版本" : "已最新");
-        atomic_store(&install->running, false);
-        atomic_fetch_sub(&g_install_threads, 1);
+        finish_check(install);
         return 0;
     }
 

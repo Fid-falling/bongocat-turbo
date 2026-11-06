@@ -11,7 +11,8 @@
           "title": "Captura facial",
           "section": "Ajustes",
           "confirmTitle": "Captura facial",
-          "confirmBody": "A captura facial exige baixar o componente uma única vez (cerca de 6,6 MB). Depois funciona offline.",
+          "confirmBody": "A captura facial exige baixar o componente uma única vez (cerca de %s). Depois funciona offline.\n\nBaixar agora?",
+          "confirmBodyNoSize": "A captura facial exige baixar o componente uma única vez. Depois funciona offline.\n\nBaixar agora?",
           "confirmAsk": "Baixar agora?",
           "confirmCancel": "Cancelar",
           "confirmOk": "Baixar"

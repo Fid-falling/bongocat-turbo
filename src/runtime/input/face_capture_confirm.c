@@ -9,10 +9,14 @@
  */
 #include "face_capture.h"
 
+#include "../update/facetrack_install.h"
+
 #include "bongo_cat/i18n.h"
 #include "bongo_cat/log.h"
 
 #include <SDL3/SDL.h>
+
+#include <stdio.h>
 #include <SDL3/SDL_messagebox.h>
 
 static const char *tr(BongoCatApp *app, const char *key, const char *fallback) {
@@ -24,20 +28,38 @@ static const char *tr(BongoCatApp *app, const char *key, const char *fallback) {
 bool bongo_cat_face_capture_confirm_download(BongoCatApp *app) {
     if (!app) return false;
     const SDL_MessageBoxButtonData buttons[] = {
-        /* 默认按钮放"取消": 回车不应该意外触发 6.6 MB 的下载 */
+        /* 默认按钮放"取消": 回车不应该意外触发一次几十 MB 的下载 */
         { SDL_MESSAGEBOX_BUTTON_RETURNKEY_DEFAULT, 0,
             tr(app, "pages.preference.face.confirmCancel", "Cancel") },
         { SDL_MESSAGEBOX_BUTTON_ESCAPEKEY_DEFAULT, 1,
             tr(app, "pages.preference.face.confirmOk", "Download") }
     };
+    /* 组件大小**从清单里取**, 不写死: 换了运行时/加了模型, 包大小会变 (6.6 MB -> 16.5 MB),
+       写死的话确认框会一直骗人。拿不到 (还没检查过) 就用不带数字的文案。 */
+    char size_text[32] = {0};
+    if (app->facetrack_install) {
+        BongoCatFacetrackInstallSnapshot snapshot;
+        bongo_cat_facetrack_install_snapshot(app->facetrack_install, &snapshot);
+        if (snapshot.total > 0)
+            snprintf(size_text, sizeof(size_text), "%.1f MB",
+                (double)snapshot.total / (1024.0 * 1024.0));
+    }
+    static char body[512];
+    if (size_text[0])
+        snprintf(body, sizeof(body), tr(app,
+            "pages.preference.face.confirmBody",
+            "Face capture needs a one-time component download (about %s). "
+            "It works offline afterwards.\n\nDownload now?"), size_text);
+    else
+        snprintf(body, sizeof(body), "%s", tr(app,
+            "pages.preference.face.confirmBodyNoSize",
+            "Face capture needs a one-time component download. "
+            "It works offline afterwards.\n\nDownload now?"));
     const SDL_MessageBoxData data = {
         SDL_MESSAGEBOX_INFORMATION,
         NULL,
         tr(app, "pages.preference.face.confirmTitle", "Face Capture"),
-        tr(app, "pages.preference.face.confirmBody",
-            "Face capture needs a one-time component download (about 6.6 MB). "
-            "It is downloaded once and used offline afterwards.\n\n"
-            "Download now?"),
+        body,
         SDL_arraysize(buttons),
         buttons,
         NULL

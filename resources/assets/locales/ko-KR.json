@@ -11,7 +11,8 @@
           "title": "얼굴 캡처",
           "section": "설정",
           "confirmTitle": "얼굴 캡처",
-          "confirmBody": "얼굴 캡처는 구성 요소(약 6.6 MB)를 한 번 받아야 합니다. 이후에는 오프라인으로 동작합니다.",
+          "confirmBody": "얼굴 캡처는 구성 요소(약 %s)를 한 번 받아야 합니다. 이후에는 오프라인으로 동작합니다.\n\n지금 받을까요?",
+          "confirmBodyNoSize": "얼굴 캡처는 구성 요소를 한 번 받아야 합니다. 이후에는 오프라인으로 동작합니다.\n\n지금 받을까요?",
           "confirmAsk": "지금 받을까요?",
           "confirmCancel": "취소",
           "confirmOk": "다운로드"

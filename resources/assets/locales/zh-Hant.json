@@ -11,7 +11,8 @@
           "title": "臉部捕捉",
           "section": "設定",
           "confirmTitle": "臉部捕捉",
-          "confirmBody": "臉部捕捉需要先下載元件（約 6.6 MB），只需下載一次，之後可離線使用。",
+          "confirmBody": "臉部捕捉需要先下載元件（約 %s），只需下載一次，之後可離線使用。\n\n現在下載嗎？",
+          "confirmBodyNoSize": "臉部捕捉需要先下載元件，只需下載一次，之後可離線使用。\n\n現在下載嗎？",
           "confirmAsk": "現在下載嗎？",
           "confirmCancel": "取消",
           "confirmOk": "下載"

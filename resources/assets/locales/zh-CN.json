@@ -11,7 +11,8 @@
           "title": "面部捕捉",
           "section": "设置",
           "confirmTitle": "面部捕捉",
-          "confirmBody": "面部捕捉需要先下载组件（约 6.6 MB），只需下载一次，之后离线可用。",
+          "confirmBody": "面部捕捉需要先下载组件（约 %s），只需下载一次，之后离线可用。\n\n现在下载吗？",
+          "confirmBodyNoSize": "面部捕捉需要先下载组件，只需下载一次，之后离线可用。\n\n现在下载吗？",
           "confirmAsk": "现在下载吗？",
           "confirmCancel": "取消",
           "confirmOk": "下载"
