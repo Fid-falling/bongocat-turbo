@@ -373,6 +373,7 @@ set(BONGO_CAT_UI_PREFERENCES_SOURCES
   src/ui/preferences/preferences_face_row.c
   src/ui/preferences/preferences_face_page.c
   src/ui/preferences/preferences_face_preview.c
+  src/ui/preview/face_preview.c
   # 模型页的"随机"标签页: 三个随机分区 + 顺序轮换 (从 preferences_pages.c 拆出, 见行数策略)
   src/ui/preferences/preferences_random_page.c
   # 互动页的 [音效] 区: 总音量 / 全部静音 / 当前模型逐条开关

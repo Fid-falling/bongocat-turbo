@@ -41,6 +41,10 @@ if(BONGO_CAT_FETCH_DEPS)
   # 直接返回 "SDL not built with camera support"。只有开启面捕的人才会真正打开设备,
   # 不开的人没有任何额外开销 (不初始化、不枚举)。
   set(SDL_CAMERA ON CACHE BOOL "" FORCE)
+  # 面捕预览窗用 SDL_Renderer 贴一张流式纹理: 关掉 SDL_RENDER 时 SDL_CreateRenderer
+  # 直接报 "SDL not built with rendering support"。它只在用户点"打开预览"时才用,
+  # 不影响桌宠的 Vulkan/OpenGL 渲染路径。
+  set(SDL_RENDER ON CACHE BOOL "" FORCE)
   set(SDL_AUDIO OFF CACHE BOOL "" FORCE)
   set(SDL_HAPTIC OFF CACHE BOOL "" FORCE)
   set(SDL_POWER OFF CACHE BOOL "" FORCE)

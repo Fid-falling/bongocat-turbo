@@ -20,6 +20,7 @@
 
 #include "../../runtime/input/face_capture.h"
 #include "../../runtime/update/facetrack_install.h"
+#include "../preview/face_preview.h"
 
 #include "bongo_cat/i18n.h"
 #include "bongo_cat/log.h"
@@ -177,8 +178,25 @@ void bongo_cat_preferences_face_content(BongoCatApp *app,
         }
     }
 
-    /* 预览窗: 类似 VTS 的摄像头画面, 让用户确认"看到的确实是自己的脸" */
-    bongo_cat_preferences_face_preview(app->preferences, context);
+    /* 预览: 独立窗口 (可以拖到一边/副屏), 按钮开关 */
+    if (app->face_capture) {
+        bongo_cat_pref_row_icon(context, BONGO_CAT_PREF_ICON_MULTIPLE_MODELS);
+        if (bongo_cat_pref_button(context, "face-preview-window",
+                face_tr(app, "pages.preference.cat.labels.facePreview",
+                    "Camera Preview"),
+                face_tr(app, "pages.preference.cat.labels.facePreviewHint",
+                    "打开一个独立窗口看摄像头画面"),
+                bongo_cat_face_preview_open()
+                    ? face_tr(app, "pages.preference.cat.labels.facePreviewClose",
+                        "Close")
+                    : face_tr(app, "pages.preference.cat.labels.facePreviewOpen",
+                        "Open"))) {
+            if (bongo_cat_face_preview_open())
+                bongo_cat_face_preview_close();
+            else
+                bongo_cat_face_preview_show(app);
+        }
+    }
 
     /* 手动检查更新: 自动检查每次会话只跑一次, 而且可能因为网络失败; 给用户一个重试入口 */
     if (ready) {

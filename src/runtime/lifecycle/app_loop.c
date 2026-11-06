@@ -12,6 +12,8 @@
  */
 #include "runtime.h"
 
+#include "../../ui/preview/face_preview.h"
+
 #include "face_capture.h"
 #include "bongo_cat/audio.h"
 #include "bongo_cat/gl_scale.h"
@@ -49,6 +51,8 @@ static void update_model(BongoCatApp *app, uint64_t now) {
     if (!app->smoke_freeze_model) bongo_cat_app_step_live2d(app, elapsed);
     /* 面捕: 每帧把最新快照写进模型。放在 step 之后、draw 之前, 这样这一帧画出来的就是
        刚采到的表情; 鼠标驱动头部在 mouse_mapping.c 里被跳过 (面部优先)。 */
+    bongo_cat_face_preview_tick(app);
+
     /* 面捕确认框: 在帧外弹, 用户同意后才开始下载/更新 */
     if (app->face_confirm_pending) {
         app->face_confirm_pending = false;
