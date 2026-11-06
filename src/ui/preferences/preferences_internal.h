@@ -145,6 +145,11 @@ void bongo_cat_preferences_bubble_rows(BongoCatApp *app,
 void bongo_cat_preferences_face_rows(BongoCatApp *app,
     struct nk_context *context);
 
+/* 面捕预览窗 (类似 VTS): 把采集线程最近一帧画出来, 见 preferences_face_preview.c。 */
+bool bongo_cat_preferences_face_preview(BongoCatPreferences *value,
+    struct nk_context *context);
+void bongo_cat_preferences_face_preview_release(BongoCatPreferences *value);
+
 /* 「面捕」独立页 (侧栏第 4 项), 见 preferences_face_page.c。 */
 void bongo_cat_preferences_page_face(BongoCatPreferences *value,
     struct nk_context *context);

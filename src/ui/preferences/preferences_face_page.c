@@ -177,6 +177,9 @@ void bongo_cat_preferences_face_content(BongoCatApp *app,
         }
     }
 
+    /* 预览窗: 类似 VTS 的摄像头画面, 让用户确认"看到的确实是自己的脸" */
+    bongo_cat_preferences_face_preview(app->preferences, context);
+
     /* 手动检查更新: 自动检查每次会话只跑一次, 而且可能因为网络失败; 给用户一个重试入口 */
     if (ready) {
         char detail[128];

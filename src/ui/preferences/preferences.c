@@ -18,6 +18,7 @@
 #include "preferences_controls.h"
 #include "preferences_model_cover.h"
 #include "preferences_state.h"
+#include "preferences_internal.h"
 #include "ui_animation.h"
 #include "ui_catime.h"
 #include "ui_native_theme.h"
@@ -54,6 +55,9 @@ void bongo_cat_preferences_page_cache_clear(BongoCatPreferences *value,
     int previous_page, int next_page) {
     if (!value || previous_page == next_page) return;
     bool released = false;
+    /* 离开面捕页: 释放预览纹理 (它会跟着相机一直刷新, 不该常驻) */
+    if (previous_page == 3 && next_page != 3)
+        bongo_cat_preferences_face_preview_release(value);
     /* 下标 4 = 关于页 (侧栏加了面捕页之后从 3 挪到 4)。 */
     const int about_page = BONGO_CAT_PREFERENCES_PAGE_COUNT - 1;
     if (previous_page == about_page && next_page != about_page) {

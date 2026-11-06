@@ -57,6 +57,11 @@ bool bongo_cat_face_capture_root(BongoCatApp *app, char *output, size_t capacity
 bool bongo_cat_face_capture_install_blocking(BongoCatApp *app, int timeout_seconds);
 bool bongo_cat_face_capture_download(BongoCatApp *app);
 
+/* 预览帧 (固定 240x180 RGB24): 采集线程每 ~5 帧更新一次。
+   generation 用来判断"有没有新帧", 没拿到过帧时返回 false。 */
+bool bongo_cat_face_capture_preview(BongoCatFaceCapture *capture,
+    unsigned char *rgb, int width, int height, uint32_t *generation);
+
 /* 还在运行的采集线程数: detach 之后要等它归零才能重建 (换后端/换摄像头)。 */
 int bongo_cat_face_capture_active_threads(void);
 

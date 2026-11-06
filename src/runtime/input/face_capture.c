@@ -24,6 +24,10 @@
    组件实例 (组件内部是 DLL 级全局单例), 表现为"一开 GPU 推理就崩"。 */
 static atomic_int g_active_threads = 0;
 
+/* 由采集线程调用 (定义在后面): 缩一帧存进预览缓冲 */
+static void bongo_cat_face_capture_store_preview(BongoCatFaceCapture *capture,
+    const unsigned char *rgb, int width, int height, int pitch);
+
 int bongo_cat_face_capture_active_threads(void) {
     return atomic_load(&g_active_threads);
 }
@@ -54,6 +58,10 @@ struct BongoCatFaceCapture {
     uint32_t camera_ids[16];
     char camera_names[16][64];
     int camera_count;
+    /* 预览帧 (240x180 RGB24 + 代数): 采集线程每 ~5 帧写一次, 设置页据此刷纹理 */
+    unsigned char preview[240 * 180 * 3];
+    uint32_t preview_generation;
+    int preview_tick;
     atomic_uint camera_id;
     /* 快照: 写者持锁, 读者持锁拷贝 */
     BongoCatFaceSnapshot snapshot;
@@ -86,6 +94,11 @@ static bool capture_from_video(BongoCatFaceCapture *capture, const char *path,
             if (SDL_ReadIO(io, frame, frame_bytes) != frame_bytes) break;
         }
         const int r = capture->feed(frame, width, height, width * 3, &result);
+        if (++capture->preview_tick >= 5) {
+            capture->preview_tick = 0;
+            bongo_cat_face_capture_store_preview(capture, frame, width, height,
+                width * 3);
+        }
         SDL_LockMutex(capture->lock);
         if (r > 0) {
             capture->snapshot.frame = result;
@@ -112,6 +125,28 @@ static bool capture_from_video(BongoCatFaceCapture *capture, const char *path,
         free(capture);
     }
     return true;
+}
+
+
+/* 把一帧缩到 240x180 存起来 (最近邻): 预览窗只有 240 宽, 不值得做双线性。 */
+static void bongo_cat_face_capture_store_preview(BongoCatFaceCapture *capture,
+    const unsigned char *rgb, int width, int height, int pitch) {
+    if (!capture || !rgb || width <= 0 || height <= 0) return;
+    unsigned char scaled[240 * 180 * 3];
+    for (int y = 0; y < 180; ++y) {
+        const int sy = y * height / 180;
+        const unsigned char *row = rgb + (size_t)sy * (size_t)pitch;
+        for (int x = 0; x < 240; ++x) {
+            const int sx = x * width / 240;
+            const unsigned char *src = row + (size_t)sx * 3;
+            unsigned char *dst = scaled + ((size_t)y * 240 + (size_t)x) * 3;
+            dst[0] = src[0]; dst[1] = src[1]; dst[2] = src[2];
+        }
+    }
+    SDL_LockMutex(capture->lock);
+    memcpy(capture->preview, scaled, sizeof(scaled));
+    ++capture->preview_generation;
+    SDL_UnlockMutex(capture->lock);
 }
 
 static int capture_thread(void *userdata) {
@@ -207,6 +242,13 @@ static int capture_thread(void *userdata) {
         }
         const int result = capture->feed((const unsigned char *)surface->pixels,
             surface->w, surface->h, surface->pitch, &frame);
+        /* 每 5 帧 (~0.25 秒) 更新一次预览: 够连贯, 又不至于让 UI 每帧重传纹理 */
+        if (++capture->preview_tick >= 5) {
+            capture->preview_tick = 0;
+            bongo_cat_face_capture_store_preview(capture,
+                (const unsigned char *)surface->pixels, surface->w, surface->h,
+                surface->pitch);
+        }
         SDL_ReleaseCameraFrame(camera, surface);
         SDL_LockMutex(capture->lock);
         if (result > 0) {
@@ -438,4 +480,17 @@ int bongo_cat_face_capture_known_cameras(BongoCatFaceCapture *capture,
     }
     SDL_UnlockMutex(capture->lock);
     return written;
+}
+
+bool bongo_cat_face_capture_preview(BongoCatFaceCapture *capture,
+    unsigned char *rgb, int width, int height, uint32_t *generation) {
+    if (!capture || !rgb || !capture->lock) return false;
+    if (width != 240 || height != 180) return false;
+    SDL_LockMutex(capture->lock);
+    const uint32_t current = capture->preview_generation;
+    const bool has = current > 0;
+    if (has) memcpy(rgb, capture->preview, 240 * 180 * 3);
+    SDL_UnlockMutex(capture->lock);
+    if (generation) *generation = current;
+    return has;
 }
