@@ -306,9 +306,18 @@ void bongo_cat_preferences_face_content(BongoCatApp *app,
     }
     /* 摄像头选择: 枚举设备, 第一项是"系统默认"。切换后要重启采集线程。 */
     {
+        /* 枚举结果要缓存: SDL_GetCameras 每帧调一次既慢, 又可能和正在跑采集线程的
+           SDL 相机后端并发 (用户切摄像头时崩溃的嫌疑就是这个)。 */
         static uint32_t ids[16];
         static char names[16 * 64];
-        const int count = bongo_cat_face_capture_cameras(ids, names, 64, 16);
+        static int count = 0;
+        static Uint64 enumerated_at = 0;
+        const Uint64 now = SDL_GetTicks();
+        const bool stale = enumerated_at == 0 || now - enumerated_at > 5000;
+        if (stale && !app->face_capture) {   /* 采集线程在跑时不枚举, 避免并发 */
+            count = bongo_cat_face_capture_cameras(ids, names, 64, 16);
+            enumerated_at = now;
+        }
         if (count > 0) {
             static const char *items[17];
             static char labels[17][96];
