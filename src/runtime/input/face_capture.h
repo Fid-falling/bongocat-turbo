@@ -75,7 +75,12 @@ bool bongo_cat_face_capture_sync(BongoCatApp *app);
 void bongo_cat_face_capture_recalibrate(BongoCatFaceCapture *capture);
 bool bongo_cat_face_capture_has_recalibrate(const BongoCatFaceCapture *capture);
 
-/* 枚举摄像头: 返回个数 (<= capacity), ids/names 可为 NULL。names 每条 name_stride 字节。 */
+/* 采集线程记下来的设备列表 (不碰 SDL): 面捕运行中 UI 只能从这里拿, 不能自己枚举。 */
+int bongo_cat_face_capture_known_cameras(BongoCatFaceCapture *capture,
+    uint32_t *ids, char *names, int name_stride, int capacity);
+
+/* 枚举摄像头: 返回个数 (<= capacity), ids/names 可为 NULL。names 每条 name_stride 字节。
+   **只在没有采集线程运行时调用** (有线程时用 known_cameras)。 */
 int bongo_cat_face_capture_cameras(uint32_t *ids, char *names, int name_stride,
     int capacity);
 

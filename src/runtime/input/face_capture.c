@@ -49,6 +49,11 @@ struct BongoCatFaceCapture {
        (手机当摄像头时很常见: 手机一锁屏就没有新帧), 在主线程 join 会直接把界面卡死,
        用户看到的是"未响应"。见 stop() 的注释。 */
     atomic_bool orphan;
+    /* 采集线程枚举到的设备列表: UI 直接读这份, 避免在采集线程运行时再调 SDL_GetCameras
+       (枚举与"设备正被打开/推流"并发在 SDL 里没有保证, 之前切摄像头崩就栽在这)。 */
+    uint32_t camera_ids[16];
+    char camera_names[16][64];
+    int camera_count;
     atomic_uint camera_id;
     /* 快照: 写者持锁, 读者持锁拷贝 */
     BongoCatFaceSnapshot snapshot;
@@ -141,6 +146,20 @@ static int capture_thread(void *userdata) {
         return 0;
     }
     SDL_CameraID wanted = (SDL_CameraID)atomic_load(&capture->camera_id);
+    /* 顺手把设备列表记下来给 UI 用 */
+    {
+        int n = 0;
+        SDL_CameraID *devices = SDL_GetCameras(&n);
+        SDL_LockMutex(capture->lock);
+        capture->camera_count = 0;
+        for (int i = 0; i < n && i < 16; ++i) {
+            capture->camera_ids[i] = (uint32_t)devices[i];
+            snprintf(capture->camera_names[i], 64, "%s", SDL_GetCameraName(devices[i]));
+            capture->camera_count = i + 1;
+        }
+        SDL_UnlockMutex(capture->lock);
+        SDL_free(devices);
+    }
     /* 0 是"系统默认"的约定, 但 SDL_OpenCamera 不接受 0 —— 自己挑第一个可用设备。 */
     if (wanted == 0) {
         int count = 0;
@@ -402,5 +421,21 @@ int bongo_cat_face_capture_cameras(uint32_t *ids, char *names, int name_stride,
         ++written;
     }
     SDL_free(devices);
+    return written;
+}
+
+int bongo_cat_face_capture_known_cameras(BongoCatFaceCapture *capture,
+    uint32_t *ids, char *names, int name_stride, int capacity) {
+    if (!capture || !capture->lock) return 0;
+    SDL_LockMutex(capture->lock);
+    int written = 0;
+    for (int i = 0; i < capture->camera_count && written < capacity; ++i) {
+        if (ids) ids[written] = capture->camera_ids[i];
+        if (names && name_stride > 0)
+            snprintf(names + (size_t)written * (size_t)name_stride,
+                (size_t)name_stride, "%s", capture->camera_names[i]);
+        ++written;
+    }
+    SDL_UnlockMutex(capture->lock);
     return written;
 }

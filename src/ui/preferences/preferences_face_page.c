@@ -313,8 +313,11 @@ void bongo_cat_preferences_face_content(BongoCatApp *app,
         static int count = 0;
         static Uint64 enumerated_at = 0;
         const Uint64 now = SDL_GetTicks();
-        const bool stale = enumerated_at == 0 || now - enumerated_at > 5000;
-        if (stale && !app->face_capture) {   /* 采集线程在跑时不枚举, 避免并发 */
+        if (app->face_capture) {
+            /* 采集线程在跑: 只读它记下的设备列表, 绝不自己调 SDL_GetCameras */
+            count = bongo_cat_face_capture_known_cameras(app->face_capture, ids,
+                names, 64, 16);
+        } else if (enumerated_at == 0 || now - enumerated_at > 5000) {
             count = bongo_cat_face_capture_cameras(ids, names, 64, 16);
             enumerated_at = now;
         }
