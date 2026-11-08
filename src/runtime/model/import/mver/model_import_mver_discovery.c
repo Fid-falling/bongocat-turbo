@@ -10,6 +10,8 @@
 #include "model_import_mver_manifest.h"
 #include "model_import_mver.h"
 #include "model_import_path.h"
+
+#include <SDL3/SDL.h>
 #include "runtime.h"
 #include "bongo_cat/file.h"
 #include "bongo_cat/path.h"
@@ -110,9 +112,24 @@ static bool mode_uses_live2d(yyjson_val *mode) {
 /* 模式目录里必须"有且仅有一个" .model3.json（多于一个就无法确定要加载哪个变体），并且它要能过
    宽松的 Mver 清单校验（允许缺 Physics、Pose 等可选段落）。 */
 static bool model_at(const char *directory, char *setting, size_t capacity) {
-    return bongo_cat_path_find_unique_suffix(directory, ".model3.json",
-        setting, capacity) == 1 &&
-        bongo_cat_import_mver_manifest_valid(directory, setting);
+    const int count = bongo_cat_path_find_unique_suffix(directory, ".model3.json",
+        setting, capacity);
+    if (count == 0) return false;
+    if (count < 0) {
+        /* 目录里有多个 model3.json: 以前这里判为"无效"直接拒绝导入, 但实际打包工具
+           经常把同一个模型导出成两份 (cat.model3.json + <名字>.model3.json) 并放进
+           gallery 用的变体, 两份指向同一个 moc3。BongoCat 约定的主模型名是
+           cat.model3.json, 有就优先用它; 否则用扫描到的第一个, 并留一行日志。 */
+        char candidate[BONGO_CAT_PATH_CAP];
+        if (bongo_cat_path_join(candidate, sizeof(candidate), directory,
+                "cat.model3.json") && bongo_cat_path_is_file(candidate)) {
+            snprintf(setting, capacity, "cat.model3.json");
+        } else {
+            SDL_LogWarn(SDL_LOG_CATEGORY_APPLICATION,
+                "[import] 目录里有多个 model3.json, 选用 %s: %s", setting, directory);
+        }
+    }
+    return bongo_cat_import_mver_manifest_valid(directory, setting);
 }
 
 /* 清单先找 <mode>/cat_model，再退回模式目录本身（Mver 的两种常见布局）；directory 无论成败都会
