@@ -12,6 +12,18 @@ static const wchar_t capture_property[] = L"BongoCat.CaptureWindow";
 static bool removal_warning_emitted;
 static bool style_warning_emitted;
 #define BONGO_CAT_CAPTURE_REFRESH_TIMER ((UINT_PTR)0xBC51)
+/*
+ * 开机自启时的一次性刷新不够: 那会儿资源管理器可能还没把任务栏建好, 我们在它之前
+ * DeleteTab 等于空操作, 之后系统才给窗格加上按钮 —— 用户看到的就是"任务栏里多了一个猫的
+ * 窗口"。所以窗口每次显示后再连打 20 次 (每 500ms 一次, 共 10 秒), 覆盖资源管理器启动慢的
+ * 情况; 正常开机时头一两次就把它摘掉了, 后续几次是空转, 代价可以忽略。
+ */
+#define BONGO_CAT_CAPTURE_RETRY_TIMER ((UINT_PTR)0xBC52)
+#define BONGO_CAT_CAPTURE_RETRY_INTERVAL_MS 500
+#define BONGO_CAT_CAPTURE_RETRY_ATTEMPTS 20
+
+static unsigned capture_retry_left;
+static unsigned capture_retry_total;
 
 /* 用窗口属性(capture_property)标记"这个窗口被登记为采集源": 后面的样式事务、
    任务栏刷新、以及窗口过程里的消息分发都以它为准, 于是没登记过的窗口(设置窗口等)
@@ -110,6 +122,16 @@ static void refresh_taskbar(HWND window) {
     }
 }
 
+/* 显示之后的一段时间里持续重试 (见上面 RETRY 的说明)。幂等: 每次显示都重新计 20 次。 */
+static void start_taskbar_retry(HWND window) {
+    if (!window) return;
+    register_messages();
+    capture_retry_left = BONGO_CAT_CAPTURE_RETRY_ATTEMPTS;
+    capture_retry_total = 0;
+    SetTimer(window, BONGO_CAT_CAPTURE_RETRY_TIMER,
+        BONGO_CAT_CAPTURE_RETRY_INTERVAL_MS, NULL);
+}
+
 /* 立刻投递一次自定义消息, 同时起一个 250ms 的一次性定时器兜底: 资源管理器重启期间
    消息可能投不进去, 定时器保证最终还会再试一次。 */
 static void schedule_refresh(HWND window) {
@@ -185,6 +207,7 @@ bool bongo_cat_windows_capture_configure(HWND window) {
     }
     refresh_taskbar(window);
     schedule_refresh(window);
+    start_taskbar_retry(window);
     return ready;
 }
 
@@ -206,6 +229,15 @@ bool bongo_cat_windows_capture_handle_message(
         has_property(window, capture_property)) {
         KillTimer(window, BONGO_CAT_CAPTURE_REFRESH_TIMER);
         refresh_taskbar(window);
+        return true;
+    }
+    if (message == WM_TIMER && wparam == BONGO_CAT_CAPTURE_RETRY_TIMER &&
+        has_property(window, capture_property)) {
+        refresh_taskbar(window);
+        ++capture_retry_total;
+        if (capture_retry_left > 0) --capture_retry_left;
+        if (capture_retry_left == 0) KillTimer(window,
+            BONGO_CAT_CAPTURE_RETRY_TIMER);
         return true;
     }
     if (taskbar_created_message && message == taskbar_created_message) {
