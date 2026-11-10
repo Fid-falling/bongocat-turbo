@@ -12,18 +12,63 @@ static const wchar_t capture_property[] = L"BongoCat.CaptureWindow";
 static bool removal_warning_emitted;
 static bool style_warning_emitted;
 #define BONGO_CAT_CAPTURE_REFRESH_TIMER ((UINT_PTR)0xBC51)
-/*
- * 开机自启时的一次性刷新不够: 那会儿资源管理器可能还没把任务栏建好, 我们在它之前
- * DeleteTab 等于空操作, 之后系统才给窗格加上按钮 —— 用户看到的就是"任务栏里多了一个猫的
- * 窗口"。所以窗口每次显示后再连打 20 次 (每 500ms 一次, 共 10 秒), 覆盖资源管理器启动慢的
- * 情况; 正常开机时头一两次就把它摘掉了, 后续几次是空转, 代价可以忽略。
- */
-#define BONGO_CAT_CAPTURE_RETRY_TIMER ((UINT_PTR)0xBC52)
-#define BONGO_CAT_CAPTURE_RETRY_INTERVAL_MS 500
-#define BONGO_CAT_CAPTURE_RETRY_ATTEMPTS 20
 
-static unsigned capture_retry_left;
-static unsigned capture_retry_total;
+/*
+ * 开机自启时的任务栏问题: 为了能被 OBS 采集, 主窗口刻意不带 WS_EX_TOOLWINDOW, 系统因此会
+ * 给它建任务栏按钮, 我们靠 ITaskbarList::DeleteTab 摘掉。手动启动时资源管理器早已就绪, 一次
+ * 就干净; 开机自启时我们的进程常常比任务栏还早, DeleteTab 落在"按钮还没建出来"的空档上,
+ * 之后系统才加按钮 —— 任务栏里就多出一个猫的窗口。
+ *
+ * 所以这里不等固定时长, 而是**等资源管理器就绪的事件**:
+ *   1) 显示时资源管理器已经好了 (Shell_TrayWnd 存在) -> 直接摘一次, 不用监视;
+ *   2) 还没有 -> 挂一个 WinEvent 钩子盯 Shell_TrayWnd 的创建/显示, 任务栏一出现就摘按钮,
+ *      摘完立刻卸钩;
+ *   3) 资源管理器中途重启也会广播 TaskbarCreated (见消息分发), 那条路径照旧。
+ */
+static HWINEVENTHOOK taskbar_watch;
+static HWND watched_window;
+
+static bool taskbar_available(void) {
+    return FindWindowW(L"Shell_TrayWnd", NULL) != NULL;
+}
+
+static void refresh_taskbar_now(HWND window);
+
+/* 任务栏窗口出现时回调 (系统在拥有该窗口的线程的消息循环里调用我们)。 */
+static void CALLBACK taskbar_appeared(HWINEVENTHOOK hook, DWORD event, HWND window,
+    LONG object, LONG child, DWORD thread, DWORD time) {
+    (void)hook; (void)event; (void)object; (void)child; (void)thread; (void)time;
+    if (!window) return;
+    wchar_t name[64];
+    if (!GetClassNameW(window, name, (int)(sizeof(name) / sizeof(name[0])))) return;
+    /* 只认任务栏本体: 资源管理器里别的窗口冒出来不算就绪 */
+    if (wcscmp(name, L"Shell_TrayWnd") != 0) return;
+    UnhookWinEvent(taskbar_watch);
+    taskbar_watch = NULL;
+    refresh_taskbar_now(watched_window);
+}
+
+/* 资源管理器没就绪就挂钩子等它 (幂等); 已经就绪就直接摘按钮。 */
+static void await_taskbar_or_refresh(HWND window) {
+    if (!window) return;
+    if (taskbar_available()) {
+        refresh_taskbar_now(window);
+        return;
+    }
+    watched_window = window;
+    if (taskbar_watch) return;
+    taskbar_watch = SetWinEventHook(EVENT_OBJECT_CREATE, EVENT_OBJECT_SHOW, NULL,
+        taskbar_appeared, 0, 0, WINEVENT_OUTOFCONTEXT);
+}
+
+static void stop_taskbar_watch(void) {
+    if (taskbar_watch) {
+        UnhookWinEvent(taskbar_watch);
+        taskbar_watch = NULL;
+    }
+    watched_window = NULL;
+}
+
 
 /* 用窗口属性(capture_property)标记"这个窗口被登记为采集源": 后面的样式事务、
    任务栏刷新、以及窗口过程里的消息分发都以它为准, 于是没登记过的窗口(设置窗口等)
@@ -122,15 +167,11 @@ static void refresh_taskbar(HWND window) {
     }
 }
 
-/* 显示之后的一段时间里持续重试 (见上面 RETRY 的说明)。幂等: 每次显示都重新计 20 次。 */
-static void start_taskbar_retry(HWND window) {
-    if (!window) return;
-    register_messages();
-    capture_retry_left = BONGO_CAT_CAPTURE_RETRY_ATTEMPTS;
-    capture_retry_total = 0;
-    SetTimer(window, BONGO_CAT_CAPTURE_RETRY_TIMER,
-        BONGO_CAT_CAPTURE_RETRY_INTERVAL_MS, NULL);
+/* WinEvent 回调里用的同名入口 (前置声明在文件上方, 语义完全一样)。 */
+static void refresh_taskbar_now(HWND window) {
+    refresh_taskbar(window);
 }
+
 
 /* 立刻投递一次自定义消息, 同时起一个 250ms 的一次性定时器兜底: 资源管理器重启期间
    消息可能投不进去, 定时器保证最终还会再试一次。 */
@@ -207,8 +248,14 @@ bool bongo_cat_windows_capture_configure(HWND window) {
     }
     refresh_taskbar(window);
     schedule_refresh(window);
-    start_taskbar_retry(window);
+    /* 资源管理器已经就绪 -> 立刻摘; 还没就绪 -> 挂钩子等任务栏出现 (开机自启的时序) */
+    await_taskbar_or_refresh(window);
     return ready;
+}
+
+/* 卸载: 摘钩子。窗口销毁之后再回调会拿到失效的 HWND, 所以必须先卸。 */
+void bongo_cat_windows_capture_shutdown(void) {
+    stop_taskbar_watch();
 }
 
 /* 采集相关消息的分发。返回 true 表示消息已被吃掉, 调用方不要再交给原窗口过程。
@@ -231,20 +278,13 @@ bool bongo_cat_windows_capture_handle_message(
         refresh_taskbar(window);
         return true;
     }
-    if (message == WM_TIMER && wparam == BONGO_CAT_CAPTURE_RETRY_TIMER &&
-        has_property(window, capture_property)) {
-        refresh_taskbar(window);
-        ++capture_retry_total;
-        if (capture_retry_left > 0) --capture_retry_left;
-        if (capture_retry_left == 0) KillTimer(window,
-            BONGO_CAT_CAPTURE_RETRY_TIMER);
-        return true;
-    }
     if (taskbar_created_message && message == taskbar_created_message) {
         bool capture_window = has_property(window, capture_property);
         if (capture_window) {
             refresh_taskbar(window);
             schedule_refresh(window);
+            /* 资源管理器重启 = 任务栏刚重建: 这时候按钮可能又冒出来一次 */
+            await_taskbar_or_refresh(window);
         }
         bongo_cat_windows_capture_repair_transparency(window);
         return capture_window;

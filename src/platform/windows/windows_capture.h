@@ -30,6 +30,8 @@ bool bongo_cat_windows_capture_handle_transparency_message(
 void bongo_cat_windows_capture_log(HWND window, const char *stage);
 bool bongo_cat_windows_capture_handle_message(
     HWND window, UINT message, WPARAM wparam);
+/* 卸载时调用: 摘掉"等资源管理器就绪"的 WinEvent 钩子。 */
+void bongo_cat_windows_capture_shutdown(void);
 #endif
 
 #endif
