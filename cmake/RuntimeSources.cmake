@@ -169,6 +169,7 @@ set(BONGO_CAT_RUNTIME_MODEL_SOURCES
   src/runtime/model/model_catalog_refresh.c
   src/runtime/model/model_catalog_selection.c
   src/runtime/model/model_cover.c
+  src/runtime/model/model_preview.c
   src/runtime/model/model_cover_queue.c
   src/runtime/model/model_files.c
   src/runtime/model/model_geometry.c

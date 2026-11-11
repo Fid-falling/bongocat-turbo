@@ -16,6 +16,7 @@
 #include "bongo_cat/image.h"
 #include "bongo_cat/path.h"
 #include "bongo_cat/preferences.h"
+#include "../../runtime/model/model_preview.h"
 
 #include <SDL3/SDL_opengl.h>
 #include <stdio.h>
@@ -142,8 +143,10 @@ const BongoCatModelCover *bongo_cat_preferences_model_cover(
     BongoCatApp *app, const BongoCatModelEntry *entry,
     int pixel_width, int pixel_height) {
     char path[BONGO_CAT_PATH_CAP];
-    if (!bongo_cat_path_join(path, sizeof(path), entry->adapter_directory,
-        "resources/cover.png")) return NULL;
+    /* 没有 cover.png 的模型退回它自己的贴图 (轮盘用同一套兜底, 见 model_preview.c),
+       否则卡片上只有一个空占位图, 看起来像"模型没导入成功"。 */
+    if (!bongo_cat_model_preview_path(entry->adapter_directory, path,
+            sizeof(path))) return NULL;
     if (!bongo_cat_path_is_file(path)) {
         static char last_missing[BONGO_CAT_PATH_CAP];
         if (strcmp(last_missing, path)) {

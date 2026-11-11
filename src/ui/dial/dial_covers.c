@@ -11,6 +11,8 @@
  * 等比缩放到 44x40 的格子里", 不能直接拉伸。
  */
 #include "dial_internal.h"
+
+#include "../../runtime/model/model_preview.h"
 #include "bongo_cat/vk_backend.h"
 #include "bongo_cat/image.h"
 #include "bongo_cat/path.h"
@@ -31,8 +33,11 @@ void dial_covers_tick(Dial *d) {
         cover->attempted = true;
         const char *directory = d->labels->model_cover_directories ?
             d->labels->model_cover_directories[index] : NULL;
+        /* 没有 cover.png 的模型退回它自己的贴图 —— 否则轮盘上只剩一个通用图标,
+           用户看到的就是"我的模型没显示全"。 */
         char path[BONGO_CAT_PATH_CAP];
-        if (directory && bongo_cat_path_join(path,sizeof(path),directory,"resources/cover.png")) {
+        if (directory && bongo_cat_model_preview_path(directory, path,
+                sizeof(path))) {
             int width = 0, height = 0;
             BongoCatError ignored = {0};
             int pixels = (int)fminf(160,ceilf(44*d->scale*d->raster_scale*1.25f));
@@ -50,7 +55,8 @@ void dial_covers_tick(Dial *d) {
                     ? (unsigned int)dial_vk_texture_register(d, texture) : 0;
             }
         } else {
-        cover->texture = bongo_cat_image_texture_thumbnail(path,pixels,pixels,&width,&height,&ignored);
+        cover->texture = bongo_cat_image_texture_thumbnail(path,pixels,pixels,&width,&height,&ignored);
+
         }
             if (cover->texture && width > 0 && height > 0) {
                 float fit = fminf(44.0f/(float)width,40.0f/(float)height);
