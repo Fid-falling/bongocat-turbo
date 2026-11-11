@@ -81,8 +81,18 @@ float dial_child_ring_radius(int ring) {
  * 这个值同时决定扇形的宽度, 所以它一变 dial_child_paths 就会重建几何 (见那边的缓存键)。
  */
 float dial_child_step(const Dial *d) {
-    /* Preserve HTML spacing; large real catalogs use pages to avoid overlap. */
-    return d->active == 4 || d->active == 5 || dial_child_count(d) > 11 ? .32f : .50f;
+    /* 项少时保持"贴着父扇形铺开"的扇形布局 (0.5 / 0.32 两档);
+       项多了(>=10)就改成绕整圈均分 —— 否则 13 项只铺 238 度, 剩下那一大片空着, 看着像
+       "有几个格子没画出来"。均分后首尾都落在父扇形两侧, 仍然是对称的。 */
+    const int count = dial_child_count(d);
+    /* 按"每圈几个"算, 不是按总数: 分了两圈时每圈最多 16 个, 用总数除会把每圈都挤在一边。 */
+    const int per_ring = count > DIAL_PAGE ? DIAL_PAGE : count;
+    float step = d->active == 4 || d->active == 5 || count > 11 ? .32f : .50f;
+    if (per_ring >= 10) {
+        const float even = 2.0f * DIAL_PI / (float)per_ring;
+        if (even > step) step = even;
+    }
+    return step;
 }
 
 /*
