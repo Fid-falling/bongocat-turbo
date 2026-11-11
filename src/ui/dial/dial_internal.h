@@ -91,7 +91,9 @@ typedef struct DialPaint {
     struct nk_font_atlas atlas;
     struct nk_font *font;
     nk_rune *ranges[4];
-    DialPath roots[DIAL_ROOTS], children[DIAL_PAGE];
+    /* children 要按"所有圈的总容量"开: 现在子项可以排到 3 圈 (DIAL_PAGE*DIAL_RINGS), 只开
+       DIAL_PAGE 会在画第二圈时越界写。 */
+    DialPath roots[DIAL_ROOTS], children[DIAL_PAGE * DIAL_RINGS];
     int child_path_count, child_path_active, child_path_roots;
     float child_path_step;
     float zoom, offset_x, offset_y, alpha;
