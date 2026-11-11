@@ -146,8 +146,10 @@ void dial_child_paths(Dial *d) {
         p->child_path_roots == d->count && p->child_path_step == step) return;
     memset(d->paint.children, 0, sizeof(d->paint.children));
     for (int i = 0; i < count; ++i) {
+        const int ring = dial_child_ring(i);
         float angle = dial_child_angle(d,i), half = dial_child_step(d)/2;
-        dial_sector(&d->paint.children[i],198,262,angle-half,angle+half);
+        dial_sector(&d->paint.children[i], dial_child_ring_inner(ring),
+            dial_child_ring_outer(ring), angle-half, angle+half);
     }
     p->child_path_count = count;
     p->child_path_active = d->active;
@@ -176,8 +178,15 @@ static float angle_distance(float a, float b) {
 void dial_hit(Dial *d, float x, float y, int *root, int *child) {
     float radius = hypotf(x, y), angle = atan2f(y, x);
     *root = -1; *child = -1;
-    if (d->active >= 0 && radius >= 190 && radius <= 277) {
+    const float child_radius_max =
+        277.0f + (float)(DIAL_RINGS - 1) * DIAL_CHILD_GAP;
+    if (d->active >= 0 && radius >= 190 && radius <= child_radius_max) {
+        /* 先按半径定位在哪一圈 (每圈之间留一点容错), 再在圈内按角度找 */
+        int ring = (int)((radius - 190.0f) / DIAL_CHILD_GAP);
+        if (ring < 0) ring = 0;
+        if (ring >= DIAL_RINGS) ring = DIAL_RINGS - 1;
         for (int i = 0; i < dial_child_count(d); ++i) {
+            if (dial_child_ring(i) != ring) continue;
             if (fabsf(angle_distance(angle, dial_child_angle(d, i))) <
                 dial_child_step(d) / 2) {
                 *root = d->active; *child = i; return;

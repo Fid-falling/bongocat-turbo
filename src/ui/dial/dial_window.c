@@ -70,7 +70,19 @@ bool dial_window_create(Dial *d) {
     bongo_cat_ui_query_window_scale(d->owner,&layout,NULL);
     SDL_Rect bounds;
     if (!SDL_GetDisplayUsableBounds(SDL_GetDisplayForWindow(d->owner),&bounds)) return false;
-    float side = fminf(608*740.0f/560*layout,.96f*(float)SDL_min(bounds.w,bounds.h));
+    /* 需要几圈: 取所有根项里子项最多的那个 (超过三圈也只显示三圈, 见 dial_items.c)。 */
+    int rings = 1;
+    for (int i = 0; i < d->count; ++i) {
+        const int needed = ((int)d->items[i].children + DIAL_PAGE - 1) / DIAL_PAGE;
+        const int clamped = needed < 1 ? 1 : (needed > DIAL_RINGS ? DIAL_RINGS : needed);
+        if (clamped > rings) rings = clamped;
+    }
+    /* 设计基准 = 最外圈的外半径 * 2 + 边距; 圈越多窗口越大, 否则外面那几圈会被裁掉。 */
+    const float design = 2.0f * (dial_child_ring_outer(rings - 1) + 24.0f);
+    d->design_extent = design;
+    /* 1.32 是原来的"留白比例" (608 的设计基准配 803 的窗口), 保持不变才有一致的手感;
+       圈数多到超出屏幕时靠 .96 的上限夹住, 缩放会自己变小。 */
+    float side = fminf(design * 1.32f * layout, .96f*(float)SDL_min(bounds.w,bounds.h));
     int size = (int)ceilf(side);
     if (size < 1) return false;
     float x = 0, y = 0;
@@ -164,7 +176,8 @@ bool dial_window_create(Dial *d) {
     if (!SDL_GetWindowSize(d->window,&d->width,&d->height) ||
         !SDL_GetWindowSizeInPixels(d->window,&d->pixel_width,&d->pixel_height) ||
         d->width < 1 || d->height < 1) return false;
-    d->scale = (float)SDL_min(d->width,d->height)/608;
+    d->scale = (float)SDL_min(d->width,d->height) /
+        (d->design_extent > 0 ? d->design_extent : 608);
     d->raster_scale = (float)d->pixel_width/(float)d->width;
     /* 轮盘按窗口坐标布局, 这一行把逻辑/像素/窗口尺寸一起打出来好对账 */
     bongo_cat_ui_log_scale("轮盘", d->window);

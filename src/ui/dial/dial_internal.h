@@ -29,7 +29,13 @@
  * 调大就会同时增加内存与顶点数。
  */
 #define DIAL_PI 3.14159265358979323846f
+/* 子项不再是"一页 16 个", 而是按圈排: 第一圈满了就往外面再开一圈 (最多 DIAL_RINGS 圈)。
+   每圈的槽位数仍然是 DIAL_PAGE —— 角度分布、命中判定、翻页残留逻辑都按它算。 */
 #define DIAL_PAGE 16
+#define DIAL_RINGS 3
+#define DIAL_CHILD_INNER 198.0f
+#define DIAL_CHILD_OUTER 262.0f
+#define DIAL_CHILD_GAP 70.0f
 #define DIAL_ROOTS 12
 #define DIAL_REVEAL_DELAY_MS 22
 #define DIAL_REVEAL_DURATION_MS 360
@@ -173,6 +179,9 @@ typedef struct Dial {
     BongoCatMenuAction result, preview;
     int width, height, pixel_width, pixel_height;
     float scale, opening, lift[DIAL_ROOTS], raster_scale;
+    /* 设计基准 (设计坐标系的边长): 一圈菜单是 608, 每多一圈就变大一圈, 见 dial_window.c。
+       0 表示按默认 608 处理。 */
+    float design_extent;
     uint64_t opened_at, changed_at, animation_at;
     SDL_Event events[128];
     /*
@@ -194,6 +203,11 @@ void dial_items(Dial *d);
 bool dial_window_create(Dial *d);
 bool SDLCALL dial_collect_event(void *userdata, SDL_Event *event);
 int dial_child_count(const Dial *d);
+/* 第 index 个子项落在第几圈 (0 起), 以及那一圈的半径区间。 */
+int dial_child_ring(int index);
+float dial_child_ring_inner(int ring);
+float dial_child_ring_outer(int ring);
+float dial_child_ring_radius(int ring);
 float dial_child_angle(const Dial *d, int index);
 float dial_child_step(const Dial *d);
 DialItem dial_child_item(const Dial *d, int index, char *text, size_t capacity);

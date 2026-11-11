@@ -57,8 +57,11 @@ static void activate(Dial *d) {
  * 用户已经看不到的效果。
  */
 static void page(Dial *d, int direction) {
-    if (d->active < 0 || d->items[d->active].children <= DIAL_PAGE) return;
-    int pages = ((int)d->items[d->active].children+DIAL_PAGE-1)/DIAL_PAGE;
+    /* 只有子项超过"所有圈的总容量"时才需要翻页 (目前容量 3x16, 基本用不到)。 */
+    if (d->active < 0 || d->items[d->active].children <= DIAL_PAGE * DIAL_RINGS)
+        return;
+    int pages = ((int)d->items[d->active].children +
+        DIAL_PAGE * DIAL_RINGS - 1) / (DIAL_PAGE * DIAL_RINGS);
     d->page = (d->page+direction+pages)%pages;
     d->child = -1;
     if (d->preview != BONGO_CAT_MENU_NONE) dial_preview(d,BONGO_CAT_MENU_NONE);
@@ -203,7 +206,8 @@ void dial_event(Dial *d, const SDL_Event *e) {
         if (!SDL_GetWindowSize(d->window,&d->width,&d->height) ||
             !SDL_GetWindowSizeInPixels(d->window,&d->pixel_width,&d->pixel_height) ||
             d->width < 1 || d->height < 1) { d->done = true; break; }
-        d->scale = (float)SDL_min(d->width,d->height)/608.0f;
+        d->scale = (float)SDL_min(d->width,d->height) /
+        (d->design_extent > 0 ? d->design_extent : 608.0f);
         d->raster_scale = (float)d->pixel_width/(float)d->width;
         /* SDL also sends DISPLAY_SCALE_CHANGED during window creation.
            Keep the menu open; existing textures remain valid and new covers

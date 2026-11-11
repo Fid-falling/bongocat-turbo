@@ -45,8 +45,34 @@ void dial_items(Dial *d) {
 /* 当前页里有几个子项: 总数减去已翻过的页, 再夹到一页的上限 DIAL_PAGE */
 int dial_child_count(const Dial *d) {
     if (d->active < 0) return 0;
-    int remaining = (int)d->items[d->active].children - d->page * DIAL_PAGE;
-    return remaining < 0 ? 0 : (remaining > DIAL_PAGE ? DIAL_PAGE : remaining);
+    /* 一圈 DIAL_PAGE 个, 放不下就往外再开一圈 (最多 DIAL_RINGS 圈), 不再翻页。 */
+    const int remaining = (int)d->items[d->active].children;
+    const int capacity = DIAL_PAGE * DIAL_RINGS;
+    if (remaining <= 0) return 0;
+    return remaining > capacity ? capacity : remaining;
+}
+
+/* 圈号夹紧 (注意: 这里的参数是圈号, 不是子项下标)。 */
+static int clamp_ring(int ring) {
+    return ring < 0 ? 0 : (ring >= DIAL_RINGS ? DIAL_RINGS - 1 : ring);
+}
+
+/* 第 index 个子项在第几圈 (0 起)。 */
+int dial_child_ring(int index) {
+    return clamp_ring(index / DIAL_PAGE);
+}
+
+float dial_child_ring_inner(int ring) {
+    return DIAL_CHILD_INNER + (float)clamp_ring(ring) * DIAL_CHILD_GAP;
+}
+
+float dial_child_ring_outer(int ring) {
+    return DIAL_CHILD_OUTER + (float)clamp_ring(ring) * DIAL_CHILD_GAP;
+}
+
+/* 图标/文字的落点半径: 落在那一圈的扇环中间。 */
+float dial_child_ring_radius(int ring) {
+    return (dial_child_ring_inner(ring) + dial_child_ring_outer(ring)) * 0.5f;
 }
 
 /*
@@ -64,13 +90,21 @@ float dial_child_step(const Dial *d) {
  * 不会绕到菜单另一边去。
  */
 float dial_child_angle(const Dial *d, int index) {
+    /* 圈内序号决定角度: 每圈都从同一个角度区间铺开, 所以第二圈会像"外面再长一圈馕"。
+       圈内项数按实际有的算, 一圈没铺满时仍然居中。 */
+    const int ring = dial_child_ring(index);
+    const int within = index - ring * DIAL_PAGE;
+    const int total = dial_child_count(d);
+    int in_ring = total - ring * DIAL_PAGE;
+    if (in_ring > DIAL_PAGE) in_ring = DIAL_PAGE;
+    if (in_ring < 1) in_ring = 1;
     return -DIAL_PI / 2 + d->active * 2 * DIAL_PI / d->count +
-        (index - (dial_child_count(d) - 1) / 2.0f) * dial_child_step(d);
+        ((float)within - (float)(in_ring - 1) / 2.0f) * dial_child_step(d);
 }
 
 /*
  * 现场生成第 child 个子项 (从根项的模板复制过来再改写)。
- * i 是**全局**下标 (d->page*DIAL_PAGE + child), 因为命令值也是按全局顺序排的; 但
+ * i 是**全局**下标 (即 child), 因为命令值也是按全局顺序排的; 但
  * 标签数组 (motion_names 等) 也是按全局下标索引的, 两者必须一致。
  * 每个分支负责三件事: 设置标签 (可能需要 snprintf 到调用方的 text 里)、算出命令值、
  * 以及标出 checked (与 labels 里的当前状态比对)。
@@ -81,7 +115,7 @@ DialItem dial_child_item(const Dial *d, int child, char *text, size_t capacity) 
     DialItem item = {0};
     if (child < 0 || child >= dial_child_count(d)) return item;
     const BongoCatMenuLabels *l = d->labels;
-    size_t i = (size_t)(d->page * DIAL_PAGE + child);
+    const size_t i = (size_t)child;   /* 分页已取消: 子项下标就是 index */
     item = d->items[d->active];
     item.children = 0;
     switch (d->active) {

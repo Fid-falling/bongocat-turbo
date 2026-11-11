@@ -26,7 +26,7 @@
 void dial_covers_tick(Dial *d) {
     if (d->active != 9) return;
     for (int i = 0; i < dial_child_count(d); ++i) {
-        size_t index = (size_t)(d->page*DIAL_PAGE+i);
+        size_t index = (size_t)i;
         if (index >= d->labels->model_count || index >= BONGO_CAT_MODEL_CAP) continue;
         DialCover *cover = &d->covers[index];
         if (cover->attempted) continue;
@@ -74,7 +74,7 @@ bool dial_cover_draw(Dial *d, int child, float x, float y, float opacity) {
  * 画一个子项的封面; 没有封面就退回通用图标。返回 true 表示"这个子项已经画过了",
  * 调用方 (dial_scene) 据此跳过文字 —— 有封面的项不再叠标签, 否则会糊成一团。
  */
-    size_t index = (size_t)(d->page*DIAL_PAGE+child);
+    size_t index = (size_t)child;
     if (index >= d->labels->model_count || index >= BONGO_CAT_MODEL_CAP) return false;
     DialCover *cover = &d->covers[index];
     uint32_t color = 0xffffff | ((uint32_t)(255*opacity)<<24);

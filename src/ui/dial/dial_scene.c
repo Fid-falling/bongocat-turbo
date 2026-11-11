@@ -191,9 +191,10 @@ static void center(Dial *d) {
     if (!child_hovered)
         dial_icon(d, item_icon(item), 0, -5, 38, item.checked ? 0xfff77daa : item.color);
     text(d, label, 0, child_hovered ? 0.0f : 30.0f, 140, true, color);
-    if (item.children > DIAL_PAGE) {
+    if (item.children > DIAL_PAGE * DIAL_RINGS) {
         snprintf(buffer, sizeof(buffer), "%d / %d", d->page + 1,
-            ((int)item.children + DIAL_PAGE - 1) / DIAL_PAGE);
+            ((int)item.children + DIAL_PAGE * DIAL_RINGS - 1) /
+            (DIAL_PAGE * DIAL_RINGS));
         text(d, buffer, 0, 58, 80, false, color);
     }
 }
@@ -210,7 +211,9 @@ static void children(Dial *d, uint64_t now) {
     for (int i = 0; i < dial_child_count(d); ++i) {
         /* Child indices increase with screen angle, so this reveals clockwise. */
         float ease = reveal(now, d->changed_at, i);
-        float angle = dial_child_angle(d, i), x = 230 * cosf(angle), y = 230 * sinf(angle);
+        const float radius = dial_child_ring_radius(dial_child_ring(i));
+        float angle = dial_child_angle(d, i), x = radius * cosf(angle),
+            y = radius * sinf(angle);
         bool hover = i == d->child;
         float zoom = .72f + .28f * ease + (hover ? .06f : 0);
         float pull = -26 * (1 - ease) + (hover ? 6 : 0);
